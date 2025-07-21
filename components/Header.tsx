@@ -1,4 +1,4 @@
-import { getCategories } from "@/lib/loaders/getCategories";
+import { getCategories } from "@/lib/loaders/categories";
 import HeaderClient from "./HeaderClient";
 
 export default async function Header() {
