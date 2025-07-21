@@ -1,4 +1,9 @@
-export default function HomePage() {
+import ProductCard from "@/components/ProductCard";
+import { getProductsByCategory } from "@/lib/loaders/products";
+
+export default async function HomePage() {
+  const featuredProducts = (await getProductsByCategory("featured")).slice(0, 3);
+
   return (
     <main className="bg-neutral-900 text-white min-h-screen px-6 sm:px-12 py-16">
       <section className="max-w-6xl mx-auto text-center mb-20">
@@ -15,24 +20,15 @@ export default function HomePage() {
       </section>
 
       <section className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
-        {[1, 2, 3].map((item) => (
-          <div
-            key={item}
-            className="bg-neutral-800 rounded-lg overflow-hidden shadow hover:shadow-lg transition"
-          >
-            <div className="aspect-video bg-neutral-700 flex items-center justify-center text-gray-500 text-xl">
-              Image
-            </div>
-            <div className="p-4">
-              <h3 className="text-xl font-semibold mb-2">Voltique Item #{item}</h3>
-              <p className="text-gray-400 text-sm mb-4">
-                Premium electric performance. Built for the extremes.
-              </p>
-              <button className="text-orange-500 hover:underline text-sm font-medium">
-                Learn more →
-              </button>
-            </div>
-          </div>
+         {featuredProducts.map((product) => (
+          <ProductCard
+            key={product.id}
+            id={product.id}
+            name={product.name}
+            slug={product.slug}
+            description={product.description ?? undefined}
+            primaryImageUrl={product.primaryImageUrl} // or use a sample image URL here
+          />
         ))}
       </section>
     </main>
