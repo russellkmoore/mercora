@@ -1,14 +1,9 @@
 import { getCategoryBySlug } from "@/lib/loaders/categories";
 import { getProductsByCategory } from "@/lib/loaders/products";
-import ProductCard from "@/components/ProductCard";
-import Image from "next/image";
 import { notFound } from "next/navigation";
+import CategoryDisplay from "./CategoryDisplay";
+import Image from "next/image";
 
-interface CategoryPageProps {
-  params: {
-    slug: string;
-  };
-}
 
 export default async function CategoryPage({ params }: any) {
   const category = await getCategoryBySlug(params.slug);
@@ -16,8 +11,16 @@ export default async function CategoryPage({ params }: any) {
 
   const products = await getProductsByCategory(params.slug);
 
+  // Ensure onSale and active are boolean, not null, and description is string or undefined
+  const normalizedProducts = products.map((product) => ({
+    ...product,
+    onSale: product.onSale ?? false,
+    active: product.active ?? false,
+    description: product.description ?? undefined,
+  }));
+
   return (
-    <main className="bg-neutral-900 text-white min-h-screen px-6 sm:px-12 py-16">
+     <main className="bg-neutral-900 text-white min-h-screen px-6 sm:px-12 py-16">
       <div className="max-w-6xl mx-auto mb-12">
         <div className="relative w-full h-96 mb-6 rounded overflow-hidden">
           {category.heroImageUrl && (
@@ -43,25 +46,7 @@ export default async function CategoryPage({ params }: any) {
         <p className="text-gray-400 mb-10">{category.description ?? ""}</p>
       </div>
 
-      <section className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
-        { products.length > 0 ?
-          ( products.map((product) => (
-            <ProductCard
-              key={product.id}
-              id={product.id}
-              name={product.name}
-              slug={product.slug}
-              description={product.description ?? ""}
-              primaryImageUrl={product.primaryImageUrl}
-            />
-          ))):
-          (
-            <div className="col-span-1 sm:col-span-2 lg:col-span-3 text-center text-gray-400">
-              No products found in this category.
-            </div>
-          )
-        }
-      </section>
+    <CategoryDisplay initialProducts={normalizedProducts} />
     </main>
   );
 }

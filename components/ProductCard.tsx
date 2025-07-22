@@ -1,53 +1,81 @@
-// components/ProductCard.tsx
-import Image from "next/image";
-import Link from "next/link";
+'use client';
 
-export interface ProductCardProps {
+import Link from 'next/link';
+import Image from 'next/image';
+
+interface ProductCardProps {
   id: number;
   name: string;
   slug: string;
   description?: string;
   primaryImageUrl?: string | null;
+  price: number | null;
+  salePrice: number | null;
+  onSale?: boolean;
+  availability: string; // 'available' or 'coming_soon'
 }
 
 export default function ProductCard({
-  id,
   name,
   slug,
   description,
   primaryImageUrl,
+  price,
+  salePrice,
+  onSale,
+  availability
 }: ProductCardProps) {
   return (
-    <div className="bg-neutral-800 rounded-lg overflow-hidden shadow hover:shadow-lg transition">
-      <div className="aspect-video bg-neutral-700 relative">
-        <Link href={`/product/${slug}`} className="block relative aspect-video">
+    <Link href={`/product/${slug}`}>
+      <div className="bg-neutral-800 rounded-lg overflow-hidden shadow hover:shadow-lg transition cursor-pointer">
+        <div className="relative aspect-video bg-neutral-700">
           {primaryImageUrl ? (
             <Image
-              src={`${primaryImageUrl.replace(/^\/+/, '')}`}
+              src={`/${primaryImageUrl}`}
               alt={name}
-              fill
+              layout="fill"
               objectFit="cover"
-              className="rounded-sm"
-              />
+              className="object-cover"
+            />
           ) : (
             <div className="flex items-center justify-center h-full text-gray-500 text-xl">
               No Image
             </div>
           )}
-        </Link>
+        </div>
+        <div className="p-4">
+          <h3 className="text-xl font-semibold mb-2">{name}</h3>
+          <p className="text-gray-400 text-sm mb-2">{description}</p>
+          {price !== null && (
+            <div className="text-sm">
+              {onSale && salePrice ? (
+                <div className="text-green-400">
+                  <span className="line-through text-gray-400 mr-2">
+                    ${(price / 100).toFixed(2)}
+                  </span>
+                  <span className="font-semibold">
+                    ${(salePrice / 100).toFixed(2)}
+                  </span>
+                  <span className="ml-2 text-xs text-orange-500 font-bold">
+                    On Sale
+                  </span>
+                </div>
+              ) : (
+                <div className="text-white font-semibold">
+                  ${(price / 100).toFixed(2)}
+                </div>
+              )}
+            </div>
+          )}
+          <p className={`mt-2 text-xs ${availability === 'available' ? 'text-green-400' : 'text-orange-500'}`}>
+            {availability === 'available' ? 'In Stock' : 'Coming Soon'}
+          </p>
+
+          <a href={`/product/${slug}`} className="text-orange-500 hover:underline text-sm font-medium">
+            Learn more →
+          </a>
+        </div>
       </div>
-      <div className="p-4">
-        <h3 className="text-xl font-semibold mb-2">{name}</h3>
-        {description && (
-          <p className="text-gray-400 text-sm mb-4">{description}</p>
-        )}
-        <a
-          href={`/product/${slug}`}
-          className="text-orange-500 hover:underline text-sm font-medium"
-        >
-          Learn more →
-        </a>
-      </div>
-    </div>
+    </Link>
   );
 }
