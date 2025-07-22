@@ -45,7 +45,7 @@ export default function ProductCard({
         </div>
         <div className="p-4">
           <h3 className="text-xl font-semibold mb-2">{name}</h3>
-          <p className="text-gray-400 text-sm mb-2">{description}</p>
+          <p className="text-gray-400 text-sm mb-2 line-clamp-3">{description}</p>
           {price !== null && (
             <div className="text-sm">
               {onSale && salePrice ? (
