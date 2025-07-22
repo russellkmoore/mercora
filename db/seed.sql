@@ -221,3 +221,5 @@ INSERT INTO product_inventory (product_id, quantity_in_stock) VALUES
   (28, 27),
   (29, 4),
   (30, 23);
+
+  INSERT INTO product_images (id, product_id, image_url) VALUES (1, 1, 'products/dusty-fire-tool-1a.png'), (2, 1, 'products/dusty-fire-tool-1b.png'), (3, 1, 'products/dusty-fire-tool-1c.png')

@@ -30,13 +30,15 @@ export default function HeaderClient({
       </Link>
 
       <div className="flex gap-4 items-center">
-        <Button
-          variant="ghost"
-          className="text-white hover:bg-white hover:text-orange-500 bg-black"
-        >
-          <Home className="mr-2 h-4 w-4" />
-          Home
-        </Button>
+        <Link href="/" passHref>
+          <Button 
+            variant="ghost"
+            className="text-white hover:bg-white hover:text-orange-500 bg-black"
+          >
+            <Home className="mr-2 h-4 w-4" />
+            Home
+          </Button>
+        </Link>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
