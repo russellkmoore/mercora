@@ -4,6 +4,10 @@ import {
   products,
   productCategories,
   categories,
+  productPrices,
+  productSalePrices,
+  productInventory,
+  productImages,
 } from "@/db/schema/product";
 
 export async function getProductsByCategory(categorySlug: string) {
@@ -26,7 +30,43 @@ export async function getProductsByCategory(categorySlug: string) {
 
 export async function getProductBySlug(slug: string) {
   const db = await getDbAsync();
-  return db.query.products.findFirst({
-    where: (product, { eq }) => eq(product.slug, slug),
-  });
+
+  const [product] = await db
+    .select()
+    .from(products)
+    .where(eq(products.slug, slug));
+
+  if (!product) return null;
+
+  const [price] = await db
+    .select()
+    .from(productPrices)
+    .where(eq(productPrices.productId, product.id));
+
+  const [salePrice] = await db
+    .select()
+    .from(productSalePrices)
+    .where(eq(productSalePrices.productId, product.id));
+
+  const [inventory] = await db
+    .select()
+    .from(productInventory)
+    .where(eq(productInventory.productId, product.id));
+
+  const images = await db
+  .select({
+    imageUrl: productImages.imageUrl
+  })
+  .from(productImages)
+  .where(eq(productImages.productId, product.id));
+  console.log("Fetched images:", images);
+
+  return {
+    ...product,
+    price: price?.price ?? null,
+    salePrice: salePrice?.sale_price ?? null,
+    quantityInStock: inventory?.quantityInStock ?? 0,
+    images: images.map(img => img.imageUrl),
+  };
 }
+

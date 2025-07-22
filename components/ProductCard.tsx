@@ -1,5 +1,6 @@
 // components/ProductCard.tsx
 import Image from "next/image";
+import Link from "next/link";
 
 export interface ProductCardProps {
   id: number;
@@ -19,19 +20,21 @@ export default function ProductCard({
   return (
     <div className="bg-neutral-800 rounded-lg overflow-hidden shadow hover:shadow-lg transition">
       <div className="aspect-video bg-neutral-700 relative">
-        {primaryImageUrl ? (
-          <Image
-            src={`${primaryImageUrl.replace(/^\/+/, '')}`}
-            alt={name}
-            fill
-            objectFit="cover"
-            className="rounded-sm"
-            />
-        ) : (
-          <div className="flex items-center justify-center h-full text-gray-500 text-xl">
-            No Image
-          </div>
-        )}
+        <Link href={`/product/${slug}`} className="block relative aspect-video">
+          {primaryImageUrl ? (
+            <Image
+              src={`${primaryImageUrl.replace(/^\/+/, '')}`}
+              alt={name}
+              fill
+              objectFit="cover"
+              className="rounded-sm"
+              />
+          ) : (
+            <div className="flex items-center justify-center h-full text-gray-500 text-xl">
+              No Image
+            </div>
+          )}
+        </Link>
       </div>
       <div className="p-4">
         <h3 className="text-xl font-semibold mb-2">{name}</h3>
