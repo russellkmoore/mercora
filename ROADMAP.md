@@ -10,110 +10,100 @@
 - D1-based product and category schema
 - Server-side rendering with Next.js
 
-## 🟧 In Progress / Immediate Next Tasks
+## 🟧 In Progress / Immediate Tasks
 
 ### UI/UX
 - [ ] Finalize styling and responsiveness of sort toggles
 - [ ] Add mini cart drawer (design and functionality)
-- [ ] Add dynamic recommendations section ("You May Also Like")
+- [ ] Add dynamic recommendations section (initially static)
 - [ ] Improve product description UX (truncate + expand)
 
 ### Product Data
 - [ ] Fill in real product descriptions
 - [ ] Standardize image naming / alt text for SEO
-- [ ] Begin tagging products for AI-based recommendations
 
 ### Dev/Docs
-- [ ] Add `ROADMAP.md` and keep it updated
-- [ ] Create `README.md` for project setup and deploy
-- [ ] Document product schema and R2 upload guidelines
-- [ ] Add local dev + deploy instructions
-- [ ] Add CONTRIBUTING.md (for future public collaboration)
+- [ ] Add `ROADMAP.md`
+- [ ] Create `README.md` with setup and deploy instructions
+- [ ] Document schema, media management, and deployment steps
 
 ---
 
 ## 🟥 Phase 1 – MVP Must Haves
 
-### 🧾 EPIC: Authentication
+### EPIC 1: Authentication
 - [ ] Add user authentication (Clerk or Auth.js)
 - [ ] Create user profile pages
 - [ ] Middleware for protected routes
 - [ ] Role-based access (admin vs. customer)
 
-### 🛒 EPIC: Shopping Cart & Checkout
-- [ ] Cart schema and persistence (local + server)
-- [ ] Cart drawer UI
-- [ ] Quantity update / remove item support
-- [ ] Checkout form (shipping + billing)
-- [ ] Convert cart to order + order confirmation
+### EPIC 2: Shopping Cart & Checkout
+- [ ] Cart schema (persistent + guest)
+- [ ] Cart UI (drawer, update, remove)
+- [ ] Checkout flow (shipping, billing, confirmation)
+- [ ] Convert cart to order + clear cart
 
 ---
 
 ## 🟨 Phase 2 – Payments & Orders
 
-### 💳 EPIC: Payment Integration
-- [ ] Integrate Stripe (via Cloudflare-compatible SDK)
-- [ ] Handle payment intents, 3DS, webhooks
-- [ ] Store minimal tokens, PCI-safe
+### EPIC 3: Payment Integration
+- [ ] Integrate Stripe (Cloudflare compatible)
+- [ ] Support for 3D Secure and webhooks
+- [ ] Secure token handling
 
-### 📦 EPIC: Order Management
-- [ ] Orders schema (orders + order items)
-- [ ] Inventory decrement on order
-- [ ] Order status tracking
-- [ ] User order history UI
+### EPIC 4: Order Management
+- [ ] Orders schema (orders + items)
+- [ ] Inventory deduction + stock handling
+- [ ] User order history + status tracking
 
 ---
 
-## 🟩 Phase 3 – Admin & Ops
+## 🟩 Phase 3 – Admin & Operations
 
-### 🛠️ EPIC: Admin Dashboard
-- [ ] Admin auth & role management
+### EPIC 5: Admin Dashboard
+- [ ] Admin auth + roles
 - [ ] Product + inventory CRUD
-- [ ] Upload images to R2
-- [ ] Order management
+- [ ] Order management panel
+- [ ] Image uploads to R2
 
-### 🔍 EPIC: Search & Filtering
-- [ ] Full-text search with D1
-- [ ] Add search bar UI
-- [ ] Faceted filters on categories
+### EPIC 6: Search & Filtering
+- [ ] D1-based full-text search
+- [ ] Search bar UI
+- [ ] Faceted filters by price, category, availability
 
 ---
 
 ## 🟦 Phase 4 – UX Enhancements
 
-### ✉️ Email System
-- [ ] Setup with Resend or SendGrid
-- [ ] Order confirmation, password reset, etc.
+### EPIC 7: Email & Notifications
+- [ ] Order confirmation, shipping, reset emails
+- [ ] Email queue with retry + tracking
 
-### 🚚 Shipping & Taxes
-- [ ] Shipping schema
-- [ ] Tax rules by location
-- [ ] (Optional) API-based real-time rates
+### EPIC 8: Shipping & Taxes
+- [ ] Schema for shipping zones + rates
+- [ ] Tax calculation by region
 
-### 🌟 Reviews & Ratings
-- [ ] Schema for reviews
-- [ ] Review form + star rating UI
-- [ ] Admin moderation
+### EPIC 9: Reviews & Ratings
+- [ ] Schema + moderation
+- [ ] UI for submitting and viewing reviews
 
 ---
 
-## 🟪 Phase 5 – Growth & AI
+## 🟪 Phase 5 – AI & Intelligence
 
-### 📊 Analytics
-- [ ] Sales + traffic tracking
-- [ ] Popular product metrics
-- [ ] Export reports
+### EPIC 10: AI Foundations
+- [ ] Set up vector database 
+- [ ] Index product descriptions
+- [ ] Create AI Worker or function to handle queries
 
-### 🧠 AI Integration (Experimental)
-- [ ] Feed product descriptions into vector DB
-- [ ] Enable AI search + recommendations
-- [ ] Chat UI for natural product discovery
+### EPIC 11: AI Assistant & Recommendations
+- [ ] AI Chat assistant with product-aware answers
+- [ ] Parse AI response → chat text + product references
+- [ ] Display product mini-cards in response
+- [ ] Track feedback on recommendations
 
----
-
-## Success Metrics
-- MVP = Auth + cart + checkout complete
-- Phase 2 = Orders + payments live
-- Phase 3+ = Admin management and UX enhancements
-
----
+### EPIC 12: AI Search
+- [ ] Natural language search support
+- [ ] Blend AI + keyword results
+- [ ] Suggest similar products dynamically
