@@ -23,3 +23,10 @@ export async function getProductsByCategory(categorySlug: string) {
 
   return rows.map((row) => row.products);
 }
+
+export async function getProductBySlug(slug: string) {
+  const db = await getDbAsync();
+  return db.query.products.findFirst({
+    where: (product, { eq }) => eq(product.slug, slug),
+  });
+}

@@ -21,7 +21,7 @@ export default function ProductCard({
       <div className="aspect-video bg-neutral-700 relative">
         {primaryImageUrl ? (
           <Image
-            src={`/media/${primaryImageUrl.replace(/^\/+/, '')}`}
+            src={`${primaryImageUrl.replace(/^\/+/, '')}`}
             alt={name}
             fill
             objectFit="cover"

@@ -29,7 +29,7 @@ export default function Footer() {
       <div className="text-center text-xs text-neutral-500 pb-4 pt-2 relative z-10">
         ©2025 Voltique. All rights reserved.
       </div>
-      <div className="absolute bottom-0 left-[270px] text-[120px] font-bold text-neutral-800 leading-none z-0 select-none">
+      <div className="absolute bottom-0 left-[20px] text-[140px] font-bold text-neutral-900 leading-none z-0 select-none">
         VOLTIQUE
       </div>
     </footer>
