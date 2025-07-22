@@ -25,7 +25,41 @@ export async function getProductsByCategory(categorySlug: string) {
     .innerJoin(productCategories, eq(products.id, productCategories.productId))
     .where(eq(productCategories.categoryId, category.id));
 
-  return rows.map((row) => row.products);
+  const productData = await Promise.all(
+    rows.map(async (row) => {
+      const product = row.products;
+
+      const [price] = await db
+        .select()
+        .from(productPrices)
+        .where(eq(productPrices.productId, product.id));
+
+      const [salePrice] = await db
+        .select()
+        .from(productSalePrices)
+        .where(eq(productSalePrices.productId, product.id));
+
+      const [inventory] = await db
+        .select()
+        .from(productInventory)
+        .where(eq(productInventory.productId, product.id));
+
+      const images = await db
+        .select({ imageUrl: productImages.imageUrl })
+        .from(productImages)
+        .where(eq(productImages.productId, product.id));
+
+      return {
+        ...product,
+        price: price?.price ?? null,
+        salePrice: salePrice?.sale_price ?? null,
+        quantityInStock: inventory?.quantityInStock ?? 0,
+        images: images.map(img => img.imageUrl),
+      };
+    })
+  );
+
+  return productData;
 }
 
 export async function getProductBySlug(slug: string) {

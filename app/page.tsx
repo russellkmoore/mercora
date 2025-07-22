@@ -1,6 +1,5 @@
 import ProductCard from "@/components/ProductCard";
 import { getProductsByCategory } from "@/lib/loaders/products";
-import Link from "next/link";
 
 export default async function HomePage() {
   const featuredProducts = (await getProductsByCategory("featured")).slice(0, 3);
@@ -15,22 +14,25 @@ export default async function HomePage() {
           High-performance electric gear, rugged and designed for the edge of the map. 
           Modular. Adaptable. Voltique.
         </p>
-        <Link href="/category/featured">
+        <a href="/category/featured">
           <button className="px-6 py-3 text-lg font-semibold border border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-black transition rounded">
             Shop Featured Gear
           </button>
-        </Link>
+        </a>
       </section>
 
       <section className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
-         {featuredProducts.map((product) => (
+        {featuredProducts.map((product) => (
           <ProductCard
             key={product.id}
             id={product.id}
             name={product.name}
             slug={product.slug}
-            description={product.description ?? undefined}
-            primaryImageUrl={product.primaryImageUrl} // or use a sample image URL here
+            description={product.description ?? ""}
+            primaryImageUrl={product.primaryImageUrl ?? ""}
+            price={product.price}
+            salePrice={product.salePrice}
+            availability={product.availability}
           />
         ))}
       </section>
