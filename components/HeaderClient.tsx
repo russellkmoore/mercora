@@ -10,7 +10,7 @@ import {
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Home, Search, LogIn, ChevronDown, Send } from "lucide-react";
+import { Home, Search, LogIn, ChevronDown, Send, ShoppingCart } from "lucide-react";
 import { useState } from "react";
 import { FaApple, FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
@@ -22,6 +22,7 @@ export default function HeaderClient({
 }) {
   const [isSignInOpen, setIsSignInOpen] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(false);
 
   return (
     <div className="flex justify-between items-center px-6 py-4 bg-black text-white">
@@ -68,8 +69,7 @@ export default function HeaderClient({
           <SheetTrigger asChild>
             <Button
               variant="ghost"
-              className="text-white hover:bg-white hover:text-orange-500"
-            >
+              className="text-white hover:bg-white hover:text-orange-500">
               <Search className="mr-2 h-4 w-4" />
               Help & Search
             </Button>
@@ -187,6 +187,21 @@ export default function HeaderClient({
             </Button>
           </DialogContent>
         </Dialog>
+
+        <Sheet open={isCartOpen} onOpenChange={setIsCartOpen}>
+          <SheetTrigger asChild>
+            <Button
+              variant="ghost"
+              className="text-white hover:bg-white hover:text-orange-500 bg-black">
+              <ShoppingCart className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="bg-white text-black w-[400px] p-4">
+            <h2 className="text-xl font-bold mb-4">Your Cart</h2>
+            {/* Placeholder: Add cart items here */}
+            <p>Your cart is empty.</p>
+          </SheetContent>
+        </Sheet>
       </div>
     </div>
   );
