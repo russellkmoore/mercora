@@ -13,15 +13,15 @@
 - Add mini cart drawer (design and functionality)
 - Add `ROADMAP.md`
 - refactor model and types defintions.
+- Fill in real product descriptions
+- Improve product description UX (truncate + expand)
 
 ## 🟧 In Progress / Immediate Tasks
 
 ### UI/UX
-- [ ] Add dynamic recommendations section (initially static)
-- [ ] Improve product description UX (truncate + expand)
 
 ### Product Data
-- [ ] Fill in real product descriptions
+
 - [ ] Standardize image naming / alt text for SEO
 
 ### Dev/Docs
@@ -106,3 +106,7 @@
 - [ ] Natural language search support
 - [ ] Blend AI + keyword results
 - [ ] Suggest similar products dynamically
+
+### EPIC 13: AI Recommendations
+- [ ] Add dynamic recommendations section (initially static) -- 
+
