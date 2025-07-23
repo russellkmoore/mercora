@@ -40,7 +40,7 @@ export default function CartDrawer() {
           <div className="space-y-4">
             <div className="max-h-[calc(100vh-20rem)] overflow-y-auto pr-2 space-y-4">
                 {items.map((item) => (
-                    <CartItemCard key={item.id} item={item} />
+                    <CartItemCard key={item.productId} item={item} />
                 ))}
             </div>
             <div className="border-t pt-4 mt-4 text-right">

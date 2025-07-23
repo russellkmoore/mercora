@@ -1,13 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-
-export type CartItem = {
-  id: number;
-  name: string;
-  price: number; // in cents
-  quantity: number;
-  primaryImageUrl: string | null;
-};
+import type { CartItem } from "@/lib/types/cartitem";
 
 type CartState = {
   items: CartItem[];
@@ -24,12 +17,12 @@ export const useCartStore = create<CartState>()(
 
       addItem: (item) => {
         const items = get().items;
-        const existing = items.find((i) => i.id === item.id);
+        const existing = items.find((i) => i.productId === item.productId);
 
         if (existing) {
           set({
             items: items.map((i) =>
-              i.id === item.id ? { ...i, quantity: i.quantity + item.quantity } : i
+              i.productId === item.productId ? { ...i, quantity: i.quantity + item.quantity } : i
             ),
           });
         } else {
@@ -38,7 +31,7 @@ export const useCartStore = create<CartState>()(
       },
 
       removeItem: (id) => {
-        set({ items: get().items.filter((i) => i.id !== id) });
+        set({ items: get().items.filter((i) => i.productId !== id) });
       },
 
       updateQuantity: (id, quantity) => {
@@ -47,7 +40,7 @@ export const useCartStore = create<CartState>()(
         } else {
           set({
             items: get().items.map((i) =>
-              i.id === id ? { ...i, quantity } : i
+              i.productId === id ? { ...i, quantity } : i
             ),
           });
         }

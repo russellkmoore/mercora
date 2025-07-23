@@ -9,12 +9,14 @@
 - Cloudflare R2 integration for media
 - D1-based product and category schema
 - Server-side rendering with Next.js
+- Finalize styling and responsiveness of sort toggles
+- Add mini cart drawer (design and functionality)
+- Add `ROADMAP.md`
+- refactor model and types defintions.
 
 ## 🟧 In Progress / Immediate Tasks
 
 ### UI/UX
-- [ ] Finalize styling and responsiveness of sort toggles
-- [ ] Add mini cart drawer (design and functionality)
 - [ ] Add dynamic recommendations section (initially static)
 - [ ] Improve product description UX (truncate + expand)
 
@@ -23,7 +25,6 @@
 - [ ] Standardize image naming / alt text for SEO
 
 ### Dev/Docs
-- [ ] Add `ROADMAP.md`
 - [ ] Create `README.md` with setup and deploy instructions
 - [ ] Document schema, media management, and deployment steps
 
@@ -37,9 +38,7 @@
 - [ ] Middleware for protected routes
 - [ ] Role-based access (admin vs. customer)
 
-### EPIC 2: Shopping Cart & Checkout
-- [ ] Cart schema (persistent + guest)
-- [ ] Cart UI (drawer, update, remove)
+### EPIC 2: Checkout
 - [ ] Checkout flow (shipping, billing, confirmation)
 - [ ] Convert cart to order + clear cart
 

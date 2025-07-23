@@ -1,30 +1,34 @@
 'use client';
 
 import ProductCard from "@/components/ProductCard";
-
-type Product = {
-  id: number;
-  name: string;
-  slug: string;
-  description: string;
-  primaryImageUrl: string;
-  price: number;
-  salePrice: number;
-  onSale?: boolean;
-  availability: string;
-};
+import type { Product } from "@/lib/types/product";
+import { act } from "react";
 
 export default function ProductRecommendations({ product }: { product?: Product }) {
   const recommendedProducts = [1, 2, 3].map((item) => ({
     id: item,
     name: `Voltique Item ${item}`,
     slug: `voltique-item-${item}`,
-    description: "Premium electric performance. Built for the extremes.",
+    shortDescription: "High-performance electric product.",
+    longDescription: "This Voltique item is designed for premium electric performance and built for the extremes. Enjoy advanced features and reliability.",
     primaryImageUrl: "products/placeholder.png",
+    images: ["products/placeholder.png"],
     price: 1999,
     salePrice: 1499,
     onSale: true,
-    availability: "available",
+    availability: "available" as const,
+    quantityInStock: 10,
+    category: "Electronics",
+    brand: "Voltique",
+    rating: 4.5,
+    tags: ["electric", "performance", "premium"],
+    useCases: ["outdoor", "travel", "daily"],
+    active: true,
+    attributes: {
+      color: "black",
+      weight: "2kg",
+      batteryLife: "12h"
+    }
   }));
 
   return (
@@ -37,7 +41,7 @@ export default function ProductRecommendations({ product }: { product?: Product 
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
         {recommendedProducts.map((prod) => (
-          <ProductCard key={prod.id} {...prod} />
+          <ProductCard key={prod.id} product={prod} />
         ))}
       </div>
     </div>

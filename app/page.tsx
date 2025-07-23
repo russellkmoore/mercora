@@ -23,17 +23,7 @@ export default async function HomePage() {
 
       <section className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
         {featuredProducts.map((product) => (
-          <ProductCard
-            key={product.id}
-            id={product.id}
-            name={product.name}
-            slug={product.slug}
-            description={product.description ?? ""}
-            primaryImageUrl={product.primaryImageUrl ?? ""}
-            price={product.price}
-            salePrice={product.salePrice}
-            availability={product.availability}
-          />
+          <ProductCard key={product.id} product={product} />
         ))}
       </section>
     </main>
