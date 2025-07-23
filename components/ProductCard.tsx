@@ -2,29 +2,25 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import type { Product } from '@/lib/types/product';
 
 interface ProductCardProps {
-  id: number;
-  name: string;
-  slug: string;
-  description?: string;
-  primaryImageUrl?: string | null;
-  price: number | null;
-  salePrice: number | null;
-  onSale?: boolean;
-  availability: string; // 'available' or 'coming_soon'
+  product: Product;
 }
 
-export default function ProductCard({
-  name,
-  slug,
-  description,
-  primaryImageUrl,
-  price,
-  salePrice,
-  onSale,
-  availability
-}: ProductCardProps) {
+export default function ProductCard({ product }: ProductCardProps) {
+  const {
+    id,
+    name,
+    slug,
+    shortDescription,
+    primaryImageUrl,
+    price,
+    salePrice,
+    onSale = false,
+    availability,
+  } = product;
+
   return (
     <Link href={`/product/${slug}`}>
       <div className="bg-neutral-800 rounded-lg overflow-hidden shadow hover:shadow-lg transition cursor-pointer">
@@ -45,10 +41,10 @@ export default function ProductCard({
         </div>
         <div className="p-4">
           <h3 className="text-xl font-semibold mb-2">{name}</h3>
-          <p className="text-gray-400 text-sm mb-2 line-clamp-3">{description}</p>
+          <p className="text-gray-400 text-sm mb-2 line-clamp-3">{shortDescription}</p>
           {price !== null && (
             <div className="text-sm">
-              {onSale && salePrice ? (
+              {onSale && salePrice != null ? (
                 <div className="text-green-400">
                   <span className="line-through text-gray-400 mr-2">
                     ${(price / 100).toFixed(2)}
