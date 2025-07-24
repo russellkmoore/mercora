@@ -5,7 +5,16 @@ import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Toaster } from 'sonner';
+import { dark } from '@clerk/themes';
 
+import {
+  ClerkProvider,
+  SignedIn,
+  SignedOut,
+  SignInButton,
+  SignUpButton,
+  UserButton,
+} from "@clerk/nextjs";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,23 +37,28 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white`}
-      >
-        <Header />
-        <main className="min-h-screen">{children}</main>
-        <Footer />
-        <Toaster
-          position="top-center"
-          toastOptions={{
-            className:
-              "bg-orange-500/80 text-black font-semibold rounded-md mt-[60px] shadow-lg animate-in fade-in slide-in-from-top-5",
-            duration: 3000,
-          }}
-        />
-      </body>
-    </html>
+    <ClerkProvider
+            appearance={{
+                baseTheme: dark,
+            }}
+        >
+      <html lang="en">
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white`}
+        >
+          <Header />
+          <main className="min-h-screen">{children}</main>
+          <Footer />
+          <Toaster
+            position="top-center"
+            toastOptions={{
+              className:
+                "bg-orange-500/80 text-black font-semibold rounded-md mt-[60px] shadow-lg animate-in fade-in slide-in-from-top-5",
+              duration: 3000,
+            }}
+          />
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
-

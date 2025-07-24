@@ -15,6 +15,8 @@
 - refactor model and types defintions.
 - Fill in real product descriptions
 - Improve product description UX (truncate + expand)
+- Add user authentication (Clerk)
+
 
 ## 🟧 In Progress / Immediate Tasks
 
@@ -33,7 +35,7 @@
 ## 🟥 Phase 1 – MVP Must Haves
 
 ### EPIC 1: Authentication
-- [ ] Add user authentication (Clerk or Auth.js)
+
 - [ ] Create user profile pages
 - [ ] Middleware for protected routes
 - [ ] Role-based access (admin vs. customer)

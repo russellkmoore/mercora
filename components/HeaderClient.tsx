@@ -14,6 +14,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { Dialog } from "@/components/ui/dialog";
 import AgentDrawer from "@/components/agent/AgentDrawer";
 import LoginDialog from "@/components/login/LoginDialog";
+import ClerkLogin from "@/components/login/ClerkLogin";
 import CartDrawer from "@/components/cart/CartDrawer";
 
 export default function HeaderClient({
@@ -64,7 +65,7 @@ export default function HeaderClient({
         </DropdownMenu>
 
         <AgentDrawer />
-        <LoginDialog />
+        <ClerkLogin />
         <CartDrawer />
       </div>
     </div>
