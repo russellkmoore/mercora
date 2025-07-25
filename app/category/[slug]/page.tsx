@@ -19,6 +19,8 @@ export default async function CategoryPage({ params }: any) {
                 alt={category.name}
                 layout="fill"
                 objectFit="cover"
+                sizes="100vw"
+                fill
                 className="object-cover"
                 priority
               />

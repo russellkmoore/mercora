@@ -13,6 +13,7 @@ export default function OrderItemCard({ item }: OrderItemCardProps) {
           <Image
             src={item.primaryImageUrl}
             alt={item.name}
+            sizes="40px"
             fill
             className="object-cover"
           />

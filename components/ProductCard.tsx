@@ -29,8 +29,8 @@ export default function ProductCard({ product }: ProductCardProps) {
             <Image
               src={`/${primaryImageUrl}`}
               alt={name}
-              layout="fill"
-              objectFit="cover"
+              fill
+              sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
               className="object-cover"
             />
           ) : (

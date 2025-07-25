@@ -24,6 +24,7 @@ export default function CartItemCard({ item }: CartItemCardProps) {
           alt={item.name}
           width={64}
           height={64}
+          sizes="64px"
           className="object-cover rounded"
         />
       )}

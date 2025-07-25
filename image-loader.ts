@@ -9,8 +9,8 @@ export default function cloudflareLoader({ src, width, quality }: ImageLoaderPro
   if (process.env.NODE_ENV === "development") {
     return src;
   }
-  const params = [`width=${width}`];
+  const params = [`width=${width}`, "format=auto"];
   if (quality) params.push(`quality=${quality}`);
   const paramsString = params.join(",");
-  return `https://voltique-images.russellkmoore.me/${normalizeSrc(src)}`;
+  return `https://voltique-images.russellkmoore.me/cdn-cgi/image/${paramsString}/${normalizeSrc(src)}`;
 }
