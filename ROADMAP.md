@@ -16,7 +16,11 @@
 - Fill in real product descriptions
 - Improve product description UX (truncate + expand)
 - Add user authentication (Clerk)
-
+- Checkout flow (shipping, billing, confirmation)
+- Orders schema (orders + items)
+- Convert cart to order + clear cart
+- order history for logged in users.
+- User order history + status tracking
 
 ## 🟧 In Progress / Immediate Tasks
 
@@ -35,28 +39,23 @@
 ## 🟥 Phase 1 – MVP Must Haves
 
 ### EPIC 1: Authentication
-
-- [ ] Create user profile pages
-- [ ] Middleware for protected routes
-- [ ] Role-based access (admin vs. customer)
+(done))
 
 ### EPIC 2: Checkout
-- [ ] Checkout flow (shipping, billing, confirmation)
-- [ ] Convert cart to order + clear cart
+(done))
 
 ---
 
 ## 🟨 Phase 2 – Payments & Orders
 
 ### EPIC 3: Payment Integration
+Current - mock checkout, throws away payment details.
 - [ ] Integrate Stripe (Cloudflare compatible)
 - [ ] Support for 3D Secure and webhooks
 - [ ] Secure token handling
 
 ### EPIC 4: Order Management
-- [ ] Orders schema (orders + items)
 - [ ] Inventory deduction + stock handling
-- [ ] User order history + status tracking
 
 ---
 
