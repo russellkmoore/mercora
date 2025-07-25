@@ -24,6 +24,7 @@ export default function ProductDisplay({ product }: { product: Product }) {
               src={formatImageSrc(selectedImage)}
               alt={product.name}
               fill
+              sizes="(min-width: 768px) 50vw, 100vw"
               style={{ objectFit: "cover" }}
               className="object-cover"
             />
