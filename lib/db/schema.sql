@@ -80,3 +80,33 @@ CREATE TABLE product_attributes (
   value TEXT NOT NULL,
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
+
+
+-- ORDERS --------------------------------------------------
+CREATE TABLE orders (
+  id TEXT PRIMARY KEY NOT NULL,
+  user_id TEXT,
+  email TEXT NOT NULL,
+
+  items TEXT NOT NULL,                 
+  shipping_address TEXT NOT NULL,      
+  billing_address TEXT,                
+  shipping_option TEXT NOT NULL,       
+  billing_info TEXT NOT NULL,         
+
+  tax_amount REAL NOT NULL,
+  shipping_cost REAL NOT NULL,
+  total REAL NOT NULL,
+
+  status TEXT NOT NULL CHECK (status IN (
+    'incomplete',
+    'pending',
+    'paid',
+    'fulfilled',
+    'shipped',
+    'cancelled'
+  )) DEFAULT 'incomplete',
+
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);

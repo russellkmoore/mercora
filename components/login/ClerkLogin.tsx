@@ -3,6 +3,7 @@
 import { SignInButton, SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
 import { LogIn } from "lucide-react";
+import { Package } from "lucide-react";
 
 export default function ClerkLogin() {
   return (
@@ -16,14 +17,15 @@ export default function ClerkLogin() {
       </SignedOut>
 
       <SignedIn>
-        <UserButton 
-          appearance={{
-            elements: {
-              avatarBox: 'w-8 h-8',
-            },
-          }}
-          afterSignOutUrl="/"
-        />
+        <UserButton appearance={{ elements: { avatarBox: 'w-8 h-8',}, }}>
+          <UserButton.MenuItems>
+             <UserButton.Link
+              label="View Voltique Order History"
+              labelIcon={<Package />}
+              href="/orders"
+            />
+          </UserButton.MenuItems>
+        </UserButton>
       </SignedIn>
     </>
   );

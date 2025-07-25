@@ -4,6 +4,7 @@ import CartItemCard from "./CartItemCard";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart } from "lucide-react";
 import { useState } from "react";
+import Link from "next/link";
 
 export default function CartDrawer() {
   const [isOpen, setIsOpen] = useState(false);
@@ -45,7 +46,12 @@ export default function CartDrawer() {
             </div>
             <div className="border-t pt-4 mt-4 text-right">
               <p className="font-semibold text-lg">Total: ${total.toFixed(2)}</p>
-              <Button className="mt-3 w-full bg-black text-white hover:bg-orange-500">
+              <Button
+                className="mt-3 w-full bg-black text-white hover:bg-orange-500"
+                onClick={() => {
+                  setIsOpen(false);
+                  setTimeout(() => { window.location.href = "/checkout";  }, 100);
+                }} >
                 Checkout
               </Button>
             </div>
