@@ -16,7 +16,9 @@ export const categories = pgTable("categories", {
   description: text("description"),
 });
 
-export async function hydrateCategory(category: typeof categories.$inferSelect): Promise<Category> {
+export async function hydrateCategory(
+  category: typeof categories.$inferSelect
+): Promise<Category> {
   const db = await getDbAsync();
   const products = await getCategoryProducts(category.slug);
   return {
@@ -28,8 +30,9 @@ export async function hydrateCategory(category: typeof categories.$inferSelect):
   };
 }
 
-
-export async function getCategoryProducts(categorySlug: string): Promise<Product[]> {
+export async function getCategoryProducts(
+  categorySlug: string
+): Promise<Product[]> {
   const db = await getDbAsync();
   const category = await db.query.categories.findFirst({
     where: eq(categories.slug, categorySlug),

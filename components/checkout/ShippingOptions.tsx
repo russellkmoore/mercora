@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { ShippingOption } from "@/lib/types/shipping";
 import type { Address } from "@/lib/types/address";
@@ -31,7 +31,9 @@ export default function ShippingOptions({
 
       <div className="space-y-4">
         {options.length === 0 && (
-          <p className="text-gray-500 text-sm">No shipping options available.</p>
+          <p className="text-gray-500 text-sm">
+            No shipping options available.
+          </p>
         )}
 
         {options.map((option) => {
@@ -50,10 +52,13 @@ export default function ShippingOptions({
               <div>
                 <div className="font-medium text-sm">{option.label}</div>
                 <div className="text-sm text-gray-500">
-                  ${option.cost.toFixed(2)} – Estimated {option.estimatedDays} days
+                  ${option.cost.toFixed(2)} – Estimated {option.estimatedDays}{" "}
+                  days
                 </div>
               </div>
-              {isSelected && <CheckCircle2 className="text-orange-500 w-6 h-6" />}
+              {isSelected && (
+                <CheckCircle2 className="text-orange-500 w-6 h-6" />
+              )}
             </div>
           );
         })}

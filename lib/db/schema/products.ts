@@ -12,4 +12,3 @@ export const products = sqliteTable("products", {
   onSale: integer("on_sale", { mode: "boolean" }).default(false),
   active: integer("active", { mode: "boolean" }).default(true),
 });
-

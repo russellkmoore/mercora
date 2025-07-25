@@ -42,7 +42,9 @@ export const useCartStore = create<CartState>()(
         if (existing) {
           set({
             items: items.map((i) =>
-              i.productId === item.productId ? { ...i, quantity: i.quantity + item.quantity } : i
+              i.productId === item.productId
+                ? { ...i, quantity: i.quantity + item.quantity }
+                : i
             ),
           });
         } else {

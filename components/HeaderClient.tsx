@@ -18,7 +18,6 @@ export default function HeaderClient({
 }: {
   categories: { id: number; name: string; slug: string }[];
 }) {
-
   return (
     <div className="flex justify-between items-center px-6 py-4 bg-black text-white">
       <Link href="/" className="text-xl font-bold">
@@ -27,7 +26,7 @@ export default function HeaderClient({
 
       <div className="flex gap-4 items-center">
         <Link href="/" passHref>
-          <Button 
+          <Button
             variant="ghost"
             className="text-white hover:bg-white hover:text-orange-500 bg-black"
           >
@@ -67,4 +66,3 @@ export default function HeaderClient({
     </div>
   );
 }
-

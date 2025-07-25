@@ -8,8 +8,15 @@ interface Props {
   taxAmount: number;
 }
 
-export default function OrderSummary({ items, shippingOption, taxAmount }: Props) {
-  const subtotal = items.reduce((acc, item) => acc + item.price * item.quantity, 0);
+export default function OrderSummary({
+  items,
+  shippingOption,
+  taxAmount,
+}: Props) {
+  const subtotal = items.reduce(
+    (acc, item) => acc + item.price * item.quantity,
+    0
+  );
   const shippingCost = shippingOption?.cost || 0;
   const total = subtotal + shippingCost + taxAmount;
 

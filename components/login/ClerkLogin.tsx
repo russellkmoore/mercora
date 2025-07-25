@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { SignInButton, SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
-import { Button } from '@/components/ui/button';
+import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { Button } from "@/components/ui/button";
 import { LogIn } from "lucide-react";
 import { Package } from "lucide-react";
 
@@ -10,16 +10,19 @@ export default function ClerkLogin() {
     <>
       <SignedOut>
         <SignInButton mode="modal">
-          <Button  variant="ghost" className="text-white hover:bg-white hover:text-orange-500">
+          <Button
+            variant="ghost"
+            className="text-white hover:bg-white hover:text-orange-500"
+          >
             <LogIn className="mr-2 h-4 w-4" /> Sign In / Register
-           </Button>
+          </Button>
         </SignInButton>
       </SignedOut>
 
       <SignedIn>
-        <UserButton appearance={{ elements: { avatarBox: 'w-8 h-8',}, }}>
+        <UserButton appearance={{ elements: { avatarBox: "w-8 h-8" } }}>
           <UserButton.MenuItems>
-             <UserButton.Link
+            <UserButton.Link
               label="View Voltique Order History"
               labelIcon={<Package />}
               href="/orders"

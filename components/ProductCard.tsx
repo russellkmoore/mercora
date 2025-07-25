@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import Image from 'next/image';
-import type { Product } from '@/lib/types/product';
+import Link from "next/link";
+import Image from "next/image";
+import type { Product } from "@/lib/types/product";
 
 interface ProductCardProps {
   product: Product;
@@ -41,7 +41,9 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
         <div className="p-4">
           <h3 className="text-xl font-semibold mb-2">{name}</h3>
-          <p className="text-gray-400 text-sm mb-2 line-clamp-3">{shortDescription}</p>
+          <p className="text-gray-400 text-sm mb-2 line-clamp-3">
+            {shortDescription}
+          </p>
           {price !== null && (
             <div className="text-sm">
               {onSale && salePrice != null ? (
@@ -63,11 +65,20 @@ export default function ProductCard({ product }: ProductCardProps) {
               )}
             </div>
           )}
-          <p className={`mt-2 text-xs ${availability === 'available' ? 'text-green-400' : 'text-orange-500'}`}>
-            {availability === 'available' ? 'In Stock' : 'Coming Soon'}
+          <p
+            className={`mt-2 text-xs ${
+              availability === "available"
+                ? "text-green-400"
+                : "text-orange-500"
+            }`}
+          >
+            {availability === "available" ? "In Stock" : "Coming Soon"}
           </p>
 
-          <a href={`/product/${slug}`} className="text-orange-500 hover:underline text-sm font-medium">
+          <a
+            href={`/product/${slug}`}
+            className="text-orange-500 hover:underline text-sm font-medium"
+          >
             Learn more →
           </a>
         </div>
