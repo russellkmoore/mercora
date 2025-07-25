@@ -9,11 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Home, Search, LogIn, ChevronDown, ShoppingCart } from "lucide-react";
-import { useState } from "react";
-import { Sheet } from "@/components/ui/sheet";
-import { Dialog } from "@/components/ui/dialog";
 import AgentDrawer from "@/components/agent/AgentDrawer";
-import LoginDialog from "@/components/login/LoginDialog";
 import ClerkLogin from "@/components/login/ClerkLogin";
 import CartDrawer from "@/components/cart/CartDrawer";
 
