@@ -4,8 +4,7 @@ import type { BillingInfo } from "@/lib/types/billing";
 import type { CartItem } from "@/lib/types/cartitem";
 import type { ShippingOption } from "@/lib/types/shipping";
 import { insertOrder } from "@/lib/models/order";
-import { auth, currentUser } from '@clerk/nextjs/server'
-
+import { auth, currentUser } from "@clerk/nextjs/server";
 
 interface OrderRequest {
   items: CartItem[];
@@ -16,7 +15,7 @@ interface OrderRequest {
 }
 
 export async function POST(req: NextRequest) {
-    const { userId } = await auth()
+  const { userId } = await auth();
 
   try {
     const body = (await req.json()) as OrderRequest;
@@ -34,14 +33,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const total = body.items.reduce((sum, item) => sum + item.price * item.quantity, 0) + body.taxAmount + (body.shippingOption.cost || 0);
+    const total =
+      body.items.reduce((sum, item) => sum + item.price * item.quantity, 0) +
+      body.taxAmount +
+      (body.shippingOption.cost || 0);
 
     const now = Date.now();
     let baseId = userId ?? "guest";
 
     // If it's an email, take the part before the @
     if (baseId.includes("@")) {
-        baseId = baseId.split("@")[0];
+      baseId = baseId.split("@")[0];
     }
     // Remove non-alphanumeric characters and make uppercase
     const safeUserId = baseId.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();

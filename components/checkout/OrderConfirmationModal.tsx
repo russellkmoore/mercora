@@ -1,9 +1,13 @@
-'use client';
+"use client";
 
-import { Dialog, DialogContent, DialogHeader, DialogFooter } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 interface OrderConfirmationModalProps {
   isOpen: boolean;
@@ -18,7 +22,6 @@ export default function OrderConfirmationModal({
   orderId,
   userId,
 }: OrderConfirmationModalProps) {
-  
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md p-8 space-y-6 text-center rounded-xl shadow-lg bg-white">
@@ -29,9 +32,7 @@ export default function OrderConfirmationModal({
         </DialogHeader>
 
         <div className="space-y-2">
-          <p className="text-sm text-gray-400">
-            Your order ID is:
-          </p>
+          <p className="text-sm text-gray-400">Your order ID is:</p>
           <pre className="text-sm font-mono text-blue-300 p-2 bg-zinc-800 rounded break-words whitespace-pre-wrap">
             {orderId}
           </pre>
@@ -39,15 +40,13 @@ export default function OrderConfirmationModal({
 
         <DialogFooter className="flex flex-col gap-4 pt-4">
           <Link href="/" passHref>
-            <Button
-              className="flex-1 bg-black text-white hover:bg-orange-500 transition-colors" >
+            <Button className="flex-1 bg-black text-white hover:bg-orange-500 transition-colors">
               Continue Shopping
             </Button>
           </Link>
           {userId && (
             <Link href="/" passHref>
-              <Button
-                className="flex-1 bg-black text-white hover:bg-orange-500 transition-colors" >
+              <Button className="flex-1 bg-black text-white hover:bg-orange-500 transition-colors">
                 View Order History
               </Button>
             </Link>

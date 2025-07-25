@@ -40,18 +40,23 @@ export default function CartDrawer() {
         ) : (
           <div className="space-y-4">
             <div className="max-h-[calc(100vh-20rem)] overflow-y-auto pr-2 space-y-4">
-                {items.map((item) => (
-                    <CartItemCard key={item.productId} item={item} />
-                ))}
+              {items.map((item) => (
+                <CartItemCard key={item.productId} item={item} />
+              ))}
             </div>
             <div className="border-t pt-4 mt-4 text-right">
-              <p className="font-semibold text-lg">Total: ${total.toFixed(2)}</p>
+              <p className="font-semibold text-lg">
+                Total: ${total.toFixed(2)}
+              </p>
               <Button
                 className="mt-3 w-full bg-black text-white hover:bg-orange-500"
                 onClick={() => {
                   setIsOpen(false);
-                  setTimeout(() => { window.location.href = "/checkout";  }, 100);
-                }} >
+                  setTimeout(() => {
+                    window.location.href = "/checkout";
+                  }, 100);
+                }}
+              >
                 Checkout
               </Button>
             </div>

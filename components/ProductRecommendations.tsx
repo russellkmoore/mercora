@@ -1,16 +1,21 @@
-'use client';
+"use client";
 
 import ProductCard from "@/components/ProductCard";
 import type { Product } from "@/lib/types/product";
 import { act } from "react";
 
-export default function ProductRecommendations({ product }: { product?: Product }) {
+export default function ProductRecommendations({
+  product,
+}: {
+  product?: Product;
+}) {
   const recommendedProducts = [1, 2, 3].map((item) => ({
     id: item,
     name: `Voltique Item ${item}`,
     slug: `voltique-item-${item}`,
     shortDescription: "High-performance electric product.",
-    longDescription: "This Voltique item is designed for premium electric performance and built for the extremes. Enjoy advanced features and reliability.",
+    longDescription:
+      "This Voltique item is designed for premium electric performance and built for the extremes. Enjoy advanced features and reliability.",
     primaryImageUrl: "products/placeholder.png",
     images: ["products/placeholder.png"],
     price: 1999,
@@ -27,8 +32,8 @@ export default function ProductRecommendations({ product }: { product?: Product 
     attributes: {
       color: "black",
       weight: "2kg",
-      batteryLife: "12h"
-    }
+      batteryLife: "12h",
+    },
   }));
 
   return (

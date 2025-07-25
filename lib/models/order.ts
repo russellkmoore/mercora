@@ -7,7 +7,9 @@ import { sql } from "drizzle-orm";
 import { Order } from "../types/order";
 
 export const orders = sqliteTable("orders", {
-  id: text("id").primaryKey().$defaultFn(() => `ORD-${nanoid(8).toUpperCase()}`),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => `ORD-${nanoid(8).toUpperCase()}`),
   userId: text("user_id"),
   email: text("email").notNull(),
   items: text("items", { mode: "json" }).notNull(),
@@ -22,8 +24,12 @@ export const orders = sqliteTable("orders", {
     .$type<"incomplete" | "pending" | "paid" | "shipped" | "cancelled">()
     .notNull()
     .default("incomplete"),
-  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const orderRelations = relations(orders, () => ({}));
@@ -34,11 +40,10 @@ export async function insertOrder(order: Order) {
   // Omit 'id' if it's a number, so Drizzle can generate it, or convert to string if needed
   const { id, ...rest } = order as any;
   const insertValue =
-    typeof id === "number" ? rest : { ...order, id: typeof id === "string" ? id : undefined };
-  const inserted = await db
-    .insert(orders)
-    .values(insertValue)
-    .returning();
+    typeof id === "number"
+      ? rest
+      : { ...order, id: typeof id === "string" ? id : undefined };
+  const inserted = await db.insert(orders).values(insertValue).returning();
   return inserted[0];
 }
 
@@ -55,8 +60,14 @@ export async function getOrderById(id: string) {
 }
 
 // Update order status
-export async function updateOrderStatus(id: string, status: typeof orders.$inferSelect["status"]) {
+export async function updateOrderStatus(
+  id: string,
+  status: (typeof orders.$inferSelect)["status"]
+) {
   const db = await getDbAsync();
   const now = new Date().toISOString();
-  return db.update(orders).set({ status, updatedAt: now }).where(eq(orders.id, id));
+  return db
+    .update(orders)
+    .set({ status, updatedAt: now })
+    .where(eq(orders.id, id));
 }

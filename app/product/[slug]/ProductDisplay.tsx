@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useState } from "react";
 import Image from "next/image";
@@ -13,7 +13,9 @@ export default function ProductDisplay({ product }: { product: Product }) {
   const formatImageSrc = (src: string | null) =>
     src?.startsWith("http") ? src : `/${src || "placeholder.jpg"}`;
 
-  const allImages = Array.from(new Set([product.primaryImageUrl, ...product.images].filter(Boolean))) as string[];
+  const allImages = Array.from(
+    new Set([product.primaryImageUrl, ...product.images].filter(Boolean))
+  ) as string[];
 
   return (
     <>
@@ -36,7 +38,9 @@ export default function ProductDisplay({ product }: { product: Product }) {
                 key={`thumb-${idx}`}
                 onClick={() => setSelectedImage(img)}
                 className={`w-20 h-20 relative rounded overflow-hidden cursor-pointer border ${
-                  selectedImage === img ? "border-orange-500" : "border-gray-700"
+                  selectedImage === img
+                    ? "border-orange-500"
+                    : "border-gray-700"
                 }`}
               >
                 <Image
@@ -56,22 +60,32 @@ export default function ProductDisplay({ product }: { product: Product }) {
 
           {product.salePrice && product.onSale ? (
             <div className="mb-4">
-              <p className="text-gray-500 line-through text-lg">${(product.price / 100).toFixed(2)}</p>
-              <p className="text-green-400 text-xl font-bold">${(product.salePrice / 100).toFixed(2)}</p>
+              <p className="text-gray-500 line-through text-lg">
+                ${(product.price / 100).toFixed(2)}
+              </p>
+              <p className="text-green-400 text-xl font-bold">
+                ${(product.salePrice / 100).toFixed(2)}
+              </p>
               <p className="text-sm text-orange-400 italic">on sale</p>
             </div>
           ) : (
-            <p className="text-xl font-semibold text-white mb-4">${(product.price / 100).toFixed(2)}</p>
+            <p className="text-xl font-semibold text-white mb-4">
+              ${(product.price / 100).toFixed(2)}
+            </p>
           )}
 
-          {product.quantityInStock > 0 && product.availability === 'available' ? (
+          {product.quantityInStock > 0 &&
+          product.availability === "available" ? (
             <button
               className="mt-6 px-6 py-3 bg-orange-500 text-black font-bold rounded hover:bg-orange-400 transition"
               onClick={() => {
                 useCartStore.getState().addItem({
                   productId: product.id,
                   name: product.name,
-                  price: ((product.onSale && product.salePrice ? product.salePrice : product.price) / 100),
+                  price:
+                    (product.onSale && product.salePrice
+                      ? product.salePrice
+                      : product.price) / 100,
                   quantity: 1,
                   primaryImageUrl: product.primaryImageUrl ?? "placeholder.jpg",
                 });
@@ -84,7 +98,9 @@ export default function ProductDisplay({ product }: { product: Product }) {
               Add to Cart
             </button>
           ) : (
-            <p className="text-orange-500 font-semibold text-xl mb-4">Coming soon</p>
+            <p className="text-orange-500 font-semibold text-xl mb-4">
+              Coming soon
+            </p>
           )}
         </div>
       </div>

@@ -10,7 +10,6 @@ import ShippingForm from "./ShippingForm";
 import OrderConfirmationModal from "./OrderConfirmationModal";
 import type { ShippingOption } from "@/lib/types/shipping";
 
-
 type ShippingOptionsResponse = { options: ShippingOption[] };
 type ShippingOptionsError = { error: string };
 type TaxResponse = { amount: number };
@@ -18,7 +17,7 @@ type TaxError = { error: string };
 type OrderResponse = { orderId: string };
 type OrderError = { error: string };
 
-export default function CheckoutClient(userId :any ) {
+export default function CheckoutClient(userId: any) {
   const {
     items,
     setShippingAddress,
@@ -49,7 +48,9 @@ export default function CheckoutClient(userId :any ) {
   const [confirmationOpen, setConfirmationOpen] = useState(false);
   const [orderId, setOrderId] = useState<string>("");
 
-  function handleAddressChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+  function handleAddressChange(
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) {
     const { name, value } = e.target;
     setAddress((prev) => ({ ...prev, [name]: value }));
   }
@@ -144,7 +145,9 @@ export default function CheckoutClient(userId :any ) {
           <ShippingForm
             address={address}
             onChange={handleAddressChange}
-            onSelectCountry={(value) => setAddress((prev) => ({ ...prev, country: value }))}
+            onSelectCountry={(value) =>
+              setAddress((prev) => ({ ...prev, country: value }))
+            }
             onSubmit={handleUseAddress}
             error={shippingError}
           />
@@ -158,8 +161,16 @@ export default function CheckoutClient(userId :any ) {
         </div>
 
         <div className="space-y-6">
-          <OrderSummary items={items} shippingOption={shippingOption} taxAmount={taxAmount ?? 0} />
-          <BillingForm disabled={step < 2} onSubmit={handleSubmitOrder} error={orderError} />
+          <OrderSummary
+            items={items}
+            shippingOption={shippingOption}
+            taxAmount={taxAmount ?? 0}
+          />
+          <BillingForm
+            disabled={step < 2}
+            onSubmit={handleSubmitOrder}
+            error={orderError}
+          />
         </div>
       </div>
 

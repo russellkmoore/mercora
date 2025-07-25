@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Button } from '@/components/ui/button';
+import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 
 type BillingFormProps = {
   disabled: boolean;
@@ -24,19 +24,23 @@ export type BillingInfo = {
   country: string;
 };
 
-export default function BillingForm({ disabled, onSubmit, error }: BillingFormProps) {
+export default function BillingForm({
+  disabled,
+  onSubmit,
+  error,
+}: BillingFormProps) {
   const [sameAsShipping, setSameAsShipping] = useState(true);
   const [billing, setBilling] = useState<BillingInfo>({
-    name: '',
-    cardNumber: '',
-    expiration: '',
-    cvv: '',
-    address: '',
-    address2: '',
-    city: '',
-    state: '',
-    zip: '',
-    country: '',
+    name: "",
+    cardNumber: "",
+    expiration: "",
+    cvv: "",
+    address: "",
+    address2: "",
+    city: "",
+    state: "",
+    zip: "",
+    country: "",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,7 +69,7 @@ export default function BillingForm({ disabled, onSubmit, error }: BillingFormPr
   return (
     <div
       className={`bg-white p-6 rounded-xl transition-opacity text-black ${
-        disabled ? 'opacity-50 pointer-events-none' : ''
+        disabled ? "opacity-50 pointer-events-none" : ""
       }`}
     >
       <h2 className="text-lg font-bold mb-4">Billing Information</h2>
@@ -106,9 +110,7 @@ export default function BillingForm({ disabled, onSubmit, error }: BillingFormPr
           <Checkbox
             id="sameAsShipping"
             checked={sameAsShipping}
-            onCheckedChange={(checked) =>
-              setSameAsShipping(checked === true)
-            }
+            onCheckedChange={(checked) => setSameAsShipping(checked === true)}
             disabled={disabled}
           />
           <label
@@ -171,7 +173,7 @@ export default function BillingForm({ disabled, onSubmit, error }: BillingFormPr
           </div>
         )}
         {error && (
-            <div className="text-red-600 text-sm font-medium mt-2">{error}</div>
+          <div className="text-red-600 text-sm font-medium mt-2">{error}</div>
         )}
 
         <Button

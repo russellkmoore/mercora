@@ -12,7 +12,9 @@ import { eq } from "drizzle-orm";
 import type { Product } from "@/lib/types/product";
 import { products } from "@/lib/db/schema";
 
-export async function hydrateProduct(product: typeof products.$inferSelect): Promise<Product> {
+export async function hydrateProduct(
+  product: typeof products.$inferSelect
+): Promise<Product> {
   const db = await getDbAsync();
 
   const [price] = await db
@@ -68,7 +70,8 @@ export async function hydrateProduct(product: typeof products.$inferSelect): Pro
     salePrice: salePrice?.sale_price ?? 0,
     onSale: !!product.onSale,
     quantityInStock: inventory?.quantityInStock ?? 0,
-    availability: product.availability === "available" ? "available" : "coming_soon",
+    availability:
+      product.availability === "available" ? "available" : "coming_soon",
     tags: tags.map((t) => t.value),
     useCases: useCases.map((u) => u.value),
     attributes,

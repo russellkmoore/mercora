@@ -1,11 +1,11 @@
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { Toaster } from 'sonner';
-import { dark } from '@clerk/themes';
+import { Toaster } from "sonner";
+import { dark } from "@clerk/themes";
 
 import {
   ClerkProvider,
@@ -38,10 +38,10 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider
-            appearance={{
-                baseTheme: dark,
-            }}
-        >
+      appearance={{
+        baseTheme: dark,
+      }}
+    >
       <html lang="en">
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white`}

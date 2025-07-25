@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { Input } from '@/components/ui/input';
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectTrigger,
   SelectValue,
   SelectContent,
   SelectItem,
-} from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import type { Address } from '@/lib/types/address';
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import type { Address } from "@/lib/types/address";
 
 interface Props {
   address: Address;
@@ -28,20 +28,22 @@ export default function ShippingForm({
   error,
   disabled = false,
 }: Props) {
-  const isSubmitDisabled = disabled || !(
-    address.name &&
-    address.email &&
-    address.address &&
-    address.city &&
-    address.state &&
-    address.zip &&
-    address.country
-  );
+  const isSubmitDisabled =
+    disabled ||
+    !(
+      address.name &&
+      address.email &&
+      address.address &&
+      address.city &&
+      address.state &&
+      address.zip &&
+      address.country
+    );
 
   return (
     <div
       className={`bg-white text-black p-6 rounded-xl transition-opacity ${
-        disabled ? 'opacity-50 pointer-events-none' : ''
+        disabled ? "opacity-50 pointer-events-none" : ""
       }`}
     >
       <h2 className="text-lg font-semibold mb-4">Shipping Address</h2>
@@ -120,9 +122,7 @@ export default function ShippingForm({
         </div>
 
         {error && (
-          <div className="text-red-600 text-sm font-medium mt-2">
-            {error}
-          </div>
+          <div className="text-red-600 text-sm font-medium mt-2">{error}</div>
         )}
       </div>
     </div>

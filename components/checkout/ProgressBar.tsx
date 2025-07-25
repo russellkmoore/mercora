@@ -30,7 +30,10 @@ export default function ProgressBar({ step }: { step: number }) {
         const isCurrent = index === step;
 
         return (
-          <div key={index} className="flex-1 flex flex-col items-center relative">
+          <div
+            key={index}
+            className="flex-1 flex flex-col items-center relative"
+          >
             {/* Circle */}
             <div className="mb-1 h-6 flex items-center justify-center">
               {isCompleted ? (
@@ -38,7 +41,9 @@ export default function ProgressBar({ step }: { step: number }) {
               ) : (
                 <div
                   className={`w-6 h-6 rounded-full border-2 ${
-                    isCurrent ? "bg-orange-500 border-orange-500" : "border-gray-300"
+                    isCurrent
+                      ? "bg-orange-500 border-orange-500"
+                      : "border-gray-300"
                   }`}
                 />
               )}
@@ -54,7 +59,9 @@ export default function ProgressBar({ step }: { step: number }) {
 
             {/* Label */}
             <div className="mt-1 text-xs font-semibold text-center">
-              <span className={index <= step ? "text-orange-500" : "text-gray-400"}>
+              <span
+                className={index <= step ? "text-orange-500" : "text-gray-400"}
+              >
                 {label}
               </span>
             </div>

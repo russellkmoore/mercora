@@ -26,7 +26,6 @@ export default function AgentDrawer() {
         {/* Left fade */}
         <div className="absolute left-0 top-0 h-full w-2 bg-gradient-to-r from-black/20 to-transparent z-10 pointer-events-none" />
 
-
         <h2 className="text-lg font-semibold mb-3 mt-2">Ask Voltique AI</h2>
         <div className="border rounded-md p-3 h-48 overflow-y-auto text-sm space-y-3">
           <div className="flex justify-end">
