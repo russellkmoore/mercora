@@ -3,10 +3,127 @@
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Search, Send } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useChatStore } from "@/lib/stores/chat-store";
+import { useUser } from "@clerk/nextjs";
+import ProductCard from "./ProductCard";
 
 export default function AgentDrawer() {
   const [isOpen, setIsOpen] = useState(false);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const { user } = useUser();
+  const {
+    messages,
+    addMessage,
+    setAssistantMessage,
+    productIds,
+    setProductIds,
+    products,
+    setProducts,
+    clearMessages,
+  } = useChatStore();
+
+  // Auto-scroll to bottom when messages change or loading state changes
+  const scrollToBottom = () => {
+    if (chatContainerRef.current) {
+      const container = chatContainerRef.current;
+      // Try multiple scroll approaches
+      container.scrollTop = container.scrollHeight;
+      
+      // Also try scrollIntoView on the bottom anchor
+      const bottomElement = container.querySelector('#chat-bottom');
+      if (bottomElement) {
+        bottomElement.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+    }
+  };
+
+  useEffect(() => {
+    // Use requestAnimationFrame to ensure DOM has updated
+    requestAnimationFrame(() => {
+      scrollToBottom();
+    });
+  }, [messages, isLoading]);
+
+  // Also scroll to bottom when the drawer opens (in case there are existing messages)
+  useEffect(() => {
+    if (isOpen) {
+      // Multiple attempts to ensure scrolling works
+      setTimeout(() => scrollToBottom(), 50);
+      setTimeout(() => scrollToBottom(), 100);
+      setTimeout(() => scrollToBottom(), 200);
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async () => {
+    if (!input.trim() || isLoading) return;
+    
+    const userMessage = {
+      role: "user" as const,
+      content: input.trim(),
+      created_at: new Date().toISOString(),
+    };
+    addMessage(userMessage);
+    setInput("");
+    setIsLoading(true);
+    
+    // Force scroll after adding user message
+    setTimeout(() => scrollToBottom(), 50);
+
+    try {
+      const res = await fetch("/api/agent-chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ 
+          question: userMessage.content,
+          userName: user?.firstName || user?.fullName || "Guest",
+          history: messages 
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+
+      const data = (await res.json()) as { 
+        answer: string; 
+        productIds?: string[];
+        products?: any[];
+        history?: any[];
+      };
+
+      addMessage({
+        role: "assistant",
+        content: data.answer,
+        created_at: new Date().toISOString(),
+      });
+      
+      // Force scroll after adding assistant message
+      setTimeout(() => scrollToBottom(), 50);
+      
+      console.log("Product IDs from agent:", data.productIds);
+      console.log("Products from agent:", data.products);
+      
+      setProductIds((data.productIds || []).map(id => Number(id)));
+      setProducts(data.products || []);
+    } catch (error) {
+      console.error("Chat error:", error);
+      addMessage({
+        role: "assistant",
+        content: "Sorry, I'm having trouble connecting right now. Please try again!",
+        created_at: new Date().toISOString(),
+      });
+      
+      // Force scroll after adding error message
+      setTimeout(() => scrollToBottom(), 50);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -21,47 +138,97 @@ export default function AgentDrawer() {
       </SheetTrigger>
       <SheetContent
         side="right"
-        className="bg-[#fdfdfb] text-black transition-all duration-300 ease-in-out w-[400px] px-3"
+        className="bg-[#fdfdfb] text-black transition-all ease-in-out px-3 !w-[800px] !max-w-[800px] !duration-[600ms] data-[state=closed]:!duration-[600ms] data-[state=open]:!duration-[600ms]"
       >
         {/* Left fade */}
         <div className="absolute left-0 top-0 h-full w-2 bg-gradient-to-r from-black/20 to-transparent z-10 pointer-events-none" />
 
-        <h2 className="text-lg font-semibold mb-3 mt-2">Ask Voltique AI</h2>
-        <div className="border rounded-md p-3 h-48 overflow-y-auto text-sm space-y-3">
-          <div className="flex justify-end">
-            <div className="bg-blue-100 text-right text-blue-900 px-3 py-2 rounded-lg max-w-[75%]">
-              <p>
-                <strong>You:</strong> How can I track my order?
-              </p>
+        <h2 className="text-lg font-semibold mb-3 mt-2">Ask Volt</h2>
+        <div 
+          ref={chatContainerRef}
+          className="border rounded-md p-3 h-80 overflow-y-auto text-sm space-y-3"
+        >
+          {messages.map((msg, i) =>
+            msg.role === "user" ? (
+              <div key={i} className="flex justify-end">
+                <div className="bg-blue-100 text-right text-blue-900 px-3 py-2 rounded-lg max-w-[75%]">
+                  <p>
+                    <strong>You:</strong> {msg.content}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div key={i} className="flex items-start space-x-2">
+                <div className="h-6 w-6 flex items-center justify-center bg-orange-500 rounded-full text-white text-xs font-bold">
+                  V
+                </div>
+                <div className="bg-gray-100 text-gray-800 px-3 py-2 rounded-lg max-w-[75%]">
+                  <p>
+                    <strong>Voltique AI:</strong> {msg.content}
+                  </p>
+                </div>
+              </div>
+            )
+          )}
+          {isLoading && (
+            <div className="flex items-start space-x-2">
+              <div className="h-6 w-6 flex items-center justify-center bg-orange-500 rounded-full text-white text-xs font-bold">
+                V
+              </div>
+              <div className="bg-gray-100 text-gray-800 px-3 py-2 rounded-lg">
+                <p className="text-gray-500">
+                  <strong>Voltique AI:</strong> Thinking...
+                </p>
+              </div>
             </div>
-          </div>
-          <div className="flex items-start space-x-2">
-            <div className="h-6 w-6 flex items-center justify-center bg-orange-500 rounded-full text-white text-xs font-bold">
-              V
-            </div>
-            <div className="bg-gray-100 text-gray-800 px-3 py-2 rounded-lg max-w-[75%]">
-              <p>
-                <strong>Voltique AI:</strong> You can track your order in the{" "}
-                <em>Order History</em> page under your account dashboard.
-              </p>
-            </div>
-          </div>
+          )}
+          {/* Invisible scroll anchor */}
+          <div id="chat-bottom" />
         </div>
 
         <div className="mt-3 relative">
           <input
             type="text"
-            placeholder="Type your question..."
-            className="w-full border rounded pl-3 pr-10 py-2"
+            placeholder={isLoading ? "Waiting for response..." : "Type your question..."}
+            className="w-full border rounded pl-3 pr-10 py-2 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            value={input}
+            disabled={isLoading}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !isLoading) handleSubmit();
+            }}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck="false"
+            data-form-type="other"
+            name="chat-input"
           />
-          <button className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-black">
+          <button
+            onClick={handleSubmit}
+            disabled={isLoading || !input.trim()}
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-black disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <Send className="w-5 h-5" />
           </button>
         </div>
 
         <hr className="my-4" />
         <div className="text-sm text-gray-600">
-          Search results will appear here...
+          {productIds.length > 0 ? (
+            <div className="space-y-2">
+              <h3 className="font-semibold text-base text-black">
+                Related Products
+              </h3>
+              <div className="space-y-2">
+                {products.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+            </div>
+          ) : (
+            "No related products yet..."
+          )}
         </div>
       </SheetContent>
     </Sheet>
