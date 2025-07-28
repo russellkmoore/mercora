@@ -45,7 +45,7 @@ export default function OrderConfirmationModal({
             </Button>
           </Link>
           {userId && (
-            <Link href="/" passHref>
+            <Link href="/orders" passHref>
               <Button className="flex-1 bg-black text-white hover:bg-orange-500 transition-colors">
                 View Order History
               </Button>

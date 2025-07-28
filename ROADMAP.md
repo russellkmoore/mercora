@@ -26,7 +26,10 @@
 - **AI Chat Assistant**: Volt personality with product-aware responses
 - **AI Context Retrieval**: Semantic search with vectorized knowledge base
 - **Product Recommendations**: AI returns contextual product suggestions
-- **Chat UI**: Enhanced drawer with auto-scroll, loading states, user personalization
+- **Chat UI**: Enhanced drawer with auto-scroll, loading states, user 
+personalization
+- Create `README.md` with setup and deploy instructions
+- Document schema, media management, and deployment steps
 
 ## 🟧 In Progress / Immediate Tasks
 
@@ -36,24 +39,11 @@
 - [ ] Fix Safari password manager detection on chat input
 - [ ] Improve AI agent drawer width and animation timing
 
-### Product Data
-- [ ] Standardize image naming / alt text for SEO
-- [ ] Enhance product vectorization with better metadata
-
-### Dev/Docs
-- [ ] Create `README.md` with setup and deploy instructions
-- [ ] Document schema, media management, and deployment steps
 
 ---
 
 ## 🟥 Phase 1 – MVP Must Haves
-
-### EPIC 1: Authentication
-(done))
-
-### EPIC 2: Checkout
-(done))
-
+(done)
 ---
 
 ## 🟨 Phase 2 – Payments & Orders
