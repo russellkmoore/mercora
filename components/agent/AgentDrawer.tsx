@@ -13,6 +13,7 @@ export default function AgentDrawer() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const { user } = useUser();
   const {
     messages,
@@ -54,6 +55,13 @@ export default function AgentDrawer() {
       setTimeout(() => scrollToBottom(), 50);
       setTimeout(() => scrollToBottom(), 100);
       setTimeout(() => scrollToBottom(), 200);
+      
+      // Focus input when drawer opens
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }, 300);
     }
   }, [isOpen]);
 
@@ -105,6 +113,13 @@ export default function AgentDrawer() {
       // Force scroll after adding assistant message
       setTimeout(() => scrollToBottom(), 50);
       
+      // Return focus to input after response
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }, 100);
+      
       console.log("Product IDs from agent:", data.productIds);
       console.log("Products from agent:", data.products);
       
@@ -120,6 +135,13 @@ export default function AgentDrawer() {
       
       // Force scroll after adding error message
       setTimeout(() => scrollToBottom(), 50);
+      
+      // Return focus to input even after error
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }, 100);
     } finally {
       setIsLoading(false);
     }
@@ -188,6 +210,7 @@ export default function AgentDrawer() {
 
         <div className="mt-3 relative">
           <input
+            ref={inputRef}
             type="text"
             placeholder={isLoading ? "Waiting for response..." : "Type your question..."}
             className="w-full border rounded pl-3 pr-10 py-2 disabled:bg-gray-100 disabled:cursor-not-allowed"
