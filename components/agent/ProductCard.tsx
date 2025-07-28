@@ -7,18 +7,17 @@ export default function ProductCard({ product }: { product: any }) {
   return (
     <div className="border rounded p-3 bg-white shadow-sm">
       <Link href={`/product/${product.slug}`} className="flex items-center space-x-3">
-        <div className="w-16 h-16 relative flex-shrink-0">
+        <div className="w-16 h-16 relative flex-shrink-0 overflow-hidden rounded border">
           <Image
             src={product.primaryImageUrl || "/placeholder.jpg"}
             alt={product.name}
-            width={64}
-            height={64}
+            fill
             sizes="64px"
-            className="rounded object-cover"
+            className="object-cover"
           />
         </div>
-        <div className="flex-1">
-          <h4 className="text-sm font-semibold">{product.name}</h4>
+        <div className="flex-1 min-w-0">
+          <h4 className="text-sm font-semibold truncate">{product.name}</h4>
           <p className="text-xs text-gray-500 truncate">
             {product.shortDescription}
           </p>
