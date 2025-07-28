@@ -1,3 +1,44 @@
+/**
+ * === Cart Drawer Component ===
+ *
+ * A sliding shopping cart interface that provides users with quick access to
+ * their cart items, total calculations, and checkout functionality. Implements
+ * persistent cart state and real-time updates.
+ *
+ * === Features ===
+ * - **Persistent Cart State**: Uses Zustand store for cart persistence
+ * - **Real-time Updates**: Instant reflection of quantity changes
+ * - **Total Calculations**: Automatic price calculations and updates
+ * - **Item Management**: Add, remove, and modify cart items
+ * - **Quick Checkout**: Direct link to checkout process
+ * - **Responsive Design**: Works across all device sizes
+ * - **Visual Indicators**: Item count badge and empty state handling
+ *
+ * === Cart Functionality ===
+ * - **Item Display**: Shows product image, name, price, quantity
+ * - **Quantity Controls**: Increase/decrease item quantities
+ * - **Item Removal**: Remove items from cart
+ * - **Total Calculation**: Real-time price totals with currency formatting
+ * - **Empty State**: Helpful message when cart is empty
+ *
+ * === State Management ===
+ * - **Zustand Store**: Persistent cart state across sessions
+ * - **Local Storage**: Cart survives browser refreshes
+ * - **Real-time Sync**: Immediate UI updates on state changes
+ *
+ * === Usage ===
+ * ```tsx
+ * <CartDrawer />
+ * ```
+ * 
+ * No props required - manages its own state and integrates with cart store.
+ *
+ * === Integration ===
+ * - **CartItemCard**: Individual cart item display and management
+ * - **Cart Store**: Global cart state management
+ * - **Checkout Flow**: Direct integration with checkout process
+ */
+
 import { useCartStore } from "@/lib/stores/cart-store";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import CartItemCard from "./CartItemCard";
@@ -6,10 +47,16 @@ import { ShoppingCart } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
 
+/**
+ * CartDrawer component providing shopping cart functionality
+ * 
+ * @returns JSX element representing a sliding cart drawer with items and totals
+ */
 export default function CartDrawer() {
   const [isOpen, setIsOpen] = useState(false);
   const items = useCartStore((state) => state.items);
 
+  // Calculate total price for all items in cart
   const total = items.reduce(
     (acc, item) => acc + item.price * item.quantity,
     0

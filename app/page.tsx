@@ -1,7 +1,50 @@
+/**
+ * === Home Page Component ===
+ *
+ * The main landing page component that showcases the brand identity and
+ * featured products. Designed to create immediate engagement and drive
+ * users deeper into the product catalog.
+ *
+ * === Features ===
+ * - **Hero Section**: Bold branding with compelling value proposition
+ * - **Featured Products**: Curated selection of top products (3 items)
+ * - **Call-to-Action**: Direct link to featured category for exploration
+ * - **Responsive Design**: Mobile-first layout with desktop enhancements
+ * - **Brand Voice**: Adventure-focused messaging with technical emphasis
+ * - **Visual Hierarchy**: Strategic typography and spacing for impact
+ *
+ * === Layout Structure ===
+ * - **Hero**: Large heading + description + CTA button
+ * - **Products Grid**: 3-column responsive grid of featured products
+ * - **Responsive**: 1 column mobile, 2 tablet, 3 desktop
+ *
+ * === Technical Implementation ===
+ * - **Server Component**: Static generation for optimal performance
+ * - **Data Loading**: Server-side product fetching with category filtering
+ * - **SEO Optimized**: Proper heading hierarchy and semantic markup
+ * - **Performance**: Minimal client-side JavaScript, fast initial load
+ *
+ * === Business Logic ===
+ * - Displays first 3 products from "featured" category
+ * - Drives traffic to full featured category page
+ * - Establishes brand positioning and product appeal
+ *
+ * === Usage ===
+ * This is the root page component rendered at "/"
+ * 
+ * @returns JSX element with complete home page layout
+ */
+
 import ProductCard from "@/components/ProductCard";
 import { getProductsByCategory } from "@/lib/loaders/products";
 
+/**
+ * Home page component - main landing page for the application
+ * 
+ * @returns Server-rendered home page with hero section and featured products
+ */
 export default async function HomePage() {
+  // Fetch first 3 featured products for hero section
   const featuredProducts = (await getProductsByCategory("featured")).slice(
     0,
     3
@@ -9,6 +52,7 @@ export default async function HomePage() {
 
   return (
     <main className="bg-neutral-900 text-white min-h-screen px-6 sm:px-12 py-16">
+      {/* Hero Section */}
       <section className="max-w-6xl mx-auto text-center mb-20">
         <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight uppercase mb-6">
           This Gear Powers Your Next Escape
@@ -24,6 +68,7 @@ export default async function HomePage() {
         </a>
       </section>
 
+      {/* Featured Products Grid */}
       <section className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
         {featuredProducts.map((product) => (
           <ProductCard key={product.id} product={product} />

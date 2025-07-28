@@ -1,3 +1,47 @@
+/**
+ * === Sheet Component (shadcn/ui) ===
+ *
+ * A slide-out dialog component built with Radix UI Dialog primitives.
+ * Provides a flexible overlay panel that slides in from any edge of the screen,
+ * commonly used for navigation menus, settings panels, or detailed content views.
+ *
+ * === Features ===
+ * - **Multi-directional**: Slides from top, right, bottom, or left
+ * - **Accessible**: Full keyboard navigation and screen reader support
+ * - **Animated**: Smooth slide and fade animations
+ * - **Portal Rendering**: Renders outside normal DOM flow for proper layering
+ * - **Focus Management**: Traps focus within sheet when open
+ * - **Backdrop**: Semi-transparent overlay with click-to-close
+ * - **Customizable**: Flexible styling and content composition
+ *
+ * === Slide Directions ===
+ * - **right**: Default slide from right edge (drawer style)
+ * - **left**: Slide from left edge (navigation menu style)
+ * - **top**: Slide from top edge (notifications/alerts)
+ * - **bottom**: Slide from bottom edge (mobile actions/menus)
+ *
+ * === Usage ===
+ * ```tsx
+ * <Sheet>
+ *   <SheetTrigger>Open Sheet</SheetTrigger>
+ *   <SheetContent side="right">
+ *     <SheetHeader>
+ *       <SheetTitle>Settings</SheetTitle>
+ *       <SheetDescription>Configure your preferences</SheetDescription>
+ *     </SheetHeader>
+ *     <div className="py-4">Sheet content here</div>
+ *   </SheetContent>
+ * </Sheet>
+ * ```
+ *
+ * === Accessibility ===
+ * - ARIA dialog implementation
+ * - Focus trap when open
+ * - Escape key to close
+ * - Screen reader announcements
+ * - Proper heading hierarchy
+ */
+
 "use client"
 
 import * as React from "react"
@@ -6,28 +50,73 @@ import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * === Sheet Root Component ===
+ * 
+ * Main container for the sheet dialog. Manages open/close state
+ * and provides context for all child components.
+ * 
+ * @param children - Sheet trigger and content components
+ * @param ...props - All Radix Dialog Root props (open, onOpenChange, etc.)
+ */
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />
 }
 
+/**
+ * === Sheet Trigger Component ===
+ * 
+ * Button or element that opens the sheet when clicked.
+ * Can be any clickable element or component.
+ * 
+ * @param children - Trigger content (button text, icon, etc.)
+ * @param ...props - All Radix Dialog Trigger props
+ */
 function SheetTrigger({
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Trigger>) {
   return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />
 }
 
+/**
+ * === Sheet Close Component ===
+ * 
+ * Button that closes the sheet. Can be placed anywhere within
+ * the sheet content for programmatic closing.
+ * 
+ * @param children - Close button content
+ * @param ...props - All Radix Dialog Close props
+ */
 function SheetClose({
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Close>) {
   return <SheetPrimitive.Close data-slot="sheet-close" {...props} />
 }
 
+/**
+ * === Sheet Portal Component ===
+ * 
+ * Portal component that renders sheet content outside normal DOM flow.
+ * Usually not used directly - automatically included in SheetContent.
+ * 
+ * @param children - Content to portal
+ * @param ...props - All Radix Dialog Portal props
+ */
 function SheetPortal({
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Portal>) {
   return <SheetPrimitive.Portal data-slot="sheet-portal" {...props} />
 }
 
+/**
+ * === Sheet Overlay Component ===
+ * 
+ * Semi-transparent backdrop behind the sheet content.
+ * Includes click-to-close functionality and fade animations.
+ * 
+ * @param className - Additional CSS classes
+ * @param ...props - All Radix Dialog Overlay props
+ */
 function SheetOverlay({
   className,
   ...props
@@ -44,6 +133,27 @@ function SheetOverlay({
   )
 }
 
+/**
+ * === Sheet Content Component ===
+ * 
+ * Main content container that slides in from the specified edge.
+ * Includes built-in close button and proper focus management.
+ * 
+ * @param side - Direction to slide from (top, right, bottom, left)
+ * @param className - Additional CSS classes
+ * @param children - Sheet content (header, body, footer, etc.)
+ * @param ...props - All Radix Dialog Content props
+ * 
+ * @example
+ * ```tsx
+ * <SheetContent side="right" className="w-[400px]">
+ *   <SheetHeader>
+ *     <SheetTitle>Navigation</SheetTitle>
+ *   </SheetHeader>
+ *   <div className="py-4">Content here</div>
+ * </SheetContent>
+ * ```
+ */
 function SheetContent({
   className,
   children,
@@ -81,6 +191,16 @@ function SheetContent({
   )
 }
 
+/**
+ * === Sheet Header Component ===
+ * 
+ * Container for sheet title and description with consistent spacing.
+ * Should contain SheetTitle and optionally SheetDescription.
+ * 
+ * @param className - Additional CSS classes
+ * @param children - Header content (title, description)
+ * @param ...props - All standard div props
+ */
 function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -91,6 +211,16 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/**
+ * === Sheet Footer Component ===
+ * 
+ * Container for sheet actions like buttons, positioned at bottom.
+ * Automatically sticks to bottom with proper spacing.
+ * 
+ * @param className - Additional CSS classes
+ * @param children - Footer content (buttons, actions)
+ * @param ...props - All standard div props
+ */
 function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -101,6 +231,16 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/**
+ * === Sheet Title Component ===
+ * 
+ * Accessible title for the sheet dialog. Required for screen readers.
+ * Should be used within SheetHeader for proper spacing.
+ * 
+ * @param className - Additional CSS classes
+ * @param children - Title text
+ * @param ...props - All Radix Dialog Title props
+ */
 function SheetTitle({
   className,
   ...props
@@ -114,6 +254,16 @@ function SheetTitle({
   )
 }
 
+/**
+ * === Sheet Description Component ===
+ * 
+ * Optional description text for the sheet dialog. 
+ * Provides additional context for screen readers.
+ * 
+ * @param className - Additional CSS classes
+ * @param children - Description text
+ * @param ...props - All Radix Dialog Description props
+ */
 function SheetDescription({
   className,
   ...props

@@ -4,6 +4,17 @@
 
 Mercora is a modern, AI-enhanced eCommerce platform specializing in outdoor gear. It features **Volt**, an intelligent AI shopping assistant that provides contextual product recommendations using semantic search and vector databases.
 
+## 🗺️ Quick Navigation
+
+| 📋 Documentation | 🔗 Link | 📝 Description |
+|------------------|---------|----------------|
+| **System Architecture** | [📐 Architecture Overview](/docs/architecture.md) | Complete system design, components, security |
+| **AI Pipeline** | [🤖 AI Documentation](/docs/ai-pipeline.md) | Vector search, anti-hallucination, recommendations |
+| **API Specifications** | [🔌 API Architecture](/docs/api-architecture.md) | Endpoints, security, integration flows |
+| **Product Roadmap** | [🗺️ Development Roadmap](/ROADMAP.md) | Planned features, milestones, and progress |
+| **Data Documentation** | [📊 Data Guide](/data/README.md) | Product data, knowledge base, data formats |
+| **Live Demo** | [🌐 mercora.russellkmoore.workers.dev](https://mercora.russellkmoore.workers.dev) | Try the AI assistant and explore products |
+
 ## ✨ Key Features
 
 ### 🤖 **AI-Powered Shopping Assistant**
@@ -47,7 +58,26 @@ User Query → AI Embeddings → Vector Search → Context Retrieval → LLM Res
 - **Language Model**: Meta Llama 3.1 8B Instruct
 - **Context Window**: Semantic search with top-K retrieval
 
-## 🚀 Getting Started
+## � Architecture Documentation
+
+Comprehensive technical documentation with interactive Mermaid diagrams:
+
+### **System Architecture**
+- **[Complete Architecture Overview](/docs/architecture.md)** - High-level system design, component relationships, deployment pipeline, and security architecture
+- **[AI Processing Pipeline](/docs/ai-pipeline.md)** - Detailed AI workflows, vector search deep-dive, anti-hallucination systems, and recommendation engine
+- **[API Architecture](/docs/api-architecture.md)** - Complete API specifications, security models, and integration flows
+
+### **Visual Documentation Features**
+- 🎨 **Interactive Mermaid Diagrams** - View in GitHub, VS Code, or any Mermaid viewer
+- 🔄 **Data Flow Visualizations** - From user input to AI recommendations
+- 🏗️ **Component Architecture** - Frontend/backend relationship mapping
+- 🔐 **Security Architecture** - Multi-layered protection strategies
+- 📊 **Database Schema** - Complete ER diagrams with relationships
+- 🚀 **Deployment Pipeline** - Build and deployment process flows
+
+> **💡 Tip**: Open the documentation files in GitHub or VS Code with Mermaid extension for interactive diagram viewing.
+
+## �🚀 Getting Started
 
 ### Prerequisites
 - Node.js 18+ 
@@ -301,8 +331,39 @@ const vectorResults = await vectorize.query(embedding.data[0], {
 
 ## 🤝 Contributing
 
+### **Development Guidelines**
+
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Review the [architecture documentation](/docs) for system understanding
+4. Make changes following the established patterns
+5. Update relevant documentation and diagrams
+6. Submit a pull request
+
+### **Documentation Standards**
+
+- **Code Documentation**: Follow the established JSDoc patterns
+- **Architecture Changes**: Update Mermaid diagrams in `/docs`
+- **API Changes**: Update API documentation accordingly
+
+## 📚 Technical Documentation
+
+For developers and technical stakeholders:
+
+### **Complete Architecture Documentation**
+- **[📐 System Architecture](/docs/architecture.md)** - Complete system overview with Mermaid diagrams
+- **[🤖 AI Pipeline Documentation](/docs/ai-pipeline.md)** - Deep dive into AI processing workflows
+- **[🔌 API Architecture](/docs/api-architecture.md)** - Comprehensive API specifications and flows
+
+### **Key Technical Resources**
+- **Interactive Diagrams**: View documentation in GitHub for interactive Mermaid diagrams
+- **Code Documentation**: Comprehensive inline documentation throughout codebase
+- **Database Schema**: Complete ER diagrams and relationship documentation
+- **Security Model**: Multi-layered security architecture and threat mitigation
+
+> **💡 Developer Tip**: Start with the [System Architecture](/docs/architecture.md) for a complete technical overview, then dive into specific areas as needed.
+
+## 🤝 Contributing (Legacy)
 3. Commit changes: `git commit -m 'Add amazing feature'`
 4. Push to branch: `git push origin feature/amazing-feature`
 5. Open a Pull Request

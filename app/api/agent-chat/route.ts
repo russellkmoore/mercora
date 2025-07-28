@@ -1,3 +1,56 @@
+/**
+ * === Agent Chat API ===
+ *
+ * This endpoint powers the Volt AI assistant - a cheeky outdoor gear expert that provides
+ * intelligent product recommendations and outdoor advice using Cloudflare AI and vectorized search.
+ *
+ * === Core Features ===
+ * - Conversational AI powered by Llama 3.1 8B Instruct
+ * - Vectorized product search using BGE embeddings
+ * - Anti-hallucination system to prevent fake product recommendations
+ * - Personality system with random flair and easter eggs
+ * - Context-aware responses based on conversation history
+ *
+ * === Request Body ===
+ * ```json
+ * {
+ *   "question": "What hiking gear do you recommend?",
+ *   "userName": "John", // Optional, defaults to "Guest"
+ *   "history": [...] // Optional conversation history
+ * }
+ * ```
+ *
+ * === Response Format ===
+ * ```json
+ * {
+ *   "answer": "AI response text",
+ *   "productIds": [1, 2, 3], // IDs of recommended products
+ *   "products": [...], // Full product objects
+ *   "history": [...], // Updated conversation history
+ *   "userId": "clerk_user_id"
+ * }
+ * ```
+ *
+ * === AI Personality ===
+ * - **Volt**: Cheeky, sarcastic, but helpful outdoor gear expert
+ * - **Anti-Hallucination**: Strict rules prevent fake product recommendations
+ * - **Flair System**: 30% chance of adding personality quirks to responses
+ * - **Easter Eggs**: Special responses for s'mores recipes and unicorn mentions
+ *
+ * === Technical Stack ===
+ * - **AI Model**: @cf/meta/llama-3.1-8b-instruct (temperature: 0.3)
+ * - **Embeddings**: @cf/baai/bge-base-en-v1.5 for vectorized search
+ * - **Database**: D1 with Drizzle ORM for product data
+ * - **Auth**: Clerk for user authentication
+ * - **Search**: Cloudflare Vectorize for semantic product matching
+ *
+ * === Security ===
+ * - Protected by Clerk authentication
+ * - Input validation and sanitization
+ * - Rate limiting via Cloudflare Workers
+ * - Strict anti-hallucination prompts
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
@@ -7,8 +60,15 @@ import { inArray } from "drizzle-orm";
 import { hydrateProduct } from "@/lib/models/product";
 import type { Product } from "@/lib/types/product";
 
+/**
+ * Handles chat interactions with the Volt AI assistant
+ * 
+ * @param req - Next.js request object containing question, userName, and history
+ * @returns JSON response with AI answer, recommended products, and updated history
+ */
 export async function POST(req: NextRequest) {
   try {
+    // Parse and validate request body
     const body: { question: string; userName?: string; history?: any[] } =
       await req.json();
     const { userId } = await auth();
@@ -18,33 +78,39 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing question" }, { status: 400 });
     }
 
-    // Use Vectorize to get relevant context
+    // === VECTORIZED SEARCH PHASE ===
+    // Use Cloudflare Vectorize to find relevant products and knowledge base content
+    // This provides context for the AI to make accurate recommendations
     let contextSnippets = "";
     let productIds: number[] = [];
 
     try {
-      // Access AI and Vectorize bindings
+      // Access Cloudflare Worker bindings for AI and Vectorize
       const { env } = await getCloudflareContext({ async: true });
       const ai = (env as any).AI;
       const vectorize = (env as any).VECTORIZE;
 
       if (ai && vectorize) {
-        // First embed the question using the same model as the indexed content
+        // Step 1: Convert user question to vector using same model as indexed content
+        // This ensures semantic similarity matching works correctly
         const questionEmbedding = await ai.run("@cf/baai/bge-base-en-v1.5", {
           text: question,
         });
 
-        // Query the Vectorize index for relevant context
+        // Step 2: Search vectorized index for semantically similar content
+        // Returns top 5 most relevant products/knowledge articles
         const vectorResults = await vectorize.query(questionEmbedding.data[0], {
-          topK: 5,
-          returnMetadata: true,
+          topK: 5, // Get top 5 matches
+          returnMetadata: true, // Include text snippets and product IDs
         });
 
         if (vectorResults && vectorResults.matches) {
+          // Extract text snippets to provide context to the AI
           contextSnippets = vectorResults.matches
             .map((match: any) => match.metadata?.text || match.id)
             .join("\n\n");
 
+          // Extract product IDs for fetching full product data later
           productIds = vectorResults.matches
             .map((match: any) => match.metadata?.productId)
             .filter((id: any) => id !== undefined && !isNaN(Number(id)))

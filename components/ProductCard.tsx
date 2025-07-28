@@ -1,14 +1,61 @@
+/**
+ * === Product Card Component ===
+ *
+ * A reusable product display card component that shows essential product information
+ * with consistent styling and interactive behavior. Used throughout the application
+ * for product listings, recommendations, and search results.
+ *
+ * === Features ===
+ * - **Responsive Design**: Adapts to different screen sizes and grid layouts
+ * - **Image Optimization**: Next.js Image component with lazy loading and optimization
+ * - **Price Display**: Handles regular pricing, sale pricing, and discount calculations
+ * - **Interactive States**: Hover effects and smooth transitions
+ * - **Accessibility**: Proper semantic markup and keyboard navigation
+ * - **Loading States**: Graceful handling of missing images or data
+ *
+ * === Visual Elements ===
+ * - **Product Image**: Optimized image with fallback placeholder
+ * - **Product Name**: Truncated title with full name on hover
+ * - **Short Description**: Brief product description
+ * - **Pricing**: Regular price, sale price, and discount percentage
+ * - **Availability**: Stock status and availability indicators
+ *
+ * === Usage ===
+ * ```tsx
+ * <ProductCard product={productData} />
+ * ```
+ *
+ * === Props ===
+ * @param product - Complete Product object with all required fields
+ *
+ * === Styling ===
+ * - Dark theme with neutral colors
+ * - Hover effects for better UX
+ * - Responsive aspect ratios
+ * - Consistent spacing and typography
+ */
+
 "use client";
 
 import Link from "next/link";
 import Image from "next/image";
 import type { Product } from "@/lib/types/product";
 
+/**
+ * Props interface for ProductCard component
+ */
 interface ProductCardProps {
   product: Product;
 }
 
+/**
+ * ProductCard component for displaying product information in a card layout
+ * 
+ * @param product - Product object containing all product data
+ * @returns JSX element representing a clickable product card
+ */
 export default function ProductCard({ product }: ProductCardProps) {
+  // Destructure product properties for easier access
   const {
     id,
     name,

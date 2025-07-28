@@ -1,3 +1,43 @@
+/**
+ * === Header Client Component ===
+ *
+ * Client-side header component that provides the main navigation interface with
+ * interactive elements including category navigation, user authentication,
+ * shopping cart, and AI assistant access.
+ *
+ * === Features ===
+ * - **Responsive Navigation**: Adapts to different screen sizes
+ * - **Category Dropdown**: Dynamic category navigation from server data
+ * - **User Authentication**: Clerk integration for login/logout
+ * - **Shopping Cart**: Quick access to cart with item count
+ * - **AI Assistant**: Integrated Volt AI chat drawer
+ * - **Interactive Elements**: Hover effects and smooth transitions
+ *
+ * === Components Integrated ===
+ * - **AgentDrawer**: AI-powered shopping assistant
+ * - **ClerkLogin**: User authentication and profile management
+ * - **CartDrawer**: Shopping cart review and management
+ * - **DropdownMenu**: Category navigation menu
+ *
+ * === Navigation Structure ===
+ * ```
+ * Logo | Home | Categories ↓ | Help & Search | Cart | Login
+ * ```
+ *
+ * === Usage ===
+ * ```tsx
+ * <HeaderClient categories={categoryData} />
+ * ```
+ *
+ * === Props ===
+ * @param categories - Array of category objects for navigation dropdown
+ *
+ * === Styling ===
+ * - Dark theme with orange accent colors
+ * - Responsive layout with flexbox
+ * - Consistent hover states and transitions
+ */
+
 "use client";
 
 import Link from "next/link";
@@ -13,11 +53,22 @@ import AgentDrawer from "@/components/agent/AgentDrawer";
 import ClerkLogin from "@/components/login/ClerkLogin";
 import CartDrawer from "@/components/cart/CartDrawer";
 
+/**
+ * Props interface for HeaderClient component
+ */
+interface HeaderClientProps {
+  categories: { id: number; name: string; slug: string }[];
+}
+
+/**
+ * HeaderClient component providing main navigation with interactive elements
+ * 
+ * @param categories - Array of product categories for navigation dropdown
+ * @returns JSX element representing the main site header
+ */
 export default function HeaderClient({
   categories,
-}: {
-  categories: { id: number; name: string; slug: string }[];
-}) {
+}: HeaderClientProps) {
   return (
     <div className="flex justify-between items-center px-6 py-4 bg-black text-white">
       <Link href="/" className="text-xl font-bold">
