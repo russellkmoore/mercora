@@ -24,7 +24,7 @@ export default function ProgressBar({ step }: { step: number }) {
   }, [step]);
 
   return (
-    <div className="w-full flex items-center justify-between mb-8">
+    <div className="w-full flex items-center justify-between mb-6 sm:mb-8">
       {steps.map((label, index) => {
         const isCompleted = index < step;
         const isCurrent = index === step;
@@ -35,12 +35,12 @@ export default function ProgressBar({ step }: { step: number }) {
             className="flex-1 flex flex-col items-center relative"
           >
             {/* Circle */}
-            <div className="mb-1 h-6 flex items-center justify-center">
+            <div className="mb-1 h-5 sm:h-6 flex items-center justify-center">
               {isCompleted ? (
-                <CheckCircle2 className="w-6 h-6 text-orange-500" />
+                <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500" />
               ) : (
                 <div
-                  className={`w-6 h-6 rounded-full border-2 ${
+                  className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 ${
                     isCurrent
                       ? "bg-orange-500 border-orange-500"
                       : "border-gray-300"
@@ -58,7 +58,7 @@ export default function ProgressBar({ step }: { step: number }) {
             </div>
 
             {/* Label */}
-            <div className="mt-1 text-xs font-semibold text-center">
+            <div className="mt-1 text-[10px] sm:text-xs font-semibold text-center px-1">
               <span
                 className={index <= step ? "text-orange-500" : "text-gray-400"}
               >

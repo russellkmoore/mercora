@@ -81,14 +81,14 @@ export default function ProductCard({ product }: ProductCardProps) {
               className="object-cover"
             />
           ) : (
-            <div className="flex items-center justify-center h-full text-gray-500 text-xl">
+            <div className="flex items-center justify-center h-full text-gray-500 text-lg sm:text-xl">
               No Image
             </div>
           )}
         </div>
-        <div className="p-4">
-          <h3 className="text-xl font-semibold mb-2">{name}</h3>
-          <p className="text-gray-400 text-sm mb-2 line-clamp-3">
+        <div className="p-3 sm:p-4">
+          <h3 className="text-lg sm:text-xl font-semibold mb-2 line-clamp-2">{name}</h3>
+          <p className="text-gray-400 text-xs sm:text-sm mb-2 line-clamp-3">
             {shortDescription}
           </p>
           {price !== null && (

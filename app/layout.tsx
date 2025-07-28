@@ -75,6 +75,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Mercora",
   description: "Marketplace powered by open knowledge",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
 };
 
 /**
