@@ -45,7 +45,7 @@ import ProductCard from "./ProductCard";
  * Manages conversation state, API calls, and user experience optimizations
  * including auto-scroll, auto-focus, and product recommendation display.
  */
-export default function AgentDrawer() {
+export default function AgentDrawer({ variant = "desktop" }: { variant?: "desktop" | "mobile" }) {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -170,13 +170,10 @@ export default function AgentDrawer() {
         }
       }, 100);
       
-      console.log("Product IDs from agent:", data.productIds);
-      console.log("Products from agent:", data.products);
       
       setProductIds((data.productIds || []).map(id => Number(id)));
       setProducts(data.products || []);
     } catch (error) {
-      console.error("Chat error:", error);
       addMessage({
         role: "assistant",
         content: "Sorry, I'm having trouble connecting right now. Please try again!",
@@ -200,13 +197,17 @@ export default function AgentDrawer() {
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
-        <Button
-          variant="ghost"
-          className="text-white hover:bg-white hover:text-orange-500"
-        >
-          <Search className="mr-2 h-4 w-4" />
-          Help & Search
-        </Button>
+        {variant === "mobile" ? (
+          <span className="text-white">Help & Search</span>
+        ) : (
+          <Button
+            variant="ghost"
+            className="text-white hover:bg-white hover:text-orange-500"
+          >
+            <Search className="mr-2 h-4 w-4" />
+            Help & Search
+          </Button>
+        )}
       </SheetTrigger>
       <SheetContent
         side="right"
@@ -218,12 +219,12 @@ export default function AgentDrawer() {
         <h2 className="text-lg font-semibold mb-3 mt-2">Ask Volt</h2>
         <div 
           ref={chatContainerRef}
-          className="border rounded-md p-3 h-60 sm:h-80 overflow-y-auto text-sm space-y-3"
+          className="border rounded-md p-3 h-60 sm:h-80 overflow-y-auto text-sm space-y-3 bg-gray-50"
         >
           {messages.map((msg, i) =>
             msg.role === "user" ? (
               <div key={i} className="flex justify-end">
-                <div className="bg-blue-100 text-right text-blue-900 px-3 py-2 rounded-lg max-w-[75%]">
+                <div className="bg-blue-500 text-right text-white px-3 py-2 rounded-lg max-w-[75%]">
                   <p>
                     <strong>You:</strong> {msg.content}
                   </p>
@@ -234,7 +235,7 @@ export default function AgentDrawer() {
                 <div className="h-6 w-6 flex items-center justify-center bg-orange-500 rounded-full text-white text-xs font-bold">
                   V
                 </div>
-                <div className="bg-gray-100 text-gray-800 px-3 py-2 rounded-lg max-w-[75%]">
+                <div className="bg-white text-gray-800 px-3 py-2 rounded-lg max-w-[75%] shadow-sm border">
                   <p>
                     <strong>Voltique AI:</strong> {msg.content}
                   </p>
@@ -247,7 +248,7 @@ export default function AgentDrawer() {
               <div className="h-6 w-6 flex items-center justify-center bg-orange-500 rounded-full text-white text-xs font-bold">
                 V
               </div>
-              <div className="bg-gray-100 text-gray-800 px-3 py-2 rounded-lg">
+              <div className="bg-white text-gray-800 px-3 py-2 rounded-lg shadow-sm border">
                 <p className="text-gray-500">
                   <strong>Voltique AI:</strong> Thinking...
                 </p>

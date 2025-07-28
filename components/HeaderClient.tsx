@@ -161,8 +161,12 @@ export default function HeaderClient({
               </div>
 
               <div className="px-4 border-t border-neutral-700 pt-4 space-y-3">
-                <div onClick={() => setIsMobileMenuOpen(false)}>
-                  <AgentDrawer />
+                <div 
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center space-x-3 text-white hover:text-orange-500 py-3 px-4 rounded-lg hover:bg-neutral-800"
+                >
+                  <Search className="h-5 w-5" />
+                  <AgentDrawer variant="mobile" />
                 </div>
                 <div onClick={() => setIsMobileMenuOpen(false)}>
                   <ClerkLogin />
