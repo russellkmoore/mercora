@@ -13,7 +13,7 @@ Mercora is a modern, AI-enhanced eCommerce platform specializing in outdoor gear
 | **API Specifications** | [🔌 API Architecture](/docs/api-architecture.md) | Endpoints, security, integration flows |
 | **Product Roadmap** | [🗺️ Development Roadmap](/ROADMAP.md) | Planned features, milestones, and progress |
 | **Data Documentation** | [📊 Data Guide](/data/README.md) | Product data, knowledge base, data formats |
-| **Live Demo** | [🌐 mercora.russellkmoore.workers.dev](https://mercora.russellkmoore.workers.dev) | Try the AI assistant and explore products |
+| **Live Demo** | [🌐 voltique.russellkmoore.me](https://voltique.russellkmoore.me) | Try the AI assistant and explore products |
 
 ## ✨ Key Features
 
