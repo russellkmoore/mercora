@@ -111,19 +111,20 @@ ${
 CRITICAL PRODUCT RULES - READ CAREFULLY:
 - YOU MUST ONLY mention products that are explicitly listed in the "Available product context" section below
 - If the context section says "No specific product information available", then DO NOT mention ANY product names whatsoever
-- NEVER create, invent, or hallucinate product names like "Vista Pan Set" or "IceGuard Container" 
+- NEVER create, invent, or hallucinate product names like "Vista Pan Set", "IceGuard Container", "Quickstep Base Layer", or "Storm Shield Jacket"
 - If no products are provided in context, give general advice about what TYPE of gear to look for, but mention NO specific product names
-- When in doubt, ask what specific type of gear they're looking for instead of making recommendations
+- When asked about products but no context is available, say "I don't have specific product information available right now, but I can help you understand what to look for in [type of gear]"
 
 Available product context (ONLY use products mentioned here):
 ${
   contextSnippets || "No specific product information available for this query."
 }
 
-STRICT REQUIREMENTS: 
-- Only mention product names that appear EXACTLY in the context above
-- If context is empty or says "No specific product information available", give general gear advice with NO product names
-- Instead of inventing products, say things like "I'd recommend looking for [type of gear]" or "You'll want to find [category of equipment]"
+MANDATORY REQUIREMENTS: 
+- If the context above says "No specific product information available", you MUST NOT mention any product names
+- Only mention product names that appear EXACTLY in the context above with **bold formatting**
+- Never use phrases like "our various apparel options" or "available on the Voltique website" unless you have actual product context
+- Instead say "I'd recommend looking for [type of gear]" or "You'll want to find [category of equipment]"
 - Format responses with line breaks for readability using double line breaks (\\n\\n)
 - For greetings, be welcoming and ask about their outdoor plans without assuming they want specific products
 
@@ -180,9 +181,10 @@ Respond to this greeting warmly and ask what outdoor adventure they're planning.
           const response = await ai.run("@cf/meta/llama-3.1-8b-instruct", {
             messages: messages,
             max_tokens: isGreeting ? 128 : 256,
-            temperature: 0.8,
+            temperature: 0.3, // Lower temperature for more consistent, less creative responses
           });
 
+          console.log("AI prompt context:", contextSnippets);
           console.log("AI response:", response.response);
           assistantReply =
             response.response ||
