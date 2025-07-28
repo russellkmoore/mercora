@@ -83,16 +83,16 @@ export default function CategoryDisplay({ category }: CategoryDisplayProps) {
   });
 
   return (
-    <div className="mx-auto">
+    <div className="mx-auto px-4 sm:px-6">
       {/* Sorting Controls */}
       {sortedProducts.length > 0 && (
-        <div className="mb-8 flex justify-end">
+        <div className="mb-6 sm:mb-8 flex justify-center sm:justify-end">
           <ToggleGroup
             variant="outline"
             type="single"
             value={sortBy}
             onValueChange={(val) => val && setSortBy(val)}
-            className="flex flex-wrap gap-0 leading-none border-neutral-700"
+            className="flex flex-wrap gap-0 leading-none border-neutral-700 scale-90 sm:scale-100"
           >
             <ToggleGroupItem
               value="featured"
@@ -125,13 +125,13 @@ export default function CategoryDisplay({ category }: CategoryDisplayProps) {
       )}
 
       {/* Products Grid */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10">
         {sortedProducts.length > 0 ? (
           sortedProducts.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))
         ) : (
-          <div className="col-span-full text-center text-gray-400">
+          <div className="col-span-full text-center text-gray-400 py-8">
             No products found in this category.
           </div>
         )}

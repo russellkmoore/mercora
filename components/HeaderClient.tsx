@@ -41,14 +41,16 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Home, Search, LogIn, ChevronDown, ShoppingCart } from "lucide-react";
+import { Home, Search, LogIn, ChevronDown, ShoppingCart, Menu, X } from "lucide-react";
 import AgentDrawer from "@/components/agent/AgentDrawer";
 import ClerkLogin from "@/components/login/ClerkLogin";
 import CartDrawer from "@/components/cart/CartDrawer";
@@ -69,13 +71,16 @@ interface HeaderClientProps {
 export default function HeaderClient({
   categories,
 }: HeaderClientProps) {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   return (
-    <div className="flex justify-between items-center px-6 py-4 bg-black text-white">
-      <Link href="/" className="text-xl font-bold">
+    <div className="flex justify-between items-center px-4 sm:px-6 py-4 bg-black text-white">
+      <Link href="/" className="text-lg sm:text-xl font-bold">
         Voltique
       </Link>
 
-      <div className="flex gap-4 items-center">
+      {/* Desktop Navigation */}
+      <div className="hidden md:flex gap-2 sm:gap-4 items-center">
         <Link href="/" passHref>
           <Button
             variant="ghost"
@@ -113,6 +118,59 @@ export default function HeaderClient({
         <AgentDrawer />
         <ClerkLogin />
         <CartDrawer />
+      </div>
+
+      {/* Mobile Navigation */}
+      <div className="flex md:hidden gap-2 items-center">
+        <CartDrawer />
+        
+        <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+          <SheetTrigger asChild>
+            <Button
+              variant="ghost"
+              className="text-white hover:bg-white hover:text-orange-500"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="bg-black text-white w-full max-w-sm">
+            <div className="flex flex-col space-y-4 mt-8">
+              <Link 
+                href="/" 
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="flex items-center space-x-3 text-white hover:text-orange-500 py-3 px-4 rounded-lg hover:bg-neutral-800"
+              >
+                <Home className="h-5 w-5" />
+                <span>Home</span>
+              </Link>
+
+              <div className="px-4 py-2">
+                <h3 className="text-orange-500 font-semibold mb-2">Categories</h3>
+                <div className="space-y-2">
+                  {categories.map((category) => (
+                    <Link
+                      key={category.id}
+                      href={`/category/${category.slug}`}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="block text-white hover:text-orange-500 py-2 px-2 rounded hover:bg-neutral-800"
+                    >
+                      {category.name}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+
+              <div className="px-4 border-t border-neutral-700 pt-4 space-y-3">
+                <div onClick={() => setIsMobileMenuOpen(false)}>
+                  <AgentDrawer />
+                </div>
+                <div onClick={() => setIsMobileMenuOpen(false)}>
+                  <ClerkLogin />
+                </div>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
     </div>
   );

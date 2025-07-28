@@ -210,7 +210,7 @@ export default function AgentDrawer() {
       </SheetTrigger>
       <SheetContent
         side="right"
-        className="bg-[#fdfdfb] text-black transition-all ease-in-out px-3 !w-[800px] !max-w-[800px] !duration-[600ms] data-[state=closed]:!duration-[600ms] data-[state=open]:!duration-[600ms]"
+        className="bg-[#fdfdfb] text-black transition-all ease-in-out px-3 w-full sm:w-[400px] lg:!w-[800px] !max-w-[800px] !duration-[600ms] data-[state=closed]:!duration-[600ms] data-[state=open]:!duration-[600ms]"
       >
         {/* Left fade */}
         <div className="absolute left-0 top-0 h-full w-2 bg-gradient-to-r from-black/20 to-transparent z-10 pointer-events-none" />
@@ -218,7 +218,7 @@ export default function AgentDrawer() {
         <h2 className="text-lg font-semibold mb-3 mt-2">Ask Volt</h2>
         <div 
           ref={chatContainerRef}
-          className="border rounded-md p-3 h-80 overflow-y-auto text-sm space-y-3"
+          className="border rounded-md p-3 h-60 sm:h-80 overflow-y-auto text-sm space-y-3"
         >
           {messages.map((msg, i) =>
             msg.role === "user" ? (

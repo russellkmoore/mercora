@@ -77,21 +77,26 @@ export default function CartDrawer() {
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="bg-white text-black w-[400px] p-4">
+      <SheetContent side="right" className="bg-white text-black w-full sm:w-[400px] max-w-[400px] p-4 flex flex-col">
         {/* Left fade */}
         <div className="absolute left-0 top-0 h-full w-2 bg-gradient-to-r from-black/20 to-transparent z-10 pointer-events-none" />
 
-        <h2 className="text-xl font-bold mb-4">Your Cart</h2>
+        {/* Header - flex-shrink-0 to maintain size */}
+        <h2 className="text-xl font-bold mb-4 flex-shrink-0">Your Cart</h2>
+        
         {items.length === 0 ? (
-          <p>Your cart is empty.</p>
+          <p className="flex-1 flex items-center justify-center text-gray-500">Your cart is empty.</p>
         ) : (
-          <div className="space-y-4">
-            <div className="max-h-[calc(100vh-20rem)] overflow-y-auto pr-2 space-y-4">
+          <>
+            {/* Cart Items - flex-1 to take remaining space */}
+            <div className="flex-1 min-h-0 overflow-y-auto pr-2 space-y-4 mb-4">
               {items.map((item) => (
                 <CartItemCard key={item.productId} item={item} />
               ))}
             </div>
-            <div className="border-t pt-4 mt-4 text-right">
+            
+            {/* Footer with total and checkout - flex-shrink-0 to maintain size */}
+            <div className="border-t pt-4 text-right flex-shrink-0">
               <p className="font-semibold text-lg">
                 Total: ${total.toFixed(2)}
               </p>
@@ -107,7 +112,7 @@ export default function CartDrawer() {
                 Checkout
               </Button>
             </div>
-          </div>
+          </>
         )}
       </SheetContent>
     </Sheet>

@@ -25,12 +25,12 @@ export default function OrderCard({ order }: { order: any }) {
     }[order.status as OrderStatus] ?? "bg-gray-700 text-white";
 
   return (
-    <div className="bg-neutral-800 rounded-lg p-6 shadow border border-neutral-700">
-      <div className="flex justify-between items-center mb-2">
-        <h3 className="text-lg font-bold text-orange-400 truncate">
+    <div className="bg-neutral-800 rounded-lg p-4 sm:p-6 shadow border border-neutral-700">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2 gap-2">
+        <h3 className="text-base sm:text-lg font-bold text-orange-400 truncate">
           Order ID: <span className="text-white">{order.id}</span>
         </h3>
-        <span className={cn("text-xs px-2 py-1 rounded-full", statusColor)}>
+        <span className={cn("text-xs px-2 py-1 rounded-full self-start sm:self-center", statusColor)}>
           {order.status}
         </span>
       </div>

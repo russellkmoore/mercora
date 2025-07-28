@@ -74,7 +74,7 @@ export default function ProductDisplay({ product }: { product: Product }) {
   return (
     <>
       {/* Main Product Display Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
         {/* Image Gallery Section */}
         <div>
           {/* Primary Image Display */}
@@ -83,19 +83,19 @@ export default function ProductDisplay({ product }: { product: Product }) {
               src={formatImageSrc(selectedImage)}
               alt={product.name}
               fill
-              sizes="(min-width: 768px) 50vw, 100vw"
+              sizes="(min-width: 1024px) 50vw, 100vw"
               style={{ objectFit: "cover" }}
               className="object-cover"
             />
           </div>
 
           {/* Image Thumbnails Navigation */}
-          <div className="flex gap-3 mt-4">
+          <div className="flex gap-2 sm:gap-3 mt-3 sm:mt-4 overflow-x-auto pb-2">
             {allImages.map((img, idx) => (
               <div
                 key={`thumb-${idx}`}
                 onClick={() => setSelectedImage(img)}
-                className={`w-20 h-20 relative rounded overflow-hidden cursor-pointer border ${
+                className={`w-16 h-16 sm:w-20 sm:h-20 relative rounded overflow-hidden cursor-pointer border flex-shrink-0 ${
                   selectedImage === img
                     ? "border-orange-500"
                     : "border-gray-700"
@@ -113,23 +113,23 @@ export default function ProductDisplay({ product }: { product: Product }) {
         </div>
 
         {/* Product Information Section */}
-        <div>
-          <h1 className="text-4xl font-extrabold mb-4">{product.name}</h1>
-          <p className="text-gray-400 mb-6">{product.longDescription}</p>
+        <div className="mt-6 lg:mt-0">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold mb-3 sm:mb-4">{product.name}</h1>
+          <p className="text-gray-400 text-sm sm:text-base mb-4 sm:mb-6">{product.longDescription}</p>
 
           {/* Pricing Display with Sale Logic */}
           {product.salePrice && product.onSale ? (
             <div className="mb-4">
-              <p className="text-gray-500 line-through text-lg">
+              <p className="text-gray-500 line-through text-base sm:text-lg">
                 ${(product.price / 100).toFixed(2)}
               </p>
-              <p className="text-green-400 text-xl font-bold">
+              <p className="text-green-400 text-lg sm:text-xl font-bold">
                 ${(product.salePrice / 100).toFixed(2)}
               </p>
-              <p className="text-sm text-orange-400 italic">on sale</p>
+              <p className="text-xs sm:text-sm text-orange-400 italic">on sale</p>
             </div>
           ) : (
-            <p className="text-xl font-semibold text-white mb-4">
+            <p className="text-lg sm:text-xl font-semibold text-white mb-4">
               ${(product.price / 100).toFixed(2)}
             </p>
           )}
@@ -138,7 +138,7 @@ export default function ProductDisplay({ product }: { product: Product }) {
           {product.quantityInStock > 0 &&
           product.availability === "available" ? (
             <button
-              className="mt-6 px-6 py-3 bg-orange-500 text-black font-bold rounded hover:bg-orange-400 transition"
+              className="mt-4 sm:mt-6 w-full sm:w-auto px-6 py-3 bg-orange-500 text-black font-bold rounded hover:bg-orange-400 transition"
               onClick={() => {
                 // Add product to cart with appropriate pricing
                 useCartStore.getState().addItem({
@@ -161,7 +161,7 @@ export default function ProductDisplay({ product }: { product: Product }) {
               Add to Cart
             </button>
           ) : (
-            <p className="text-orange-500 font-semibold text-xl mb-4">
+            <p className="text-orange-500 font-semibold text-lg sm:text-xl mb-4">
               Coming soon
             </p>
           )}
