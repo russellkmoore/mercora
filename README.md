@@ -1,4 +1,4 @@
-# Mercora - AI-Powered Outdoor Gear eCommerce Platform
+# Mercora - AI-Powered Outdoor Ge- **Cloudflare Workers**: Global edge deployment for sub-100ms response times
 
 > **Advanced eCommerce platform with integrated AI assistant, built on Cloudflare's edge infrastructure**
 
@@ -8,12 +8,12 @@ Mercora is a modern, AI-enhanced eCommerce platform specializing in outdoor gear
 
 | 📋 Documentation | 🔗 Link | 📝 Description |
 |------------------|---------|----------------|
-| **System Architecture** | [📐 Architecture Overview](/docs/architecture.md) | Complete system design, components, security |
-| **AI Pipeline** | [🤖 AI Documentation](/docs/ai-pipeline.md) | Vector search, anti-hallucination, recommendations |
-| **API Specifications** | [🔌 API Architecture](/docs/api-architecture.md) | Endpoints, security, integration flows |
-| **Product Roadmap** | [🗺️ Development Roadmap](/ROADMAP.md) | Planned features, milestones, and progress |
-| **Data Documentation** | [📊 Data Guide](/data/README.md) | Product data, knowledge base, data formats |
-| **Live Demo** | [🌐 voltique.russellkmoore.me](https://voltique.russellkmoore.me) | Try the AI assistant and explore products |
+| **System Architecture** | 📐 [Architecture Overview](/docs/architecture.md) | Complete system design, components, security |
+| **AI Pipeline** | 🤖 [AI Documentation](/docs/ai-pipeline.md) | Vector search, anti-hallucination, recommendations |
+| **API Specifications** | 🔌 [API Architecture](/docs/api-architecture.md) | Endpoints, security, integration flows |
+| **Product Roadmap** | 🗺️ [Development Roadmap](/ROADMAP.md) | Planned features, milestones, and progress |
+| **Data Documentation** | 📊 [Data Guide](/data/README.md) | Product data, knowledge base, data formats |
+| **Live Demo** | 🌐 [voltique.russellkmoore.me](https://voltique.russellkmoore.me) | Try the AI assistant and explore products |
 
 ## ✨ Key Features
 
@@ -34,12 +34,12 @@ Mercora is a modern, AI-enhanced eCommerce platform specializing in outdoor gear
 - **Cloudflare Workers**: Global edge deployment for sub-100ms response times
 - **Cloudflare D1**: Distributed SQLite database for product/order data
 - **Cloudflare R2**: Object storage for product images and content
-- **Next.js 14**: Modern React framework with App Router
+- **Next.js 15**: Modern React framework with App Router
 
 ## 🏗️ Architecture
 
 ### **Tech Stack**
-- **Frontend**: Next.js 14, TypeScript, Tailwind CSS, shadcn/ui
+- **Frontend**: Next.js 15, TypeScript, Tailwind CSS, shadcn/ui
 - **Backend**: Cloudflare Workers, OpenNext
 - **Database**: Cloudflare D1 (SQLite), Drizzle ORM
 - **Storage**: Cloudflare R2 Object Storage
