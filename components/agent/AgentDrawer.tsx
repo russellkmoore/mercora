@@ -1,3 +1,34 @@
+/**
+ * === Agent Drawer Component ===
+ *
+ * A sliding chat interface that provides users with AI-powered assistance from Volt,
+ * the outdoor gear expert. Features intelligent product recommendations, conversation
+ * history, and seamless user experience optimizations.
+ *
+ * === Key Features ===
+ * - **AI Chat Interface**: Real-time conversations with Volt AI assistant
+ * - **Product Recommendations**: Displays AI-recommended products with full details
+ * - **Auto-scroll**: Automatically scrolls to show latest messages
+ * - **Auto-focus**: Returns focus to input after AI responses
+ * - **Safari Compatibility**: Prevents password manager interference
+ * - **Responsive Design**: 800px width with smooth animations
+ * - **Error Handling**: Graceful fallbacks for API failures
+ *
+ * === Technical Details ===
+ * - **State Management**: Uses Zustand chat store for conversation persistence
+ * - **Authentication**: Integrates with Clerk for user context
+ * - **API Integration**: Calls /api/agent-chat for AI responses
+ * - **Component Architecture**: Modular with ProductCard components
+ * - **Performance**: Optimized scrolling and focus management
+ *
+ * === Usage ===
+ * ```tsx
+ * <AgentDrawer />
+ * ```
+ * 
+ * The component is fully self-contained and handles all chat functionality.
+ */
+
 "use client";
 
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -8,6 +39,12 @@ import { useChatStore } from "@/lib/stores/chat-store";
 import { useUser } from "@clerk/nextjs";
 import ProductCard from "./ProductCard";
 
+/**
+ * Main AgentDrawer component providing AI chat interface
+ * 
+ * Manages conversation state, API calls, and user experience optimizations
+ * including auto-scroll, auto-focus, and product recommendation display.
+ */
 export default function AgentDrawer() {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -26,7 +63,10 @@ export default function AgentDrawer() {
     clearMessages,
   } = useChatStore();
 
-  // Auto-scroll to bottom when messages change or loading state changes
+  /**
+   * Scrolls chat container to bottom to show latest messages
+   * Uses multiple approaches for maximum browser compatibility
+   */
   const scrollToBottom = () => {
     if (chatContainerRef.current) {
       const container = chatContainerRef.current;
@@ -41,22 +81,23 @@ export default function AgentDrawer() {
     }
   };
 
+  // Auto-scroll when messages or loading state changes
   useEffect(() => {
-    // Use requestAnimationFrame to ensure DOM has updated
+    // Use requestAnimationFrame to ensure DOM has updated before scrolling
     requestAnimationFrame(() => {
       scrollToBottom();
     });
   }, [messages, isLoading]);
 
-  // Also scroll to bottom when the drawer opens (in case there are existing messages)
+  // Handle drawer open state - scroll to bottom and focus input
   useEffect(() => {
     if (isOpen) {
-      // Multiple attempts to ensure scrolling works
+      // Multiple scroll attempts with different delays to ensure it works across browsers
       setTimeout(() => scrollToBottom(), 50);
       setTimeout(() => scrollToBottom(), 100);
       setTimeout(() => scrollToBottom(), 200);
       
-      // Focus input when drawer opens
+      // Focus input when drawer opens for immediate typing
       setTimeout(() => {
         if (inputRef.current) {
           inputRef.current.focus();
@@ -65,6 +106,15 @@ export default function AgentDrawer() {
     }
   }, [isOpen]);
 
+  /**
+   * Handles form submission and API communication with Volt AI
+   * 
+   * - Validates input
+   * - Updates chat state
+   * - Calls agent-chat API
+   * - Handles responses and errors
+   * - Manages focus and scroll behavior
+   */
   const handleSubmit = async () => {
     if (!input.trim() || isLoading) return;
     

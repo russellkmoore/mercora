@@ -1,9 +1,45 @@
+/**
+ * === Product Recommendations Component ===
+ *
+ * An intelligent product recommendation system that uses AI to suggest
+ * relevant products based on the current product context. Provides
+ * contextually aware suggestions to enhance user discovery and sales.
+ *
+ * === Features ===
+ * - **AI-Powered**: Uses Volt AI to analyze current product and find similarities
+ * - **Context-Aware**: Considers product tags, use cases, and characteristics
+ * - **Dynamic Layout**: Responsive grid that adapts to number of recommendations
+ * - **Loading States**: Shows skeleton placeholders during API calls
+ * - **Smart Filtering**: Excludes current product from recommendations
+ * - **Graceful Degradation**: Hides section if no recommendations found
+ *
+ * === Technical Implementation ===
+ * - **API Integration**: Calls agent-chat endpoint with product context
+ * - **TypeScript Safety**: Fully typed with Product interface
+ * - **Performance**: Only fetches when product context is available
+ * - **Error Handling**: Silent failures to prevent breaking page experience
+ *
+ * === Usage ===
+ * ```tsx
+ * <ProductRecommendations product={currentProduct} />
+ * ```
+ *
+ * === Props ===
+ * @param product - Optional Product object to base recommendations on
+ */
+
 "use client";
 
 import ProductCard from "@/components/ProductCard";
 import type { Product } from "@/lib/types/product";
 import { useState, useEffect } from "react";
 
+/**
+ * ProductRecommendations component that displays AI-suggested products
+ * 
+ * @param product - The current product to base recommendations on
+ * @returns JSX element with recommended products or null if none available
+ */
 export default function ProductRecommendations({
   product,
 }: {
@@ -12,12 +48,19 @@ export default function ProductRecommendations({
   const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  /**
+   * Fetch intelligent product recommendations based on current product
+   * 
+   * Uses the AI agent to analyze the current product's characteristics
+   * and find complementary or similar items from the inventory.
+   */
   useEffect(() => {
     if (!product) return;
 
     const fetchRecommendations = async () => {
       setIsLoading(true);
       try {
+        // Build contextual query using product metadata
         const productTags = product.tags.join(", ");
         const productUseCases = product.useCases.join(", ");
         const recommendationQuery = `I'm interested in the ${product.name}. It's used for ${productUseCases} and has tags: ${productTags}. Can you recommend 3 similar or complementary products that would go well with this item?`;
