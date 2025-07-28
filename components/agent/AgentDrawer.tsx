@@ -45,7 +45,13 @@ import ProductCard from "./ProductCard";
  * Manages conversation state, API calls, and user experience optimizations
  * including auto-scroll, auto-focus, and product recommendation display.
  */
-export default function AgentDrawer({ variant = "desktop" }: { variant?: "desktop" | "mobile" }) {
+export default function AgentDrawer({ 
+  variant = "desktop", 
+  onOpen 
+}: { 
+  variant?: "desktop" | "mobile"; 
+  onOpen?: () => void; 
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -195,14 +201,26 @@ export default function AgentDrawer({ variant = "desktop" }: { variant?: "deskto
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={setIsOpen}>
+    <Sheet open={isOpen} onOpenChange={(open) => {
+      setIsOpen(open);
+      if (open && onOpen) {
+        onOpen();
+      }
+    }}>
       <SheetTrigger asChild>
         {variant === "mobile" ? (
-          <span className="text-white">Help & Search</span>
+          <button 
+            className="flex items-center space-x-3 text-white hover:text-orange-500 py-3 px-4 rounded-lg hover:bg-neutral-800 cursor-pointer w-full text-left bg-transparent border-none"
+            type="button"
+          >
+            <Search className="h-5 w-5" />
+            <span>Help & Search</span>
+          </button>
         ) : (
           <Button
             variant="ghost"
             className="text-white hover:bg-white hover:text-orange-500"
+            data-testid="agent-drawer-trigger"
           >
             <Search className="mr-2 h-4 w-4" />
             Help & Search
@@ -211,97 +229,112 @@ export default function AgentDrawer({ variant = "desktop" }: { variant?: "deskto
       </SheetTrigger>
       <SheetContent
         side="right"
-        className="bg-[#fdfdfb] text-black transition-all ease-in-out px-3 w-full sm:w-[400px] lg:!w-[800px] !max-w-[800px] !duration-[600ms] data-[state=closed]:!duration-[600ms] data-[state=open]:!duration-[600ms]"
+        className="bg-[#fdfdfb] text-black transition-all ease-in-out px-3 w-full sm:w-[400px] lg:!w-[800px] !max-w-[800px] !duration-[600ms] data-[state=closed]:!duration-[600ms] data-[state=open]:!duration-[600ms] flex flex-col h-full"
       >
         {/* Left fade */}
         <div className="absolute left-0 top-0 h-full w-2 bg-gradient-to-r from-black/20 to-transparent z-10 pointer-events-none" />
 
-        <h2 className="text-lg font-semibold mb-3 mt-2">Ask Volt</h2>
-        <div 
-          ref={chatContainerRef}
-          className="border rounded-md p-3 h-60 sm:h-80 overflow-y-auto text-sm space-y-3 bg-gray-50"
-        >
-          {messages.map((msg, i) =>
-            msg.role === "user" ? (
-              <div key={i} className="flex justify-end">
-                <div className="bg-blue-500 text-right text-white px-3 py-2 rounded-lg max-w-[75%]">
-                  <p>
-                    <strong>You:</strong> {msg.content}
-                  </p>
+        {/* Header - fixed */}
+        <div className="flex-shrink-0">
+          <h2 className="text-lg font-semibold mb-3 mt-2">Ask Volt</h2>
+        </div>
+
+        {/* Chat container - fixed height */}
+        <div className="flex-shrink-0">
+          <div 
+            ref={chatContainerRef}
+            className="border rounded-md p-3 h-60 sm:h-80 overflow-y-auto text-sm space-y-3 bg-gray-50"
+          >
+            {messages.map((msg, i) =>
+              msg.role === "user" ? (
+                <div key={i} className="flex justify-end">
+                  <div className="bg-blue-500 text-right text-white px-3 py-2 rounded-lg max-w-[75%]">
+                    <p>
+                      <strong>You:</strong> {msg.content}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div key={i} className="flex items-start space-x-2">
+              ) : (
+                <div key={i} className="flex items-start space-x-2">
+                  <div className="h-6 w-6 flex items-center justify-center bg-orange-500 rounded-full text-white text-xs font-bold">
+                    V
+                  </div>
+                  <div className="bg-white text-gray-800 px-3 py-2 rounded-lg max-w-[75%] shadow-sm border">
+                    <p>
+                      <strong>Voltique AI:</strong> {msg.content}
+                    </p>
+                  </div>
+                </div>
+              )
+            )}
+            {isLoading && (
+              <div className="flex items-start space-x-2">
                 <div className="h-6 w-6 flex items-center justify-center bg-orange-500 rounded-full text-white text-xs font-bold">
                   V
                 </div>
-                <div className="bg-white text-gray-800 px-3 py-2 rounded-lg max-w-[75%] shadow-sm border">
-                  <p>
-                    <strong>Voltique AI:</strong> {msg.content}
+                <div className="bg-white text-gray-800 px-3 py-2 rounded-lg shadow-sm border">
+                  <p className="text-gray-500">
+                    <strong>Voltique AI:</strong> Thinking...
                   </p>
                 </div>
               </div>
-            )
-          )}
-          {isLoading && (
-            <div className="flex items-start space-x-2">
-              <div className="h-6 w-6 flex items-center justify-center bg-orange-500 rounded-full text-white text-xs font-bold">
-                V
-              </div>
-              <div className="bg-white text-gray-800 px-3 py-2 rounded-lg shadow-sm border">
-                <p className="text-gray-500">
-                  <strong>Voltique AI:</strong> Thinking...
-                </p>
-              </div>
-            </div>
-          )}
-          {/* Invisible scroll anchor */}
-          <div id="chat-bottom" />
+            )}
+            {/* Invisible scroll anchor */}
+            <div id="chat-bottom" />
+          </div>
         </div>
 
-        <div className="mt-3 relative">
-          <input
-            ref={inputRef}
-            type="text"
-            placeholder={isLoading ? "Waiting for response..." : "Type your question..."}
-            className="w-full border rounded pl-3 pr-10 py-2 disabled:bg-gray-100 disabled:cursor-not-allowed"
-            value={input}
-            disabled={isLoading}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !isLoading) handleSubmit();
-            }}
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck="false"
-            data-form-type="other"
-            name="chat-input"
-          />
-          <button
-            onClick={handleSubmit}
-            disabled={isLoading || !input.trim()}
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-black disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Send className="w-5 h-5" />
-          </button>
+        {/* Input area - fixed */}
+        <div className="flex-shrink-0 mt-3">
+          <div className="relative">
+            <input
+              ref={inputRef}
+              type="text"
+              placeholder={isLoading ? "Waiting for response..." : "Type your question..."}
+              className="w-full border rounded pl-3 pr-10 py-2 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              value={input}
+              disabled={isLoading}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !isLoading) handleSubmit();
+              }}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck="false"
+              data-form-type="other"
+              name="chat-input"
+            />
+            <button
+              onClick={handleSubmit}
+              disabled={isLoading || !input.trim()}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-black disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Send className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
-        <hr className="my-4" />
-        <div className="text-sm text-gray-600">
+        {/* Divider */}
+        <hr className="my-4 flex-shrink-0" />
+
+        {/* Products area - scrollable */}
+        <div className="flex-1 overflow-y-auto text-sm text-gray-600">
           {productIds.length > 0 ? (
             <div className="space-y-2">
-              <h3 className="font-semibold text-base text-black">
+              <h3 className="font-semibold text-base text-black sticky top-0 bg-[#fdfdfb] pb-2">
                 Related Products
               </h3>
-              <div className="space-y-2">
+              <div className="space-y-2 pb-4">
                 {products.map((product) => (
                   <ProductCard key={product.id} product={product} />
                 ))}
               </div>
             </div>
           ) : (
-            "No related products yet..."
+            <div className="text-center py-4">
+              No related products yet...
+            </div>
           )}
         </div>
       </SheetContent>
