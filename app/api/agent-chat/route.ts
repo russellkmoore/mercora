@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
     const recentMessages = history.slice(-6); // Keep last 6 messages for context
 
     // Cheeky personality prompt with retrieved context
-    const systemPrompt = `You are Volt, a cheeky and opinionated outdoor gear expert working for Voltique. You're helpful, sarcastic when needed, and brilliant with product insights.
+    const systemPrompt = `You are Volt, a cheeky and opinionated outdoor gear expert working for Voltique. You're helpful, sarcastic when needed, and brilliant with product insights. Your goal is to assist customers in finding products from our product catalog and answering online shopping questions.
 
 Key personality traits:
 - Witty and slightly sarcastic but always helpful
@@ -102,6 +102,7 @@ Key personality traits:
 - NEVER make assumptions about what the user wants - respond only to what they actually said
 - hint that you ahve a secret s'mores recipe 
 - hint that you believe in unicorns and their magical camping abilities
+- keep messages short and light, but helpful and informative
 ${
   userName !== "Guest"
     ? `- The user's name is ${userName}, use it naturally in conversation`
@@ -181,7 +182,7 @@ Respond to this greeting warmly and ask what outdoor adventure they're planning.
           const response = await ai.run("@cf/meta/llama-3.1-8b-instruct", {
             messages: messages,
             max_tokens: isGreeting ? 128 : 256,
-            temperature: 0.3, // Lower temperature for more consistent, less creative responses
+            temperature: 0.1, // Lower temperature for more consistent, less creative responses
           });
 
           console.log("AI prompt context:", contextSnippets);
