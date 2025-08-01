@@ -5,31 +5,20 @@ const nextConfig: NextConfig = {
     loader: "custom",
     loaderFile: "./image-loader.ts",
   },
-  // Performance and resource optimization
+  // Minimal experimental config to avoid build issues
   experimental: {
     optimizePackageImports: ["@next/font"],
-    optimizeCss: true,
-    // Enable optimizations
-    turbo: {
-      loaders: {
-        '.svg': ['@svgr/webpack'],
-      },
-    },
   },
-  // Optimize build performance
-  swcMinify: true,
-  // Configure webpack for better performance
-  webpack: (config, { isServer, dev }) => {
+  // Configure webpack for better performance without problematic optimizations
+  webpack: (config, { isServer }) => {
     if (!isServer) {
-      // Reduce preload aggressive behavior
+      // Basic chunk optimization
       config.optimization = {
         ...config.optimization,
         splitChunks: {
           ...config.optimization.splitChunks,
-          chunks: 'all',
           cacheGroups: {
             ...config.optimization.splitChunks.cacheGroups,
-            // Optimize vendor chunks
             vendor: {
               test: /[\\/]node_modules[\\/]/,
               name: 'vendors',
@@ -37,53 +26,21 @@ const nextConfig: NextConfig = {
               priority: 10,
               reuseExistingChunk: true,
             },
-            // Separate large libraries
-            react: {
-              test: /[\\/]node_modules[\\/](react|react-dom)[\\/]/,
-              name: 'react',
-              chunks: 'all',
-              priority: 20,
-            },
           },
         },
       };
     }
-    
-    // Enable production optimizations in development for testing
-    if (!dev) {
-      config.optimization.usedExports = true;
-      config.optimization.sideEffects = false;
-    }
-    
     return config;
   },
-  // Optimize resource hints and headers
+  // Basic headers for performance
   async headers() {
     return [
       {
         source: "/(.*)",
         headers: [
           {
-            key: "Link",
-            value: "rel=preconnect; href=https://fonts.googleapis.com; crossorigin",
-          },
-          {
             key: "X-DNS-Prefetch-Control",
             value: "on",
-          },
-          {
-            key: "X-Content-Type-Options",
-            value: "nosniff",
-          },
-        ],
-      },
-      // Cache static assets longer
-      {
-        source: "/images/:path*",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
           },
         ],
       },
