@@ -243,28 +243,46 @@ export default function AgentDrawer({
         <div className="flex-shrink-0">
           <div 
             ref={chatContainerRef}
-            className="border rounded-md p-3 h-60 sm:h-80 overflow-y-auto text-sm space-y-3 bg-gray-50"
+            className="border rounded-md p-3 h-60 sm:h-80 overflow-y-auto text-sm space-y-3 bg-gray-100"
           >
-            {messages.map((msg, i) =>
-              msg.role === "user" ? (
-                <div key={i} className="flex justify-end">
-                  <div className="bg-blue-500 text-right text-white px-3 py-2 rounded-lg max-w-[75%]">
-                    <p>
-                      <strong>You:</strong> {msg.content}
-                    </p>
-                  </div>
+            {messages.length === 0 && !isLoading ? (
+              <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 space-y-3">
+                <div className="h-12 w-12 flex items-center justify-center bg-orange-500 rounded-full text-white text-lg font-bold">
+                  V
                 </div>
-              ) : (
-                <div key={i} className="flex items-start space-x-2">
-                  <div className="h-6 w-6 flex items-center justify-center bg-orange-500 rounded-full text-white text-xs font-bold">
-                    V
-                  </div>
-                  <div className="bg-white text-gray-800 px-3 py-2 rounded-lg max-w-[75%] shadow-sm border">
-                    <p>
-                      <strong>Voltique AI:</strong> {msg.content}
-                    </p>
-                  </div>
+                <div className="space-y-2">
+                  <p className="font-semibold text-gray-700">Hi! I'm Volt, your gear expert.</p>
+                  <p className="text-xs leading-relaxed max-w-xs">
+                    Ask me about outdoor gear, product recommendations, or anything adventure-related. 
+                    I'm here to help you find the perfect equipment!
+                  </p>
+                  <p className="text-xs text-gray-400 italic">
+                    Try: "What's the best camping gear for beginners?"
+                  </p>
                 </div>
+              </div>
+            ) : (
+              messages.map((msg, i) =>
+                msg.role === "user" ? (
+                  <div key={i} className="flex justify-end">
+                    <div className="bg-blue-500 text-right text-white px-3 py-2 rounded-lg max-w-[75%]">
+                      <p>
+                        <strong>You:</strong> {msg.content}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div key={i} className="flex items-start space-x-2">
+                    <div className="h-6 w-6 flex items-center justify-center bg-orange-500 rounded-full text-white text-xs font-bold">
+                      V
+                    </div>
+                    <div className="bg-white text-gray-800 px-3 py-2 rounded-lg max-w-[75%] shadow-sm border">
+                      <p>
+                        <strong>Voltique AI:</strong> {msg.content}
+                      </p>
+                    </div>
+                  </div>
+                )
               )
             )}
             {isLoading && (
@@ -323,7 +341,7 @@ export default function AgentDrawer({
           {productIds.length > 0 ? (
             <div className="space-y-2">
               <h3 className="font-semibold text-base text-black sticky top-0 bg-[#fdfdfb] pb-2">
-                Related Products
+                Recommended Products
               </h3>
               <div className="space-y-2 pb-4">
                 {products.map((product) => (
@@ -332,8 +350,12 @@ export default function AgentDrawer({
               </div>
             </div>
           ) : (
-            <div className="text-center py-4">
-              No related products yet...
+            <div className="text-center py-8 text-gray-400">
+              <div className="space-y-2">
+                <div className="text-2xl">🎒</div>
+                <p className="font-medium text-gray-500">Product recommendations will appear here</p>
+                <p className="text-xs">Ask Volt about specific gear and I'll show you the best options!</p>
+              </div>
             </div>
           )}
         </div>
