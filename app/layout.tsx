@@ -112,7 +112,7 @@ export default function RootLayout({
     >
       <html lang="en" suppressHydrationWarning>
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white`}
+          className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white flex flex-col min-h-screen`}
           suppressHydrationWarning
         >
           {/* Global navigation header with suspense boundary */}
@@ -120,8 +120,8 @@ export default function RootLayout({
             <Header />
           </Suspense>
           
-          {/* Main content area with minimum height */}
-          <main className="min-h-screen">{children}</main>
+          {/* Main content area - grows to fill available space */}
+          <main className="flex-1">{children}</main>
           
           {/* Global footer */}
           <Footer />
