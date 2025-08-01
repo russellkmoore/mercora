@@ -121,7 +121,7 @@ export default function RootLayout({
           </Suspense>
           
           {/* Main content area - grows to fill available space */}
-          <main className="flex-1">{children}</main>
+          <main className="flex-1" suppressHydrationWarning>{children}</main>
           
           {/* Global footer */}
           <Footer />

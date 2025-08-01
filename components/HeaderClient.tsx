@@ -48,11 +48,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Home, Search, LogIn, ChevronDown, ShoppingCart, Menu, X } from "lucide-react";
 import AgentDrawer from "@/components/agent/AgentDrawer";
 import ClerkLogin from "@/components/login/ClerkLogin";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import CartDrawer from "@/components/cart/CartDrawer";
 
 /**
@@ -134,6 +135,14 @@ export default function HeaderClient({
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="bg-black text-white w-full max-w-sm">
+            {/* Accessibility components */}
+            <VisuallyHidden>
+              <SheetTitle>Mobile Navigation Menu</SheetTitle>
+              <SheetDescription>
+                Main navigation menu for mobile devices with links to home, categories, help, and user account.
+              </SheetDescription>
+            </VisuallyHidden>
+
             <div className="flex flex-col space-y-4 mt-8">
               <Link 
                 href="/" 
