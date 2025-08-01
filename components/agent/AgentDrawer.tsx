@@ -256,8 +256,8 @@ export default function AgentDrawer({
                     Ask me about outdoor gear, product recommendations, or anything adventure-related. 
                     I'm here to help you find the perfect equipment!
                   </p>
-                  <p className="text-xs text-gray-400 italic">
-                    Try: "What's the best camping gear for beginners?"
+                  <p className="text-xs text-gray-600 italic">
+                    Try: "what do I use to start a fire? or "Tell me your secret s'mores recipe"
                   </p>
                 </div>
               </div>
@@ -326,7 +326,7 @@ export default function AgentDrawer({
             <button
               onClick={handleSubmit}
               disabled={isLoading || !input.trim()}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-black disabled:opacity-50 disabled:cursor-not-allowed"
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-orange-400 hover:text-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Send className="w-5 h-5" />
             </button>
@@ -353,7 +353,7 @@ export default function AgentDrawer({
             <div className="text-center py-8 text-gray-400">
               <div className="space-y-2">
                 <div className="text-2xl">🎒</div>
-                <p className="font-medium text-gray-500">Product recommendations will appear here</p>
+                <p className="font-medium text-gray-700">Product recommendations will appear here</p>
                 <p className="text-xs">Ask Volt about specific gear and I'll show you the best options!</p>
               </div>
             </div>
