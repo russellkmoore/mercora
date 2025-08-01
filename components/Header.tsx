@@ -31,6 +31,14 @@
 
 import { getCategories } from "@/lib/loaders/categories";
 import HeaderClient from "./HeaderClient";
+import { unstable_cache } from "next/cache";
+
+// Cache categories for better performance
+const getCachedCategories = unstable_cache(
+  async () => getCategories(),
+  ['header-categories'],
+  { revalidate: 3600 } // Cache for 1 hour
+);
 
 /**
  * Server-side Header component that fetches categories and renders HeaderClient
@@ -38,8 +46,8 @@ import HeaderClient from "./HeaderClient";
  * @returns Promise<JSX.Element> Server-rendered header with category data
  */
 export default async function Header() {
-  // Fetch categories on the server for optimal performance
-  const categories = await getCategories();
+  // Fetch categories on the server for optimal performance with caching
+  const categories = await getCachedCategories();
   
   // Pass categories to client component for interactive functionality
   return <HeaderClient categories={categories} />;

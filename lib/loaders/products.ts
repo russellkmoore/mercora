@@ -35,7 +35,7 @@ import { getCategoryProducts } from "../models/category";
 import type { Product } from "@/lib/types/product";
 
 /**
- * Load all products within a specific category
+ * Load all products within a specific category with caching
  * 
  * @param categorySlug - URL slug of the category to load
  * @returns Promise<Product[]> - Array of fully hydrated products
@@ -43,6 +43,11 @@ import type { Product } from "@/lib/types/product";
 export async function getProductsByCategory(
   categorySlug: string
 ): Promise<Product[]> {
+  // For featured products on homepage, limit the query to improve performance
+  if (categorySlug === "featured") {
+    const products = await getCategoryProducts(categorySlug);
+    return products.slice(0, 3); // Only return first 3 for performance
+  }
   return getCategoryProducts(categorySlug);
 }
 
