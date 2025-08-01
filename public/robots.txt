@@ -1,0 +1,43 @@
+# Robots.txt for Voltique Demo Site
+# Demo eCommerce platform showcasing serverless architecture
+# Site: https://voltique.russellkmoore.me
+
+User-agent: *
+
+# Allow main pages for discoverability
+Allow: /
+Allow: /category/*
+
+# Block individual product pages (demo products)
+Disallow: /product/
+Disallow: /products/
+
+# Block user-specific pages
+Disallow: /checkout
+Disallow: /orders
+Disallow: /cart
+
+# Block API endpoints
+Disallow: /api/
+
+# Block admin/development resources
+Disallow: /_next/
+Disallow: /admin/
+Disallow: /.well-known/
+
+# Block data files
+Disallow: /data/
+Disallow: *.csv
+Disallow: *.json
+
+# Allow sitemap for better indexing
+Allow: /sitemap.xml
+
+# Crawl delay to be respectful (1 second)
+Crawl-delay: 1
+
+# Sitemap location
+Sitemap: https://voltique.russellkmoore.me/sitemap.xml
+
+# Note: This is a demonstration site showcasing serverless architecture
+# and AI-powered eCommerce features. Products are for demo purposes only.
