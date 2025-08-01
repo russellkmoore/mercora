@@ -75,7 +75,13 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Mercora",
   description: "Marketplace powered by open knowledge",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
+};
+
+// Viewport configuration (separate export in Next.js 15+)
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 /**
