@@ -49,7 +49,6 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Toaster } from "sonner";
 import { dark } from "@clerk/themes";
-import Script from "next/script";
 import { Suspense } from "react";
 
 import {
@@ -134,33 +133,6 @@ export default function RootLayout({
               className:
                 "bg-orange-500/80 text-black font-semibold rounded-md mt-[60px] shadow-lg animate-in fade-in slide-in-from-top-5",
               duration: 3000,
-            }}
-          />
-          
-          {/* Font loading optimization script */}
-          <Script
-            id="font-optimization"
-            strategy="afterInteractive"
-            dangerouslySetInnerHTML={{
-              __html: `
-                // Optimize font loading to reduce preload warnings
-                if (typeof window !== 'undefined') {
-                  window.addEventListener('load', function() {
-                    // Small delay to ensure critical rendering is complete
-                    setTimeout(function() {
-                      if ('fonts' in document) {
-                        Promise.all([
-                          document.fonts.load('400 1em Geist'),
-                          document.fonts.load('500 1em Geist'),
-                          document.fonts.load('600 1em Geist')
-                        ]).then(function() {
-                          document.documentElement.classList.add('fonts-loaded');
-                        });
-                      }
-                    }, 100);
-                  });
-                }
-              `,
             }}
           />
         </body>
