@@ -51,6 +51,7 @@
 
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import React from "react";
 
 /**
  * Combine and merge CSS class names with intelligent conflict resolution
@@ -76,4 +77,38 @@ import { twMerge } from "tailwind-merge";
  */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+/**
+ * Performance utility to debounce function calls
+ * Useful for search inputs and resize handlers
+ */
+export function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
+
+/**
+ * Format price for display with proper currency formatting
+ */
+export function formatPrice(priceInCents: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(priceInCents / 100);
+}
+
+/**
+ * Lazy load component utility for code splitting
+ */
+export function lazy<T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T }>
+): React.LazyExoticComponent<T> {
+  return React.lazy(factory);
 }

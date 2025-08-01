@@ -46,15 +46,17 @@ import type { Product } from "@/lib/types/product";
  */
 interface ProductCardProps {
   product: Product;
+  priority?: boolean; // For above-the-fold images
 }
 
 /**
  * ProductCard component for displaying product information in a card layout
  * 
  * @param product - Product object containing all product data
+ * @param priority - Whether to prioritize image loading (for above-the-fold content)
  * @returns JSX element representing a clickable product card
  */
-export default function ProductCard({ product }: ProductCardProps) {
+export default function ProductCard({ product, priority = false }: ProductCardProps) {
   // Destructure product properties for easier access
   const {
     id,
@@ -79,6 +81,8 @@ export default function ProductCard({ product }: ProductCardProps) {
               fill
               sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
               className="object-cover"
+              priority={priority}
+              loading={priority ? "eager" : "lazy"}
             />
           ) : (
             <div className="flex items-center justify-center h-full text-gray-500 text-lg sm:text-xl">

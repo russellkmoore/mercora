@@ -44,11 +44,8 @@ import { getProductsByCategory } from "@/lib/loaders/products";
  * @returns Server-rendered home page with hero section and featured products
  */
 export default async function HomePage() {
-  // Fetch first 3 featured products for hero section
-  const featuredProducts = (await getProductsByCategory("featured")).slice(
-    0,
-    3
-  );
+  // Fetch only 3 featured products with optimized query
+  const featuredProducts = (await getProductsByCategory("featured")).slice(0, 3);
 
   return (
     <main className="bg-neutral-900 text-white min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
@@ -71,9 +68,12 @@ export default async function HomePage() {
       {/* Featured Products Grid */}
       <section className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10">
         {featuredProducts.map((product) => (
-          <ProductCard key={product.id} product={product} />
+          <ProductCard key={product.id} product={product} priority />
         ))}
       </section>
     </main>
   );
 }
+
+// Enable static generation with revalidation for better performance
+export const revalidate = 3600; // Revalidate every hour
