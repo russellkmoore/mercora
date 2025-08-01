@@ -40,12 +40,13 @@
  */
 
 import { useCartStore } from "@/lib/stores/cart-store";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import CartItemCard from "./CartItemCard";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 /**
  * CartDrawer component providing shopping cart functionality
@@ -78,6 +79,14 @@ export default function CartDrawer() {
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="bg-white text-black w-full sm:w-[400px] max-w-[400px] p-4 flex flex-col">
+        {/* Accessibility components */}
+        <VisuallyHidden>
+          <SheetTitle>Shopping Cart</SheetTitle>
+          <SheetDescription>
+            Review and manage items in your shopping cart, view total price, and proceed to checkout.
+          </SheetDescription>
+        </VisuallyHidden>
+
         {/* Left fade */}
         <div className="absolute left-0 top-0 h-full w-2 bg-gradient-to-r from-black/20 to-transparent z-10 pointer-events-none" />
 

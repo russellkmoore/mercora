@@ -31,13 +31,14 @@
 
 "use client";
 
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Search, Send } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useUser } from "@clerk/nextjs";
 import ProductCard from "./ProductCard";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 /**
  * Main AgentDrawer component providing AI chat interface
@@ -231,6 +232,14 @@ export default function AgentDrawer({
         side="right"
         className="bg-[#fdfdfb] text-black transition-all ease-in-out px-3 w-full sm:w-[400px] lg:!w-[800px] !max-w-[800px] !duration-[600ms] data-[state=closed]:!duration-[600ms] data-[state=open]:!duration-[600ms] flex flex-col h-full"
       >
+        {/* Accessibility components */}
+        <VisuallyHidden>
+          <SheetTitle>AI Assistant Chat</SheetTitle>
+          <SheetDescription>
+            Chat with Volt, your AI outdoor gear expert, to get product recommendations and adventure advice.
+          </SheetDescription>
+        </VisuallyHidden>
+
         {/* Left fade */}
         <div className="absolute left-0 top-0 h-full w-2 bg-gradient-to-r from-black/20 to-transparent z-10 pointer-events-none" />
 

@@ -5,6 +5,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogFooter,
+  DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -26,9 +28,12 @@ export default function OrderConfirmationModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md p-8 space-y-6 text-center rounded-xl shadow-lg bg-white">
         <DialogHeader>
-          <h2 className="text-2xl font-bold text-orange-500">
+          <DialogTitle className="text-2xl font-bold text-orange-500">
             Thank you for your order!
-          </h2>
+          </DialogTitle>
+          <DialogDescription>
+            Your order has been successfully placed and is being processed.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2">
