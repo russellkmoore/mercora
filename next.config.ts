@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
   // Configure webpack for better performance without problematic optimizations
   webpack: (config, { isServer }) => {
     if (!isServer) {
-      // Basic chunk optimization
+      // Basic chunk optimization with reduced preloading
       config.optimization = {
         ...config.optimization,
         splitChunks: {
@@ -25,6 +25,7 @@ const nextConfig: NextConfig = {
               chunks: 'all',
               priority: 10,
               reuseExistingChunk: true,
+              maxSize: 200000, // Limit chunk size to reduce preloading
             },
           },
         },
@@ -32,7 +33,7 @@ const nextConfig: NextConfig = {
     }
     return config;
   },
-  // Basic headers for performance
+  // Basic headers for performance and resource loading control
   async headers() {
     return [
       {
@@ -41,6 +42,20 @@ const nextConfig: NextConfig = {
           {
             key: "X-DNS-Prefetch-Control",
             value: "on",
+          },
+          {
+            key: "Link",
+            value: "<https://fonts.googleapis.com>; rel=preconnect; crossorigin",
+          },
+        ],
+      },
+      {
+        // Specific headers for static assets to prevent over-eager preloading
+        source: "/_next/static/(.*)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
           },
         ],
       },
