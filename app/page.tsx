@@ -67,8 +67,12 @@ export default async function HomePage() {
 
       {/* Featured Products Grid */}
       <section className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10 mb-12 sm:mb-16">
-        {featuredProducts.map((product) => (
-          <ProductCard key={product.id} product={product} priority />
+        {featuredProducts.map((product, index) => (
+          <ProductCard 
+            key={product.id} 
+            product={product} 
+            priority={index === 0} // Only prioritize the first product image
+          />
         ))}
       </section>
     </main>
