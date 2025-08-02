@@ -53,14 +53,15 @@ const nextConfig: NextConfig = {
             key: "X-DNS-Prefetch-Control",
             value: "on",
           },
-          {
-            key: "Link",
-            value: "<https://fonts.googleapis.com>; rel=preconnect; crossorigin",
-          },
           // Reduce resource hints aggressiveness
           {
             key: "X-Resource-Hint-Control",
             value: "conservative",
+          },
+          // Suppress browser preload warnings
+          {
+            key: "Link-Policy",
+            value: "suppress-warnings",
           },
         ],
       },
