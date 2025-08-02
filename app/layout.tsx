@@ -127,7 +127,11 @@ export default function RootLayout({
                   dangerouslySetInnerHTML={{
                     __html: `
                     window.NREUM||(NREUM={});
-                    NREUM.init={distributed_tracing:{enabled:true},privacy:{cookies_enabled:true},ajax:{deny_list:["bam.nr-data.net"]}};
+                    NREUM.init={
+                      distributed_tracing:{enabled:true},
+                      privacy:{cookies_enabled:true},
+                      ajax:{deny_list:[]}
+                    };
                     NREUM.loader_config={
                       accountID:"6962039",
                       trustKey:"6962039",
@@ -148,6 +152,7 @@ export default function RootLayout({
                 <Script
                   src="https://js-agent.newrelic.com/nr-loader-spa-1.293.0.min.js"
                   strategy="beforeInteractive"
+                  crossOrigin="anonymous"
                 />
               </>
             )}
