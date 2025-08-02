@@ -82,7 +82,7 @@ export default function HeaderClient({
 
       {/* Desktop Navigation */}
       <div className="hidden md:flex gap-2 sm:gap-4 items-center">
-        <Link href="/" passHref>
+        <Link href="/" passHref prefetch={true}>
           <Button
             variant="ghost"
             className="text-white hover:bg-white hover:text-orange-500 bg-black"
@@ -108,7 +108,11 @@ export default function HeaderClient({
                 key={category.id}
                 asChild
               >
-                <Link href={`/category/${category.slug}`} className="w-full">
+                <Link 
+                  href={`/category/${category.slug}`} 
+                  className="w-full"
+                  prefetch={true}
+                >
                   {category.name}
                 </Link>
               </DropdownMenuItem>
@@ -148,6 +152,7 @@ export default function HeaderClient({
                 href="/" 
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="flex items-center space-x-3 text-white hover:text-orange-500 py-3 px-4 rounded-lg hover:bg-neutral-800"
+                prefetch={true}
               >
                 <Home className="h-5 w-5" />
                 <span>Home</span>
@@ -162,6 +167,7 @@ export default function HeaderClient({
                       href={`/category/${category.slug}`}
                       onClick={() => setIsMobileMenuOpen(false)}
                       className="block text-white hover:text-orange-500 py-2 px-2 rounded hover:bg-neutral-800"
+                      prefetch={true}
                     >
                       {category.name}
                     </Link>
