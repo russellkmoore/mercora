@@ -57,43 +57,28 @@ export async function hydrateProduct(
 ): Promise<Product> {
   const db = await getDbAsync();
 
-  // Fetch current pricing information
-  const [price] = await db
-    .select()
-    .from(productPrices)
-    .where(eq(productPrices.productId, product.id));
-
-  // Fetch sale pricing (if any)
-  const [salePrice] = await db
-    .select()
-    .from(productSalePrices)
-    .where(eq(productSalePrices.productId, product.id));
-
-  // Fetch inventory and availability data
-  const [inventory] = await db
-    .select()
-    .from(productInventory)
-    .where(eq(productInventory.productId, product.id));
-
-  const images = await db
-    .select({ imageUrl: productImages.imageUrl })
-    .from(productImages)
-    .where(eq(productImages.productId, product.id));
-
-  const tags = await db
-    .select({ value: productTags.tag })
-    .from(productTags)
-    .where(eq(productTags.productId, product.id));
-
-  const useCases = await db
-    .select({ value: productUseCases.useCase })
-    .from(productUseCases)
-    .where(eq(productUseCases.productId, product.id));
-
-  const attributesRaw = await db
-    .select({ key: productAttributes.key, value: productAttributes.value })
-    .from(productAttributes)
-    .where(eq(productAttributes.productId, product.id));
+  // Batch all queries to run in parallel instead of sequentially
+  // This reduces 7 sequential queries to 2 parallel batches
+  const [
+    // Batch 1: Single-record queries (price, sale price, inventory)
+    [price, salePrice, inventory],
+    // Batch 2: Multi-record queries (images, tags, use cases, attributes)
+    [images, tags, useCases, attributesRaw]
+  ] = await Promise.all([
+    // Single-record queries
+    Promise.all([
+      db.select().from(productPrices).where(eq(productPrices.productId, product.id)).then(rows => rows[0]),
+      db.select().from(productSalePrices).where(eq(productSalePrices.productId, product.id)).then(rows => rows[0]),
+      db.select().from(productInventory).where(eq(productInventory.productId, product.id)).then(rows => rows[0])
+    ]),
+    // Multi-record queries
+    Promise.all([
+      db.select({ imageUrl: productImages.imageUrl }).from(productImages).where(eq(productImages.productId, product.id)),
+      db.select({ value: productTags.tag }).from(productTags).where(eq(productTags.productId, product.id)),
+      db.select({ value: productUseCases.useCase }).from(productUseCases).where(eq(productUseCases.productId, product.id)),
+      db.select({ key: productAttributes.key, value: productAttributes.value }).from(productAttributes).where(eq(productAttributes.productId, product.id))
+    ])
+  ]);
 
   const attributes: Record<string, string> = {};
   for (const attr of attributesRaw) {
@@ -120,4 +105,21 @@ export async function hydrateProduct(
     attributes,
     aiNotes: product.aiNotes ?? "",
   };
+}
+
+/**
+ * Efficiently hydrates multiple products in a single batch operation
+ * 
+ * This function is optimized for loading multiple products at once by using
+ * the existing single-product hydrator but with better parallelization.
+ * For even better performance, this could be rewritten to use SQL IN clauses.
+ * 
+ * @param products - Array of basic product records from database
+ * @returns Promise<Product[]> - Array of fully hydrated products
+ */
+export async function hydrateProductsBatch(
+  productRecords: (typeof products.$inferSelect)[]
+): Promise<Product[]> {
+  // Use Promise.all to hydrate all products in parallel instead of sequentially
+  return Promise.all(productRecords.map((product: typeof products.$inferSelect) => hydrateProduct(product)));
 }

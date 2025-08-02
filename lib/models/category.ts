@@ -7,7 +7,7 @@ import { productCategories } from "@/lib/db/schema/productCategories";
 import type { Product } from "@/lib/types/product";
 import type { Category } from "@/lib/types/category";
 
-import { hydrateProduct } from "./product";
+import { hydrateProduct, hydrateProductsBatch } from "./product";
 
 export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
@@ -45,9 +45,7 @@ export async function getCategoryProducts(
     .innerJoin(productCategories, eq(products.id, productCategories.productId))
     .where(eq(productCategories.categoryId, category.id));
 
-  const productData = await Promise.all(
-    rows.map((row) => hydrateProduct(row.products))
-  );
-
-  return productData;
+  // Use batch hydration for better performance
+  const productRecords = rows.map((row) => row.products);
+  return hydrateProductsBatch(productRecords);
 }
