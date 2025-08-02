@@ -58,7 +58,9 @@
    * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
    */
   "vars": {
-    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_bGVhcm5pbmctbGlnZXItMTAuY2xlcmsuYWNjb3VudHMuZGV2JA"
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_bGVhcm5pbmctbGlnZXItMTAuY2xlcmsuYWNjb3VudHMuZGV2JA",
+    "NEXT_PUBLIC_NEW_RELIC_BROWSER_LICENSE_KEY": "87519e482aa877578c01a8dd77197027FFFFNRAL",
+    "NEXT_PUBLIC_NEW_RELIC_APP_NAME": "voltique"
   },
   /**
    * Note: Use secrets to store sensitive data.
