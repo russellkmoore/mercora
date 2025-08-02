@@ -31,7 +31,7 @@ import {
   productUseCases,
   productAttributes,
 } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { Product } from "@/lib/types/product";
 import { products } from "@/lib/db/schema";
 
@@ -53,12 +53,20 @@ import { products } from "@/lib/db/schema";
  * ```
  */
 export async function hydrateProduct(
-  product: typeof products.$inferSelect
+  product: typeof products.$inferSelect,
+  dbInstance?: Awaited<ReturnType<typeof getDbAsync>>
 ): Promise<Product> {
-  const db = await getDbAsync();
+  const startTime = Date.now();
+  const db = dbInstance || (await getDbAsync());
+  const dbTime = Date.now();
+  
+  if (!dbInstance) {
+    console.log(`⚡ hydrateProduct[${product.id}]: New DB connection took ${dbTime - startTime}ms`);
+  }
 
   // Batch all queries to run in parallel instead of sequentially
   // This reduces 7 sequential queries to 2 parallel batches
+  const queryStart = Date.now();
   const [
     // Batch 1: Single-record queries (price, sale price, inventory)
     [price, salePrice, inventory],
@@ -79,11 +87,17 @@ export async function hydrateProduct(
       db.select({ key: productAttributes.key, value: productAttributes.value }).from(productAttributes).where(eq(productAttributes.productId, product.id))
     ])
   ]);
+  
+  const queryTime = Date.now();
+  console.log(`⚡ hydrateProduct[${product.id}]: Parallel queries took ${queryTime - queryStart}ms`);
 
   const attributes: Record<string, string> = {};
   for (const attr of attributesRaw) {
     attributes[attr.key] = attr.value;
   }
+  
+  const totalTime = Date.now() - startTime;
+  console.log(`⚡ hydrateProduct[${product.id}]: Total hydration took ${totalTime}ms`);
 
   return {
     id: product.id,
@@ -118,8 +132,106 @@ export async function hydrateProduct(
  * @returns Promise<Product[]> - Array of fully hydrated products
  */
 export async function hydrateProductsBatch(
-  productRecords: (typeof products.$inferSelect)[]
+  productRecords: (typeof products.$inferSelect)[],
+  dbInstance?: Awaited<ReturnType<typeof getDbAsync>>
 ): Promise<Product[]> {
-  // Use Promise.all to hydrate all products in parallel instead of sequentially
-  return Promise.all(productRecords.map((product: typeof products.$inferSelect) => hydrateProduct(product)));
+  const startTime = Date.now();
+  console.log(`🔄 hydrateProductsBatch: Starting batch hydration of ${productRecords.length} products`);
+  
+  if (productRecords.length === 0) return [];
+  
+  const db = dbInstance || (await getDbAsync());
+  const productIds = productRecords.map(p => p.id);
+  
+  // Single batch query for all products instead of individual queries
+  const batchQueryStart = Date.now();
+  const [
+    allPrices,
+    allSalePrices, 
+    allInventory,
+    allImages,
+    allTags,
+    allUseCases,
+    allAttributes
+  ] = await Promise.all([
+    db.select().from(productPrices).where(inArray(productPrices.productId, productIds)),
+    db.select().from(productSalePrices).where(inArray(productSalePrices.productId, productIds)),
+    db.select().from(productInventory).where(inArray(productInventory.productId, productIds)),
+    db.select({ productId: productImages.productId, imageUrl: productImages.imageUrl }).from(productImages).where(inArray(productImages.productId, productIds)),
+    db.select({ productId: productTags.productId, value: productTags.tag }).from(productTags).where(inArray(productTags.productId, productIds)),
+    db.select({ productId: productUseCases.productId, value: productUseCases.useCase }).from(productUseCases).where(inArray(productUseCases.productId, productIds)),
+    db.select({ productId: productAttributes.productId, key: productAttributes.key, value: productAttributes.value }).from(productAttributes).where(inArray(productAttributes.productId, productIds))
+  ]);
+  
+  const batchQueryTime = Date.now();
+  console.log(`🔄 hydrateProductsBatch: Batch queries took ${batchQueryTime - batchQueryStart}ms`);
+  
+  // Group results by product ID for fast lookup
+  const pricesMap = new Map(allPrices.map(p => [p.productId, p]));
+  const salePricesMap = new Map(allSalePrices.map(p => [p.productId, p]));
+  const inventoryMap = new Map(allInventory.map(p => [p.productId, p]));
+  const imagesMap = new Map<number, string[]>();
+  const tagsMap = new Map<number, string[]>();
+  const useCasesMap = new Map<number, string[]>();
+  const attributesMap = new Map<number, Record<string, string>>();
+  
+  // Group multi-record results
+  allImages.forEach(img => {
+    if (!imagesMap.has(img.productId)) imagesMap.set(img.productId, []);
+    imagesMap.get(img.productId)!.push(img.imageUrl);
+  });
+  
+  allTags.forEach(tag => {
+    if (!tagsMap.has(tag.productId)) tagsMap.set(tag.productId, []);
+    tagsMap.get(tag.productId)!.push(tag.value);
+  });
+  
+  allUseCases.forEach(uc => {
+    if (!useCasesMap.has(uc.productId)) useCasesMap.set(uc.productId, []);
+    useCasesMap.get(uc.productId)!.push(uc.value);
+  });
+  
+  allAttributes.forEach(attr => {
+    if (!attributesMap.has(attr.productId)) attributesMap.set(attr.productId, {});
+    attributesMap.get(attr.productId)![attr.key] = attr.value;
+  });
+  
+  const mapBuildTime = Date.now();
+  console.log(`🔄 hydrateProductsBatch: Map building took ${mapBuildTime - batchQueryTime}ms`);
+  
+  // Build final products using the maps
+  const result = productRecords.map((product): Product => {
+    const price = pricesMap.get(product.id);
+    const salePrice = salePricesMap.get(product.id);
+    const inventory = inventoryMap.get(product.id);
+    const images = imagesMap.get(product.id) || [];
+    const tags = tagsMap.get(product.id) || [];
+    const useCases = useCasesMap.get(product.id) || [];
+    const attributes = attributesMap.get(product.id) || {};
+    
+    return {
+      id: product.id,
+      name: product.name,
+      slug: product.slug,
+      shortDescription: product.shortDescription ?? "",
+      longDescription: product.longDescription ?? "",
+      primaryImageUrl: product.primaryImageUrl,
+      images,
+      price: price?.price ?? 0,
+      active: product.active ?? false,
+      salePrice: salePrice?.sale_price ?? 0,
+      onSale: !!product.onSale,
+      quantityInStock: inventory?.quantityInStock ?? 0,
+      availability: product.availability === "available" ? "available" : "coming_soon",
+      tags,
+      useCases,
+      attributes,
+      aiNotes: product.aiNotes ?? "",
+    };
+  });
+  
+  const totalTime = Date.now() - startTime;
+  console.log(`🔄 hydrateProductsBatch: Completed ${productRecords.length} products in ${totalTime}ms (avg: ${(totalTime/productRecords.length).toFixed(1)}ms per product)`);
+  
+  return result;
 }

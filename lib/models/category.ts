@@ -33,19 +33,39 @@ export async function hydrateCategory(
 export async function getCategoryProducts(
   categorySlug: string
 ): Promise<Product[]> {
+  const startTime = Date.now();
+  console.log(`📂 getCategoryProducts: Starting fetch for "${categorySlug}"`);
+  
   const db = await getDbAsync();
+  const dbConnectTime = Date.now();
+  console.log(`📂 getCategoryProducts: DB connection took ${dbConnectTime - startTime}ms`);
+  
   const category = await db.query.categories.findFirst({
     where: eq(categories.slug, categorySlug),
   });
   if (!category) return [];
 
+  const categoryQueryTime = Date.now();
+  console.log(`📂 getCategoryProducts: Category lookup took ${categoryQueryTime - dbConnectTime}ms`);
+
   const rows = await db
     .select()
     .from(products)
     .innerJoin(productCategories, eq(products.id, productCategories.productId))
-    .where(eq(productCategories.categoryId, category.id));
+    .where(eq(productCategories.categoryId, category.id))
+    .limit(3); // Only fetch 3 products instead of 8
 
-  // Use batch hydration for better performance
+  const productsQueryTime = Date.now();
+  console.log(`📂 getCategoryProducts: Products query took ${productsQueryTime - categoryQueryTime}ms, found ${rows.length} products`);
+
+  // Use batch hydration with shared database connection for better performance
   const productRecords = rows.map((row) => row.products);
-  return hydrateProductsBatch(productRecords);
+  const hydratedProducts = await hydrateProductsBatch(productRecords, db);
+  
+  const hydrationTime = Date.now();
+  const totalTime = hydrationTime - startTime;
+  console.log(`📂 getCategoryProducts: Hydration took ${hydrationTime - productsQueryTime}ms`);
+  console.log(`📂 getCategoryProducts: Total time ${totalTime}ms for ${hydratedProducts.length} products`);
+  
+  return hydratedProducts;
 }
