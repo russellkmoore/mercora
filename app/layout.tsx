@@ -121,7 +121,7 @@ export default function RootLayout({
             <script
               dangerouslySetInnerHTML={{
                 __html: `
-                  <script type="text/javascript">
+                 
 ;window.NREUM||(NREUM={});NREUM.init={distributed_tracing:{enabled:true},privacy:{cookies_enabled:true},ajax:{deny_list:["bam.nr-data.net"]}};
 
 ;NREUM.loader_config={accountID:"6962039",trustKey:"6962039",agentID:"1103430512",licenseKey:"NRJS-9d6f533aea31ca8db8f",applicationID:"1103430512"};
