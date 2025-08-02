@@ -1,6 +1,8 @@
 {
 	"files.associations": {
-		"wrangler.json": "jsonc"
+		"wrangler.json": "jsonc",
+		"_headers": "plaintext",
+		"_redirects": "plaintext"
 	},
 	"debug.javascript.defaultRuntimeExecutable": {
 		"pwa-node": "/Users/rmoore/.local/share/mise/shims/node"

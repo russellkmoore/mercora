@@ -25,11 +25,21 @@ const nextConfig: NextConfig = {
               chunks: 'all',
               priority: 10,
               reuseExistingChunk: true,
-              maxSize: 200000, // Limit chunk size to reduce preloading
+              maxSize: 150000, // Smaller chunks to reduce preloading
+            },
+            common: {
+              name: 'common',
+              minChunks: 2,
+              priority: 5,
+              chunks: 'all',
+              maxSize: 100000, // Keep common chunks small
             },
           },
         },
       };
+      
+      // Reduce module concatenation which can cause larger chunks
+      config.optimization.concatenateModules = false;
     }
     return config;
   },
@@ -47,6 +57,11 @@ const nextConfig: NextConfig = {
             key: "Link",
             value: "<https://fonts.googleapis.com>; rel=preconnect; crossorigin",
           },
+          // Reduce resource hints aggressiveness
+          {
+            key: "X-Resource-Hint-Control",
+            value: "conservative",
+          },
         ],
       },
       {
@@ -56,6 +71,16 @@ const nextConfig: NextConfig = {
           {
             key: "Cache-Control",
             value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        // Prevent preloading of non-critical webpack chunks
+        source: "/_next/static/chunks/webpack-(.*)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400",
           },
         ],
       },
