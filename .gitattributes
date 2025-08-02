@@ -1,0 +1,3 @@
+# Cloudflare Workers files should not be treated as YAML
+_headers linguist-language=Text
+_redirects linguist-language=Text

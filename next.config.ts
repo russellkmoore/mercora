@@ -63,11 +63,6 @@ const nextConfig: NextConfig = {
             key: "Link-Policy",
             value: "suppress-warnings",
           },
-          // Allow New Relic beacon requests
-          {
-            key: "Content-Security-Policy",
-            value: "connect-src 'self' https://bam.nr-data.net https://js-agent.newrelic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js-agent.newrelic.com;",
-          },
         ],
       },
       {

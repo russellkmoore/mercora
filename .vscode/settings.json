@@ -2,9 +2,14 @@
 	"files.associations": {
 		"wrangler.json": "jsonc",
 		"_headers": "plaintext",
-		"_redirects": "plaintext"
+		"_redirects": "plaintext",
+		"**/public/_headers": "plaintext",
+		"**/_headers": "plaintext"
 	},
 	"debug.javascript.defaultRuntimeExecutable": {
 		"pwa-node": "/Users/rmoore/.local/share/mise/shims/node"
+	},
+	"yaml.schemas": {
+		"https://json.schemastore.org/github-workflow.json": "!_headers"
 	}
 }
