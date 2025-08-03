@@ -26,7 +26,7 @@
  * === Checkout Flow ===
  * 1. Cart items and quantities
  * 2. Shipping address collection
- * 3. Billing address (can copy from shipping)
+ * 3. Billing address (can copy from shipping)  
  * 4. Shipping option selection
  * 5. Payment information entry
  * 6. Tax calculation and total computation
@@ -96,7 +96,7 @@ interface CartState {
 }
 
 /**
- * Cart store with persistent storage and comprehensive checkout support
+ * Main cart store with Zustand for state management
  * 
  * Automatically saves cart state to localStorage and provides intelligent
  * item management with quantity consolidation and checkout flow support.
