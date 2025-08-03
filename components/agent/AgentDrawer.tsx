@@ -37,6 +37,7 @@ import { Search, Send } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useUser } from "@clerk/nextjs";
+import { useEnhancedUserContext, formatUserContextForAI } from "@/lib/hooks/useEnhancedUserContext";
 import ProductCard from "./ProductCard";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
@@ -59,6 +60,7 @@ export default function AgentDrawer({
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { user } = useUser();
+  const userContext = useEnhancedUserContext();
   const {
     messages,
     addMessage,
@@ -146,6 +148,8 @@ export default function AgentDrawer({
         body: JSON.stringify({ 
           question: userMessage.content,
           userName: user?.firstName || user?.fullName || "Guest",
+          userContext: formatUserContextForAI(userContext),
+          orders: userContext.orders,
           history: messages 
         }),
       });
