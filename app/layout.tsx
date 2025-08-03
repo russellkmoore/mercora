@@ -121,26 +121,6 @@ export default function RootLayout({
           className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white flex flex-col min-h-screen`}
           suppressHydrationWarning
         >
-          {/* Suppress preload warnings in development */}
-          {process.env.NODE_ENV === "development" && (
-            <script
-              dangerouslySetInnerHTML={{
-                __html: `
-                  if (typeof console !== 'undefined') {
-                    const originalWarn = console.warn;
-                    console.warn = function(...args) {
-                      if (args[0] && typeof args[0] === 'string' && 
-                          (args[0].includes('preload') || args[0].includes('preconnect'))) {
-                        return;
-                      }
-                      originalWarn.apply(console, args);
-                    };
-                  }
-                `,
-              }}
-            />
-          )}
-
           {/* Global navigation header with suspense boundary */}
           <Suspense fallback={<div className="h-16 bg-neutral-900" />}>
             <Header />
