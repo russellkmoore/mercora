@@ -83,14 +83,13 @@ export default function HeaderClient({
 
       {/* Desktop Navigation */}
       <div className="hidden md:flex gap-2 sm:gap-4 items-center">
-        <Link href="/" passHref prefetch={true}>
-          <Button
-            variant="ghost"
-            className="text-white hover:bg-white hover:text-orange-500 bg-black"
-          >
-            <Home className="mr-2 h-4 w-4" />
-            Home
-          </Button>
+        <Link 
+          href="/"
+          prefetch={true}
+          className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 text-white hover:bg-white hover:text-orange-500 bg-black h-10 px-4 py-2"
+        >
+          <Home className="mr-2 h-4 w-4" />
+          Home
         </Link>
 
         <DropdownMenu>

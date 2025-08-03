@@ -6,7 +6,7 @@ import Link from "next/link";
 export default function ProductCard({ product }: { product: any }) {
   return (
     <div className="border rounded p-3 bg-white shadow-sm">
-      <Link href={`/product/${product.slug}`} className="flex items-center space-x-3">
+      <Link href={`/product/${product.slug}`} className="flex items-center space-x-3" prefetch={true}>
         <div className="w-16 h-16 relative flex-shrink-0 overflow-hidden rounded border">
           <Image
             src={product.primaryImageUrl || "/placeholder.jpg"}
