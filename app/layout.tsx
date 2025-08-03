@@ -53,11 +53,6 @@ import { Suspense } from "react";
 
 import {
   ClerkProvider,
-  SignedIn,
-  SignedOut,
-  SignInButton,
-  SignUpButton,
-  UserButton,
 } from "@clerk/nextjs";
 
 // Configure primary font family with CSS variables
