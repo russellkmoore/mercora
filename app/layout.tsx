@@ -50,7 +50,6 @@ import Footer from "@/components/Footer";
 import { Toaster } from "sonner";
 import { dark } from "@clerk/themes";
 import { Suspense } from "react";
-import Script from "next/script";
 
 import {
   ClerkProvider,
@@ -117,45 +116,6 @@ export default function RootLayout({
     >
       <html lang="en" suppressHydrationWarning>
         <head>
-          {/* New Relic Browser Agent - Only in production */}
-          {process.env.NODE_ENV === "production" &&
-            process.env.NEXT_PUBLIC_NEW_RELIC_BROWSER_LICENSE_KEY && (
-              <>
-                <Script
-                  id="newrelic-config"
-                  strategy="beforeInteractive"
-                  dangerouslySetInnerHTML={{
-                    __html: `
-                    window.NREUM||(NREUM={});
-                    NREUM.init={
-                      distributed_tracing:{enabled:true},
-                      privacy:{cookies_enabled:true},
-                      ajax:{deny_list:[]}
-                    };
-                    NREUM.loader_config={
-                      accountID:"6962039",
-                      trustKey:"6962039",
-                      agentID:"1103430512",
-                      licenseKey:"${process.env.NEXT_PUBLIC_NEW_RELIC_BROWSER_LICENSE_KEY}",
-                      applicationID:"1103430512"
-                    };
-                    NREUM.info={
-                      beacon:"bam.nr-data.net",
-                      errorBeacon:"bam.nr-data.net",
-                      licenseKey:"${process.env.NEXT_PUBLIC_NEW_RELIC_BROWSER_LICENSE_KEY}",
-                      applicationID:"1103430512",
-                      sa:1
-                    };
-                  `,
-                  }}
-                />
-                <Script
-                  src="https://js-agent.newrelic.com/nr-loader-spa-1.293.0.min.js"
-                  strategy="beforeInteractive"
-                  crossOrigin="anonymous"
-                />
-              </>
-            )}
         </head>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white flex flex-col min-h-screen`}
