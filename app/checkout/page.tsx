@@ -30,30 +30,38 @@
  * @returns Server-rendered checkout page with auth context
  */
 
-import CheckoutClient from "@/components/checkout/CheckoutClient";
-import ClientOnly from "@/components/ClientOnly";
-import { auth } from "@clerk/nextjs/server";
+"use client";
+
+import dynamic from "next/dynamic";
+import { useAuth } from "@clerk/nextjs";
+
+// Dynamically import CheckoutClient with no SSR to prevent hydration issues
+const CheckoutClient = dynamic(
+  () => import("@/components/checkout/CheckoutClient"),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-white">Loading checkout...</div>
+      </div>
+    )
+  }
+);
 
 /**
- * Checkout page component with server-side authentication
+ * Checkout page component with client-side authentication
  * 
  * @returns JSX element with checkout client component and auth context
  */
-export default async function CheckoutPage() {
-  // Get authenticated user ID from Clerk on server-side
-  const { userId } = await auth();
+export default function CheckoutPage() {
+  // Get authenticated user ID from Clerk on client-side
+  const { userId } = useAuth();
   
   return (
     <main className="bg-neutral-900 text-white min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
       <div className="max-w-6xl mx-auto p-4 sm:p-6">
-        {/* Wrap CheckoutClient with hydration protection to prevent mismatches */}
-        <ClientOnly fallback={
-          <div className="flex items-center justify-center py-12">
-            <div className="text-white">Loading checkout...</div>
-          </div>
-        }>
-          <CheckoutClient userId={userId} />
-        </ClientOnly>
+        {/* Use dynamic import with SSR disabled to prevent hydration issues */}
+        <CheckoutClient userId={userId} />
       </div>
     </main>
   );
