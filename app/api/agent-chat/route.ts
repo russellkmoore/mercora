@@ -69,10 +69,15 @@ import type { Product } from "@/lib/types/product";
 export async function POST(req: NextRequest) {
   try {
     // Parse and validate request body
-    const body: { question: string; userName?: string; history?: any[] } =
-      await req.json();
+    const body: { 
+      question: string; 
+      userName?: string; 
+      userContext?: string;
+      orders?: any[];
+      history?: any[] 
+    } = await req.json();
     const { userId } = await auth();
-    const { question, userName = "Guest", history = [] } = body;
+    const { question, userName = "Guest", userContext = "", orders = [], history = [] } = body;
 
     if (!question) {
       return NextResponse.json({ error: "Missing question" }, { status: 400 });
@@ -174,6 +179,19 @@ ${
     ? `- The user's name is ${userName}, use it naturally in conversation`
     : ""
 }
+
+USER CONTEXT:
+${userContext ? `${userContext}` : "No user purchase history available"}
+${orders.length > 0 ? `\nRecent orders: ${orders.slice(0, 3).map(order => 
+  `Order ${order.id} (${order.status}): ${order.items?.length || 0} items, $${(order.total / 100).toFixed(2)}`
+).join(', ')}` : ''}
+
+PERSONALIZATION GUIDELINES:
+- Use order history to provide personalized recommendations
+- If user asks about order status, reference their actual orders
+- Consider their past purchases when suggesting complementary products
+- For returning customers, acknowledge their loyalty
+- For VIP customers (high spending), offer premium recommendations
 
 CRITICAL PRODUCT RULES - READ CAREFULLY:
 - YOU MUST ONLY mention products that are explicitly listed in the "Available product context" section below
