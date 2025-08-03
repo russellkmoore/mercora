@@ -155,46 +155,55 @@ export default function ProductRecommendations({
     currentProduct: Product, 
     userContext: any
   ): Promise<Product[]> => {
-    const productTags = currentProduct.tags.join(", ");
-    const productUseCases = currentProduct.useCases.join(", ");
-    
-    // Enhanced query with user context
-    let recommendationQuery = `I'm interested in the ${currentProduct.name}. It's used for ${productUseCases} and has tags: ${productTags}.`;
-    
-    if (userContext?.orders.length > 0) {
-      recommendationQuery += ` I'm a returning customer with ${userContext.orders.length} previous orders.`;
-      if (userContext.isVipCustomer) {
-        recommendationQuery += " I'm interested in premium products.";
+    try {
+      const productTags = currentProduct.tags?.join(", ") || "";
+      const productUseCases = currentProduct.useCases?.join(", ") || "";
+      
+      // Enhanced query with user context
+      let recommendationQuery = `I'm interested in the ${currentProduct.name}. It's used for ${productUseCases} and has tags: ${productTags}.`;
+      
+      if (userContext?.orders?.length > 0) {
+        recommendationQuery += ` I'm a returning customer with ${userContext.orders.length} previous orders.`;
+        if (userContext.isVipCustomer) {
+          recommendationQuery += " I'm interested in premium products.";
+        }
       }
-    }
-    
-    recommendationQuery += " Can you recommend 3 similar or complementary products?";
-    
-    const res = await fetch("/api/agent-chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ 
-        question: recommendationQuery,
-        userName: userContext?.user?.firstName || "Guest",
-        userContext: userContext ? {
-          orders: userContext.orders.slice(0, 3), // Last 3 orders for context
-          isVipCustomer: userContext.isVipCustomer,
-          totalOrders: userContext.orders.length,
-        } : undefined,
-        history: []
-      }),
-    });
+      
+      recommendationQuery += " Can you recommend 3 similar or complementary products?";
+      
+      const res = await fetch("/api/agent-chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ 
+          question: recommendationQuery,
+          userName: userContext?.user?.firstName || "Guest",
+          userContext: userContext ? {
+            orders: userContext.orders?.slice(0, 3) || [], // Last 3 orders for context
+            isVipCustomer: userContext.isVipCustomer || false,
+            totalOrders: userContext.orders?.length || 0,
+          } : undefined,
+          history: []
+        }),
+      });
 
-    if (!res.ok) throw new Error("AI recommendation failed");
-    
-    const data = (await res.json()) as { 
-      answer: string; 
-      products?: Product[];
-      productIds?: number[];
-    };
-    return data.products?.filter((p: Product) => p.id !== currentProduct.id) || [];
+      if (!res.ok) {
+        console.warn("AI recommendation request failed:", res.status, res.statusText);
+        return [];
+      }
+      
+      const data = await res.json() as { 
+        answer: string; 
+        products?: Product[];
+        productIds?: number[];
+      };
+      
+      return data.products?.filter((p: Product) => p.id !== currentProduct.id) || [];
+    } catch (error) {
+      console.error("fetchAIRecommendations error:", error);
+      return []; // Return empty array instead of throwing
+    }
   };
 
   // Don't render anything if no product context
