@@ -56,6 +56,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 export default function CartDrawer() {
   const [isOpen, setIsOpen] = useState(false);
   const items = useCartStore((state) => state.items);
+  const hasHydrated = useCartStore((state) => state.hasHydrated);
 
   // Calculate total price for all items in cart
   const total = items.reduce(
@@ -63,66 +64,66 @@ export default function CartDrawer() {
     0
   );
 
+  // Show loading state during hydration to prevent mismatches
+  const itemCount = hasHydrated ? items.length : 0;
+  const displayTotal = hasHydrated ? total : 0;
+
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
         <Button
           variant="ghost"
-          className="text-white hover:bg-white hover:text-orange-500 bg-black relative"
+          className="text-white hover:bg-white hover:text-orange-500 relative"
         >
-          <ShoppingCart className="h-5 w-5" />
-          {items.length > 0 && (
-            <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-              {items.length}
+          <ShoppingCart className="mr-2 h-4 w-4" />
+          Cart ({itemCount})
+          {itemCount > 0 && (
+            <span className="absolute -top-2 -right-2 bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+              {itemCount}
             </span>
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="bg-white text-black w-full sm:w-[400px] max-w-[400px] p-4 flex flex-col">
+      <SheetContent className="bg-black text-white w-full max-w-md">
         {/* Accessibility components */}
         <VisuallyHidden>
           <SheetTitle>Shopping Cart</SheetTitle>
           <SheetDescription>
-            Review and manage items in your shopping cart, view total price, and proceed to checkout.
+            Review and manage items in your shopping cart before checkout.
           </SheetDescription>
         </VisuallyHidden>
 
-        {/* Left fade */}
-        <div className="absolute left-0 top-0 h-full w-2 bg-gradient-to-r from-black/20 to-transparent z-10 pointer-events-none" />
-
-        {/* Header - flex-shrink-0 to maintain size */}
-        <h2 className="text-xl font-bold mb-4 flex-shrink-0">Your Cart</h2>
-        
-        {items.length === 0 ? (
-          <p className="flex-1 flex items-center justify-center text-gray-500">Your cart is empty.</p>
-        ) : (
-          <>
-            {/* Cart Items - flex-1 to take remaining space */}
-            <div className="flex-1 min-h-0 overflow-y-auto pr-2 space-y-4 mb-4">
+        <div className="py-6">
+          <h2 className="text-xl font-bold mb-4">Your Cart</h2>
+          
+          {!hasHydrated ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-gray-400">Loading cart...</div>
+            </div>
+          ) : itemCount === 0 ? (
+            <div className="text-gray-400 text-center py-8">
+              Your cart is empty
+            </div>
+          ) : (
+            <div className="space-y-4">
               {items.map((item) => (
                 <CartItemCard key={item.productId} item={item} />
               ))}
+              
+              <div className="border-t border-gray-700 pt-4">
+                <div className="flex justify-between items-center text-lg font-bold">
+                  <span>Total: ${displayTotal.toFixed(2)}</span>
+                </div>
+                
+                <Link href="/checkout" onClick={() => setIsOpen(false)}>
+                  <Button className="w-full bg-orange-500 hover:bg-orange-600 mt-4">
+                    Proceed to Checkout
+                  </Button>
+                </Link>
+              </div>
             </div>
-            
-            {/* Footer with total and checkout - flex-shrink-0 to maintain size */}
-            <div className="border-t pt-4 text-right flex-shrink-0">
-              <p className="font-semibold text-lg">
-                Total: ${total.toFixed(2)}
-              </p>
-              <Button
-                className="mt-3 w-full bg-black text-white hover:bg-orange-500"
-                onClick={() => {
-                  setIsOpen(false);
-                  setTimeout(() => {
-                    window.location.href = "/checkout";
-                  }, 100);
-                }}
-              >
-                Checkout
-              </Button>
-            </div>
-          </>
-        )}
+          )}
+        </div>
       </SheetContent>
     </Sheet>
   );
