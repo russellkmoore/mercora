@@ -31,6 +31,7 @@
  */
 
 import CheckoutClient from "@/components/checkout/CheckoutClient";
+import ClientOnly from "@/components/ClientOnly";
 import { auth } from "@clerk/nextjs/server";
 
 /**
@@ -45,8 +46,14 @@ export default async function CheckoutPage() {
   return (
     <main className="bg-neutral-900 text-white min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
       <div className="max-w-6xl mx-auto p-4 sm:p-6">
-        {/* Pass authentication state to client-side checkout flow */}
-        <CheckoutClient userId={userId} />
+        {/* Wrap CheckoutClient with hydration protection to prevent mismatches */}
+        <ClientOnly fallback={
+          <div className="flex items-center justify-center py-12">
+            <div className="text-white">Loading checkout...</div>
+          </div>
+        }>
+          <CheckoutClient userId={userId} />
+        </ClientOnly>
       </div>
     </main>
   );
