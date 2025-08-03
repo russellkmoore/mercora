@@ -11,5 +11,20 @@
 	},
 	"yaml.schemas": {
 		"https://json.schemastore.org/github-workflow.json": "!_headers"
+	},
+	"mcp.servers": {
+		"filesystem": {
+			"command": "npx",
+			"args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/rmoore/Workspaces/mercora"],
+			"env": {}
+		},
+		"context7": {
+			"type": "http",
+			"url": "https://mcp.context7.com/mcp",
+			"tools": [
+				"get-library-docs",
+				"resolve-library-id"
+			]
+		}
 	}
 }
