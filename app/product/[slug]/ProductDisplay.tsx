@@ -40,35 +40,10 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import dynamic from "next/dynamic";
+import ProductRecommendations from "@/components/ProductRecommendations";
 import { useCartStore } from "@/lib/stores/cart-store";
 import { toast } from "sonner";
 import type { Product } from "@/lib/types/product";
-
-// Dynamic import for ProductRecommendations to prevent hydration issues
-const ProductRecommendations = dynamic(
-  () => import("@/components/ProductRecommendations"),
-  { 
-    ssr: false,
-    loading: () => (
-      <div className="mt-16">
-        <h2 className="text-2xl font-bold mb-6">You may also like</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-neutral-800 rounded-lg overflow-hidden animate-pulse">
-              <div className="aspect-video bg-neutral-700"></div>
-              <div className="p-4 space-y-2">
-                <div className="h-4 bg-neutral-700 rounded w-3/4"></div>
-                <div className="h-3 bg-neutral-700 rounded w-1/2"></div>
-                <div className="h-4 bg-neutral-700 rounded w-1/4"></div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-);
 
 /**
  * ProductDisplay component for showcasing individual product details

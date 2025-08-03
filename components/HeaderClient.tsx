@@ -86,9 +86,9 @@ export default function HeaderClient({
         <Link 
           href="/"
           prefetch={true}
-          className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 text-white hover:bg-white hover:text-orange-500 bg-black h-10 px-4 py-2"
+          className="flex items-center gap-2 px-4 py-2 text-white hover:bg-white hover:text-orange-500 rounded-md transition-colors"
         >
-          <Home className="mr-2 h-4 w-4" />
+          <Home className="h-4 w-4" />
           Home
         </Link>
 
