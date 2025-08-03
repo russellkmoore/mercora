@@ -49,27 +49,50 @@ import type { ShippingOption } from "@/lib/types/shipping";
  */
 interface CartState {
   // === Cart Items ===
-  items: CartItem[];                                    // Products in cart with quantities
-  
+  /** Array of items currently in the shopping cart */
+  items: CartItem[];
+
   // === Checkout Information ===
-  shippingAddress?: Address;                            // Customer shipping address
-  billingAddress?: Address;                             // Billing address (can differ from shipping)
-  shippingOption?: ShippingOption;                      // Selected shipping method and cost
-  billingInfo?: BillingInfo;                           // Payment method information
-  taxAmount?: number;                                   // Calculated tax amount for order
-  
+  /** Customer shipping address */
+  shippingAddress?: Address;
+  /** Customer billing address (may differ from shipping) */
+  billingAddress?: Address;
+  /** Selected shipping method and pricing */
+  shippingOption?: ShippingOption;
+  /** Payment and billing information */
+  billingInfo?: BillingInfo;
+  /** Calculated tax amount for the order */
+  taxAmount?: number;
+
+  // === Hydration State ===
+  /** Track if store has been hydrated from localStorage */
+  hasHydrated: boolean;
+
   // === Cart Management Actions ===
-  addItem: (item: CartItem) => void;                   // Add item to cart (merges quantities)
-  removeItem: (id: number) => void;                    // Remove item completely from cart
-  updateQuantity: (id: number, quantity: number) => void; // Update item quantity
-  clearCart: () => void;                               // Empty entire cart
-  
-  // === Checkout Actions ===
-  setShippingAddress: (address: Address) => void;      // Set shipping destination
-  setBillingAddress: (address: Address) => void;       // Set billing address
-  setShippingOption: (option: ShippingOption | undefined) => void; // Select shipping method
-  setBillingInfo: (info: BillingInfo) => void;         // Set payment information
-  setTaxAmount: (amount: number) => void;               // Update calculated tax amount
+  /** Add an item to the cart (merges quantities if item exists) */
+  addItem: (item: CartItem) => void;
+  /** Remove an item completely from the cart */
+  removeItem: (productId: number) => void;
+  /** Update the quantity of a specific item */
+  updateQuantity: (productId: number, quantity: number) => void;
+  /** Clear all items from the cart */
+  clearCart: () => void;
+  /** Calculate total price of all items in cart */
+  get total(): number;
+
+  // === Checkout Information Setters ===
+  /** Set customer shipping address */
+  setShippingAddress: (address: Address) => void;
+  /** Set billing address (can be different from shipping) */
+  setBillingAddress: (address: Address) => void;
+  /** Set selected shipping method and cost */
+  setShippingOption: (option: ShippingOption | undefined) => void;
+  /** Set payment/billing information */
+  setBillingInfo: (info: BillingInfo) => void;
+  /** Update calculated tax amount */
+  setTaxAmount: (amount: number) => void;
+  /** Set hydration state */
+  setHasHydrated: (state: boolean) => void;
 }
 
 /**
@@ -88,6 +111,7 @@ export const useCartStore = create<CartState>()(
       shippingOption: undefined,
       billingInfo: undefined,
       taxAmount: undefined,
+      hasHydrated: false,
 
       /**
        * Add item to cart with intelligent quantity merging
@@ -137,6 +161,16 @@ export const useCartStore = create<CartState>()(
       },
 
       /**
+       * Calculate total price of all items in cart
+       */
+      get total() {
+        const items = get().items;
+        return items.reduce((total, item) => {
+          return total + item.price * item.quantity;
+        }, 0);
+      },
+
+      /**
        * Clear entire cart and reset all checkout information
        * Used after successful order completion or manual cart reset
        */
@@ -165,10 +199,16 @@ export const useCartStore = create<CartState>()(
       
       /** Update calculated tax amount */
       setTaxAmount: (amount) => set({ taxAmount: amount }),
+
+      /** Set hydration state */
+      setHasHydrated: (state) => set({ hasHydrated: state }),
     }),
     {
       // Persist cart state in localStorage
       name: "cart-storage",
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );
