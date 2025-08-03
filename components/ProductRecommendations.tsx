@@ -255,9 +255,14 @@ export default function ProductRecommendations({
             ? "grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto" 
             : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
         }`}>
-          {recommendedProducts.map((prod) => (
-            <ProductCard key={prod.id} product={prod} />
-          ))}
+          {recommendedProducts.map((prod) => {
+            try {
+              return <ProductCard key={prod.id} product={prod} />;
+            } catch (error) {
+              console.error("Error rendering ProductCard:", error);
+              return null;
+            }
+          })}
         </div>
       )}
       

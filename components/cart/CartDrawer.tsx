@@ -55,12 +55,12 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
  */
 export default function CartDrawer() {
   const [isOpen, setIsOpen] = useState(false);
-  const items = useCartStore((state) => state.items);
+  const items = useCartStore((state) => state.items) || [];
   const hasHydrated = useCartStore((state) => state.hasHydrated);
 
-  // Calculate total price for all items in cart
+  // Calculate total price for all items in cart with safety checks
   const total = items.reduce(
-    (acc, item) => acc + item.price * item.quantity,
+    (acc, item) => acc + (item?.price || 0) * (item?.quantity || 0),
     0
   );
 
