@@ -55,6 +55,7 @@ import AgentDrawer from "@/components/agent/AgentDrawer";
 import ClerkLogin from "@/components/login/ClerkLogin";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import CartDrawer from "@/components/cart/CartDrawer";
+import ClientOnly from "@/components/ClientOnly";
 
 /**
  * Props interface for HeaderClient component
@@ -120,7 +121,9 @@ export default function HeaderClient({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <AgentDrawer />
+        <ClientOnly>
+          <AgentDrawer />
+        </ClientOnly>
         <ClerkLogin />
         <CartDrawer />
       </div>
