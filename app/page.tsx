@@ -44,18 +44,8 @@ import { getProductsByCategory } from "@/lib/loaders/products";
  * @returns Server-rendered home page with hero section and featured products
  */
 export default async function HomePage() {
-  const startTime = Date.now();
-  console.log('🏠 HomePage: Starting data fetch');
-  
   // Fetch only 3 featured products with optimized query
-  const fetchStart = Date.now();
   const featuredProducts = (await getProductsByCategory("featured")).slice(0, 3);
-  const fetchEnd = Date.now();
-  
-  const totalTime = Date.now() - startTime;
-  console.log(`🏠 HomePage: Data fetch took ${fetchEnd - fetchStart}ms`);
-  console.log(`🏠 HomePage: Total render prep took ${totalTime}ms`);
-  console.log(`🏠 HomePage: Loaded ${featuredProducts.length} products`);
 
   return (
     <main className="bg-neutral-900 text-white px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
