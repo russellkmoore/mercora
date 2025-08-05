@@ -56,7 +56,9 @@ export default function ProductRecommendations({
   const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const userContext = useEnhancedUserContext();
+  // Temporarily disable enhanced user context to debug cart issues
+  // const userContext = useEnhancedUserContext();
+  const userContext = null;
 
   /**
    * Load all products for personalized recommendation algorithm
@@ -105,6 +107,8 @@ export default function ProductRecommendations({
         }
 
         // Step 2: If we don't have enough personalized recommendations, enhance with AI
+        // Temporarily disabled to debug cart issues
+        /*
         if (recommendations.length < maxRecommendations) {
           try {
             const aiRecommendations = await fetchAIRecommendations(product, userContext);
@@ -123,6 +127,7 @@ export default function ProductRecommendations({
             console.warn("AI recommendations failed, using personalized only:", aiError);
           }
         }
+        */
 
         // Step 3: Final fallback to simple tag-based matching if still not enough
         if (recommendations.length < maxRecommendations) {
@@ -219,15 +224,17 @@ export default function ProductRecommendations({
     return null;
   }
 
-  // Determine section title based on personalization
+  // Determine section title based on personalization  
   let sectionTitle = "You may also like";
   if (isLoading) {
-    sectionTitle = userContext?.orders.length > 0 
-      ? "Finding personalized recommendations..." 
-      : "Finding recommendations...";
-  } else if (userContext?.orders.length > 0 && hasRecommendations) {
-    sectionTitle = "Recommended for you";
+    sectionTitle = "Finding recommendations...";
+    // sectionTitle = userContext?.orders.length > 0 
+    //   ? "Finding personalized recommendations..." 
+    //   : "Finding recommendations...";
   }
+  // } else if (userContext?.orders.length > 0 && hasRecommendations) {
+  //   sectionTitle = "Recommended for you";
+  // }
 
   return (
     <div className="mt-20 text-center relative">
@@ -267,11 +274,11 @@ export default function ProductRecommendations({
       )}
       
       {/* Optional: Show personalization indicator for VIP customers */}
-      {userContext?.isVipCustomer && hasRecommendations && !isLoading && (
+      {/* {userContext?.isVipCustomer && hasRecommendations && !isLoading && (
         <div className="mt-4 text-sm text-orange-400/70">
           ✨ Curated selections for valued customers
         </div>
-      )}
+      )} */}
     </div>
   );
 }

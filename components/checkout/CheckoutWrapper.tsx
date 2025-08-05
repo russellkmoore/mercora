@@ -9,21 +9,17 @@ interface CheckoutWrapperProps {
 }
 
 /**
- * Hydration-safe wrapper for CheckoutClient
- * Ensures cart store is properly hydrated before rendering checkout
+ * Client-side wrapper for CheckoutClient
+ * Uses ClientOnly pattern to prevent hydration mismatches
  */
 export default function CheckoutWrapper({ userId }: CheckoutWrapperProps) {
-  const [isHydrated, setIsHydrated] = useState(false);
-  const hasStoreHydrated = useCartStore((state) => state.hasHydrated);
+  const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
-    // Wait for both client mount and store hydration
-    if (hasStoreHydrated) {
-      setIsHydrated(true);
-    }
-  }, [hasStoreHydrated]);
+    setHasMounted(true);
+  }, []);
 
-  if (!isHydrated) {
+  if (!hasMounted) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-white">Loading checkout...</div>
