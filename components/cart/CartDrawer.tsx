@@ -44,7 +44,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from 
 import CartItemCard from "./CartItemCard";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
@@ -55,8 +55,14 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
  */
 export default function CartDrawer() {
   const [isOpen, setIsOpen] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
   const items = useCartStore((state) => state.items) || [];
-  const hasHydrated = useCartStore((state) => state.hasHydrated);
+
+  useEffect(() => {
+    // Trigger manual rehydration and mark as mounted
+    useCartStore.persist.rehydrate();
+    setHasMounted(true);
+  }, []);
 
   // Calculate total price for all items in cart with safety checks
   const total = items.reduce(
@@ -64,9 +70,8 @@ export default function CartDrawer() {
     0
   );
 
-  // Show loading state during hydration to prevent mismatches
-  const itemCount = hasHydrated ? items.length : 0;
-  const displayTotal = hasHydrated ? total : 0;
+  // Only show real count after mounting to prevent hydration mismatch
+  const itemCount = hasMounted ? items.length : 0;
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -84,7 +89,10 @@ export default function CartDrawer() {
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent className="bg-black text-white w-full max-w-md">
+      <SheetContent 
+        side="right"
+        className="bg-[#171717] text-white transition-all ease-in-out px-3 w-full sm:w-[400px] !max-w-[400px] !duration-[600ms] data-[state=closed]:!duration-[600ms] data-[state=open]:!duration-[600ms] flex flex-col h-full border-neutral-800"
+      >
         {/* Accessibility components */}
         <VisuallyHidden>
           <SheetTitle>Shopping Cart</SheetTitle>
@@ -96,11 +104,7 @@ export default function CartDrawer() {
         <div className="py-6">
           <h2 className="text-xl font-bold mb-4">Your Cart</h2>
           
-          {!hasHydrated ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="text-gray-400">Loading cart...</div>
-            </div>
-          ) : itemCount === 0 ? (
+          {itemCount === 0 ? (
             <div className="text-gray-400 text-center py-8">
               Your cart is empty
             </div>
@@ -112,7 +116,7 @@ export default function CartDrawer() {
               
               <div className="border-t border-gray-700 pt-4">
                 <div className="flex justify-between items-center text-lg font-bold">
-                  <span>Total: ${displayTotal.toFixed(2)}</span>
+                  <span>Total: ${total.toFixed(2)}</span>
                 </div>
                 
                 <Link href="/checkout" onClick={() => setIsOpen(false)}>

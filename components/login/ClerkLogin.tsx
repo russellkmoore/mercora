@@ -4,11 +4,23 @@ import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { LogIn } from "lucide-react";
 import { Package } from "lucide-react";
-import ClientOnly from "@/components/ClientOnly";
+import { useState, useEffect } from "react";
 
 export default function ClerkLogin() {
-  return (
-    <ClientOnly fallback={
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    // Small delay to ensure Clerk is fully initialized
+    const timer = setTimeout(() => {
+      setHasMounted(true);
+    }, 50);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Don't render anything until client has mounted
+  if (!hasMounted) {
+    return (
       <Button
         variant="ghost"
         className="text-white hover:bg-white hover:text-orange-500"
@@ -16,7 +28,11 @@ export default function ClerkLogin() {
       >
         <LogIn className="mr-2 h-4 w-4" /> Loading...
       </Button>
-    }>
+    );
+  }
+
+  return (
+    <>
       <SignedOut>
         <SignInButton mode="modal">
           <Button
@@ -39,6 +55,6 @@ export default function ClerkLogin() {
           </UserButton.MenuItems>
         </UserButton>
       </SignedIn>
-    </ClientOnly>
+    </>
   );
 }
