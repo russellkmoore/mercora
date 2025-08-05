@@ -249,7 +249,10 @@ export default function AgentDrawer({
 
         {/* Header - fixed */}
         <div className="flex-shrink-0">
-          <h2 className="text-lg font-semibold mb-3 mt-2">Ask Volt</h2>
+          <h2 className="text-lg font-semibold mb-3 mt-2">
+            <Search className="h-5 w-5" />
+            Ask Volt
+          </h2>
         </div>
 
         {/* Chat container - fixed height */}

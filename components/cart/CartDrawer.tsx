@@ -102,7 +102,10 @@ export default function CartDrawer() {
         </VisuallyHidden>
 
         <div className="py-6">
-          <h2 className="text-xl font-bold mb-4">Your Cart</h2>
+          <h2 className="text-xl font-bold mb-4">
+            <ShoppingCart className="mr-2 h-4 w-4" />
+            Your Cart
+          </h2>
           
           {itemCount === 0 ? (
             <div className="text-gray-400 text-center py-8">
