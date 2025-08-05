@@ -91,7 +91,7 @@ export default function CartDrawer() {
       </SheetTrigger>
       <SheetContent 
         side="right"
-        className="bg-[#171717] text-white transition-all ease-in-out px-3 w-full sm:w-[400px] !max-w-[400px] !duration-[600ms] data-[state=closed]:!duration-[600ms] data-[state=open]:!duration-[600ms] flex flex-col h-full border-neutral-800"
+        className="bg-[#fdfdfb] text-black  transition-all ease-in-out px-3 w-full sm:w-[400px] !max-w-[400px] !duration-[600ms] data-[state=closed]:!duration-[600ms] data-[state=open]:!duration-[600ms] flex flex-col h-full border-neutral-800"
       >
         {/* Accessibility components */}
         <VisuallyHidden>
