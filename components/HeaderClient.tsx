@@ -50,7 +50,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Home, Search, LogIn, ChevronDown, ShoppingCart, Menu, X } from "lucide-react";
+import { Home, Search, LogIn, ChevronDown, ShoppingCart, Menu, X, Grid3X3 } from "lucide-react";
 import AgentDrawer from "@/components/agent/AgentDrawer";
 import ClerkLogin from "@/components/login/ClerkLogin";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -99,6 +99,7 @@ export default function HeaderClient({
               variant="ghost"
               className="text-white hover:bg-white hover:text-orange-500"
             >
+              <Grid3X3 className="mr-2 h-4 w-4" />
               Categories <ChevronDown className="ml-1 h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
