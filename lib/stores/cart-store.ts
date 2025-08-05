@@ -38,7 +38,7 @@
  */
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { CartItem } from "@/lib/types/cartitem";
 import type { Address } from "@/lib/types/address";
 import type { BillingInfo } from "@/lib/types/billing";
@@ -64,10 +64,6 @@ interface CartState {
   /** Calculated tax amount for the order */
   taxAmount?: number;
 
-  // === Hydration State ===
-  /** Track if store has been hydrated from localStorage */
-  hasHydrated: boolean;
-
   // === Cart Management Actions ===
   /** Add an item to the cart (merges quantities if item exists) */
   addItem: (item: CartItem) => void;
@@ -91,8 +87,6 @@ interface CartState {
   setBillingInfo: (info: BillingInfo) => void;
   /** Update calculated tax amount */
   setTaxAmount: (amount: number) => void;
-  /** Set hydration state */
-  setHasHydrated: (state: boolean) => void;
 }
 
 /**
@@ -111,7 +105,6 @@ export const useCartStore = create<CartState>()(
       shippingOption: undefined,
       billingInfo: undefined,
       taxAmount: undefined,
-      hasHydrated: false,
 
       /**
        * Add item to cart with intelligent quantity merging
@@ -199,16 +192,10 @@ export const useCartStore = create<CartState>()(
       
       /** Update calculated tax amount */
       setTaxAmount: (amount) => set({ taxAmount: amount }),
-
-      /** Set hydration state */
-      setHasHydrated: (state) => set({ hasHydrated: state }),
     }),
     {
-      // Persist cart state in localStorage
-      name: "cart-storage",
-      onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true);
-      },
+      name: 'cart-storage',
+      skipHydration: true,
     }
   )
 );

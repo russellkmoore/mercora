@@ -55,6 +55,7 @@ import AgentDrawer from "@/components/agent/AgentDrawer";
 import ClerkLogin from "@/components/login/ClerkLogin";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import CartDrawer from "@/components/cart/CartDrawer";
+import { CartHydrationGuard } from "@/components/cart/CartHydrationGuard";
 import ClientOnly from "@/components/ClientOnly";
 
 /**
