@@ -5,6 +5,7 @@ import type { CartItem } from "@/lib/types/cartitem";
 import type { ShippingOption } from "@/lib/types/shipping";
 import { insertOrder } from "@/lib/models/order";
 import { auth, currentUser } from "@clerk/nextjs/server";
+import { sendOrderConfirmationEmail, type OrderData } from "@/lib/utils/email";
 
 interface OrderRequest {
   items: CartItem[];
@@ -66,6 +67,50 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
+
+    // Send order confirmation email
+    try {
+      const user = await currentUser();
+      const customerName = user?.firstName && user?.lastName 
+        ? `${user.firstName} ${user.lastName}`
+        : body.shippingAddress.name || 'Valued Customer';
+
+      const orderData: OrderData = {
+        orderNumber: webOrderId,
+        customerName,
+        customerEmail: body.shippingAddress.email,
+        items: body.items.map(item => ({
+          productId: item.productId.toString(),
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          imageUrl: item.primaryImageUrl,
+        })),
+        subtotal: body.items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+        shipping: body.shippingOption.cost || 0,
+        tax: body.taxAmount,
+        total,
+        shippingAddress: {
+          street: body.shippingAddress.address + (body.shippingAddress.address2 ? `, ${body.shippingAddress.address2}` : ''),
+          city: body.shippingAddress.city,
+          state: body.shippingAddress.state,
+          zipCode: body.shippingAddress.zip,
+          country: body.shippingAddress.country || 'United States',
+        },
+        estimatedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+      };
+
+      // Send order confirmation email
+      const emailResult = await sendOrderConfirmationEmail(orderData);
+      if (emailResult.success) {
+        console.log('Order confirmation email sent successfully:', emailResult.id);
+      } else {
+        console.error('Failed to send confirmation email:', emailResult.error);
+      }
+    } catch (emailError) {
+      console.error('Email preparation failed:', emailError);
+      // Continue with order creation even if email fails
+    }
 
     return NextResponse.json({ orderId: order.id });
   } catch (err) {
