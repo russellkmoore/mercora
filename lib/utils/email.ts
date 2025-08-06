@@ -1,6 +1,13 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resend: Resend | null = null;
+
+function getResendClient(): Resend {
+  if (!resend) {
+    resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resend;
+}
 
 interface OrderData {
   orderNumber: string;
@@ -36,8 +43,9 @@ export interface EmailResult {
 export async function sendOrderConfirmationEmail(orderData: OrderData): Promise<EmailResult> {
   try {
     const emailHtml = generateOrderConfirmationHTML(orderData);
+    const resendClient = getResendClient();
     
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await resendClient.emails.send({
       from: 'Volt at Voltique<volt@russellkmoore.me>',
       to: [orderData.customerEmail],
       subject: `Order Confirmation #${orderData.orderNumber} - Voltique`,
