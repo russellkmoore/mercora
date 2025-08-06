@@ -3,8 +3,6 @@
 // Runtime types generated with workerd@1.20250803.0 2025-03-01 global_fetch_strictly_public,nodejs_compat
 declare namespace Cloudflare {
 	interface Env {
-		NEXT_PUBLIC_NEW_RELIC_BROWSER_LICENSE_KEY: "87519e482aa877578c01a8dd77197027FFFFNRAL";
-		NEXT_PUBLIC_NEW_RELIC_APP_NAME: "voltique";
 		NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: string;
 		RESEND_API_KEY: string;
 		MEDIA: R2Bucket;
