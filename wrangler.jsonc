@@ -59,7 +59,6 @@
    */
   "vars": {
     "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_bGVhcm5pbmctbGlnZXItMTAuY2xlcmsuYWNjb3VudHMuZGV2JA",
-    "RESEND_API_KEY": "placeholder-will-be-overridden-by-secret"
   },
   /**
    * Note: Use secrets to store sensitive data.
