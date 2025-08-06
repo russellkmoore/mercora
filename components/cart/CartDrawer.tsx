@@ -40,10 +40,10 @@
  */
 
 import { useCartStore } from "@/lib/stores/cart-store";
-import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription, SheetClose } from "@/components/ui/sheet";
 import CartItemCard from "./CartItemCard";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -101,8 +101,22 @@ export default function CartDrawer() {
           </SheetDescription>
         </VisuallyHidden>
 
+        {/* Custom Close Button */}
+        <div className="absolute top-4 right-4 z-10">
+          <SheetClose asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 rounded-full bg-gray-100 hover:bg-gray-200 hover:text-gray-900 transition-colors"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close cart</span>
+            </Button>
+          </SheetClose>
+        </div>
+
         <div className="py-6">
-          <h2 className="text-xl font-bold mb-4">
+          <h2 className="text-xl font-bold mb-4 flex items-center">
             <ShoppingCart className="mr-2 h-4 w-4" />
             Your Cart
           </h2>
