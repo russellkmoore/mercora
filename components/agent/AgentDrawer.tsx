@@ -31,9 +31,9 @@
 
 "use client";
 
-import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription, SheetClose } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Search, Send } from "lucide-react";
+import { Search, Send, X } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useUser } from "@clerk/nextjs";
@@ -244,13 +244,27 @@ export default function AgentDrawer({
           </SheetDescription>
         </VisuallyHidden>
 
+        {/* Custom Close Button */}
+        <div className="absolute top-4 right-4 z-20">
+          <SheetClose asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 rounded-full bg-gray-100 hover:bg-gray-200 hover:text-gray-900 transition-colors"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close chat</span>
+            </Button>
+          </SheetClose>
+        </div>
+
         {/* Left fade */}
         <div className="absolute left-0 top-0 h-full w-2 bg-gradient-to-r from-black/20 to-transparent z-10 pointer-events-none" />
 
         {/* Header - fixed */}
         <div className="flex-shrink-0">
-          <h2 className="text-lg font-semibold mb-3 mt-2">
-            <Search className="h-5 w-5" />
+          <h2 className="text-lg font-semibold mb-3 mt-2 flex items-center">
+            <Search className="mr-2 h-5 w-5" />
             Ask Volt
           </h2>
         </div>
