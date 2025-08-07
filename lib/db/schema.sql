@@ -102,11 +102,55 @@ CREATE TABLE orders (
     'incomplete',
     'pending',
     'paid',
-    'fulfilled',
+    'processing',
     'shipped',
+    'delivered',
     'cancelled'
   )) DEFAULT 'incomplete',
 
+  -- Shipping tracking fields
+  carrier TEXT,
+  tracking_number TEXT,
+  tracking_url TEXT,
+  shipped_at TEXT,
+  delivered_at TEXT,
+  
+  -- Additional metadata
+  cancellation_reason TEXT,
+  notes TEXT,
+
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Webhook events table for tracking status updates and delivery confirmations
+CREATE TABLE order_webhooks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL CHECK (event_type IN (
+    'status_update',
+    'tracking_update', 
+    'delivery_confirmation',
+    'exception'
+  )),
+  payload TEXT NOT NULL,                -- JSON webhook payload
+  source TEXT NOT NULL,                 -- 'admin', 'carrier_webhook', 'system'
+  processed BOOLEAN DEFAULT false,
+  processed_at TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  
+  UNIQUE(order_id, event_type, created_at)  -- Prevent duplicate events
+);
+
+-- API tokens table for unified authentication
+CREATE TABLE api_tokens (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  token_name TEXT NOT NULL UNIQUE,      -- 'admin_vectorize', 'admin_orders', 'webhook_carrier'
+  token_hash TEXT NOT NULL,             -- SHA-256 hash of actual token
+  permissions TEXT NOT NULL,            -- JSON array of permissions
+  active BOOLEAN DEFAULT true,
+  expires_at TEXT,                      -- Optional expiration
+  last_used_at TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );

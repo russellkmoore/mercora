@@ -7,8 +7,9 @@ export type OrderStatus =
   | "incomplete"
   | "pending"
   | "paid"
-  | "fulfilled"
+  | "processing"
   | "shipped"
+  | "delivered"
   | "cancelled";
 
 export type Order = {
@@ -30,6 +31,18 @@ export type Order = {
   email: string; 
 
   status: OrderStatus;
+  
+  // Shipping tracking fields
+  carrier?: string;
+  trackingNumber?: string;
+  trackingUrl?: string;
+  shippedAt?: string;
+  deliveredAt?: string;
+  
+  // Additional metadata
+  cancellationReason?: string;
+  notes?: string;
+  
   createdAt: string; // ISO format
   updatedAt: string;
 };
