@@ -8,37 +8,23 @@
  * Each file is expected to be a structured Markdown file with user-facing content and AI notes.
  *
  * === Security ===
- * Access is protected with a token passed via query string. Token must match the value
- * stored as a secret: `ADMIN_VECTORIZE_TOKEN`.
+ * Uses unified authentication system with permissions: ["vectorize:read", "vectorize:write"]
+ * 
+ * Supported authentication methods:
+ * - Authorization: Bearer <token>
+ * - X-API-Key: <token>
+ * - Query parameter: ?token=<token> (deprecated, for backward compatibility)
  *
  * === Setup ===
  *
- * 1. Ensure the following bindings exist in `wrangler.jsonc`:
- *
- *    ```jsonc
- *    "r2_buckets": [
- *      { "binding": "MEDIA", "bucket_name": "voltique-images" }
- *    ],
- *    "vectorize": [
- *      { "binding": "VECTORIZE", "index_name": "voltique-index" }
- *    ],
- *    "ai": {
- *      "binding": "AI"
- *    }
- *    ```
- *
- * 2. Upload `.md` files to your R2 bucket under `knowledge_md/`
- *
- * 3. Set your access token:
- *
+ * 1. Generate an API token:
  *    ```bash
- *    npx wrangler secret put ADMIN_VECTORIZE_TOKEN
+ *    npm run token:generate admin_vectorize "vectorize:read,vectorize:write"
  *    ```
  *
- * 4. Deploy and trigger the route:
- *
- *    ```
- *    GET /api/vectorize-knowledge?token=your-secret-token
+ * 2. Use the token in your requests:
+ *    ```bash
+ *    curl -H "Authorization: Bearer YOUR_TOKEN" /api/vectorize-knowledge
  *    ```
  *
  * === Returns ===
@@ -47,25 +33,21 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { authenticateRequest, PERMISSIONS } from "@/lib/auth/unified-auth";
 
 export async function GET(request: NextRequest) {
+  // Authenticate request with required permissions
+  const authResult = await authenticateRequest(request, PERMISSIONS.VECTORIZE_WRITE);
+  if (!authResult.success) {
+    return authResult.response!;
+  }
+
   try {
     // Get Cloudflare bindings directly
     const { env } = await getCloudflareContext({ async: true });
     const media = (env as any).MEDIA;
     const vectorize = (env as any).VECTORIZE;
     const ai = (env as any).AI;
-    
-    // Access environment variables/secrets through process.env
-    const ADMIN_VECTORIZE_TOKEN = process.env.ADMIN_VECTORIZE_TOKEN;
-
-    // Token check
-    const url = new URL(request.url);
-    const token = url.searchParams.get("token");
-    
-    if (token !== ADMIN_VECTORIZE_TOKEN) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     if (!media || !vectorize || !ai) {
       return NextResponse.json(
@@ -131,6 +113,7 @@ export async function GET(request: NextRequest) {
       message: `Knowledge vectorization complete. Indexed ${results.length} files.`,
       indexed: results,
       errors: errors.length > 0 ? errors : undefined,
+      authenticatedAs: authResult.tokenInfo?.tokenName,
     };
 
     return NextResponse.json(response, { status: 200 });
