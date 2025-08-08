@@ -15,3 +15,6 @@ export * from "./billing";
 export * from "./cart";
 export * from "./cartitem";
 export * from "./money";
+export * from "./apiPermissions";
+export * from "./agent";
+
