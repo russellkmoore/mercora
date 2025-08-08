@@ -1,6 +1,6 @@
 import type { CartItem } from "./cartitem";
 import type { ShippingOption } from "./shipping";
-import type { Address } from "./address";
+import type { Address } from ".";
 import type { BillingInfo } from "./billing";
 
 export type OrderStatus =

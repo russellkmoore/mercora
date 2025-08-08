@@ -1,7 +1,7 @@
 "use client";
 
 import { ShippingOption } from "@/lib/types/shipping";
-import type { Address } from "@/lib/types/address";
+import type { Address } from "@/lib/types";
 import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 

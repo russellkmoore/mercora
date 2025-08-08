@@ -7,7 +7,7 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useState, useEffect, useMemo } from "react";
-import type { Order } from "@/lib/types/order";
+import type { Order } from "@/lib/types";
 
 export interface EnhancedUserContext {
   // Basic user info from Clerk
@@ -85,7 +85,10 @@ export function useEnhancedUserContext(): EnhancedUserContext {
       };
     }
 
-    const totalOrderValue = orders.reduce((sum, order) => sum + order.total, 0);
+    const totalOrderValue = orders.reduce((sum, order) => {
+      const orderValue = order.totals?.total || 0;
+      return sum + orderValue;
+    }, 0);
     const averageOrderValue = totalOrderValue / orders.length;
     
     // Extract product IDs from recent orders (last 3 months)
@@ -93,18 +96,22 @@ export function useEnhancedUserContext(): EnhancedUserContext {
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
     
     const recentOrders = orders.filter(order => 
-      new Date(order.createdAt) >= threeMonthsAgo
+      order.createdAt && new Date(order.createdAt) >= threeMonthsAgo
     );
     
     const recentPurchases = recentOrders
-      .flatMap(order => order.items.map(item => String(item.productId)))
+      .flatMap(order => 
+        (order.lineItems || []).map(item => 
+          String(item.productId || item.id)
+        )
+      )
       .slice(0, 10); // Last 10 products
     
     // Category analysis would require product data - simplified for now
     const favoriteCategories: string[] = []; // TODO: Implement with product category mapping
     
     // Price range analysis
-    const orderValues = orders.map(order => order.total);
+    const orderValues = orders.map(order => order.totals?.total || 0).filter(val => val > 0);
     const preferredPriceRange = orderValues.length > 0 ? {
       min: Math.min(...orderValues),
       max: Math.max(...orderValues)

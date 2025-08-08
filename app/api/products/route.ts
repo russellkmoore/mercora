@@ -1,104 +1,124 @@
 /**
- * === Products API Route ===
- * 
- * RESTful API endpoint for retrieving product data from the database.
- * Supports filtering, searching, and pagination for product listings.
- *
- * === Endpoints ===
- * - GET /api/products - Get all active products
- * - Supports query parameters for filtering and search
- *
- * === Query Parameters ===
- * - category: Filter by product category/tag
- * - search: Search product names and descriptions
- * - limit: Limit number of results (default: no limit)
- * - availability: Filter by availability status
- *
- * === Response Format ===
- * ```json
- * [
- *   {
- *     "id": 1,
- *     "name": "Product Name",
- *     "price": 1999,
- *     "availability": "available",
- *     // ... other product fields
- *   }
- * ]
- * ```
+ * Products API - MACH-compliant product management
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getDbAsync } from "@/lib/db";
-import { products } from "@/lib/db/schema";
-import { hydrateProduct } from "@/lib/models/product";
-import type { Product } from "@/lib/types/product";
+import { 
+  listProducts, 
+  getProduct, 
+  createProduct, 
+  updateProduct, 
+  getProductsCount,
+  type CreateProductInput 
+} from "@/lib/models/mach/products";
+import type { MACHApiResponse } from "@/lib/types";
 
 /**
- * GET /api/products
- * 
- * Retrieve products from the database with optional filtering
+ * GET /api/products - List products
  */
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    
-    // Extract query parameters
-    const category = searchParams.get("category");
-    const search = searchParams.get("search");
-    const limit = searchParams.get("limit");
-    const availability = searchParams.get("availability");
-    
-    // Get products from database
-    const db = await getDbAsync();
-    const rawProducts = await db.query.products.findMany({
-      where: (products, { eq }) => eq(products.active, true),
-    });
-    
-    // Hydrate all products
-    let productList: Product[] = await Promise.all(
-      rawProducts.map(product => hydrateProduct(product))
-    );
-    
-    // Apply filters
-    if (category) {
-      productList = productList.filter((product: Product) => 
-        product.tags.some((tag: string) => 
-          tag.toLowerCase().includes(category.toLowerCase())
-        )
-      );
-    }
-    
-    if (search) {
-      const searchLower = search.toLowerCase();
-      productList = productList.filter((product: Product) =>
-        product.name.toLowerCase().includes(searchLower) ||
-        product.shortDescription.toLowerCase().includes(searchLower) ||
-        product.longDescription.toLowerCase().includes(searchLower) ||
-        product.tags.some((tag: string) => tag.toLowerCase().includes(searchLower))
-      );
-    }
-    
-    if (availability) {
-      productList = productList.filter((product: Product) => 
-        product.availability === availability
-      );
-    }
-    
-    // Apply limit
-    if (limit) {
-      const limitNum = parseInt(limit, 10);
-      if (!isNaN(limitNum) && limitNum > 0) {
-        productList = productList.slice(0, limitNum);
+    const url = new URL(request.url);
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100);
+    const offset = parseInt(url.searchParams.get('offset') || '0');
+    const status = url.searchParams.get('status') as 'active' | 'inactive' | 'draft' | 'archived' | null;
+    const search = url.searchParams.get('search');
+    const category = url.searchParams.get('category');
+
+    const [products, total] = await Promise.all([
+      listProducts({ 
+        status: status || undefined,
+        search: search || undefined,
+        category: category || undefined,
+        limit, 
+        offset 
+      }),
+      getProductsCount({ 
+        status: status || undefined,
+        search: search || undefined,
+        category: category || undefined,
+      })
+    ]);
+
+    const response: MACHApiResponse<typeof products> = {
+      data: products,
+      meta: {
+        total,
+        limit,
+        offset,
+        schema: "mach:product"
+      },
+      links: {
+        self: `/api/products?limit=${limit}&offset=${offset}`,
+        first: `/api/products?limit=${limit}&offset=0`,
+        ...(offset + limit < total && {
+          next: `/api/products?limit=${limit}&offset=${offset + limit}`
+        }),
+        ...(offset > 0 && {
+          prev: `/api/products?limit=${limit}&offset=${Math.max(0, offset - limit)}`
+        }),
+        last: `/api/products?limit=${limit}&offset=${Math.floor(total / limit) * limit}`
       }
+    };
+
+    return NextResponse.json(response);
+
+  } catch (error) {
+    console.error('Products API error:', error);
+    return NextResponse.json(
+      { error: 'Failed to retrieve products' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST /api/products - Create product
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json() as any;
+    
+    if (!body.name) {
+      return NextResponse.json({
+        error: 'Validation failed',
+        details: ['name is required']
+      }, { status: 400 });
+    }
+
+    if (!body.pricing?.basePrice || !body.pricing?.currency) {
+      return NextResponse.json({
+        error: 'Validation failed',
+        details: [
+          'pricing.basePrice is required',
+          'pricing.currency is required'
+        ]
+      }, { status: 400 });
+    }
+
+    const product = await createProduct(body as CreateProductInput);
+    
+    const response: MACHApiResponse<typeof product> = {
+      data: product,
+      meta: {
+        schema: "mach:product"
+      }
+    };
+    
+    return NextResponse.json(response, { status: 201 });
+
+  } catch (error) {
+    console.error('Products API error:', error);
+    
+    if (error instanceof Error) {
+      return NextResponse.json({
+        error: 'Validation failed',
+        message: error.message
+      }, { status: 400 });
     }
     
-    return NextResponse.json(productList);
-    
-  } catch (error) {
-    console.error("Error fetching products:", error);
     return NextResponse.json(
-      { error: "Failed to fetch products" },
+      { error: 'Failed to create product' },
       { status: 500 }
     );
   }

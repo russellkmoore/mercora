@@ -1,6 +1,7 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectTrigger,
@@ -9,33 +10,37 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import type { Address } from "@/lib/types/address";
+import type { Address } from "@/lib/types";
 
-interface Props {
+interface ShippingFormProps {
   address: Address;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  email: string; // Email is separate from MACH address
+  onChange: (address: Address, email?: string) => void;
   onSelectCountry: (value: string) => void;
-  onSubmit: (address: Address) => void;
+  onSubmit: (address: Address, email: string) => void;
+  loading?: boolean;
   error?: string | null;
   disabled?: boolean;
 }
 
 export default function ShippingForm({
   address,
+  email,
   onChange,
   onSelectCountry,
   onSubmit,
   error,
   disabled = false,
-}: Props) {
+}: ShippingFormProps) {
   const isSubmitDisabled =
     disabled ||
     !(
-      address.name &&
-      address.email &&
-      address.address &&
+      address.firstName &&
+      address.lastName &&
+      email &&
+      address.address1 &&
       address.city &&
-      address.state &&
+      address.province &&
       address.zip &&
       address.country
     );
@@ -49,29 +54,63 @@ export default function ShippingForm({
       <h2 className="text-lg font-semibold mb-4">Shipping Address</h2>
 
       <div className="space-y-4">
-        <Input
-          name="name"
-          placeholder="Full Name"
-          value={address.name}
-          onChange={onChange}
-        />
-        <Input
-          name="email"
-          placeholder="Email"
-          value={address.email}
-          onChange={onChange}
-        />
-        <Input
-          name="address"
-          placeholder="Street Address"
-          value={address.address}
-          onChange={onChange}
-        />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="firstName">First Name</Label>
+            <Input
+              id="firstName"
+              value={address.firstName}
+              onChange={(e) =>
+                onChange({ ...address, firstName: e.target.value })
+              }
+              disabled={disabled}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="lastName">Last Name</Label>
+            <Input
+              id="lastName"
+              value={address.lastName}
+              onChange={(e) =>
+                onChange({ ...address, lastName: e.target.value })
+              }
+              disabled={disabled}
+              required
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => onChange({ ...address }, e.target.value)}
+            disabled={disabled}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="address1">Address</Label>
+          <Input
+            id="address1"
+            value={address.address1}
+            onChange={(e) =>
+              onChange({ ...address, address1: e.target.value })
+            }
+            disabled={disabled}
+            required
+          />
+        </div>
         <Input
           name="address2"
-          placeholder="Street Address 2"
-          value={address.address2}
-          onChange={onChange}
+          placeholder="Apartment, suite, etc. (optional)"
+          value={address.address2 || ""}
+          onChange={(e) =>
+            onChange({ ...address, address2: e.target.value })
+          }
+          disabled={disabled}
         />
         <div className="flex gap-2">
           <Input
@@ -79,21 +118,31 @@ export default function ShippingForm({
             placeholder="City"
             className="flex-[2]"
             value={address.city}
-            onChange={onChange}
+            onChange={(e) =>
+              onChange({ ...address, city: e.target.value })
+            }
+            disabled={disabled}
+            required
           />
           <Input
-            name="state"
-            placeholder="State"
+            name="province"
+            placeholder="State/Province"
             className="flex-1"
-            value={address.state}
-            onChange={onChange}
+            value={address.province}
+            onChange={(e) =>
+              onChange({ ...address, province: e.target.value })
+            }
+            disabled={disabled}
+            required
           />
           <Input
             name="zip"
-            placeholder="Zip Code"
+            placeholder="ZIP Code"
             className="flex-1"
             value={address.zip}
-            onChange={onChange}
+            onChange={(e) => onChange({ ...address, zip: e.target.value })}
+            disabled={disabled}
+            required
           />
         </div>
 
@@ -112,7 +161,7 @@ export default function ShippingForm({
           </div>
           <div className="flex-1">
             <Button
-              onClick={() => onSubmit(address)}
+              onClick={() => onSubmit(address, email)}
               className="w-full bg-black text-white hover:bg-orange-500"
               disabled={isSubmitDisabled}
             >

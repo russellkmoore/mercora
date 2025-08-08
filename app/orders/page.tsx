@@ -37,7 +37,7 @@
  */
 
 import { auth } from "@clerk/nextjs/server";
-import { getOrdersByUserId } from "@/lib/models/order";
+import { getOrdersByCustomer } from "@/lib/models/mach/orders";
 import OrderCard from "@/components/OrderCard";
 
 /**
@@ -63,8 +63,10 @@ export default async function OrdersPage() {
     );
   }
 
-  // Fetch user's order history from database
-  const orders = await getOrdersByUserId(userId);
+  // First get the customer ID from the Clerk user ID
+  // In MACH architecture, we need to find the customer record first
+  // For now, assuming customer ID equals user ID (or we'd use getCustomerByClerkId)
+  const orders = await getOrdersByCustomer(userId);
 
   return (
     <main className="bg-neutral-900 text-white min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
