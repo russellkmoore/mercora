@@ -40,7 +40,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { CartItem } from "@/lib/types/cartitem";
-import type { Address } from "@/lib/types/address";
+import type { Address } from "@/lib/types";
 import type { BillingInfo } from "@/lib/types/billing";
 import type { ShippingOption } from "@/lib/types/shipping";
 
@@ -55,7 +55,7 @@ interface CartState {
   // === Checkout Information ===
   /** Customer shipping address */
   shippingAddress?: Address;
-  /** Customer billing address (may differ from shipping) */
+  // Billing information for payment processing
   billingAddress?: Address;
   /** Selected shipping method and pricing */
   shippingOption?: ShippingOption;

@@ -55,9 +55,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDbAsync } from "@/lib/db";
-import { products } from "@/lib/db/schema";
+// TODO: Create products schema - temporarily commented out
+// import { products } from "@/lib/db/schema/clean-mach-schema";
 import { inArray } from "drizzle-orm";
-import { hydrateProduct } from "@/lib/models/product";
+import { getProduct, listProducts } from "@/lib/models/mach/products";
 import type { Product } from "@/lib/types/product";
 
 /**
@@ -350,16 +351,46 @@ Respond to this greeting warmly and ask what outdoor adventure they're planning.
     console.log("Product IDs found from vectorize:", productIds);
     if (productIds.length > 0) {
       try {
+        // Convert number IDs to strings for MACH schema compatibility
+        const stringProductIds = productIds.map(id => id.toString());
+        
         const db = await getDbAsync();
         const productResults = await db
           .select()
           .from(products)
-          .where(inArray(products.id, productIds));
+          .where(inArray(products.id, stringProductIds));
 
-        // Hydrate each product with related data
-        relatedProducts = await Promise.all(
-          productResults.map((product) => hydrateProduct(product))
-        );
+        // Products from MACH schema are already fully hydrated
+        relatedProducts = productResults.map(product => {
+          const name = typeof product.name === 'string' ? JSON.parse(product.name) : product.name;
+          const description = typeof product.description === 'string' ? JSON.parse(product.description) : product.description;
+          const pricing = typeof product.pricing === 'string' ? JSON.parse(product.pricing) : product.pricing;
+          const images = typeof product.images === 'string' ? JSON.parse(product.images) : product.images;
+          
+          return {
+            id: parseInt(product.id), // Convert back to number for compatibility
+            name: name?.en || 'Unknown Product',
+            slug: product.sku.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            shortDescription: description?.en ? description.en.substring(0, 150) : '',
+            longDescription: description?.en || '',
+            primaryImageUrl: images?.[0]?.url || '',
+            images: images?.map((img: any) => img.url) || [],
+            price: pricing?.basePrice || 0,
+            active: true,
+            salePrice: pricing?.compareAtPrice || 0,
+            onSale: !!pricing?.compareAtPrice && pricing.compareAtPrice < pricing.basePrice,
+            quantityInStock: 100, // Default for now
+            availability: "available" as const,
+            tags: [],
+            useCases: [],
+            attributes: {},
+            aiNotes: (() => {
+              if (!product.metadata) return '';
+              const metadata = typeof product.metadata === 'string' ? JSON.parse(product.metadata) : product.metadata;
+              return (metadata as any)?.aiNotes || '';
+            })(),
+          } as Product;
+        });
         console.log("Hydrated products:", relatedProducts.length);
       } catch (productError) {
         console.error("Error fetching products:", productError);
