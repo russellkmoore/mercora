@@ -411,23 +411,86 @@ CREATE INDEX idx_orders_payment_status ON orders(payment_status);
 CREATE INDEX idx_orders_created_at ON orders(created_at);
 CREATE INDEX idx_orders_customer_status ON orders(customer_id, status);
 
--- Order Items Table - Custom extension
-CREATE TABLE order_items (
-    id TEXT PRIMARY KEY,
-    order_id TEXT NOT NULL,
-    product_id TEXT NOT NULL,
-    variant_id TEXT,
-    sku TEXT NOT NULL,
-    quantity INTEGER NOT NULL CHECK (quantity > 0),
-    unit_price TEXT NOT NULL, -- JSON: Money object
-    total_price TEXT NOT NULL, -- JSON: Money object
-    product_name TEXT NOT NULL,
-    variant_options TEXT, -- JSON: variant option values
+
+
+-- =====================================================
+-- Application-Specific Extensions
+-- =====================================================
+
+-- API Tokens Table - For unified authentication system
+CREATE TABLE api_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_name TEXT NOT NULL UNIQUE,
+    token_hash TEXT NOT NULL,
+    permissions TEXT NOT NULL, -- JSON array of permissions
+    active INTEGER DEFAULT 1 CHECK (active IN (0, 1)),
+    expires_at TEXT,
+    last_used_at TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (order_id) REFERENCES orders(id),
-    FOREIGN KEY (product_id) REFERENCES products(id)
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_order_items_order_id ON order_items(order_id);
-CREATE INDEX idx_order_items_product_id ON order_items(product_id);
-CREATE INDEX idx_order_items_sku ON order_items(sku);
+CREATE INDEX idx_api_tokens_token_name ON api_tokens(token_name);
+CREATE INDEX idx_api_tokens_token_hash ON api_tokens(token_hash);
+CREATE INDEX idx_api_tokens_active ON api_tokens(active);
+CREATE INDEX idx_api_tokens_expires_at ON api_tokens(expires_at) WHERE expires_at IS NOT NULL;
+
+-- Chat Sessions Table - For AI agent conversations
+CREATE TABLE chat_sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'archived', 'deleted')),
+    title TEXT,
+    context TEXT, -- JSON: conversation context and metadata
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    last_message_at TEXT,
+    message_count INTEGER DEFAULT 0,
+    extensions TEXT -- JSON: additional session data
+);
+
+CREATE INDEX idx_chat_sessions_user_id ON chat_sessions(user_id);
+CREATE INDEX idx_chat_sessions_status ON chat_sessions(status);
+CREATE INDEX idx_chat_sessions_created_at ON chat_sessions(created_at);
+CREATE INDEX idx_chat_sessions_last_message_at ON chat_sessions(last_message_at);
+
+-- Chat Messages Table - Individual messages in chat sessions
+CREATE TABLE chat_messages (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+    content TEXT NOT NULL,
+    product_ids TEXT, -- JSON array of referenced product IDs
+    metadata TEXT, -- JSON: message metadata (tokens, timing, etc.)
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES chat_sessions(id)
+);
+
+CREATE INDEX idx_chat_messages_session_id ON chat_messages(session_id);
+CREATE INDEX idx_chat_messages_role ON chat_messages(role);
+CREATE INDEX idx_chat_messages_created_at ON chat_messages(created_at);
+
+-- Order Webhooks Table - For order processing and notifications
+CREATE TABLE order_webhooks (
+    id TEXT PRIMARY KEY,
+    order_id TEXT NOT NULL,
+    webhook_type TEXT NOT NULL CHECK (webhook_type IN ('order_created', 'order_updated', 'payment_completed', 'shipment_created', 'delivery_confirmed')),
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'retrying')),
+    payload TEXT NOT NULL, -- JSON: webhook payload
+    response TEXT, -- JSON: webhook response
+    endpoint_url TEXT,
+    attempts INTEGER DEFAULT 0,
+    max_attempts INTEGER DEFAULT 3,
+    next_retry_at TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    completed_at TEXT,
+    FOREIGN KEY (order_id) REFERENCES orders(id)
+);
+
+CREATE INDEX idx_order_webhooks_order_id ON order_webhooks(order_id);
+CREATE INDEX idx_order_webhooks_type ON order_webhooks(webhook_type);
+CREATE INDEX idx_order_webhooks_status ON order_webhooks(status);
+CREATE INDEX idx_order_webhooks_created_at ON order_webhooks(created_at);
+CREATE INDEX idx_order_webhooks_next_retry ON order_webhooks(next_retry_at) WHERE next_retry_at IS NOT NULL;

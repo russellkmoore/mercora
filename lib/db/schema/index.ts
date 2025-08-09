@@ -91,3 +91,6 @@ export {
   isFirstPurchaseOnly
 } from "./promotions";
 export { getLocalizedValue as getPromotionLocalizedValue } from "./promotions";
+
+// Order entity schema (application-specific, not MACH Alliance)
+export * from "./order";

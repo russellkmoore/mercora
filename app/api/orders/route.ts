@@ -10,8 +10,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { getDbAsync } from "@/lib/db";
-// TODO: Create orders schema - temporarily commented out
-// import { orders } from "@/lib/db/schema/clean-mach-schema";
+import { orders } from "@/lib/db/schema/order";
+import { 
+  getOrdersByCustomerId, 
+  getOrderById, 
+  insertOrder, 
+  updateOrderStatus,
+  updateOrderShipping 
+} from "@/lib/models/order";
 import { eq, desc, and } from "drizzle-orm";
 import { authenticateRequest, PERMISSIONS } from "@/lib/auth/unified-auth";
 import { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail, type OrderData } from "@/lib/utils/email";
