@@ -9,9 +9,9 @@
  */
 
 import { getDbAsync } from "@/lib/db";
-import { addresses, transformToMACHAddress, transformFromMACHAddress } from "@/lib/db/schema/address";
+import { addresses } from "@/lib/db/schema/address";
 import { eq, desc, asc, like, or, and, inArray } from "drizzle-orm";
-import type { MACHAddress, MACHCoordinates, MACHAddressValidation } from "@/lib/types/mach/Address";
+import type { Address, Coordinates, AddressValidation } from "@/lib/types";
 
 // Address creation input type
 export interface CreateAddressInput {
@@ -33,7 +33,7 @@ export interface CreateAddressInput {
   postal_code?: string; // Postal code, ZIP code, or postcode
   
   // Geographic and formatting
-  coordinates?: MACHCoordinates;
+  coordinates?: Coordinates;
   formatted?: string | Record<string, string>; // Pre-formatted address
   
   // Contact information
@@ -47,7 +47,7 @@ export interface CreateAddressInput {
   access_codes?: string;
   
   // Validation and metadata
-  validation?: MACHAddressValidation;
+  validation?: AddressValidation;
   attributes?: Record<string, any>;
   
   // Extensions
@@ -82,8 +82,8 @@ export interface AddressValidationResult {
   isValid: boolean;
   errors: string[];
   warnings: string[];
-  suggestions?: Partial<MACHAddress>;
-  standardized?: MACHAddress;
+  suggestions?: Partial<Address>;
+  standardized?: Address;
 }
 
 /**
@@ -96,7 +96,7 @@ function generateAddressId(): string {
 /**
  * Validate address data according to MACH Alliance standards
  */
-export function validateAddress(address: Partial<MACHAddress>): AddressValidationResult {
+export function validateAddress(address: Partial<Address>): AddressValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
   
@@ -141,57 +141,98 @@ export function validateAddress(address: Partial<MACHAddress>): AddressValidatio
   };
 }
 
+// Helper: parse stringified JSON or return as-is
+function parseMaybeJson(val: any) {
+  if (typeof val !== 'string') return val;
+  try {
+    return JSON.parse(val);
+  } catch {
+    return val;
+  }
+}
+
+// Helper: convert DB record to MACHAddress
+function deserializeAddress(record: any): Address {
+  return {
+    id: record.id,
+    line1: parseMaybeJson(record.line1),
+    city: parseMaybeJson(record.city),
+    country: record.country,
+    type: record.type,
+    status: record.status,
+    line2: record.line2 ? parseMaybeJson(record.line2) : undefined,
+    line3: record.line3 ? parseMaybeJson(record.line3) : undefined,
+    line4: record.line4 ? parseMaybeJson(record.line4) : undefined,
+    district: record.district ? parseMaybeJson(record.district) : undefined,
+    region: record.region,
+    postal_code: record.postalCode,
+    coordinates: record.coordinates ? JSON.parse(record.coordinates) : undefined,
+    formatted: record.formatted ? parseMaybeJson(record.formatted) : undefined,
+    company: record.company,
+    recipient: record.recipient,
+    phone: record.phone,
+    email: record.email,
+    delivery_instructions: record.deliveryInstructions ? parseMaybeJson(record.deliveryInstructions) : undefined,
+    access_codes: record.accessCodes,
+    validation: record.validation ? JSON.parse(record.validation) : undefined,
+    attributes: record.attributes ? JSON.parse(record.attributes) : undefined,
+    created_at: record.createdAt,
+    updated_at: record.updatedAt,
+    extensions: record.extensions ? JSON.parse(record.extensions) : undefined,
+    verified_at: record.verifiedAt,
+  };
+}
+
 /**
  * Create a new address
  */
-export async function createAddress(input: CreateAddressInput): Promise<MACHAddress> {
+export async function createAddress(input: CreateAddressInput): Promise<Address> {
   const id = generateAddressId();
   const now = new Date().toISOString();
   
-  const machAddress: MACHAddress = {
-    id,
-    line1: input.line1,
-    city: input.city,
-    country: input.country,
-    type: input.type ?? "shipping",
-    status: input.status ?? "unverified",
-    line2: input.line2,
-    line3: input.line3,
-    line4: input.line4,
-    district: input.district,
-    region: input.region,
-    postal_code: input.postal_code,
-    coordinates: input.coordinates,
-    formatted: input.formatted,
-    company: input.company,
-    recipient: input.recipient,
-    phone: input.phone,
-    email: input.email,
-    delivery_instructions: input.delivery_instructions,
-    access_codes: input.access_codes,
-    validation: input.validation,
-    attributes: input.attributes,
-    created_at: now,
-    updated_at: now,
-    extensions: input.extensions,
-  };
-  
   // Validate before creating
-  const validation = validateAddress(machAddress);
+  const validation = validateAddress(input as Address);
   if (!validation.isValid) {
     throw new Error(`Address validation failed: ${validation.errors.join(', ')}`);
   }
   
+  const dbRecord = {
+    id,
+    line1: typeof input.line1 === 'string' ? input.line1 : JSON.stringify(input.line1),
+    city: typeof input.city === 'string' ? input.city : JSON.stringify(input.city),
+    country: input.country,
+    type: input.type ?? "shipping",
+    status: input.status ?? "unverified",
+    line2: input.line2 ? (typeof input.line2 === 'string' ? input.line2 : JSON.stringify(input.line2)) : undefined,
+    line3: input.line3 ? (typeof input.line3 === 'string' ? input.line3 : JSON.stringify(input.line3)) : undefined,
+    line4: input.line4 ? (typeof input.line4 === 'string' ? input.line4 : JSON.stringify(input.line4)) : undefined,
+    district: input.district ? (typeof input.district === 'string' ? input.district : JSON.stringify(input.district)) : undefined,
+    region: input.region,
+    postalCode: input.postal_code,
+    coordinates: input.coordinates ? JSON.stringify(input.coordinates) : undefined,
+    formatted: input.formatted ? (typeof input.formatted === 'string' ? input.formatted : JSON.stringify(input.formatted)) : undefined,
+    company: input.company,
+    recipient: input.recipient,
+    phone: input.phone,
+    email: input.email,
+    deliveryInstructions: input.delivery_instructions ? (typeof input.delivery_instructions === 'string' ? input.delivery_instructions : JSON.stringify(input.delivery_instructions)) : undefined,
+    accessCodes: input.access_codes,
+    validation: input.validation ? JSON.stringify(input.validation) : undefined,
+    attributes: input.attributes ? JSON.stringify(input.attributes) : undefined,
+    createdAt: now,
+    updatedAt: now,
+    extensions: input.extensions ? JSON.stringify(input.extensions) : undefined,
+  };
+  
   const db = await getDbAsync();
-  const record = transformFromMACHAddress(machAddress);
-  const [created] = await db.insert(addresses).values(record).returning();
-  return transformToMACHAddress(created);
+  const [created] = await db.insert(addresses).values(dbRecord).returning();
+  return deserializeAddress(created);
 }
 
 /**
  * Get an address by ID
  */
-export async function getAddress(id: string): Promise<MACHAddress | null> {
+export async function getAddress(id: string): Promise<Address | null> {
   const db = await getDbAsync();
   
   const [record] = await db
@@ -201,13 +242,13 @@ export async function getAddress(id: string): Promise<MACHAddress | null> {
     .limit(1);
     
   if (!record) return null;
-  return transformToMACHAddress(record);
+  return deserializeAddress(record);
 }
 
 /**
  * List addresses with filtering and pagination
  */
-export async function listAddresses(filters: AddressFilters = {}): Promise<MACHAddress[]> {
+export async function listAddresses(filters: AddressFilters = {}): Promise<Address[]> {
   const db = await getDbAsync();
   
   let query = db.select().from(addresses);
@@ -330,7 +371,7 @@ export async function listAddresses(filters: AddressFilters = {}): Promise<MACHA
   }
   
   const records = await query;
-  return records.map(record => transformToMACHAddress(record));
+  return records.map(deserializeAddress);
 }
 
 /**
@@ -344,7 +385,7 @@ export async function getAddressesCount(filters: Omit<AddressFilters, 'limit' | 
 /**
  * Update an existing address
  */
-export async function updateAddress(id: string, input: Partial<CreateAddressInput>): Promise<MACHAddress | null> {
+export async function updateAddress(id: string, input: Partial<CreateAddressInput>): Promise<Address | null> {
   const db = await getDbAsync();
   
   // Get existing address first
@@ -352,21 +393,42 @@ export async function updateAddress(id: string, input: Partial<CreateAddressInpu
   if (!existing) return null;
   
   // Create updated address object
-  const updated: MACHAddress = {
+  const updated: Address = {
     ...existing,
     ...input,
     id, // Ensure ID stays the same
     updated_at: new Date().toISOString(),
   };
   
-  // Validate before updating
-  const validation = validateAddress(updated);
-  if (!validation.isValid) {
-    throw new Error(`Address validation failed: ${validation.errors.join(', ')}`);
-  }
+  const dbRecord = {
+    id,
+    line1: typeof updated.line1 === 'string' ? updated.line1 : JSON.stringify(updated.line1),
+    city: typeof updated.city === 'string' ? updated.city : JSON.stringify(updated.line2),
+    country: updated.country,
+    type: updated.type ?? "shipping",
+    status: updated.status ?? "unverified",
+    line2: updated.line2 ? (typeof updated.line2 === 'string' ? updated.line2 : JSON.stringify(updated.line2)) : undefined,
+    line3: updated.line3 ? (typeof updated.line3 === 'string' ? updated.line3 : JSON.stringify(updated.line3)) : undefined,
+    line4: updated.line4 ? (typeof updated.line4 === 'string' ? updated.line4 : JSON.stringify(updated.line4)) : undefined,
+    district: updated.district ? (typeof updated.district === 'string' ? updated.district : JSON.stringify(updated.line4)) : undefined,
+    region: updated.region,
+    postalCode: updated.postal_code,
+    coordinates: updated.coordinates ? JSON.stringify(updated.coordinates) : undefined,
+    formatted: updated.formatted ? (typeof updated.formatted === 'string' ? updated.formatted : JSON.stringify(updated.formatted)) : undefined,
+    company: updated.company,
+    recipient: updated.recipient,
+    phone: updated.phone,
+    email: updated.email,
+    deliveryInstructions: updated.delivery_instructions ? (typeof updated.delivery_instructions === 'string' ? updated.delivery_instructions : JSON.stringify(updated.delivery_instructions)) : undefined,
+    accessCodes: updated.access_codes,
+    validation: updated.validation ? JSON.stringify(updated.validation) : undefined,
+    attributes: updated.attributes ? JSON.stringify(updated.attributes) : undefined,
+    createdAt: updated.created_at,
+    updatedAt: updated.updated_at,
+    extensions: updated.extensions ? JSON.stringify(updated.extensions) : undefined,
+  };
   
-  const record = transformFromMACHAddress(updated);
-  await db.update(addresses).set(record).where(eq(addresses.id, id));
+  await db.update(addresses).set(dbRecord).where(eq(addresses.id, id));
   
   return getAddress(id);
 }
@@ -392,7 +454,7 @@ export async function hardDeleteAddress(id: string): Promise<boolean> {
 /**
  * Verify an address (mark as verified and update verification timestamp)
  */
-export async function verifyAddress(id: string, validationData?: MACHAddressValidation): Promise<MACHAddress | null> {
+export async function verifyAddress(id: string, validationData?: AddressValidation): Promise<Address | null> {
   const db = await getDbAsync();
   
   // Get existing address first
@@ -402,7 +464,7 @@ export async function verifyAddress(id: string, validationData?: MACHAddressVali
   const now = new Date().toISOString();
   
   // Create updated address object with verification
-  const updated: MACHAddress = {
+  const updated: Address = {
     ...existing,
     status: "verified",
     validation: validationData,
@@ -410,8 +472,35 @@ export async function verifyAddress(id: string, validationData?: MACHAddressVali
     updated_at: now,
   };
   
-  const record = transformFromMACHAddress(updated);
-  await db.update(addresses).set(record).where(eq(addresses.id, id));
+  const dbRecord = {
+    id: updated.id,
+    line1: typeof updated.line1 === 'string' ? updated.line1 : JSON.stringify(updated.line1),
+    city: typeof updated.city === 'string' ? updated.city : JSON.stringify(updated.line2),
+    country: updated.country,
+    type: updated.type ?? "shipping",
+    status: updated.status ?? "unverified",
+    line2: updated.line2 ? (typeof updated.line2 === 'string' ? updated.line2 : JSON.stringify(updated.line2)) : undefined,
+    line3: updated.line3 ? (typeof updated.line3 === 'string' ? updated.line3 : JSON.stringify(updated.line3)) : undefined,
+    line4: updated.line4 ? (typeof updated.line4 === 'string' ? updated.line4 : JSON.stringify(updated.line4)) : undefined,
+    district: updated.district ? (typeof updated.district === 'string' ? updated.district : JSON.stringify(updated.line4)) : undefined,
+    region: updated.region,
+    postalCode: updated.postal_code,
+    coordinates: updated.coordinates ? JSON.stringify(updated.coordinates) : undefined,
+    formatted: updated.formatted ? (typeof updated.formatted === 'string' ? updated.formatted : JSON.stringify(updated.formatted)) : undefined,
+    company: updated.company,
+    recipient: updated.recipient,
+    phone: updated.phone,
+    email: updated.email,
+    deliveryInstructions: updated.delivery_instructions ? (typeof updated.delivery_instructions === 'string' ? updated.delivery_instructions : JSON.stringify(updated.delivery_instructions)) : undefined,
+    accessCodes: updated.access_codes,
+    validation: updated.validation ? JSON.stringify(updated.validation) : undefined,
+    attributes: updated.attributes ? JSON.stringify(updated.attributes) : undefined,
+    createdAt: updated.created_at,
+    updatedAt: updated.updated_at,
+    extensions: updated.extensions ? JSON.stringify(updated.extensions) : undefined,
+  };
+  
+  await db.update(addresses).set(dbRecord).where(eq(addresses.id, id));
   
   return getAddress(id);
 }
@@ -419,35 +508,35 @@ export async function verifyAddress(id: string, validationData?: MACHAddressVali
 /**
  * Get addresses by type
  */
-export async function getAddressesByType(type: "shipping" | "billing" | "business" | "residential" | "mailing" | "pickup"): Promise<MACHAddress[]> {
+export async function getAddressesByType(type: "shipping" | "billing" | "business" | "residential" | "mailing" | "pickup"): Promise<Address[]> {
   return listAddresses({ type });
 }
 
 /**
  * Get addresses by recipient
  */
-export async function getAddressesByRecipient(recipient: string): Promise<MACHAddress[]> {
+export async function getAddressesByRecipient(recipient: string): Promise<Address[]> {
   return listAddresses({ recipient });
 }
 
 /**
  * Get addresses by country
  */
-export async function getAddressesByCountry(country: string): Promise<MACHAddress[]> {
+export async function getAddressesByCountry(country: string): Promise<Address[]> {
   return listAddresses({ country });
 }
 
 /**
  * Get verified addresses only
  */
-export async function getVerifiedAddresses(): Promise<MACHAddress[]> {
+export async function getVerifiedAddresses(): Promise<Address[]> {
   return listAddresses({ verified: true });
 }
 
 /**
  * Search addresses by text
  */
-export async function searchAddresses(searchTerm: string, limit?: number): Promise<MACHAddress[]> {
+export async function searchAddresses(searchTerm: string, limit?: number): Promise<Address[]> {
   return listAddresses({ 
     search: searchTerm, 
     limit: limit || 50 
@@ -457,7 +546,7 @@ export async function searchAddresses(searchTerm: string, limit?: number): Promi
 /**
  * Format address for display (create human-readable string)
  */
-export function formatAddressForDisplay(address: MACHAddress, locale = 'en'): string {
+export function formatAddressForDisplay(address: Address, locale = 'en'): string {
   if (address.formatted) {
     // Use pre-formatted if available
     if (typeof address.formatted === 'string') {

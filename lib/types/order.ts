@@ -1,31 +1,5 @@
-import type { CartItem } from "./cartitem";
-import type { ShippingOption } from "./shipping";
-// lib/types/order.ts - MACH Alliance Order Types
-import type { BillingInfo } from "./billing";
+import type { CartItem, Address, ShippingOption, BillingInfo, Money } from ".";
 
-// lib/types/order.ts - MACH Alliance Order Types
-
-// Standard Money type used throughout MACH Alliance
-export interface Money {
-  amount: number; // Amount in smallest currency unit (e.g., cents)
-  currency: string; // ISO 4217 currency code
-}
-
-// Address type for billing and shipping
-export interface Address {
-  id?: string;
-  type?: "billing" | "shipping";
-  first_name?: string;
-  last_name?: string;
-  company?: string;
-  address_line_1: string;
-  address_line_2?: string;
-  city: string;
-  state?: string;
-  postal_code: string;
-  country_code: string; // ISO 3166-1 alpha-2
-  phone?: string;
-}
 
 // Product variant option values (e.g., size: "Large", color: "Red")
 export interface VariantOption {

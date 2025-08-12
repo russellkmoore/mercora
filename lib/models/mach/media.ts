@@ -20,8 +20,8 @@ import type {
   MACHAccessibility
 } from "../../types/mach/Media";
 import { 
-  transformFromMACHMedia, 
-  transformToMACHMedia,
+  serializeMedia,
+  deserializeMedia,
   generateMediaId,
   validateMediaFile,
   validateMediaVariant,
@@ -103,7 +103,7 @@ export async function createMedia(
     extensions: mediaData.extensions,
   };
 
-  const record = transformFromMACHMedia(mediaAsset);
+  const record = serializeMedia(mediaAsset);
   
   try {
     const db = await getDbAsync();
@@ -128,7 +128,7 @@ export async function getMediaById(id: string): Promise<MACHMedia | null> {
     .where(eq(media.id, id))
     .limit(1);
 
-  return records.length > 0 ? transformToMACHMedia(records[0]) : null;
+  return records.length > 0 ? deserializeMedia(records[0]) : null;
 }
 
 /**
@@ -181,7 +181,7 @@ export async function updateMedia(
     updated.type = updates.type || getMediaTypeFromFormat(updates.file.format);
   }
 
-  const record = transformFromMACHMedia(updated);
+  const record = serializeMedia(updated);
   
   const db = await getDbAsync();
   await db
@@ -301,7 +301,7 @@ export async function listMedia(options?: {
   }
 
   const records = await query;
-  return records.map(transformToMACHMedia);
+  return records.map(deserializeMedia);
 }
 
 // ====================================
@@ -656,7 +656,7 @@ export async function getPublishedMedia(options?: {
   }
 
   const records = await query;
-  return records.map(transformToMACHMedia);
+  return records.map(deserializeMedia);
 }
 
 // ====================================
@@ -736,7 +736,7 @@ export async function getMediaStatistics(): Promise<{
 }> {
   const db = await getDbAsync();
   const allRecords = await db.select().from(media);
-  const allMedia = allRecords.map(transformToMACHMedia);
+  const allMedia = allRecords.map(deserializeMedia);
   
   const total = allMedia.length;
   

@@ -9,7 +9,7 @@
  */
 
 import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
-import type { MACHInventory, MACHInventoryQuantities } from "../../types/mach/Inventory";
+import type { Inventory, InventoryQuantities } from "@/lib/types";
 
 /**
  * Inventory table schema
@@ -24,7 +24,7 @@ export const inventory = sqliteTable("inventory", {
   locationId: text("location_id").notNull(),
   
   // Stock quantities stored as JSON - REQUIRED
-  quantities: text("quantities", { mode: "json" }).$type<MACHInventoryQuantities>().notNull(),
+  quantities: text("quantities", { mode: "json" }).$type<InventoryQuantities>().notNull(),
   
   // Status and state - OPTIONAL
   status: text("status", { enum: ["draft", "active", "inactive"] }).default("active"),
@@ -53,55 +53,9 @@ export const inventory = sqliteTable("inventory", {
 });
 
 /**
- * Transform MACH Inventory to database record
- */
-export function transformFromMACHInventory(machInventory: MACHInventory): typeof inventory.$inferInsert {
-  return {
-    id: machInventory.id,
-    skuId: machInventory.sku_id,
-    locationId: machInventory.location_id,
-    quantities: machInventory.quantities,
-    status: machInventory.status || "active",
-    stockStatus: machInventory.stock_status,
-    externalReferences: machInventory.external_references,
-    createdAt: machInventory.created_at,
-    updatedAt: machInventory.updated_at,
-    policyId: machInventory.policy_id,
-    backorderable: machInventory.backorderable || false,
-    backorderEta: machInventory.backorder_eta,
-    safetyStock: machInventory.safety_stock || 0,
-    version: machInventory.version || 0,
-    extensions: machInventory.extensions,
-  };
-}
-
-/**
- * Transform database record to MACH Inventory
- */
-export function transformToMACHInventory(record: typeof inventory.$inferSelect): MACHInventory {
-  return {
-    id: record.id,
-    sku_id: record.skuId,
-    location_id: record.locationId,
-    quantities: record.quantities,
-    status: record.status || "active",
-    stock_status: record.stockStatus || undefined,
-    external_references: record.externalReferences || undefined,
-    created_at: record.createdAt || undefined,
-    updated_at: record.updatedAt || undefined,
-    policy_id: record.policyId || undefined,
-    backorderable: record.backorderable || false,
-    backorder_eta: record.backorderEta || undefined,
-    safety_stock: record.safetyStock || 0,
-    version: record.version || 0,
-    extensions: record.extensions || undefined,
-  };
-}
-
-/**
  * Validate quantities to ensure business rules
  */
-export function validateInventoryQuantities(quantities: MACHInventoryQuantities): {
+export function validateInventoryQuantities(quantities: InventoryQuantities): {
   isValid: boolean;
   errors: string[];
   warnings: string[];
@@ -152,7 +106,7 @@ export function validateInventoryQuantities(quantities: MACHInventoryQuantities)
  * Calculate stock status based on quantities
  */
 export function calculateStockStatus(
-  quantities: MACHInventoryQuantities, 
+  quantities: InventoryQuantities, 
   backorderable?: boolean,
   safetyStock?: number
 ): "in_stock" | "out_of_stock" | "backorder" | "preorder" {
@@ -193,7 +147,7 @@ export function calculateAvailableQuantity(
  * Check if inventory can fulfill a specific quantity
  */
 export function canFulfillQuantity(
-  inventory: MACHInventory,
+  inventory: Inventory,
   requestedQuantity: number
 ): {
   canFulfill: boolean;
@@ -216,6 +170,48 @@ export function canFulfillQuantity(
     availableQuantity: effectiveAvailable,
     shortfall,
     canBackorder
+  };
+}
+
+// Helper: convert DB record to MACH Inventory
+export function deserializeInventory(record: typeof inventory.$inferSelect): Inventory {
+  return {
+    id: record.id,
+    sku_id: record.skuId,
+    location_id: record.locationId,
+    quantities: record.quantities,
+    status: record.status || "active",
+    stock_status: record.stockStatus || undefined,
+    external_references: record.externalReferences || undefined,
+    created_at: record.createdAt || undefined,
+    updated_at: record.updatedAt || undefined,
+    policy_id: record.policyId || undefined,
+    backorderable: record.backorderable || false,
+    backorder_eta: record.backorderEta || undefined,
+    safety_stock: record.safetyStock || 0,
+    version: record.version || 0,
+    extensions: record.extensions || undefined,
+  };
+}
+
+// Helper: convert MACH Inventory to DB insert format
+export function serializeInventory(machInventory: Inventory): typeof inventory.$inferInsert {
+  return {
+    id: machInventory.id,
+    skuId: machInventory.sku_id,
+    locationId: machInventory.location_id,
+    quantities: machInventory.quantities,
+    status: machInventory.status || "active",
+    stockStatus: machInventory.stock_status,
+    externalReferences: machInventory.external_references,
+    createdAt: machInventory.created_at,
+    updatedAt: machInventory.updated_at,
+    policyId: machInventory.policy_id,
+    backorderable: machInventory.backorderable || false,
+    backorderEta: machInventory.backorder_eta,
+    safetyStock: machInventory.safety_stock || 0,
+    version: machInventory.version || 0,
+    extensions: machInventory.extensions,
   };
 }
 

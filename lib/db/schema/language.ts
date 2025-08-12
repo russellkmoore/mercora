@@ -1,20 +1,20 @@
 /**
- * MACH Alliance Open Data Model - Language Schema
+ *  Alliance Open Data Model - Language Schema
  * 
- * Drizzle ORM schema for the Language utility object following the MACH Alliance standards.
+ * Drizzle ORM schema for the Language utility object following the  Alliance standards.
  * Optimized for Cloudflare D1 database with JSON storage for complex objects.
  * 
  * Based on official specification:
- * https://github.com/machalliance/standards/blob/main/models/entities/utilities/language.md
+ * https://github.com/alliance/standards/blob/main/models/entities/utilities/language.md
  */
 
 import { sqliteTable, text } from "drizzle-orm/sqlite-core";
 import type { 
-  MACHLanguage, 
-  MACHLocaleFormatting,
-  MACHNumberFormatting,
-  MACHCurrencyFormatting
-} from "../../types/mach/Language";
+  Language, 
+  LocaleFormatting,
+  NumberFormatting,
+  CurrencyFormatting
+} from "@/lib/types/";
 
 /**
  * Language table schema
@@ -44,7 +44,7 @@ export const languages = sqliteTable("languages", {
   updatedAt: text("updated_at"), // ISO 8601 update timestamp
   
   // Formatting and localization - OPTIONAL
-  formatting: text("formatting", { mode: "json" }).$type<MACHLocaleFormatting>(),
+  formatting: text("formatting", { mode: "json" }).$type<LocaleFormatting>(),
   fallbackLocales: text("fallback_locales", { mode: "json" }).$type<string[]>(),
   
   // Extensions for custom data - OPTIONAL
@@ -52,30 +52,9 @@ export const languages = sqliteTable("languages", {
 });
 
 /**
- * Transform MACH Language to database record
+ * Helper: convert DB record to MACH Language
  */
-export function transformFromMACHLanguage(machLanguage: MACHLanguage): typeof languages.$inferInsert {
-  return {
-    code: machLanguage.code,
-    name: machLanguage.name,
-    locale: machLanguage.locale,
-    region: machLanguage.region,
-    script: machLanguage.script,
-    direction: machLanguage.direction || "ltr",
-    status: machLanguage.status || "active",
-    externalReferences: machLanguage.external_references,
-    createdAt: machLanguage.created_at,
-    updatedAt: machLanguage.updated_at,
-    formatting: machLanguage.formatting,
-    fallbackLocales: machLanguage.fallback_locales,
-    extensions: machLanguage.extensions,
-  };
-}
-
-/**
- * Transform database record to MACH Language
- */
-export function transformToMACHLanguage(record: typeof languages.$inferSelect): MACHLanguage {
+export function deserializeLanguage(record: typeof languages.$inferSelect): Language {
   return {
     code: record.code,
     name: record.name,
@@ -90,6 +69,27 @@ export function transformToMACHLanguage(record: typeof languages.$inferSelect): 
     formatting: record.formatting || undefined,
     fallback_locales: record.fallbackLocales || undefined,
     extensions: record.extensions || undefined,
+  };
+}
+
+/**
+ * Helper: convert MACH Language to DB insert format
+ */
+export function serializeLanguage(language: Language): typeof languages.$inferInsert {
+  return {
+    code: language.code,
+    name: language.name,
+    locale: language.locale,
+    region: language.region,
+    script: language.script,
+    direction: language.direction || "ltr",
+    status: language.status || "active",
+    externalReferences: language.external_references,
+    createdAt: language.created_at,
+    updatedAt: language.updated_at,
+    formatting: language.formatting,
+    fallbackLocales: language.fallback_locales,
+    extensions: language.extensions,
   };
 }
 
@@ -221,14 +221,14 @@ export function generateDefaultFormatting(
   languageCode: string, 
   region?: string, 
   script?: string
-): MACHLocaleFormatting {
+): LocaleFormatting {
   const isUS = region === 'US';
   const isGB = region === 'GB';
   const isMetric = getDefaultMeasurementSystem(region) === 'metric';
   const firstDayOfWeek = getDefaultFirstDayOfWeek(region);
   
   // Default number formatting
-  const numberFormat: MACHNumberFormatting = {
+  const numberFormat: NumberFormatting = {
     decimal_separator: ".",
     thousands_separator: ",",
     decimal_places: 2,
@@ -242,7 +242,7 @@ export function generateDefaultFormatting(
   }
   
   // Default currency formatting
-  const currencyFormat: MACHCurrencyFormatting = {
+  const currencyFormat: CurrencyFormatting = {
     symbol: "$",
     code: "USD",
     position: "before",

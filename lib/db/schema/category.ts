@@ -7,7 +7,7 @@
  */
 
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
-import type { MACHCategory } from "@/lib/types/mach/Category";
+import type { Category } from "@/lib/types";
 
 /**
  * Categories table - MACH Alliance compliant category storage
@@ -67,64 +67,49 @@ export type InsertCategory = typeof categories.$inferInsert;
  */
 export type SelectCategory = typeof categories.$inferSelect;
 
-/**
- * Transform database record to MACH Category interface
- */
-export function transformToMACHCategory(record: SelectCategory): MACHCategory {
+// Helper: parse stringified JSON or return as-is
+function parseMaybeJson(val: any) {
+  if (typeof val !== 'string') return val;
+  try {
+    return JSON.parse(val);
+  } catch {
+    return val;
+  }
+}
+
+// Helper: convert DB record to MACH Category
+export function deserializeCategory(record: SelectCategory): Category {
   return {
-    // Core identification - REQUIRED
     id: record.id,
-    name: record.name ? (isJsonString(record.name) ? JSON.parse(record.name) : record.name) : "",
-    
-    // Display information - OPTIONAL
-    description: record.description ? (isJsonString(record.description) ? JSON.parse(record.description) : record.description) : undefined,
-    slug: record.slug ? (isJsonString(record.slug) ? JSON.parse(record.slug) : record.slug) : undefined,
-    
-    // Status and hierarchy - OPTIONAL  
+    name: parseMaybeJson(record.name),
+    description: record.description ? parseMaybeJson(record.description) : undefined,
+    slug: record.slug ? parseMaybeJson(record.slug) : undefined,
     status: record.status ?? undefined,
     parent_id: record.parentId ?? undefined,
     position: record.position ?? undefined,
     path: record.path ?? undefined,
-    
-    // External references - OPTIONAL
     external_references: record.externalReferences ? JSON.parse(record.externalReferences) : undefined,
-    
-    // Timestamps - OPTIONAL
     created_at: record.createdAt ?? undefined,
     updated_at: record.updatedAt ?? undefined,
-    
-    // Hierarchy and products - OPTIONAL
     children: record.children ? JSON.parse(record.children) : undefined,
     product_count: record.productCount ?? undefined,
-    
-    // Metadata and classification - OPTIONAL
     attributes: record.attributes ? JSON.parse(record.attributes) : undefined,
     tags: record.tags ? JSON.parse(record.tags) : undefined,
-    
-    // Media assets - OPTIONAL
     primary_image: record.primaryImage ? JSON.parse(record.primaryImage) : undefined,
     media: record.media ? JSON.parse(record.media) : undefined,
-    
-    // SEO - OPTIONAL
     seo: record.seo ? JSON.parse(record.seo) : undefined,
-    
-    // Extensions - OPTIONAL
     extensions: record.extensions ? JSON.parse(record.extensions) : undefined,
   };
 }
 
-/**
- * Transform MACH Category to database insert format
- */
-export function transformFromMACHCategory(category: MACHCategory): InsertCategory {
+// Helper: convert MACH Category to DB insert format
+export function serializeCategory(category: Category): InsertCategory {
   return {
     id: category.id,
     name: typeof category.name === 'string' ? category.name : JSON.stringify(category.name),
-    description: category.description ? 
-      (typeof category.description === 'string' ? category.description : JSON.stringify(category.description)) : undefined,
-    slug: category.slug ? 
-      (typeof category.slug === 'string' ? category.slug : JSON.stringify(category.slug)) : undefined,
-    status: category.status ?? "active",
+    description: category.description ? (typeof category.description === 'string' ? category.description : JSON.stringify(category.description)) : undefined,
+    slug: category.slug ? (typeof category.slug === 'string' ? category.slug : JSON.stringify(category.slug)) : undefined,
+    status: category.status ?? 'active',
     parentId: category.parent_id,
     position: category.position,
     path: category.path,
@@ -140,16 +125,4 @@ export function transformFromMACHCategory(category: MACHCategory): InsertCategor
     seo: category.seo ? JSON.stringify(category.seo) : undefined,
     extensions: category.extensions ? JSON.stringify(category.extensions) : undefined,
   };
-}
-
-/**
- * Helper function to check if a string is valid JSON
- */
-function isJsonString(str: string): boolean {
-  try {
-    JSON.parse(str);
-    return true;
-  } catch {
-    return false;
-  }
 }

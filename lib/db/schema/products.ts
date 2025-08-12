@@ -5,18 +5,18 @@
 
 import { sqliteTable, text, integer, real, blob } from 'drizzle-orm/sqlite-core';
 import type { 
-  MACHProduct, 
-  MACHProductVariant,
-  MACHProductOption,
-  MACHOptionValue,
-  MACHWeight,
-  MACHDimensions,
-  MACHSEO,
-  MACHRating,
-  MACHProductInventory
-} from '../../types/mach/Product.js';
-import type { MACHMoney } from '../../types/mach/Money.js';
-import type { MACHMedia } from '../../types/mach/Media.js';
+  Money,
+  Media,
+  Product, 
+  ProductVariant,
+  ProductOption,
+  OptionValue,
+  Weight,
+  Dimensions,
+  SEO,
+  Rating,
+  ProductInventory
+} from '@/lib/types';
 
 // Main products table
 export const products = sqliteTable('products', {
@@ -29,14 +29,14 @@ export const products = sqliteTable('products', {
   brand: text('brand'),
   categories: text('categories', { mode: 'json' }).$type<string[]>(),
   tags: text('tags', { mode: 'json' }).$type<string[]>(),
-  options: text('options', { mode: 'json' }).$type<MACHProductOption[]>(),
+  options: text('options', { mode: 'json' }).$type<ProductOption[]>(),
   default_variant_id: text('default_variant_id'),
   fulfillment_type: text('fulfillment_type', { enum: ['physical', 'digital', 'service'] }).default('physical'),
   tax_category: text('tax_category'),
-  primary_image: text('primary_image', { mode: 'json' }).$type<MACHMedia>(),
-  media: text('media', { mode: 'json' }).$type<MACHMedia[]>(),
-  seo: text('seo', { mode: 'json' }).$type<MACHSEO>(),
-  rating: text('rating', { mode: 'json' }).$type<MACHRating>(),
+  primary_image: text('primary_image', { mode: 'json' }).$type<Media>(),
+  media: text('media', { mode: 'json' }).$type<Media[]>(),
+  seo: text('seo', { mode: 'json' }).$type<SEO>(),
+  rating: text('rating', { mode: 'json' }).$type<Rating>(),
   related_products: text('related_products', { mode: 'json' }).$type<string[]>(),
   external_references: text('external_references', { mode: 'json' }).$type<Record<string, string>>(),
   extensions: text('extensions', { mode: 'json' }).$type<Record<string, any>>(),
@@ -51,17 +51,17 @@ export const product_variants = sqliteTable('product_variants', {
   sku: text('sku').notNull(),
   status: text('status', { enum: ['active', 'inactive', 'discontinued'] }).default('active'),
   position: integer('position'),
-  option_values: text('option_values', { mode: 'json' }).$type<MACHOptionValue[]>().notNull(),
-  price: text('price', { mode: 'json' }).$type<MACHMoney>().notNull(),
-  compare_at_price: text('compare_at_price', { mode: 'json' }).$type<MACHMoney>(),
-  cost: text('cost', { mode: 'json' }).$type<MACHMoney>(),
-  weight: text('weight', { mode: 'json' }).$type<MACHWeight>(),
-  dimensions: text('dimensions', { mode: 'json' }).$type<MACHDimensions>(),
+  option_values: text('option_values', { mode: 'json' }).$type<OptionValue[]>().notNull(),
+  price: text('price', { mode: 'json' }).$type<Money>().notNull(),
+  compare_at_price: text('compare_at_price', { mode: 'json' }).$type<Money>(),
+  cost: text('cost', { mode: 'json' }).$type<Money>(),
+  weight: text('weight', { mode: 'json' }).$type<Weight>(),
+  dimensions: text('dimensions', { mode: 'json' }).$type<Dimensions>(),
   barcode: text('barcode'),
-  inventory: text('inventory', { mode: 'json' }).$type<MACHProductInventory>(),
+  inventory: text('inventory', { mode: 'json' }).$type<ProductInventory>(),
   tax_category: text('tax_category'),
   shipping_required: integer('shipping_required', { mode: 'boolean' }).default(true),
-  media: text('media', { mode: 'json' }).$type<MACHMedia[]>(),
+  media: text('media', { mode: 'json' }).$type<Media[]>(),
   attributes: text('attributes', { mode: 'json' }).$type<Record<string, any>>(),
   created_at: text('created_at'),
   updated_at: text('updated_at')
@@ -71,7 +71,7 @@ export const product_variants = sqliteTable('product_variants', {
  * Schema validation and transformation utilities
  */
 
-export function validateProduct(data: any): data is MACHProduct {
+export function validateProduct(data: any): data is Product {
   return (
     typeof data === 'object' &&
     typeof data.id === 'string' &&
@@ -80,7 +80,7 @@ export function validateProduct(data: any): data is MACHProduct {
   );
 }
 
-export function validateProductVariant(data: any): data is MACHProductVariant {
+export function validateProductVariant(data: any): data is ProductVariant {
   return (
     typeof data === 'object' &&
     typeof data.id === 'string' &&
@@ -94,7 +94,7 @@ export function validateProductVariant(data: any): data is MACHProductVariant {
   );
 }
 
-export function transformProductForDB(product: MACHProduct) {
+export function transformProductForDB(product: Product) {
   return {
     ...product,
     created_at: product.created_at || new Date().toISOString(),
@@ -102,7 +102,7 @@ export function transformProductForDB(product: MACHProduct) {
   };
 }
 
-export function transformVariantForDB(variant: MACHProductVariant) {
+export function transformVariantForDB(variant: ProductVariant) {
   return {
     ...variant,
     created_at: variant.created_at || new Date().toISOString(),
@@ -115,9 +115,9 @@ export function transformVariantForDB(variant: MACHProductVariant) {
  */
 
 export function calculateVariantPrice(
-  variant: MACHProductVariant,
+  variant: ProductVariant,
   quantity: number = 1
-): MACHMoney {
+): Money {
   return {
     amount: variant.price.amount * quantity,
     currency: variant.price.currency
@@ -125,9 +125,9 @@ export function calculateVariantPrice(
 }
 
 export function getVariantByOptions(
-  variants: MACHProductVariant[],
+  variants: ProductVariant[],
   selectedOptions: Record<string, string>
-): MACHProductVariant | undefined {
+): ProductVariant | undefined {
   return variants.find(variant => {
     return variant.option_values.every(ov => 
       selectedOptions[ov.option_id] === ov.value
@@ -136,7 +136,7 @@ export function getVariantByOptions(
 }
 
 export function getAvailableOptionValues(
-  variants: MACHProductVariant[],
+  variants: ProductVariant[],
   optionId: string
 ): string[] {
   const values = new Set<string>();
@@ -149,7 +149,7 @@ export function getAvailableOptionValues(
   return Array.from(values);
 }
 
-export function isVariantAvailable(variant: MACHProductVariant): boolean {
+export function isVariantAvailable(variant: ProductVariant): boolean {
   return (
     variant.status === 'active' &&
     (!variant.inventory?.track_inventory || 
@@ -158,7 +158,7 @@ export function isVariantAvailable(variant: MACHProductVariant): boolean {
   );
 }
 
-export function getVariantInventoryLevel(variant: MACHProductVariant): number {
+export function getVariantInventoryLevel(variant: ProductVariant): number {
   if (!variant.inventory?.track_inventory) {
     return Infinity; // Unlimited if not tracking
   }
@@ -171,15 +171,15 @@ export function getVariantInventoryLevel(variant: MACHProductVariant): number {
   return quantity + backorderQuantity;
 }
 
-export function formatWeight(weight: MACHWeight): string {
+export function formatWeight(weight: Weight): string {
   return `${weight.value}${weight.unit}`;
 }
 
-export function formatDimensions(dimensions: MACHDimensions): string {
+export function formatDimensions(dimensions: Dimensions): string {
   return `${dimensions.length}×${dimensions.width}×${dimensions.height} ${dimensions.unit}`;
 }
 
-export function calculateShippingWeight(variants: MACHProductVariant[]): MACHWeight | null {
+export function calculateShippingWeight(variants: ProductVariant[]): Weight | null {
   const weights = variants
     .filter(v => v.weight)
     .map(v => v.weight!);
@@ -204,7 +204,7 @@ export function calculateShippingWeight(variants: MACHProductVariant[]): MACHWei
   };
 }
 
-export function isProductLocalized(product: MACHProduct): boolean {
+export function isProductLocalized(product: Product): boolean {
   return typeof product.name === 'object' || typeof product.description === 'object';
 }
 
@@ -226,7 +226,7 @@ export function buildProductSlug(name: string): string {
 
 export function generateSKU(
   baseCode: string,
-  optionValues: MACHOptionValue[]
+  optionValues: OptionValue[]
 ): string {
   const suffix = optionValues
     .map(ov => ov.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))

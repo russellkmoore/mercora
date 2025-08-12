@@ -8,16 +8,16 @@
  * https://github.com/machalliance/standards/blob/main/models/entities/inventory/inventory.md
  */
 
-import { getDbAsync } from "../../db";
-import { 
-  inventory, 
-  transformToMACHInventory, 
-  transformFromMACHInventory,
+import { getDbAsync } from "@/lib/db";
+import {
+  inventory,
+  deserializeInventory,
+  serializeInventory,
   validateInventoryQuantities,
   calculateStockStatus,
-  calculateAvailableQuantity,
-  canFulfillQuantity
-} from "../../db/schema/inventory";
+  canFulfillQuantity,
+  calculateAvailableQuantity
+} from "@/lib/db/schema/inventory";
 import { eq, desc, asc, and, or, inArray, isNull, isNotNull, sql, gte, lte } from "drizzle-orm";
 import type { 
   MACHInventory, 
@@ -256,9 +256,9 @@ export async function createInventory(input: CreateInventoryInput): Promise<MACH
   }
   
   const db = await getDbAsync();
-  const record = transformFromMACHInventory(machInventory);
+  const record = serializeInventory(machInventory);
   const [created] = await db.insert(inventory).values(record).returning();
-  return transformToMACHInventory(created);
+  return deserializeInventory(created);
 }
 
 /**
@@ -274,7 +274,7 @@ export async function getInventory(id: string): Promise<MACHInventory | null> {
     .limit(1);
     
   if (!record) return null;
-  return transformToMACHInventory(record);
+  return deserializeInventory(record);
 }
 
 /**
@@ -293,7 +293,7 @@ export async function getInventoryBySkuAndLocation(skuId: string, locationId: st
     .limit(1);
     
   if (!record) return null;
-  return transformToMACHInventory(record);
+  return deserializeInventory(record);
 }
 
 /**
@@ -422,7 +422,7 @@ export async function listInventory(filters: InventoryFilters = {}): Promise<MAC
   }
   
   const records = await query;
-  let inventoryList = records.map(record => transformToMACHInventory(record));
+  let inventoryList = records.map(deserializeInventory);
   
   // Apply additional filters that require JSON parsing
   if (filters.min_on_hand !== undefined) {
@@ -523,7 +523,7 @@ export async function updateInventory(id: string, input: Partial<CreateInventory
     throw new Error(`Inventory validation failed: ${validation.errors.join(', ')}`);
   }
   
-  const record = transformFromMACHInventory(updated);
+  const record = serializeInventory(updated);
   await db.update(inventory).set(record).where(eq(inventory.id, id));
   
   return getInventory(id);

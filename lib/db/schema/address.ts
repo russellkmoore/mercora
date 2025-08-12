@@ -7,7 +7,7 @@
  */
 
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
-import type { MACHAddress } from "@/lib/types/mach/Address";
+import type { Address } from "@/lib/types";
 
 /**
  * Addresses table - MACH Alliance compliant address storage
@@ -81,30 +81,38 @@ export type InsertAddress = typeof addresses.$inferInsert;
  */
 export type SelectAddress = typeof addresses.$inferSelect;
 
-/**
- * Transform database record to MACH Address interface
- */
-export function transformToMACHAddress(record: SelectAddress): MACHAddress {
+// Helper: parse stringified JSON or return as-is
+function parseMaybeJson(val: any) {
+  if (typeof val !== 'string') return val;
+  try {
+    return JSON.parse(val);
+  } catch {
+    return val;
+  }
+}
+
+// Helper: convert DB record to MACH Address
+export function deserializeAddress(record: SelectAddress): Address {
   return {
     id: record.id ?? undefined,
     type: record.type ?? undefined,
     status: record.status ?? undefined,
-    line1: record.line1,
-    city: record.city,
+    line1: parseMaybeJson(record.line1),
+    city: parseMaybeJson(record.city),
     country: record.country,
-    line2: record.line2 ?? undefined,
-    line3: record.line3 ?? undefined,
-    line4: record.line4 ?? undefined,
-    district: record.district ?? undefined,
+    line2: record.line2 ? parseMaybeJson(record.line2) : undefined,
+    line3: record.line3 ? parseMaybeJson(record.line3) : undefined,
+    line4: record.line4 ? parseMaybeJson(record.line4) : undefined,
+    district: record.district ? parseMaybeJson(record.district) : undefined,
     region: record.region ?? undefined,
     postal_code: record.postalCode ?? undefined,
     coordinates: record.coordinates ? JSON.parse(record.coordinates) : undefined,
-    formatted: record.formatted ?? undefined,
+    formatted: record.formatted ? parseMaybeJson(record.formatted) : undefined,
     company: record.company ?? undefined,
     recipient: record.recipient ?? undefined,
     phone: record.phone ?? undefined,
     email: record.email ?? undefined,
-    delivery_instructions: record.deliveryInstructions ?? undefined,
+    delivery_instructions: record.deliveryInstructions ? parseMaybeJson(record.deliveryInstructions) : undefined,
     access_codes: record.accessCodes ?? undefined,
     validation: record.validation ? JSON.parse(record.validation) : undefined,
     attributes: record.attributes ? JSON.parse(record.attributes) : undefined,
@@ -115,30 +123,28 @@ export function transformToMACHAddress(record: SelectAddress): MACHAddress {
   };
 }
 
-/**
- * Transform MACH Address to database insert format
- */
-export function transformFromMACHAddress(address: MACHAddress): InsertAddress {
+// Helper: convert MACH Address to DB insert format
+export function serializeAddress(address: Address): InsertAddress {
   return {
     id: address.id ?? `addr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
     type: address.type ?? "shipping",
     status: address.status ?? "unverified",
-    line1: address.line1 as string, // Handle localization by storing JSON
-    city: address.city as string,   // Handle localization by storing JSON  
+    line1: typeof address.line1 === 'string' ? address.line1 : JSON.stringify(address.line1),
+    city: typeof address.city === 'string' ? address.city : JSON.stringify(address.city),
     country: address.country,
-    line2: address.line2 as string | undefined,
-    line3: address.line3 as string | undefined,
-    line4: address.line4 as string | undefined,
-    district: address.district as string | undefined,
+    line2: address.line2 ? (typeof address.line2 === 'string' ? address.line2 : JSON.stringify(address.line2)) : undefined,
+    line3: address.line3 ? (typeof address.line3 === 'string' ? address.line3 : JSON.stringify(address.line3)) : undefined,
+    line4: address.line4 ? (typeof address.line4 === 'string' ? address.line4 : JSON.stringify(address.line4)) : undefined,
+    district: address.district ? (typeof address.district === 'string' ? address.district : JSON.stringify(address.district)) : undefined,
     region: address.region,
     postalCode: address.postal_code,
     coordinates: address.coordinates ? JSON.stringify(address.coordinates) : undefined,
-    formatted: address.formatted as string | undefined,
+    formatted: address.formatted ? (typeof address.formatted === 'string' ? address.formatted : JSON.stringify(address.formatted)) : undefined,
     company: address.company,
     recipient: address.recipient,
     phone: address.phone,
     email: address.email,
-    deliveryInstructions: address.delivery_instructions as string | undefined,
+    deliveryInstructions: address.delivery_instructions ? (typeof address.delivery_instructions === 'string' ? address.delivery_instructions : JSON.stringify(address.delivery_instructions)) : undefined,
     accessCodes: address.access_codes,
     validation: address.validation ? JSON.stringify(address.validation) : undefined,
     attributes: address.attributes ? JSON.stringify(address.attributes) : undefined,

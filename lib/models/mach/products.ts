@@ -4,8 +4,7 @@
  */
 
 import { eq, and, like, inArray } from 'drizzle-orm';
-import type { MACHProduct, MACHProductVariant } from '../../types/mach/Product.js';
-import type { MACHMoney } from '../../types/mach/Money.js';
+import type {Product, ProductVariant, Money } from '@/lib/types/';
 import { products, product_variants } from '../../db/schema/products.js';
 import { validateProduct, validateProductVariant, transformProductForDB, transformVariantForDB } from '../../db/schema/products.js';
 import { getDb } from '../../db.js';
@@ -14,7 +13,7 @@ import { getDb } from '../../db.js';
  * Core Product CRUD Operations
  */
 
-export async function createProduct(productData: MACHProduct): Promise<MACHProduct> {
+export async function createProduct(productData: Product): Promise<Product> {
   if (!validateProduct(productData)) {
     throw new Error('Invalid product data provided');
   }
@@ -26,13 +25,13 @@ export async function createProduct(productData: MACHProduct): Promise<MACHProdu
   return product;
 }
 
-export async function getProduct(id: string): Promise<MACHProduct | null> {
+export async function getProduct(id: string): Promise<Product | null> {
   const db = getDb();
   const result = await db.select().from(products).where(eq(products.id, id));
-  return result[0] as MACHProduct || null;
+  return result[0] as Product || null;
 }
 
-export async function updateProduct(id: string, updates: Partial<MACHProduct>): Promise<MACHProduct | null> {
+export async function updateProduct(id: string, updates: Partial<Product>): Promise<Product | null> {
   const db = getDb();
   const updateData = {
     ...updates,
@@ -55,7 +54,7 @@ export async function listProducts(options: {
   brand?: string;
   limit?: number;
   offset?: number;
-} = {}): Promise<MACHProduct[]> {
+} = {}): Promise<Product[]> {
   const db = getDb();
   const results = await db.select().from(products);
   let filteredResults = results;
@@ -83,14 +82,14 @@ export async function listProducts(options: {
     filteredResults = filteredResults.slice(0, options.limit);
   }
   
-  return filteredResults as MACHProduct[];
+  return filteredResults as Product[];
 }
 
 /**
  * Product Variant Operations
  */
 
-export async function createProductVariant(variantData: MACHProductVariant): Promise<MACHProductVariant> {
+export async function createProductVariant(variantData: ProductVariant): Promise<ProductVariant> {
   if (!validateProductVariant(variantData)) {
     throw new Error('Invalid product variant data provided');
   }
@@ -110,27 +109,27 @@ export async function createProductVariant(variantData: MACHProductVariant): Pro
   return variant;
 }
 
-export async function getProductVariant(id: string): Promise<MACHProductVariant | null> {
+export async function getProductVariant(id: string): Promise<ProductVariant | null> {
   const db = getDb();
   const result = await db.select().from(product_variants).where(eq(product_variants.id, id));
-  return result[0] as MACHProductVariant || null;
+  return result[0] as ProductVariant || null;
 }
 
-export async function getProductVariants(productId: string): Promise<MACHProductVariant[]> {
+export async function getProductVariants(productId: string): Promise<ProductVariant[]> {
   const db = getDb();
   const results = await db.select()
     .from(product_variants)
     .where(eq(product_variants.product_id, productId));
-  return results as MACHProductVariant[];
+  return results as ProductVariant[];
 }
 
-export async function getVariantBySKU(sku: string): Promise<MACHProductVariant | null> {
+export async function getVariantBySKU(sku: string): Promise<ProductVariant | null> {
   const db = getDb();
   const result = await db.select().from(product_variants).where(eq(product_variants.sku, sku));
-  return result[0] as MACHProductVariant || null;
+  return result[0] as ProductVariant || null;
 }
 
-export async function updateProductVariant(id: string, updates: Partial<MACHProductVariant>): Promise<MACHProductVariant | null> {
+export async function updateProductVariant(id: string, updates: Partial<ProductVariant>): Promise<ProductVariant | null> {
   const db = getDb();
   const updateData = {
     ...updates,
@@ -151,28 +150,28 @@ export async function deleteProductVariant(id: string): Promise<boolean> {
  * Product Search Operations
  */
 
-export async function searchProducts(searchTerm: string): Promise<MACHProduct[]> {
+export async function searchProducts(searchTerm: string): Promise<Product[]> {
   const db = getDb();
   const results = await db.select()
     .from(products)
     .where(like(products.name, `%${searchTerm}%`));
-  return results as MACHProduct[];
+  return results as Product[];
 }
 
-export async function getProductsByBrand(brand: string): Promise<MACHProduct[]> {
+export async function getProductsByBrand(brand: string): Promise<Product[]> {
   const db = getDb();
   const results = await db.select()
     .from(products)
     .where(eq(products.brand, brand));
-  return results as MACHProduct[];
+  return results as Product[];
 }
 
-export async function getActiveProducts(): Promise<MACHProduct[]> {
+export async function getActiveProducts(): Promise<Product[]> {
   const db = getDb();
   const results = await db.select()
     .from(products)
     .where(eq(products.status, 'active'));
-  return results as MACHProduct[];
+  return results as Product[];
 }
 
 /**
@@ -182,7 +181,7 @@ export async function getActiveProducts(): Promise<MACHProduct[]> {
 export async function getVariantByOptions(
   productId: string,
   selectedOptions: Record<string, string>
-): Promise<MACHProductVariant | null> {
+): Promise<ProductVariant | null> {
   const variants = await getProductVariants(productId);
   
   return variants.find(variant => {
@@ -192,7 +191,7 @@ export async function getVariantByOptions(
   }) || null;
 }
 
-export async function getAvailableVariants(productId: string): Promise<MACHProductVariant[]> {
+export async function getAvailableVariants(productId: string): Promise<ProductVariant[]> {
   const db = getDb();
   const results = await db.select()
     .from(product_variants)
@@ -200,7 +199,7 @@ export async function getAvailableVariants(productId: string): Promise<MACHProdu
       eq(product_variants.product_id, productId),
       eq(product_variants.status, 'active')
     ));
-  return results as MACHProductVariant[];
+  return results as ProductVariant[];
 }
 
 /**
@@ -252,7 +251,7 @@ export async function bulkUpdateProductStatus(
 }
 
 export async function bulkUpdateVariantPrices(
-  updates: { id: string; price: MACHMoney }[]
+  updates: { id: string; price: Money }[]
 ): Promise<number> {
   const db = getDb();
   let totalUpdated = 0;
@@ -298,7 +297,7 @@ export async function removeRelatedProduct(productId: string, relatedProductId: 
   return true;
 }
 
-export async function getRelatedProducts(productId: string): Promise<MACHProduct[]> {
+export async function getRelatedProducts(productId: string): Promise<Product[]> {
   const db = getDb();
   const product = await getProduct(productId);
   if (!product || !product.related_products) return [];
@@ -306,7 +305,7 @@ export async function getRelatedProducts(productId: string): Promise<MACHProduct
   const results = await db.select()
     .from(products)
     .where(inArray(products.id, product.related_products));
-  return results as MACHProduct[];
+  return results as Product[];
 }
 
 /**
@@ -314,8 +313,8 @@ export async function getRelatedProducts(productId: string): Promise<MACHProduct
  */
 
 export async function getProductWithVariants(productId: string): Promise<{
-  product: MACHProduct;
-  variants: MACHProductVariant[];
+  product: Product;
+  variants: ProductVariant[];
 } | null> {
   const product = await getProduct(productId);
   if (!product) return null;
@@ -328,12 +327,12 @@ export async function getProductWithVariants(productId: string): Promise<{
 export async function duplicateProduct(
   productId: string,
   newId: string,
-  modifications: Partial<MACHProduct> = {}
-): Promise<MACHProduct | null> {
+  modifications: Partial<Product> = {}
+): Promise<Product | null> {
   const original = await getProduct(productId);
   if (!original) return null;
 
-  const duplicateData: MACHProduct = {
+  const duplicateData: Product = {
     ...original,
     id: newId,
     ...modifications,

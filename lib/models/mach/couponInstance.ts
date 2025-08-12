@@ -9,7 +9,7 @@
  */
 
 import { getDbAsync } from "@/lib/db";
-import { couponInstances, transformToMACHCouponInstance, transformFromMACHCouponInstance } from "@/lib/db/schema/couponInstance";
+import { couponInstances, deserializeCouponInstance, serializeCouponInstance } from "@/lib/db/schema/couponInstance";
 import { eq, desc, asc, like, or, and, inArray, isNull, isNotNull, sql, gte, lte } from "drizzle-orm";
 import type { MACHCouponInstance, MACHUsageRecord } from "@/lib/types/mach/CouponInstance";
 
@@ -249,9 +249,9 @@ export async function createCouponInstance(input: CreateCouponInstanceInput): Pr
   }
   
   const db = await getDbAsync();
-  const record = transformFromMACHCouponInstance(machCouponInstance);
+  const record = serializeCouponInstance(machCouponInstance);
   const [created] = await db.insert(couponInstances).values(record).returning();
-  return transformToMACHCouponInstance(created);
+  return deserializeCouponInstance(created);
 }
 
 /**
@@ -267,7 +267,7 @@ export async function getCouponInstance(id: string): Promise<MACHCouponInstance 
     .limit(1);
     
   if (!record) return null;
-  return transformToMACHCouponInstance(record);
+  return deserializeCouponInstance(record);
 }
 
 /**
@@ -283,7 +283,7 @@ export async function getCouponInstanceByCode(code: string): Promise<MACHCouponI
     .limit(1);
     
   if (!record) return null;
-  return transformToMACHCouponInstance(record);
+  return deserializeCouponInstance(record);
 }
 
 /**
@@ -488,7 +488,7 @@ export async function listCouponInstances(filters: CouponInstanceFilters = {}): 
   }
   
   const records = await query;
-  return records.map(record => transformToMACHCouponInstance(record));
+  return records.map(deserializeCouponInstance);
 }
 
 /**
@@ -523,7 +523,7 @@ export async function updateCouponInstance(id: string, input: Partial<CreateCoup
     throw new Error(`CouponInstance validation failed: ${validation.errors.join(', ')}`);
   }
   
-  const record = transformFromMACHCouponInstance(updated);
+  const record = serializeCouponInstance(updated);
   await db.update(couponInstances).set(record).where(eq(couponInstances.id, id));
   
   return getCouponInstance(id);

@@ -1,6 +1,4 @@
-import { Product } from '.';
-import { CartItem } from './cartitem';
-import { UserProfile } from './userProfile';
+import { Product, CartItem, UserProfile } from '.';
 export interface AgentResponse {
   answer?: string;
   content?: string;

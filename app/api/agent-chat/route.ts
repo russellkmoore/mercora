@@ -55,11 +55,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDbAsync } from "@/lib/db";
-// TODO: Create products schema - temporarily commented out
-// import { products } from "@/lib/db/schema/clean-mach-schema";
+import { products } from "@/lib/db/schema/products";
 import { inArray } from "drizzle-orm";
-import { getProduct, listProducts } from "@/lib/models/mach/products";
-import type { Product } from "@/lib/types/product";
+import type { Product } from "@/lib/types";
 
 /**
  * Handles chat interactions with the Volt AI assistant
@@ -347,7 +345,7 @@ Respond to this greeting warmly and ask what outdoor adventure they're planning.
     }
 
     // Fetch full product data if we have product IDs
-    let relatedProducts: Product[] = [];
+  let relatedProducts: Product[] = [];
     console.log("Product IDs found from vectorize:", productIds);
     if (productIds.length > 0) {
       try {
@@ -360,38 +358,9 @@ Respond to this greeting warmly and ask what outdoor adventure they're planning.
           .from(products)
           .where(inArray(products.id, stringProductIds));
 
-        // Products from MACH schema are already fully hydrated
-        relatedProducts = productResults.map(product => {
-          const name = typeof product.name === 'string' ? JSON.parse(product.name) : product.name;
-          const description = typeof product.description === 'string' ? JSON.parse(product.description) : product.description;
-          const pricing = typeof product.pricing === 'string' ? JSON.parse(product.pricing) : product.pricing;
-          const images = typeof product.images === 'string' ? JSON.parse(product.images) : product.images;
-          
-          return {
-            id: parseInt(product.id), // Convert back to number for compatibility
-            name: name?.en || 'Unknown Product',
-            slug: product.sku.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-            shortDescription: description?.en ? description.en.substring(0, 150) : '',
-            longDescription: description?.en || '',
-            primaryImageUrl: images?.[0]?.url || '',
-            images: images?.map((img: any) => img.url) || [],
-            price: pricing?.basePrice || 0,
-            active: true,
-            salePrice: pricing?.compareAtPrice || 0,
-            onSale: !!pricing?.compareAtPrice && pricing.compareAtPrice < pricing.basePrice,
-            quantityInStock: 100, // Default for now
-            availability: "available" as const,
-            tags: [],
-            useCases: [],
-            attributes: {},
-            aiNotes: (() => {
-              if (!product.metadata) return '';
-              const metadata = typeof product.metadata === 'string' ? JSON.parse(product.metadata) : product.metadata;
-              return (metadata as any)?.aiNotes || '';
-            })(),
-          } as Product;
-        });
-        console.log("Hydrated products:", relatedProducts.length);
+  // Products from MACH schema are already MACH-compliant, return as-is
+  relatedProducts = productResults as Product[];
+  console.log("MACH products returned:", relatedProducts.length);
       } catch (productError) {
         console.error("Error fetching products:", productError);
         // Continue without products if fetch fails

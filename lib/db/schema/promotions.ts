@@ -5,22 +5,22 @@
 
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 import type { 
-  MACHPromotion,
-  MACHPromotionRules,
-  MACHCondition,
-  MACHAction,
-  MACHPromotionCodes,
-  MACHUsageLimits,
-  MACHEligibility,
-  MACHDiscountTier
-} from '../../types/mach/Promotion.js';
+  Promotion,
+  PromotionRules,
+  Condition,
+  Action,
+  PromotionCodes,
+  UsageLimits,
+  Eligibility,
+  DiscountTier
+} from '@/lib/types';
 
 // Main promotions table
 export const promotions = sqliteTable('promotions', {
   id: text('id').primaryKey(),
   name: text('name', { mode: 'json' }).$type<string | Record<string, string>>().notNull(),
   type: text('type', { enum: ['cart', 'product', 'shipping'] }).notNull(),
-  rules: text('rules', { mode: 'json' }).$type<MACHPromotionRules>().notNull(),
+  rules: text('rules', { mode: 'json' }).$type<PromotionRules>().notNull(),
   status: text('status', { enum: ['draft', 'scheduled', 'active', 'paused', 'expired', 'archived'] }).default('draft'),
   description: text('description', { mode: 'json' }).$type<string | Record<string, string>>(),
   slug: text('slug'),
@@ -30,9 +30,9 @@ export const promotions = sqliteTable('promotions', {
   valid_from: text('valid_from'),
   valid_to: text('valid_to'),
   activation_method: text('activation_method', { enum: ['automatic', 'code', 'customer_specific', 'link'] }).default('automatic'),
-  codes: text('codes', { mode: 'json' }).$type<MACHPromotionCodes>(),
-  usage_limits: text('usage_limits', { mode: 'json' }).$type<MACHUsageLimits>(),
-  eligibility: text('eligibility', { mode: 'json' }).$type<MACHEligibility>(),
+  codes: text('codes', { mode: 'json' }).$type<PromotionCodes>(),
+  usage_limits: text('usage_limits', { mode: 'json' }).$type<UsageLimits>(),
+  eligibility: text('eligibility', { mode: 'json' }).$type<Eligibility>(),
   priority: integer('priority').default(100),
   stackable: integer('stackable').default(0),
   extensions: text('extensions', { mode: 'json' }).$type<Record<string, any>>()
@@ -42,7 +42,7 @@ export const promotions = sqliteTable('promotions', {
  * Schema validation and transformation utilities
  */
 
-export function validatePromotion(data: any): data is MACHPromotion {
+export function validatePromotion(data: any): data is Promotion {
   return (
     typeof data === 'object' &&
     typeof data.id === 'string' &&
@@ -57,7 +57,7 @@ export function validatePromotion(data: any): data is MACHPromotion {
   );
 }
 
-export function validatePromotionRules(data: any): data is MACHPromotionRules {
+export function validatePromotionRules(data: any): data is PromotionRules {
   return (
     typeof data === 'object' &&
     Array.isArray(data.actions) &&
@@ -67,7 +67,7 @@ export function validatePromotionRules(data: any): data is MACHPromotionRules {
   );
 }
 
-export function validateCondition(data: any): data is MACHCondition {
+export function validateCondition(data: any): data is Condition {
   const validTypes = [
     'cart_minimum', 'cart_subtotal', 'cart_quantity',
     'product_category', 'product_sku', 'product_brand',
@@ -87,7 +87,7 @@ export function validateCondition(data: any): data is MACHCondition {
   );
 }
 
-export function validateAction(data: any): data is MACHAction {
+export function validateAction(data: any): data is Action {
   const validTypes = [
     'percentage_discount', 'fixed_discount', 'fixed_price',
     'item_percentage_discount', 'item_fixed_discount',
@@ -101,7 +101,7 @@ export function validateAction(data: any): data is MACHAction {
   );
 }
 
-export function transformPromotionForDB(promotion: MACHPromotion) {
+export function transformPromotionForDB(promotion: Promotion) {
   return {
     ...promotion,
     stackable: promotion.stackable ? 1 : 0,
@@ -114,55 +114,55 @@ export function transformPromotionForDB(promotion: MACHPromotion) {
  * Promotion utility functions
  */
 
-export function isActivePromotion(promotion: MACHPromotion): boolean {
+export function isActivePromotion(promotion: Promotion): boolean {
   return promotion.status === 'active' || promotion.status === undefined;
 }
 
-export function isScheduledPromotion(promotion: MACHPromotion): boolean {
+export function isScheduledPromotion(promotion: Promotion): boolean {
   return promotion.status === 'scheduled';
 }
 
-export function isDraftPromotion(promotion: MACHPromotion): boolean {
+export function isDraftPromotion(promotion: Promotion): boolean {
   return promotion.status === 'draft';
 }
 
-export function isExpiredPromotion(promotion: MACHPromotion): boolean {
+export function isExpiredPromotion(promotion: Promotion): boolean {
   return promotion.status === 'expired';
 }
 
-export function isCartPromotion(promotion: MACHPromotion): boolean {
+export function isCartPromotion(promotion: Promotion): boolean {
   return promotion.type === 'cart';
 }
 
-export function isProductPromotion(promotion: MACHPromotion): boolean {
+export function isProductPromotion(promotion: Promotion): boolean {
   return promotion.type === 'product';
 }
 
-export function isShippingPromotion(promotion: MACHPromotion): boolean {
+export function isShippingPromotion(promotion: Promotion): boolean {
   return promotion.type === 'shipping';
 }
 
-export function isCodeBasedPromotion(promotion: MACHPromotion): boolean {
+export function isCodeBasedPromotion(promotion: Promotion): boolean {
   return promotion.activation_method === 'code';
 }
 
-export function isAutomaticPromotion(promotion: MACHPromotion): boolean {
+export function isAutomaticPromotion(promotion: Promotion): boolean {
   return promotion.activation_method === 'automatic' || promotion.activation_method === undefined;
 }
 
-export function isCustomerSpecificPromotion(promotion: MACHPromotion): boolean {
+export function isCustomerSpecificPromotion(promotion: Promotion): boolean {
   return promotion.activation_method === 'customer_specific';
 }
 
-export function isLinkBasedPromotion(promotion: MACHPromotion): boolean {
+export function isLinkBasedPromotion(promotion: Promotion): boolean {
   return promotion.activation_method === 'link';
 }
 
-export function isStackablePromotion(promotion: MACHPromotion): boolean {
+export function isStackablePromotion(promotion: Promotion): boolean {
   return promotion.stackable === true;
 }
 
-export function isPromotionValid(promotion: MACHPromotion, date?: Date): boolean {
+export function isPromotionValid(promotion: Promotion, date?: Date): boolean {
   const checkDate = date || new Date();
   const validFrom = promotion.valid_from ? new Date(promotion.valid_from) : null;
   const validTo = promotion.valid_to ? new Date(promotion.valid_to) : null;
@@ -173,29 +173,29 @@ export function isPromotionValid(promotion: MACHPromotion, date?: Date): boolean
   return isActivePromotion(promotion);
 }
 
-export function hasUsageLimits(promotion: MACHPromotion): boolean {
+export function hasUsageLimits(promotion: Promotion): boolean {
   return promotion.usage_limits !== undefined && promotion.usage_limits !== null;
 }
 
-export function hasEligibilityRestrictions(promotion: MACHPromotion): boolean {
+export function hasEligibilityRestrictions(promotion: Promotion): boolean {
   return promotion.eligibility !== undefined && promotion.eligibility !== null;
 }
 
-export function hasConditions(promotion: MACHPromotion): boolean {
+export function hasConditions(promotion: Promotion): boolean {
   return promotion.rules.conditions !== undefined && 
          promotion.rules.conditions !== null && 
          promotion.rules.conditions.length > 0;
 }
 
-export function getPromotionPriority(promotion: MACHPromotion): number {
+export function getPromotionPriority(promotion: Promotion): number {
   return promotion.priority || 100;
 }
 
-export function isHighPriorityPromotion(promotion: MACHPromotion, threshold: number = 500): boolean {
+export function isHighPriorityPromotion(promotion: Promotion, threshold: number = 500): boolean {
   return getPromotionPriority(promotion) >= threshold;
 }
 
-export function getTotalUsesRemaining(promotion: MACHPromotion): number | null {
+export function getTotalUsesRemaining(promotion: Promotion): number | null {
   if (!promotion.usage_limits || !promotion.usage_limits.uses_remaining) {
     return null;
   }
@@ -203,7 +203,7 @@ export function getTotalUsesRemaining(promotion: MACHPromotion): number | null {
 }
 
 export function canBeUsedByCustomer(
-  promotion: MACHPromotion, 
+  promotion: Promotion, 
   customerType: string, 
   customerSegments?: string[]
 ): boolean {
@@ -228,14 +228,14 @@ export function canBeUsedByCustomer(
   return true;
 }
 
-export function canBeUsedInChannel(promotion: MACHPromotion, channel: string): boolean {
+export function canBeUsedInChannel(promotion: Promotion, channel: string): boolean {
   if (!promotion.eligibility || !promotion.eligibility.channels) {
     return true;
   }
   return promotion.eligibility.channels.includes(channel as any);
 }
 
-export function canBeUsedInRegion(promotion: MACHPromotion, region: string): boolean {
+export function canBeUsedInRegion(promotion: Promotion, region: string): boolean {
   if (!promotion.eligibility) return true;
 
   // Check excluded regions first
@@ -255,16 +255,16 @@ export function canBeUsedInRegion(promotion: MACHPromotion, region: string): boo
   return true;
 }
 
-export function getActionsByType(promotion: MACHPromotion, actionType: string): MACHAction[] {
+export function getActionsByType(promotion: Promotion, actionType: string): Action[] {
   return promotion.rules.actions.filter(action => action.type === actionType);
 }
 
-export function getConditionsByType(promotion: MACHPromotion, conditionType: string): MACHCondition[] {
+export function getConditionsByType(promotion: Promotion, conditionType: string): Condition[] {
   if (!promotion.rules.conditions) return [];
   return promotion.rules.conditions.filter(condition => condition.type === conditionType);
 }
 
-export function hasPercentageDiscountAction(promotion: MACHPromotion): boolean {
+export function hasPercentageDiscountAction(promotion: Promotion): boolean {
   return promotion.rules.actions.some(action => 
     action.type === 'percentage_discount' || 
     action.type === 'item_percentage_discount' ||
@@ -272,7 +272,7 @@ export function hasPercentageDiscountAction(promotion: MACHPromotion): boolean {
   );
 }
 
-export function hasFixedDiscountAction(promotion: MACHPromotion): boolean {
+export function hasFixedDiscountAction(promotion: Promotion): boolean {
   return promotion.rules.actions.some(action => 
     action.type === 'fixed_discount' || 
     action.type === 'item_fixed_discount' ||
@@ -280,23 +280,23 @@ export function hasFixedDiscountAction(promotion: MACHPromotion): boolean {
   );
 }
 
-export function hasBOGOAction(promotion: MACHPromotion): boolean {
+export function hasBOGOAction(promotion: Promotion): boolean {
   return promotion.rules.actions.some(action => action.type === 'bogo_discount');
 }
 
-export function hasTieredDiscountAction(promotion: MACHPromotion): boolean {
+export function hasTieredDiscountAction(promotion: Promotion): boolean {
   return promotion.rules.actions.some(action => action.type === 'tiered_discount');
 }
 
-export function hasCartSubtotalCondition(promotion: MACHPromotion): boolean {
+export function hasCartSubtotalCondition(promotion: Promotion): boolean {
   return getConditionsByType(promotion, 'cart_subtotal').length > 0;
 }
 
-export function hasProductCategoryCondition(promotion: MACHPromotion): boolean {
+export function hasProductCategoryCondition(promotion: Promotion): boolean {
   return getConditionsByType(promotion, 'product_category').length > 0;
 }
 
-export function getCartMinimumAmount(promotion: MACHPromotion): number | null {
+export function getCartMinimumAmount(promotion: Promotion): number | null {
   const cartConditions = getConditionsByType(promotion, 'cart_subtotal');
   const minimumCondition = cartConditions.find(condition => 
     condition.operator === 'gte' || condition.operator === 'gt'
@@ -309,7 +309,7 @@ export function getCartMinimumAmount(promotion: MACHPromotion): number | null {
   return null;
 }
 
-export function getTargetProductCategories(promotion: MACHPromotion): string[] {
+export function getTargetProductCategories(promotion: Promotion): string[] {
   const categoryConditions = getConditionsByType(promotion, 'product_category');
   const categories: string[] = [];
   
@@ -324,15 +324,15 @@ export function getTargetProductCategories(promotion: MACHPromotion): string[] {
   return categories;
 }
 
-export function isSingleUsePerCustomer(promotion: MACHPromotion): boolean {
+export function isSingleUsePerCustomer(promotion: Promotion): boolean {
   return promotion.usage_limits?.per_customer === 1;
 }
 
-export function requiresAccountLogin(promotion: MACHPromotion): boolean {
+export function requiresAccountLogin(promotion: Promotion): boolean {
   return promotion.eligibility?.requires_account === true;
 }
 
-export function isFirstPurchaseOnly(promotion: MACHPromotion): boolean {
+export function isFirstPurchaseOnly(promotion: Promotion): boolean {
   const firstPurchaseConditions = getConditionsByType(promotion, 'first_purchase');
   return firstPurchaseConditions.some(condition => 
     condition.operator === 'equals' && condition.value === true
@@ -348,7 +348,7 @@ export function getLocalizedValue(
   return value[locale] || value[Object.keys(value)[0]];
 }
 
-export function isPromotionLocalized(promotion: MACHPromotion): boolean {
+export function isPromotionLocalized(promotion: Promotion): boolean {
   return typeof promotion.name === 'object' || typeof promotion.description === 'object';
 }
 
@@ -361,7 +361,7 @@ export function generatePromotionSlug(name: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-export function calculatePromotionScore(promotion: MACHPromotion): number {
+export function calculatePromotionScore(promotion: Promotion): number {
   let score = 0;
   
   // Base score for type
@@ -391,7 +391,7 @@ export function calculatePromotionScore(promotion: MACHPromotion): number {
   return Math.round(score);
 }
 
-export function getPromotionValidityWindow(promotion: MACHPromotion): {
+export function getPromotionValidityWindow(promotion: Promotion): {
   start: Date | null;
   end: Date | null;
   isCurrentlyValid: boolean;

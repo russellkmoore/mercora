@@ -14,7 +14,7 @@
  * A standardized utility object for representing physical and mailing addresses
  * across all entities in the MACH Alliance Common Data Model.
  */
-export interface MACHAddress {
+export type MACHAddress = {
   // Core address components - REQUIRED
   line1: string | Record<string, string>; // Localizable
   city: string | Record<string, string>; // Localizable
@@ -67,7 +67,7 @@ export interface MACHAddress {
 /**
  * Geographic coordinates for mapping and routing
  */
-export interface MACHCoordinates {
+export type MACHCoordinates = {
   latitude: number; // -90 to 90
   longitude: number; // -180 to 180
   altitude?: number; // meters
@@ -77,7 +77,7 @@ export interface MACHCoordinates {
 /**
  * Address validation metadata
  */
-export interface MACHAddressValidation {
+export type MACHAddressValidation = {
   provider?: string; // e.g., "google-maps", "ups-address-validation", "usps"
   validation_id?: string;
   confidence_score?: number; // 0-100
@@ -92,7 +92,7 @@ export interface MACHAddressValidation {
 /**
  * Suggested address corrections
  */
-export interface MACHAddressCorrection {
+export type MACHAddressCorrection = {
   field: string; // e.g., "postal_code"
   original: string;
   suggested: string;

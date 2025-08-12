@@ -5,17 +5,17 @@
 
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 import type { 
-  MACHProductType,
-  MACHAttributeDefinition,
-  MACHAttributeValidation,
-  MACHAttributeOption
-} from '../../types/mach/ProductType.js';
+  ProductType,
+  AttributeDefinition,
+  AttributeValidation,
+  AttributeOption
+} from '@/lib/types';
 
 // Main product_types table
 export const product_types = sqliteTable('product_types', {
   id: text('id').primaryKey(),
   name: text('name', { mode: 'json' }).$type<string | Record<string, string>>().notNull(),
-  attribute_definitions: text('attribute_definitions', { mode: 'json' }).$type<Record<string, MACHAttributeDefinition>>().notNull(),
+  attribute_definitions: text('attribute_definitions', { mode: 'json' }).$type<Record<string, AttributeDefinition>>().notNull(),
   status: text('status', { enum: ['active', 'inactive', 'deprecated'] }).default('active'),
   external_references: text('external_references', { mode: 'json' }).$type<Record<string, string>>(),
   created_at: text('created_at'),
@@ -35,7 +35,7 @@ export const product_types = sqliteTable('product_types', {
  * Schema validation and transformation utilities
  */
 
-export function validateProductType(data: any): data is MACHProductType {
+export function validateProductType(data: any): data is ProductType {
   return (
     typeof data === 'object' &&
     typeof data.id === 'string' &&
@@ -46,7 +46,7 @@ export function validateProductType(data: any): data is MACHProductType {
   );
 }
 
-export function validateAttributeDefinition(data: any): data is MACHAttributeDefinition {
+export function validateAttributeDefinition(data: any): data is AttributeDefinition {
   const validTypes = [
     'text', 'number', 'boolean', 'date', 'datetime',
     'select', 'multiselect', 'money', 'dimension',
@@ -60,7 +60,7 @@ export function validateAttributeDefinition(data: any): data is MACHAttributeDef
   );
 }
 
-export function transformProductTypeForDB(productType: MACHProductType) {
+export function transformProductTypeForDB(productType: ProductType) {
   return {
     ...productType,
     created_at: productType.created_at || new Date().toISOString(),
@@ -72,40 +72,40 @@ export function transformProductTypeForDB(productType: MACHProductType) {
  * ProductType utility functions
  */
 
-export function isActiveProductType(productType: MACHProductType): boolean {
+export function isActiveProductType(productType: ProductType): boolean {
   return productType.status === 'active' || productType.status === undefined;
 }
 
-export function isDeprecatedProductType(productType: MACHProductType): boolean {
+export function isDeprecatedProductType(productType: ProductType): boolean {
   return productType.status === 'deprecated';
 }
 
-export function hasParentType(productType: MACHProductType): boolean {
+export function hasParentType(productType: ProductType): boolean {
   return productType.parent_type_id !== undefined && productType.parent_type_id !== null;
 }
 
-export function hasRequiredAttributes(productType: MACHProductType): boolean {
+export function hasRequiredAttributes(productType: ProductType): boolean {
   return productType.required_attributes !== undefined && productType.required_attributes.length > 0;
 }
 
-export function getRequiredAttributes(productType: MACHProductType): string[] {
+export function getRequiredAttributes(productType: ProductType): string[] {
   return productType.required_attributes || [];
 }
 
 export function getAttributeDefinition(
-  productType: MACHProductType,
+  productType: ProductType,
   attributeId: string
-): MACHAttributeDefinition | undefined {
+): AttributeDefinition | undefined {
   return productType.attribute_definitions[attributeId];
 }
 
-export function isRequiredAttribute(productType: MACHProductType, attributeId: string): boolean {
+export function isRequiredAttribute(productType: ProductType, attributeId: string): boolean {
   const requiredAttrs = productType.required_attributes || [];
   return requiredAttrs.includes(attributeId);
 }
 
 export function isVariantDefiningAttribute(
-  productType: MACHProductType,
+  productType: ProductType,
   attributeId: string
 ): boolean {
   const attr = productType.attribute_definitions[attributeId];
@@ -113,9 +113,9 @@ export function isVariantDefiningAttribute(
 }
 
 export function getSelectOptions(
-  productType: MACHProductType,
+  productType: ProductType,
   attributeId: string
-): MACHAttributeOption[] {
+): AttributeOption[] {
   const attr = productType.attribute_definitions[attributeId];
   if (!attr || (attr.type !== 'select' && attr.type !== 'multiselect')) {
     return [];
@@ -124,7 +124,7 @@ export function getSelectOptions(
 }
 
 export function validateAttributeValue(
-  productType: MACHProductType,
+  productType: ProductType,
   attributeId: string,
   value: any
 ): { isValid: boolean; error?: string } {
@@ -224,10 +224,10 @@ export function validateAttributeValue(
 }
 
 export function getInheritedAttributes(
-  productType: MACHProductType,
-  allProductTypes: MACHProductType[]
-): Record<string, MACHAttributeDefinition> {
-  const inheritedAttributes: Record<string, MACHAttributeDefinition> = {};
+  productType: ProductType,
+  allProductTypes: ProductType[]
+): Record<string, AttributeDefinition> {
+  const inheritedAttributes: Record<string, AttributeDefinition> = {};
   
   // Start with current type's attributes
   Object.assign(inheritedAttributes, productType.attribute_definitions);
@@ -252,8 +252,8 @@ export function getInheritedAttributes(
 }
 
 export function getInheritedRequiredAttributes(
-  productType: MACHProductType,
-  allProductTypes: MACHProductType[]
+  productType: ProductType,
+  allProductTypes: ProductType[]
 ): string[] {
   const requiredAttributes = new Set<string>(productType.required_attributes || []);
   
@@ -274,7 +274,7 @@ export function getInheritedRequiredAttributes(
   return Array.from(requiredAttributes);
 }
 
-export function getVariantDefiningAttributes(productType: MACHProductType): string[] {
+export function getVariantDefiningAttributes(productType: ProductType): string[] {
   const variantDefiningAttrs: string[] = [];
   
   for (const [attrId, attrDef] of Object.entries(productType.attribute_definitions)) {
@@ -286,7 +286,7 @@ export function getVariantDefiningAttributes(productType: MACHProductType): stri
   return variantDefiningAttrs;
 }
 
-export function getSearchableAttributes(productType: MACHProductType): string[] {
+export function getSearchableAttributes(productType: ProductType): string[] {
   const searchableAttrs: string[] = [];
   
   for (const [attrId, attrDef] of Object.entries(productType.attribute_definitions)) {
@@ -298,12 +298,12 @@ export function getSearchableAttributes(productType: MACHProductType): string[] 
   return searchableAttrs;
 }
 
-export function buildProductTypeHierarchy(productTypes: MACHProductType[]): {
-  roots: MACHProductType[];
-  children: Record<string, MACHProductType[]>;
+export function buildProductTypeHierarchy(productTypes: ProductType[]): {
+  roots: ProductType[];
+  children: Record<string, ProductType[]>;
 } {
-  const roots: MACHProductType[] = [];
-  const children: Record<string, MACHProductType[]> = {};
+  const roots: ProductType[] = [];
+  const children: Record<string, ProductType[]> = {};
   
   for (const productType of productTypes) {
     if (!productType.parent_type_id) {
@@ -328,7 +328,7 @@ export function getLocalizedValue(
   return value[locale] || value[Object.keys(value)[0]];
 }
 
-export function isProductTypeLocalized(productType: MACHProductType): boolean {
+export function isProductTypeLocalized(productType: ProductType): boolean {
   return typeof productType.name === 'object' || typeof productType.description === 'object';
 }
 

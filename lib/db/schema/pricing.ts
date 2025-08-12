@@ -7,8 +7,7 @@
 
 import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
-import type { MACHPricing, MACHTaxInfo, MACHBulkPricingTier } from '../../types/mach/Pricing';
-import type { Money } from '../../types/money';
+import type { Money, Pricing, TaxInfo, BulkPricingTier } from '@/lib/types';
 
 /**
  * MACH Alliance Pricing table schema
@@ -42,7 +41,7 @@ export const pricing = sqliteTable('pricing', {
   catalog_id: text('catalog_id'),
   
   // Tax information (stored as JSON) - OPTIONAL
-  tax: text('tax', { mode: 'json' }).$type<MACHTaxInfo>(),
+  tax: text('tax', { mode: 'json' }).$type<TaxInfo>(),
   
   // Additional pricing context - OPTIONAL
   currency_code: text('currency_code', { length: 3 }), // ISO 4217
@@ -71,16 +70,16 @@ export type PricingSelect = typeof pricing.$inferSelect;
 export type PricingInsert = typeof pricing.$inferInsert;
 
 /**
- * Transform database record to MACH Alliance format
+ * Helper: convert DB record to MACH Pricing
  */
-export function transformPricingFromDb(record: PricingSelect): MACHPricing {
+export function deserializePricing(record: PricingSelect): Pricing {
   return {
     id: record.id,
     product_id: record.product_id,
     list_price: record.list_price,
     sale_price: record.sale_price,
-    type: record.type as MACHPricing['type'],
-    status: record.status as MACHPricing['status'],
+    type: record.type as Pricing['type'],
+    status: record.status as Pricing['status'],
     external_references: record.external_references || undefined,
     created_at: record.created_at || undefined,
     updated_at: record.updated_at || undefined,
@@ -99,10 +98,8 @@ export function transformPricingFromDb(record: PricingSelect): MACHPricing {
   };
 }
 
-/**
- * Transform MACH Alliance format to database record
- */
-export function transformPricingToDb(pricing: MACHPricing): PricingInsert {
+// Helper: convert MACH Pricing to DB insert format
+export function serializePricing(pricing: Pricing): PricingInsert {
   return {
     id: pricing.id,
     product_id: pricing.product_id,
@@ -146,21 +143,21 @@ export function isValidMoney(money: any): money is Money {
 /**
  * Validate pricing type
  */
-export function isValidPricingType(type: string): type is NonNullable<MACHPricing['type']> {
+export function isValidPricingType(type: string): type is NonNullable<Pricing['type']> {
   return ['retail', 'wholesale', 'bulk', 'contract', 'dynamic'].includes(type);
 }
 
 /**
  * Validate pricing status
  */
-export function isValidPricingStatus(status: string): status is NonNullable<MACHPricing['status']> {
+export function isValidPricingStatus(status: string): status is NonNullable<Pricing['status']> {
   return ['active', 'inactive', 'scheduled', 'expired', 'draft'].includes(status);
 }
 
 /**
  * Check if pricing is currently valid based on date range
  */
-export function isPricingCurrentlyValid(pricing: MACHPricing, date?: Date): boolean {
+export function isPricingCurrentlyValid(pricing: Pricing, date?: Date): boolean {
   const checkDate = date || new Date();
   const checkTime = checkDate.toISOString();
   
@@ -173,7 +170,7 @@ export function isPricingCurrentlyValid(pricing: MACHPricing, date?: Date): bool
 /**
  * Calculate discount percentage from list and sale price
  */
-export function calculateDiscountPercentage(pricing: MACHPricing): number | null {
+export function calculateDiscountPercentage(pricing: Pricing): number | null {
   if (!pricing.list_price || !pricing.sale_price) return null;
   if (pricing.list_price.currency !== pricing.sale_price.currency) return null;
   if (pricing.list_price.amount <= 0) return null;
@@ -185,12 +182,12 @@ export function calculateDiscountPercentage(pricing: MACHPricing): number | null
 /**
  * Get bulk pricing tier for quantity
  */
-export function getBulkPricingTier(pricing: MACHPricing, quantity: number): MACHBulkPricingTier | null {
+export function getBulkPricingTier(pricing: Pricing, quantity: number): BulkPricingTier | null {
   const bulkExtension = pricing.extensions?.bulk_pricing;
   if (!bulkExtension?.tiers) return null;
   
   // Find the appropriate tier for the quantity
-  const tiers = bulkExtension.tiers as MACHBulkPricingTier[];
+  const tiers = bulkExtension.tiers as BulkPricingTier[];
   
   // Sort tiers by minimum_quantity descending to find the highest applicable tier
   const sortedTiers = tiers
@@ -203,7 +200,7 @@ export function getBulkPricingTier(pricing: MACHPricing, quantity: number): MACH
 /**
  * Get effective price for quantity (considering bulk pricing)
  */
-export function getEffectivePriceForQuantity(pricing: MACHPricing, quantity: number): Money {
+export function getEffectivePriceForQuantity(pricing: Pricing, quantity: number): Money {
   const bulkTier = getBulkPricingTier(pricing, quantity);
   return bulkTier ? bulkTier.price : pricing.sale_price;
 }
@@ -211,7 +208,7 @@ export function getEffectivePriceForQuantity(pricing: MACHPricing, quantity: num
 /**
  * Validate tax info structure
  */
-export function isValidTaxInfo(tax: any): tax is MACHTaxInfo {
+export function isValidTaxInfo(tax: any): tax is TaxInfo {
   if (!tax || typeof tax !== 'object') return true; // Tax is optional
   
   const validTaxTypes = ['VAT', 'GST', 'PST', 'HST', 'sales_tax', 'none'];
@@ -235,7 +232,7 @@ export function generatePricingId(productId: string, type?: string, suffix?: str
 /**
  * Validate complete pricing object
  */
-export function validatePricingObject(pricing: Partial<MACHPricing>): string[] {
+export function validatePricingObject(pricing: Partial<Pricing>): string[] {
   const errors: string[] = [];
   
   // Required fields

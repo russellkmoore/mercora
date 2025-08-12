@@ -19,8 +19,8 @@ import type {
   MACHCurrencyFormatting 
 } from "../../types/mach/Language";
 import { 
-  transformFromMACHLanguage, 
-  transformToMACHLanguage,
+  serializeLanguage,
+  deserializeLanguage,
   validateLanguageCode,
   validateLocale,
   validateRegionCode,
@@ -90,7 +90,7 @@ export async function createLanguage(
     extensions: languageData.extensions,
   };
 
-  const record = transformFromMACHLanguage(language);
+  const record = serializeLanguage(language);
   
   try {
     const db = await getDbAsync();
@@ -115,7 +115,7 @@ export async function getLanguageByCode(code: string): Promise<MACHLanguage | nu
     .where(eq(languages.code, code))
     .limit(1);
 
-  return records.length > 0 ? transformToMACHLanguage(records[0]) : null;
+  return records.length > 0 ? deserializeLanguage(records[0]) : null;
 }
 
 /**
@@ -129,7 +129,7 @@ export async function getLanguageByLocale(locale: string): Promise<MACHLanguage 
     .where(eq(languages.locale, locale))
     .limit(1);
 
-  return records.length > 0 ? transformToMACHLanguage(records[0]) : null;
+  return records.length > 0 ? deserializeLanguage(records[0]) : null;
 }
 
 /**
@@ -163,7 +163,7 @@ export async function updateLanguage(
     updated_at: new Date().toISOString(),
   };
 
-  const record = transformFromMACHLanguage(updated);
+  const record = serializeLanguage(updated);
   
   const db = await getDbAsync();
   await db
@@ -235,7 +235,7 @@ export async function listLanguages(options?: {
   }
 
   const records = await query;
-  return records.map(transformToMACHLanguage);
+  return records.map(deserializeLanguage);
 }
 
 // ====================================
@@ -274,7 +274,7 @@ export async function getLanguagesForRegion(region: string): Promise<MACHLanguag
     ))
     .orderBy(asc(languages.code));
 
-  return records.map(transformToMACHLanguage);
+  return records.map(deserializeLanguage);
 }
 
 /**
@@ -291,7 +291,7 @@ export async function getRTLLanguages(): Promise<MACHLanguage[]> {
     ))
     .orderBy(asc(languages.code));
 
-  return records.map(transformToMACHLanguage);
+  return records.map(deserializeLanguage);
 }
 
 /**
@@ -312,7 +312,7 @@ export async function getLanguagesByScript(script: string): Promise<MACHLanguage
     ))
     .orderBy(asc(languages.code));
 
-  return records.map(transformToMACHLanguage);
+  return records.map(deserializeLanguage);
 }
 
 // ====================================
@@ -347,7 +347,7 @@ export async function resolveLocale(
       .limit(1);
 
     if (languagesForCode.length > 0) {
-      return transformToMACHLanguage(languagesForCode[0]);
+  return deserializeLanguage(languagesForCode[0]);
     }
   }
 

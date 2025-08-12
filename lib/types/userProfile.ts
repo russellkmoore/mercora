@@ -1,5 +1,4 @@
-import { Customer } from ".";
-import { Order } from ".";
+import { Customer, Order } from ".";
 // User authentication and profile (hybrid Clerk + MACH)
 export interface UserProfile extends Customer {
   // Clerk-specific fields

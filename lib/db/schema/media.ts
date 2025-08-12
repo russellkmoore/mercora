@@ -10,12 +10,12 @@
 
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 import type { 
-  MACHMedia,
-  MACHFile,
-  MACHMediaVariant,
-  MACHFocalPoint,
-  MACHAccessibility
-} from "../../types/mach/Media";
+  Media,
+  File,
+  MediaVariant,
+  FocalPoint,
+  Accessibility
+} from "@/lib/types";
 
 /**
  * Media table schema
@@ -49,15 +49,15 @@ export const media = sqliteTable("media", {
   tags: text("tags", { mode: "json" }).$type<string[]>(),
   
   // Core file information - REQUIRED
-  file: text("file", { mode: "json" }).$type<MACHFile>().notNull(),
+  file: text("file", { mode: "json" }).$type<File>().notNull(),
   
   // Media variants and derivatives - OPTIONAL
-  variants: text("variants", { mode: "json" }).$type<MACHMediaVariant[]>(),
-  thumbnail: text("thumbnail", { mode: "json" }).$type<MACHFile>(),
-  focalPoint: text("focal_point", { mode: "json" }).$type<MACHFocalPoint>(),
+  variants: text("variants", { mode: "json" }).$type<MediaVariant[]>(),
+  thumbnail: text("thumbnail", { mode: "json" }).$type<File>(),
+  focalPoint: text("focal_point", { mode: "json" }).$type<FocalPoint>(),
   
   // Accessibility - OPTIONAL
-  accessibility: text("accessibility", { mode: "json" }).$type<MACHAccessibility>(),
+  accessibility: text("accessibility", { mode: "json" }).$type<Accessibility>(),
   
   // Technical metadata - OPTIONAL
   metadata: text("metadata", { mode: "json" }).$type<Record<string, any>>(),
@@ -67,9 +67,33 @@ export const media = sqliteTable("media", {
 });
 
 /**
- * Transform MACH Media to database record
+ * Helper: convert DB record to MACH Media
  */
-export function transformFromMACHMedia(machMedia: MACHMedia): typeof media.$inferInsert {
+export function deserializeMedia(record: typeof media.$inferSelect): Media {
+  return {
+    id: record.id,
+    type: record.type as Media['type'],
+    status: record.status as Media['status'],
+    external_references: record.externalReferences || undefined,
+    created_at: record.createdAt || undefined,
+    updated_at: record.updatedAt || undefined,
+    title: record.title || undefined,
+    description: record.description || undefined,
+    tags: record.tags || undefined,
+    file: record.file,
+    variants: record.variants || undefined,
+    thumbnail: record.thumbnail || undefined,
+    focal_point: record.focalPoint || undefined,
+    accessibility: record.accessibility || undefined,
+    metadata: record.metadata || undefined,
+    extensions: record.extensions || undefined,
+  };
+}
+
+/**
+ * Helper: convert MACH Media to DB insert format
+ */
+export function serializeMedia(machMedia: Media): typeof media.$inferInsert {
   return {
     id: machMedia.id || generateMediaId(),
     type: machMedia.type || "image",
@@ -91,30 +115,6 @@ export function transformFromMACHMedia(machMedia: MACHMedia): typeof media.$infe
 }
 
 /**
- * Transform database record to MACH Media
- */
-export function transformToMACHMedia(record: typeof media.$inferSelect): MACHMedia {
-  return {
-    id: record.id,
-    type: record.type as MACHMedia['type'],
-    status: record.status as MACHMedia['status'],
-    external_references: record.externalReferences || undefined,
-    created_at: record.createdAt || undefined,
-    updated_at: record.updatedAt || undefined,
-    title: record.title || undefined,
-    description: record.description || undefined,
-    tags: record.tags || undefined,
-    file: record.file,
-    variants: record.variants || undefined,
-    thumbnail: record.thumbnail || undefined,
-    focal_point: record.focalPoint || undefined,
-    accessibility: record.accessibility || undefined,
-    metadata: record.metadata || undefined,
-    extensions: record.extensions || undefined,
-  };
-}
-
-/**
  * Generate unique media ID with timestamp and random suffix
  */
 export function generateMediaId(): string {
@@ -126,7 +126,7 @@ export function generateMediaId(): string {
 /**
  * Validate media file object
  */
-export function validateMediaFile(file: MACHFile): boolean {
+export function validateMediaFile(file: File): boolean {
   if (!file.url || typeof file.url !== 'string') {
     return false;
   }
@@ -148,7 +148,7 @@ export function validateMediaFile(file: MACHFile): boolean {
 /**
  * Validate media variant
  */
-export function validateMediaVariant(variant: MACHMediaVariant): boolean {
+export function validateMediaVariant(variant: MediaVariant): boolean {
   if (!variant.variant_type || typeof variant.variant_type !== 'string') {
     return false;
   }
@@ -174,7 +174,7 @@ export function validateMediaVariant(variant: MACHMediaVariant): boolean {
 /**
  * Validate focal point coordinates
  */
-export function validateFocalPoint(focalPoint: MACHFocalPoint): boolean {
+export function validateFocalPoint(focalPoint: FocalPoint): boolean {
   if (typeof focalPoint.x !== 'number' || focalPoint.x < 0 || focalPoint.x > 1) {
     return false;
   }
@@ -199,7 +199,7 @@ export function extractFileExtension(urlOrFilename: string): string {
 /**
  * Determine media type from file format
  */
-export function getMediaTypeFromFormat(format: string): MACHMedia['type'] {
+export function getMediaTypeFromFormat(format: string): Media['type'] {
   const lowerFormat = format.toLowerCase();
   
   // Image formats
@@ -234,14 +234,14 @@ export function getMediaTypeFromFormat(format: string): MACHMedia['type'] {
 /**
  * Check if media type supports dimensions
  */
-export function supportsImageDimensions(type?: MACHMedia['type']): boolean {
+export function supportsImageDimensions(type?: Media['type']): boolean {
   return type ? ['image', 'video'].includes(type) : false;
 }
 
 /**
  * Check if media type supports duration
  */
-export function supportsDuration(type?: MACHMedia['type']): boolean {
+export function supportsDuration(type?: Media['type']): boolean {
   return type ? ['video', 'audio'].includes(type) : false;
 }
 
@@ -252,7 +252,7 @@ export function generateResponsiveVariants(
   baseUrl: string,
   format: string,
   sizes: { label: string; width: number; height: number }[]
-): MACHMediaVariant[] {
+): MediaVariant[] {
   return sizes.map(size => ({
     variant_type: 'responsive',
     label: size.label,
@@ -270,7 +270,7 @@ export function generateFormatVariants(
   baseUrl: string,
   originalFormat: string,
   targetFormats: string[]
-): MACHMediaVariant[] {
+): MediaVariant[] {
   return targetFormats
     .filter(format => format !== originalFormat)
     .map(format => ({
@@ -336,7 +336,7 @@ export function generateThumbnailUrl(
 /**
  * Validate accessibility features
  */
-export function validateAccessibility(accessibility: MACHAccessibility): string[] {
+export function validateAccessibility(accessibility: Accessibility): string[] {
   const errors: string[] = [];
   
   if (accessibility.alt_text && accessibility.alt_text.trim().length === 0) {
@@ -365,7 +365,7 @@ export function validateAccessibility(accessibility: MACHAccessibility): string[
 /**
  * Get supported formats for a media type
  */
-export function getSupportedFormats(type: MACHMedia['type']): string[] {
+export function getSupportedFormats(type: Media['type']): string[] {
   switch (type) {
     case 'image':
       return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif', 'bmp', 'tiff'];
@@ -385,14 +385,14 @@ export function getSupportedFormats(type: MACHMedia['type']): string[] {
 /**
  * Check if format is supported for media type
  */
-export function isFormatSupported(format: string, type: MACHMedia['type']): boolean {
+export function isFormatSupported(format: string, type: Media['type']): boolean {
   return getSupportedFormats(type).includes(format.toLowerCase());
 }
 
 /**
  * Get recommended formats for web delivery
  */
-export function getWebOptimizedFormats(type: MACHMedia['type']): string[] {
+export function getWebOptimizedFormats(type: Media['type']): string[] {
   switch (type) {
     case 'image':
       return ['webp', 'avif', 'jpg']; // Modern formats first

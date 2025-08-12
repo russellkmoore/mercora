@@ -39,14 +39,109 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import type { Product } from "@/lib/types/product";
+import type { Product } from "@/lib/types";
+import { formatPrice } from "@/lib/utils";
+import type { ProductWithImages } from "@/lib/loaders/products";
 import { getDarkBlurPlaceholder } from "@/lib/utils/image-placeholders";
 
-/**
- * Props interface for ProductCard component
- */
+type ProductCardProduct = Product | ProductWithImages;
+
+// Type guards
+function isMACHProduct(p: any): p is Product {
+  return (
+    typeof p === 'object' &&
+    (typeof p.name === 'string' || typeof p.name === 'object') &&
+    Array.isArray(p.variants)
+  );
+// (removed stray closing brace)
+
+function isProductWithImages(p: any): p is ProductWithImages {
+  return (
+    typeof p === 'object' &&
+    Array.isArray(p.variants) &&
+    Array.isArray(p.images)
+  );
+// (removed extra closing brace)
+
+// Helper: get product name (localization)
+function getProductName(product: ProductCardProduct): string {
+  if (typeof product.name === 'string') return product.name;
+  return product.name?.['en'] || Object.values(product.name || {})[0] || '';
+// (removed unmatched closing brace)
+
+// Helper: get product slug
+function getProductSlug(product: ProductCardProduct): string {
+  if (typeof product.slug === 'string') return product.slug;
+  if (typeof product.slug === 'object' && product.slug !== null) {
+    return product.slug['en'] || Object.values(product.slug)[0] || String(product.id);
+  }
+  return String(product.id);
+// (removed unmatched closing brace)
+
+// Helper: get product description
+function getProductDescription(product: ProductCardProduct): string {
+  if (typeof product.description === 'string') return product.description;
+  return product.description?.['en'] || Object.values(product.description || {})[0] || '';
+}
+
+// Helper: get product image URL
+function getProductImageUrl(product: ProductCardProduct): string | undefined {
+  if (isMACHProduct(product)) {
+    if (product.primary_image?.file?.url) return product.primary_image.file.url;
+    if (Array.isArray(product.media) && product.media.length > 0 && product.media[0].file?.url) return product.media[0].file.url;
+    return undefined;
+  } else if (isProductWithImages(product)) {
+    if (product.primaryImageUrl) return product.primaryImageUrl;
+    if (Array.isArray(product.imageUrls) && product.imageUrls.length > 0) return product.imageUrls[0];
+    return undefined;
+  }
+  return undefined;
+}
+
+// Helper: get default variant
+function getDefaultVariant(product: ProductCardProduct): any {
+  if (isMACHProduct(product)) {
+}
+    return variants.find(v => v.id === product.default_variant_id) || variants[0];
+  } else if (isProductWithImages(product)) {
+    return product.variants[0];
+  }
+  return undefined;
+}
+
+// Helper: get price and sale price
+function getPriceInfo(product: ProductCardProduct): { price: number | null, salePrice: number | null, onSale: boolean } {
+  const variant = getDefaultVariant(product);
+  if (!variant) return { price: null, salePrice: null, onSale: false };
+  if (isMACHProduct(product)) {
+    const price = variant?.price?.amount ?? null;
+    const salePrice = variant?.compare_at_price?.amount && variant.compare_at_price.amount < price ? variant.compare_at_price.amount : null;
+    const onSale = salePrice !== null && salePrice < price;
+    return { price, salePrice, onSale };
+  } else if (isProductWithImages(product)) {
+    const price = typeof variant.price === 'number' ? variant.price : null;
+    return { price, salePrice: null, onSale: false };
+  }
+  return { price: null, salePrice: null, onSale: false };
+}
+
+// Helper: get availability
+function getAvailability(product: ProductCardProduct): string {
+  const variant = getDefaultVariant(product);
+  if (!variant) return 'unavailable';
+  if (isMACHProduct(product)) {
+    return variant.status === 'active' ? 'available' : 'unavailable';
+  } else if (isProductWithImages(product)) {
+    return product.status === 'active' ? 'available' : 'unavailable';
+  }
+  return 'unavailable';
+}
+
+
+// (removed duplicate type)
+
 interface ProductCardProps {
-  product: Product;
+  product: ProductCardProduct;
   priority?: boolean; // For above-the-fold images
 }
 
@@ -58,18 +153,13 @@ interface ProductCardProps {
  * @returns JSX element representing a clickable product card
  */
 export default function ProductCard({ product, priority = false }: ProductCardProps) {
-  // Destructure product properties for easier access
-  const {
-    id,
-    name,
-    slug,
-    shortDescription,
-    primaryImageUrl,
-    price,
-    salePrice,
-    onSale = false,
-    availability,
-  } = product;
+  const id = product.id;
+  const name = getProductName(product);
+  const slug = getProductSlug(product);
+  const description = getProductDescription(product);
+  const primaryImageUrl = getProductImageUrl(product);
+  const { price, salePrice, onSale } = getPriceInfo(product);
+  const availability = getAvailability(product);
 
   return (
     <Link href={`/product/${slug}`} prefetch={true}>
@@ -97,17 +187,17 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
         <div className="p-3 sm:p-4">
           <h3 className="text-lg sm:text-xl font-semibold mb-2 line-clamp-2">{name}</h3>
           <p className="text-gray-400 text-xs sm:text-sm mb-2 line-clamp-3">
-            {shortDescription}
+            {description}
           </p>
           {price !== null && (
             <div className="text-sm">
               {onSale && salePrice != null ? (
                 <div className="text-green-400">
                   <span className="line-through text-gray-400 mr-2">
-                    ${(price / 100).toFixed(2)}
+                    {formatPrice(price)}
                   </span>
                   <span className="font-semibold">
-                    ${(salePrice / 100).toFixed(2)}
+                    {formatPrice(salePrice)}
                   </span>
                   <span className="ml-2 text-xs text-orange-500 font-bold">
                     On Sale
@@ -115,7 +205,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
                 </div>
               ) : (
                 <div className="text-white font-semibold">
-                  ${(price / 100).toFixed(2)}
+                  {formatPrice(price)}
                 </div>
               )}
             </div>

@@ -23,7 +23,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDbAsync } from "@/lib/db";
 // TODO: Create products schema - temporarily commented out  
-// import { products, productAiNotes } from "@/lib/db/schema/clean-mach-schema";
+import { products, product_variants } from "@/lib/db/schema/";
 import { eq } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
@@ -60,12 +60,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Query all products from the MACH database
+    // Query all products and all variants from the MACH database
     const db = await getDbAsync();
-    const allProducts = await db.select().from(products);
-    
+  const allProducts = await db.select().from(products);
+  const allVariants = await db.select().from(product_variants);
+
     console.log(`Found ${allProducts.length} products to process`);
-    
+
     const results = [];
     const errors = [];
 
@@ -74,42 +75,51 @@ export async function GET(request: NextRequest) {
         // Parse JSON fields from MACH schema
         const name = typeof product.name === 'string' ? JSON.parse(product.name) : product.name;
         const description = typeof product.description === 'string' ? JSON.parse(product.description) : product.description;
-        const pricing = typeof product.pricing === 'string' ? JSON.parse(product.pricing) : product.pricing;
-        const images = typeof product.images === 'string' ? JSON.parse(product.images) : product.images;
         const categories = typeof product.categories === 'string' ? JSON.parse(product.categories) : product.categories;
-        const attributes = typeof product.attributes === 'string' ? JSON.parse(product.attributes) : product.attributes;
-        
-        // Get AI notes from extension table
-        let aiNotes = '';
-        try {
-          const aiNotesResult = await db.select()
-            .from(productAiNotes)
-            .where(eq(productAiNotes.productId, product.id))
-            .limit(1);
-          
-          if (aiNotesResult.length > 0) {
-            aiNotes = aiNotesResult[0].aiNotes || '';
-          }
-        } catch (aiNotesError) {
-          console.log(`No AI notes found for product ${product.id}:`, aiNotesError);
+        // Find the default variant for this product
+        const defaultVariantId = product.default_variant_id;
+        const defaultVariant = allVariants.find((v: any) => v.product_id === product.id && v.id === defaultVariantId);
+        let pricing = {};
+        let images = [];
+        let attributes = {};
+        if (defaultVariant) {
+          pricing = {
+            basePrice: defaultVariant.price ? (typeof defaultVariant.price === 'string' ? JSON.parse(defaultVariant.price).amount : defaultVariant.price.amount) : undefined,
+            compareAtPrice: defaultVariant.compare_at_price ? (typeof defaultVariant.compare_at_price === 'string' ? JSON.parse(defaultVariant.compare_at_price).amount : defaultVariant.compare_at_price.amount) : undefined,
+            currency: defaultVariant.price ? (typeof defaultVariant.price === 'string' ? JSON.parse(defaultVariant.price).currency : defaultVariant.price.currency) : undefined
+          };
+          images = defaultVariant.media ? (typeof defaultVariant.media === 'string' ? JSON.parse(defaultVariant.media) : defaultVariant.media) : [];
+          attributes = defaultVariant.attributes ? (typeof defaultVariant.attributes === 'string' ? JSON.parse(defaultVariant.attributes) : defaultVariant.attributes) : {};
         }
-
         // Generate slug for filename
-        const slug = product.sku.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-        
-        // Create comprehensive markdown content
+        const slug = product.id.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        // Parse extensions and other meta fields
+        const extensions = typeof product.extensions === 'string' ? JSON.parse(product.extensions) : (product.extensions || {});
+        const tags = typeof product.tags === 'string' ? JSON.parse(product.tags) : (product.tags || []);
+        const useCases = extensions.use_cases || [];
+        const aiNotesFinal = extensions.ai_notes || '';
+        const brand = product.brand || '';
+        const rating = typeof product.rating === 'string' ? JSON.parse(product.rating) : (product.rating || {});
+        const relatedProducts = typeof product.related_products === 'string' ? JSON.parse(product.related_products) : (product.related_products || []);
+
         const mdContent = generateProductMarkdown({
           id: product.id,
-          sku: product.sku,
+          sku: product.id,
           name: name?.en || 'Unknown Product',
           description: description?.en || '',
           pricing: pricing || {},
           images: images || [],
           categories: categories || [],
           attributes: attributes || {},
-          aiNotes: aiNotes,
-          createdAt: product.createdAt,
-          updatedAt: product.updatedAt
+          tags: tags,
+          useCases: useCases,
+          aiNotes: aiNotesFinal,
+          brand: brand,
+          rating: rating,
+          relatedProducts: relatedProducts,
+          extensions: extensions,
+          createdAt: product.created_at || '',
+          updatedAt: product.updated_at || ''
         });
 
         if (!mdContent || mdContent.trim().length < 10) {
@@ -186,65 +196,111 @@ function generateProductMarkdown(product: {
   images: any[];
   categories: any[];
   attributes: any;
-  aiNotes: string;
+  tags?: string[];
+  useCases?: string[];
+  aiNotes?: string;
+  brand?: string;
+  rating?: any;
+  relatedProducts?: string[];
+  extensions?: Record<string, any>;
   createdAt: string;
   updatedAt: string;
 }): string {
-  const { id, sku, name, description, pricing, images, categories, attributes, aiNotes, createdAt, updatedAt } = product;
-  
-  let md = `---
-id: ${id}
-sku: ${sku}
-name: ${name}
-created: ${createdAt}
-updated: ${updatedAt}
----
+  const { id, sku, name, description, pricing, images, categories, attributes, tags = [], useCases = [], aiNotes = '', brand = '', rating = {}, relatedProducts = [], extensions = {}, createdAt, updatedAt } = product;
 
-# ${name}
-
-## Product Information
-- **SKU**: ${sku}
-- **Product ID**: ${id}
-`;
-
-  // Add pricing information
-  if (pricing.basePrice) {
-    md += `- **Price**: $${pricing.basePrice.toFixed(2)}`;
-    if (pricing.compareAtPrice && pricing.compareAtPrice > pricing.basePrice) {
-      md += ` (Compare at $${pricing.compareAtPrice.toFixed(2)})`;
+  // YAML frontmatter with all metadata
+  let md = '---\n';
+  md += 'id: ' + id + '\n';
+  md += 'sku: ' + sku + '\n';
+  md += 'name: ' + name + '\n';
+  md += 'brand: ' + brand + '\n';
+  md += 'created: ' + createdAt + '\n';
+  md += 'updated: ' + updatedAt + '\n';
+  if (pricing.basePrice) md += 'price: ' + pricing.basePrice + '\n';
+  if (pricing.compareAtPrice && pricing.compareAtPrice > pricing.basePrice) md += 'sale_price: ' + pricing.basePrice + '\nregular_price: ' + pricing.compareAtPrice + '\n';
+  if (Array.isArray(tags) && tags.length > 0) md += 'tags: [' + tags.map((t: string) => `'${t}'`).join(', ') + ']\n';
+  if (Array.isArray(useCases) && useCases.length > 0) md += 'use_cases: [' + useCases.map((u: string) => `'${u}'`).join(', ') + ']\n';
+  if (Array.isArray(categories) && categories.length > 0) md += 'categories: [' + categories.map((cat: any) => `'${cat.name?.en || cat.name}'`).join(', ') + ']\n';
+  if (Array.isArray(relatedProducts) && relatedProducts.length > 0) md += 'related_products: [' + relatedProducts.map((r: string) => `'${r}'`).join(', ') + ']\n';
+  if (rating.average) md += 'rating: ' + rating.average + '\n';
+  if (rating.count) md += 'rating_count: ' + rating.count + '\n';
+  // Add all extensions fields to frontmatter (except ai_notes/use_cases already handled)
+  for (const [key, value] of Object.entries(extensions)) {
+    if (key === 'ai_notes' || key === 'use_cases') continue;
+    if (Array.isArray(value)) {
+      md += key + ': [' + (value as any[]).map((v: any) => `'${v}'`).join(', ') + ']\n';
+    } else if (typeof value === 'object' && value !== null) {
+      md += key + ': ' + JSON.stringify(value) + '\n';
+    } else {
+      md += key + ": '" + value + "'\n";
     }
-    md += `\n`;
   }
+  md += '---\n\n';
 
-  // Add categories
+  md += '# ' + name + '\n\n';
+  md += '## Product Information\n- **SKU**: ' + sku + '\n- **Product ID**: ' + id + '\n';
+  if (brand) md += '- **Brand**: ' + brand + '\n';
+  if (pricing.basePrice) {
+    md += '- **Price**: $' + pricing.basePrice.toFixed(2);
+    if (pricing.compareAtPrice && pricing.compareAtPrice > pricing.basePrice) {
+      md += ' (On Sale! Regular $' + pricing.compareAtPrice.toFixed(2) + ')';
+    }
+    md += '\n';
+  }
   if (categories && categories.length > 0) {
-    md += `- **Categories**: ${categories.map((cat: any) => cat.name?.en || cat.name).join(', ')}\n`;
+    md += '- **Categories**: ' + categories.map((cat: any) => cat.name?.en || cat.name).join(', ') + '\n';
+  }
+  if (tags.length > 0) {
+    md += '- **Tags**: ' + tags.join(', ') + '\n';
+  }
+  if (useCases.length > 0) {
+    md += '- **Use Cases**: ' + useCases.join(', ') + '\n';
+  }
+  if (relatedProducts.length > 0) {
+    md += '- **Related Products**: ' + relatedProducts.join(', ') + '\n';
+  }
+  if (rating.average) {
+    md += '- **Rating**: ' + rating.average + ' (' + (rating.count || 0) + ' reviews)\n';
   }
 
   // Add description
   if (description) {
-    md += `\n## Description\n${description}\n`;
+    md += '\n## Description\n' + description + '\n';
   }
 
   // Add attributes/specifications
   if (attributes && Object.keys(attributes).length > 0) {
-    md += `\n## Specifications\n`;
+    md += '\n## Specifications\n';
     for (const [key, value] of Object.entries(attributes)) {
-      md += `- **${key}**: ${value}\n`;
+      md += '- **' + key + '**: ' + value + '\n';
     }
   }
 
   // Add images
   if (images && images.length > 0) {
-    md += `\n## Images\n`;
+    md += '\n## Images\n';
     images.forEach((img: any, index: number) => {
-      md += `${index + 1}. ${img.url}${img.alt ? ` (${img.alt})` : ''}\n`;
+      md += (index + 1) + '. ' + img.url + (img.alt ? ' (' + img.alt + ')' : '') + '\n';
     });
+  }
+
+  // Add all extensions fields as sections (except ai_notes/use_cases)
+  for (const [key, value] of Object.entries(extensions)) {
+    if (key === 'ai_notes' || key === 'use_cases') continue;
+    const heading = key.replace(/_/g, ' ').replace(/\b\w/g, function(l) { return l.toUpperCase(); });
+    md += '\n## ' + heading + '\n';
+    if (Array.isArray(value)) {
+      value.forEach((v: any) => { md += '- ' + v + '\n'; });
+    } else if (typeof value === 'object' && value !== null) {
+      md += JSON.stringify(value, null, 2) + '\n';
+    } else {
+      md += value + '\n';
+    }
   }
 
   // Add AI notes if present
   if (aiNotes && aiNotes.trim().length > 0) {
-    md += `\n## AI Assistant Notes\n${aiNotes}\n`;
+    md += '\n## AI Assistant Notes\n' + aiNotes + '\n';
   }
 
   return md;

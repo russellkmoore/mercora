@@ -2,8 +2,8 @@
 
 import { eq, desc, and, sql } from "drizzle-orm";
 import { getDbAsync } from "@/lib/db";
-import { orders, order_items, order_webhooks } from "@/lib/db/schema/order";
-import { Order, CreateOrderRequest, UpdateOrderRequest, Money, Address, OrderItem } from "@/lib/types/order";
+import { orders, order_webhooks } from "@/lib/db/schema/order";
+import { Order, CreateOrderRequest, Money, Address, OrderItem } from "@/lib/types";
 
 /**
  * MACH Alliance Order Operations
@@ -42,21 +42,7 @@ export async function createOrder(orderData: CreateOrderRequest): Promise<Order>
   
   const [newOrder] = await db.insert(orders).values(orderRecord).returning();
   
-  // Create order items
-  for (const item of orderData.items) {
-    const orderItemRecord: Omit<typeof order_items.$inferInsert, 'id' | 'created_at'> = {
-      order_id: orderId,
-      product_id: item.product_id,
-      variant_id: item.variant_id || null,
-      sku: item.sku,
-      quantity: item.quantity,
-      unit_price: JSON.stringify(item.unit_price),
-      total_price: JSON.stringify(item.total_price),
-      product_name: item.product_name,
-      variant_options: item.variant_options ? JSON.stringify(item.variant_options) : null,
-    };
-    await db.insert(order_items).values(orderItemRecord);
-  }
+  // Items are stored as a JSON array in the orders table per schema; no separate order_items table logic needed.
   
   return hydrateOrder(newOrder);
 }
@@ -198,35 +184,13 @@ export async function getOrdersByStatus(status: Order['status']): Promise<Order[
   return orderRecords.map(hydrateOrder);
 }
 
-// Get order items for an order
-export async function getOrderItems(orderId: string): Promise<OrderItem[]> {
-  const db = await getDbAsync();
-  
-  const items = await db
-    .select()
-    .from(order_items)
-    .where(eq(order_items.order_id, orderId));
-  
-  return items.map(item => ({
-    id: item.id,
-    order_id: item.order_id,
-    product_id: item.product_id,
-    variant_id: item.variant_id,
-    sku: item.sku,
-    quantity: item.quantity,
-    unit_price: JSON.parse(item.unit_price as string) as Money,
-    total_price: JSON.parse(item.total_price as string) as Money,
-    product_name: item.product_name,
-    variant_options: item.variant_options ? JSON.parse(item.variant_options as string) : undefined,
-    created_at: item.created_at,
-  }));
-}
+// Items are always accessed via the items field on the order record (JSON array).
 
 // Utility function to convert database record to Order type
 function hydrateOrder(orderRecord: typeof orders.$inferSelect): Order {
   return {
-    id: orderRecord.id,
-    customer_id: orderRecord.customer_id,
+    id: orderRecord.id ?? undefined,
+    customer_id: orderRecord.customer_id ?? undefined,
     status: orderRecord.status,
     total_amount: JSON.parse(orderRecord.total_amount as string) as Money,
     currency_code: orderRecord.currency_code,
@@ -237,21 +201,21 @@ function hydrateOrder(orderRecord: typeof orders.$inferSelect): Order {
       ? JSON.parse(orderRecord.billing_address as string) as Address
       : undefined,
     items: JSON.parse(orderRecord.items as string) as OrderItem[],
-    shipping_method: orderRecord.shipping_method,
-    payment_method: orderRecord.payment_method,
-    payment_status: orderRecord.payment_status,
-    tracking_number: orderRecord.tracking_number,
-    shipped_at: orderRecord.shipped_at,
-    delivered_at: orderRecord.delivered_at,
-    notes: orderRecord.notes,
+    shipping_method: orderRecord.shipping_method ?? undefined,
+    payment_method: orderRecord.payment_method ?? undefined,
+    payment_status: orderRecord.payment_status ?? 'pending',
+    tracking_number: orderRecord.tracking_number ?? undefined,
+    shipped_at: orderRecord.shipped_at ?? undefined,
+    delivered_at: orderRecord.delivered_at ?? undefined,
+    notes: orderRecord.notes ?? undefined,
     external_references: orderRecord.external_references
       ? JSON.parse(orderRecord.external_references as string)
       : undefined,
     extensions: orderRecord.extensions
       ? JSON.parse(orderRecord.extensions as string)
       : undefined,
-    created_at: orderRecord.created_at,
-    updated_at: orderRecord.updated_at,
+    created_at: orderRecord.created_at ?? undefined,
+    updated_at: orderRecord.updated_at ?? undefined,
   };
 }
 
@@ -264,6 +228,7 @@ export async function createOrderWebhook(
   const db = await getDbAsync();
   
   await db.insert(order_webhooks).values({
+    id: `wh_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
     order_id: orderId,
     webhook_type: webhookType,
     status: "pending",

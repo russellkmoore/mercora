@@ -21,34 +21,9 @@ import {
 import { eq, desc, and } from "drizzle-orm";
 import { authenticateRequest, PERMISSIONS } from "@/lib/auth/unified-auth";
 import { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail, type OrderData } from "@/lib/utils/email";
-import type { 
-  Address, 
-  Order, 
-  CartItem, 
-  ShippingOption, 
-  BillingInfo, 
-  MACHApiResponse
-} from "@/lib/types";
+import type { Order, CreateOrderRequest, UpdateOrderRequest } from "@/lib/types/order";
 
-interface CreateOrderRequest {
-  items: CartItem[];
-  shippingAddress: Address;
-  billingAddress?: Address;
-  shippingOption: ShippingOption;
-  billingInfo: BillingInfo;
-  taxAmount: number;
-  customerEmail?: string;
-}
 
-interface UpdateOrderRequest {
-  orderId: string;
-  status: "cart" | "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled" | "refunded";
-  carrier?: string;
-  trackingNumber?: string;
-  trackingUrl?: string;
-  notes?: string;
-  cancellationReason?: string;
-}
 
 /**
  * GET /api/orders - List orders (consolidates user-orders functionality)
@@ -88,13 +63,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    let query = db.select().from(orders).orderBy(desc(orders.createdAt));
+  let query = db.select().from(orders).orderBy(desc(orders.created_at));
     const allOrders = await query;
     let filteredOrders = allOrders;
     
     // Apply filters based on MACH schema
     if (!isAdminRequest && requestedUserId) {
-      filteredOrders = filteredOrders.filter(order => order.customerId === requestedUserId);
+      filteredOrders = filteredOrders.filter(order => order.customer_id === requestedUserId);
     }
     if (status) {
       filteredOrders = filteredOrders.filter(order => order.status === status);
@@ -104,7 +79,7 @@ export async function GET(request: NextRequest) {
     const paginatedOrders = filteredOrders.slice(offset, offset + limit);
     const hydratedOrders = paginatedOrders.map(hydrateOrder);
     
-    const response: MACHApiResponse<Order[]> = {
+    const response = {
       data: hydratedOrders,
       meta: {
         total,
@@ -124,7 +99,6 @@ export async function GET(request: NextRequest) {
         last: `/api/orders?limit=${limit}&offset=${Math.floor(total / limit) * limit}`
       }
     };
-
     return NextResponse.json(response);
 
   } catch (error) {
@@ -145,140 +119,97 @@ export async function POST(request: NextRequest) {
     const body = await request.json() as CreateOrderRequest;
     
     // Validate required fields
-    const email = body.customerEmail || (body.shippingAddress as any)?.email;
-    if (!email) {
-      return NextResponse.json({
-        error: 'Validation failed',
-        details: ['customer email is required']
-      }, { status: 400 });
-    }
 
+    // Validate MACH-compliant order fields
     if (!body.items || !Array.isArray(body.items) || body.items.length === 0) {
       return NextResponse.json({
         error: 'Validation failed',
         details: ['items array is required and must not be empty']
       }, { status: 400 });
     }
-
-    if (!body.shippingAddress) {
+    if (!body.total_amount || typeof body.total_amount.amount !== 'number') {
       return NextResponse.json({
         error: 'Validation failed',
-        details: ['shippingAddress is required']
+        details: ['total_amount is required and must be a Money object']
+      }, { status: 400 });
+    }
+    if (!body.currency_code) {
+      return NextResponse.json({
+        error: 'Validation failed',
+        details: ['currency_code is required']
       }, { status: 400 });
     }
 
-    // Use MACH-compliant addresses directly
-    const shippingAddress = body.shippingAddress;
-    const billingAddress = body.billingAddress;
-
-    // Generate order ID  
+    // Generate order ID
     const now = Date.now();
     let baseId = userId ?? "guest";
-
-    if (baseId.includes("@")) {
-      baseId = baseId.split("@")[0];
-    }
+    if (baseId.includes("@")) baseId = baseId.split("@")[0];
     const safeUserId = baseId.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
     const orderId = `WEB-${safeUserId}-${now}`;
 
-    // Calculate totals
-    const subtotal = body.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-    const total = subtotal + body.taxAmount + (body.shippingOption.cost || 0);
-
     const db = await getDbAsync();
-    
-    // Create MACH-compliant order structure
-    const machOrder = {
+    const machOrder: any = {
       id: orderId,
-      orderNumber: orderId,
-      customerId: userId || "guest",
-      status: 'pending' as const,
-      lineItems: JSON.stringify(body.items.map(item => ({
-        id: item.productId.toString(),
-        productId: item.productId.toString(),
-        variantId: item.variantId,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        totalPrice: item.totalPrice,
-        currency: 'USD',
-        product: {
-          name: { en: item.name },
-          sku: item.sku,
-          image: item.image
-        }
-      }))),
-      shipping: JSON.stringify({
-        method: body.shippingOption.name || 'Standard',
-        cost: body.shippingOption.cost || 0,
-        currency: 'USD',
-        address: {
-          firstName: shippingAddress.firstName,
-          lastName: shippingAddress.lastName,
-          company: shippingAddress.company,
-          address1: shippingAddress.address1,
-          address2: shippingAddress.address2,
-          city: shippingAddress.city,
-          province: shippingAddress.province,
-          country: shippingAddress.country,
-          zip: shippingAddress.zip,
-          phone: shippingAddress.phone
-        }
-      }),
-      billing: JSON.stringify({
-        method: body.billingInfo.method || 'card',
-        address: billingAddress || shippingAddress
-      }),
-      totals: JSON.stringify({
-        subtotal,
-        shipping: body.shippingOption.cost || 0,
-        tax: body.taxAmount,
-        total,
-        currency: 'USD'
-      }),
-      metadata: JSON.stringify({
-        email,
-        billingInfo: body.billingInfo
-      }),
-      notes: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      customer_id: userId || body.customer_id || "guest",
+      status: 'pending',
+      total_amount: JSON.stringify(body.total_amount),
+      currency_code: body.currency_code,
+      shipping_address: body.shipping_address ? JSON.stringify(body.shipping_address) : null,
+      billing_address: body.billing_address ? JSON.stringify(body.billing_address) : null,
+      items: JSON.stringify(body.items),
+      shipping_method: body.shipping_method || null,
+      payment_method: body.payment_method || null,
+      payment_status: 'pending',
+      notes: body.notes || null,
+      external_references: body.external_references ? JSON.stringify(body.external_references) : null,
+      extensions: body.extensions ? JSON.stringify(body.extensions) : null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
-    
+
     // Create the order
     const [newOrder] = await db.insert(orders).values(machOrder).returning();
 
-    // Send order confirmation email
+
+    // Send order confirmation email (MACH-compliant)
     try {
       const user = await currentUser();
-      const customerName = user?.firstName && user?.lastName 
-        ? `${user.firstName} ${user.lastName}`
-        : `${shippingAddress.firstName} ${shippingAddress.lastName}` || 'Valued Customer';
-
+      const shippingAddr = body.shipping_address;
+      let customerName = 'Valued Customer';
+      if (user?.firstName && user?.lastName) {
+        customerName = `${user.firstName} ${user.lastName}`;
+      } else if (shippingAddr?.recipient) {
+        customerName = shippingAddr.recipient;
+      } else if (shippingAddr?.company) {
+        customerName = shippingAddr.company;
+      }
+      const customerEmail = body.extensions?.email || shippingAddr?.email || '';
       const orderData: OrderData = {
         orderNumber: orderId,
         customerName,
-        customerEmail: email,
+        customerEmail,
         items: body.items.map(item => ({
-          productId: item.productId.toString(),
-          name: item.name,
-          price: item.unitPrice,
+          productId: item.product_id,
+          name: item.product_name,
+          price: typeof item.unit_price === 'object' ? item.unit_price.amount : item.unit_price,
           quantity: item.quantity,
-          imageUrl: item.image,
+          imageUrl: (item as any).imageUrl || '',
         })),
-        subtotal,
-        shipping: body.shippingOption.cost || 0,
-        tax: body.taxAmount,
-        total,
-        shippingAddress: {
-          street: shippingAddress.address1 + (shippingAddress.address2 ? `, ${shippingAddress.address2}` : ''),
-          city: shippingAddress.city,
-          state: shippingAddress.province || '',
-          zipCode: shippingAddress.zip,
-          country: shippingAddress.country || 'United States',
+        subtotal: body.extensions?.subtotal || 0,
+        shipping: body.extensions?.shippingCost || 0,
+        tax: body.extensions?.taxAmount || 0,
+        total: typeof body.total_amount === 'object' ? body.total_amount.amount : body.total_amount,
+        shippingAddress: shippingAddr ? {
+          street: [shippingAddr.line1, shippingAddr.line2].filter(Boolean).join(', '),
+          city: typeof shippingAddr.city === 'string' ? shippingAddr.city : (shippingAddr.city ? Object.values(shippingAddr.city)[0] : ''),
+          state: shippingAddr.region || '',
+          zipCode: shippingAddr.postal_code || '',
+          country: shippingAddr.country || 'US',
+        } : {
+          street: '', city: '', state: '', zipCode: '', country: ''
         },
         estimatedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString(),
       };
-
       const emailResult = await sendOrderConfirmationEmail(orderData);
       if (emailResult.success) {
         console.log('Order confirmation email sent successfully:', emailResult.id);
@@ -289,13 +220,13 @@ export async function POST(request: NextRequest) {
       console.error('Email preparation failed:', emailError);
     }
     
-    const response: MACHApiResponse<Order> = {
+
+    const response = {
       data: hydrateOrder(newOrder),
       meta: {
         schema: "mach:order"
       }
     };
-
     return NextResponse.json(response, { status: 201 });
 
   } catch (error) {
@@ -327,12 +258,13 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json() as UpdateOrderRequest;
-    const { orderId, status, carrier, trackingNumber, trackingUrl, cancellationReason, notes } = body;
 
+    const { status, payment_status, shipping_method, tracking_number, shipped_at, delivered_at, notes, external_references, extensions } = body;
+    const orderId = (body as any).orderId;
     if (!orderId) {
       return NextResponse.json({
         error: 'Validation failed',
-        details: ['orderId is required']
+        details: ['orderId is required in the request body']
       }, { status: 400 });
     }
 
@@ -343,8 +275,8 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Validate status value
-    const validStatuses = ['cart', 'pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
+    // Validate status value (must match schema)
+    const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
     if (!validStatuses.includes(status)) {
       return NextResponse.json({
         error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
@@ -363,37 +295,19 @@ export async function PUT(request: NextRequest) {
 
     const currentOrder = existingOrder[0];
     
-    // Parse current metadata and shipping info
-    const currentMetadata = currentOrder.metadata ? JSON.parse(currentOrder.metadata) : {};
-    const currentShipping = currentOrder.shipping ? JSON.parse(currentOrder.shipping) : {};
 
-    // Update metadata with tracking information
-    const updatedMetadata = {
-      ...currentMetadata,
-      ...(carrier && { carrier }),
-      ...(trackingNumber && { trackingNumber }),
-      ...(trackingUrl && { trackingUrl }),
-      ...(cancellationReason && { cancellationReason }),
-      ...(status === 'shipped' && { shippedAt: new Date().toISOString() }),
-      ...(status === 'delivered' && { deliveredAt: new Date().toISOString() })
-    };
-
-    // Update shipping with tracking info
-    const updatedShipping = {
-      ...currentShipping,
-      ...(trackingNumber && { trackingNumber }),
-      ...(status === 'delivered' && { 
-        estimatedDelivery: new Date().toISOString() 
-      })
-    };
-
-    // Build update data
+    // Build update data (MACH-compliant)
     const updateData: any = {
-      status,
-      shipping: JSON.stringify(updatedShipping),
-      metadata: JSON.stringify(updatedMetadata),
+      ...(status && { status }),
+      ...(payment_status && { payment_status }),
+      ...(shipping_method && { shipping_method }),
+      ...(tracking_number && { tracking_number }),
+      ...(shipped_at && { shipped_at }),
+      ...(delivered_at && { delivered_at }),
       ...(notes && { notes }),
-      updatedAt: new Date().toISOString()
+      ...(external_references && { external_references: JSON.stringify(external_references) }),
+      ...(extensions && { extensions: JSON.stringify(extensions) }),
+      updated_at: new Date().toISOString()
     };
 
     // Update the order
@@ -424,13 +338,12 @@ export async function PUT(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
 
-    const response: MACHApiResponse<Order> = {
+    const response = {
       data: hydrateOrder(updatedOrder),
       meta: {
         schema: "mach:order"
       }
     };
-
     return NextResponse.json(response);
 
   } catch (error) {
@@ -446,25 +359,26 @@ export async function PUT(request: NextRequest) {
  * Hydrate order data from MACH database format to Order type
  */
 function hydrateOrder(dbOrder: typeof orders.$inferSelect): Order {
-  const lineItems = JSON.parse(dbOrder.lineItems);
-  const shipping = dbOrder.shipping ? JSON.parse(dbOrder.shipping) : null;
-  const billing = dbOrder.billing ? JSON.parse(dbOrder.billing) : null;
-  const totals = JSON.parse(dbOrder.totals);
-  const metadata = dbOrder.metadata ? JSON.parse(dbOrder.metadata) : {};
-
   return {
-    id: dbOrder.id,
-    orderNumber: dbOrder.orderNumber || dbOrder.id,
-    customerId: dbOrder.customerId,
-    status: dbOrder.status as any,
-    lineItems: lineItems,
-    shipping: shipping,
-    billing: billing,
-    totals: totals,
-    notes: dbOrder.notes || undefined,
-    metadata: metadata,
-    createdAt: dbOrder.createdAt,
-    updatedAt: dbOrder.updatedAt
+    id: dbOrder.id ?? undefined,
+    customer_id: dbOrder.customer_id ?? undefined,
+    status: dbOrder.status,
+    total_amount: typeof dbOrder.total_amount === 'string' ? JSON.parse(dbOrder.total_amount) : { amount: 0, currency: dbOrder.currency_code },
+    currency_code: dbOrder.currency_code,
+    shipping_address: dbOrder.shipping_address ? (typeof dbOrder.shipping_address === 'string' ? JSON.parse(dbOrder.shipping_address) : dbOrder.shipping_address) : undefined,
+    billing_address: dbOrder.billing_address ? (typeof dbOrder.billing_address === 'string' ? JSON.parse(dbOrder.billing_address) : dbOrder.billing_address) : undefined,
+    items: dbOrder.items ? (typeof dbOrder.items === 'string' ? JSON.parse(dbOrder.items) : dbOrder.items) : [],
+    shipping_method: dbOrder.shipping_method ?? undefined,
+    payment_method: dbOrder.payment_method ?? undefined,
+    payment_status: dbOrder.payment_status ?? 'pending',
+    tracking_number: dbOrder.tracking_number ?? undefined,
+    shipped_at: dbOrder.shipped_at ?? undefined,
+    delivered_at: dbOrder.delivered_at ?? undefined,
+    notes: dbOrder.notes ?? undefined,
+    external_references: dbOrder.external_references ? (typeof dbOrder.external_references === 'string' ? JSON.parse(dbOrder.external_references) : dbOrder.external_references) : undefined,
+    extensions: dbOrder.extensions ? (typeof dbOrder.extensions === 'string' ? JSON.parse(dbOrder.extensions) : dbOrder.extensions) : undefined,
+    created_at: dbOrder.created_at ?? undefined,
+    updated_at: dbOrder.updated_at ?? undefined
   };
 }
 
@@ -472,34 +386,43 @@ function hydrateOrder(dbOrder: typeof orders.$inferSelect): Order {
  * Transform order data for email notification
  */
 function transformOrderForEmail(order: any): any {
-  const lineItems = typeof order.lineItems === 'string' ? JSON.parse(order.lineItems) : order.lineItems || [];
-  const shipping = typeof order.shipping === 'string' ? JSON.parse(order.shipping) : order.shipping || {};
-  const metadata = typeof order.metadata === 'string' ? JSON.parse(order.metadata) : order.metadata || {};
+  // Use MACH-compliant fields
+  const items = order.items ? (typeof order.items === 'string' ? JSON.parse(order.items) : order.items) : [];
+  const shippingAddr = order.shipping_address ? (typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : order.shipping_address) : {};
+  const extensions = order.extensions ? (typeof order.extensions === 'string' ? JSON.parse(order.extensions) : order.extensions) : {};
 
-  const shippingAddr = shipping.address || {};
+  // MACHAddress: line1, line2, city, region, postal_code, country, recipient, company
+  let customerName = '';
+  if (shippingAddr.recipient) {
+    customerName = shippingAddr.recipient;
+  } else if (shippingAddr.company) {
+    customerName = shippingAddr.company;
+  } else {
+    customerName = 'Valued Customer';
+  }
 
   return {
     orderNumber: order.id,
-    customerName: `${shippingAddr.firstName || ''} ${shippingAddr.lastName || ''}`.trim() || 'Valued Customer',
-    customerEmail: metadata.email || '',
+    customerName,
+    customerEmail: extensions.email || shippingAddr.email || '',
     status: order.status,
-    carrier: metadata.carrier,
-    trackingNumber: metadata.trackingNumber,
-    trackingUrl: metadata.trackingUrl,
+    carrier: extensions.carrier,
+    trackingNumber: order.tracking_number,
+    trackingUrl: extensions.trackingUrl,
     notes: order.notes,
-    cancellationReason: metadata.cancellationReason,
-    items: lineItems.map((item: any) => ({
-      productId: item.productId || item.id,
-      name: item.product?.name?.en || item.name || item.title,
-      price: item.unitPrice || item.price || 0,
+    cancellationReason: extensions.cancellationReason,
+    items: items.map((item: any) => ({
+      productId: item.product_id || item.id,
+      name: item.product_name || item.name || item.title,
+      price: item.unit_price?.amount || item.unit_price || item.price || 0,
       quantity: item.quantity || 1,
-      imageUrl: item.product?.image || item.imageUrl || item.image,
+      imageUrl: item.imageUrl || '',
     })),
     shippingAddress: {
-      street: `${shippingAddr.address1 || ''} ${shippingAddr.address2 || ''}`.trim(),
+      street: [shippingAddr.line1, shippingAddr.line2].filter(Boolean).join(', '),
       city: shippingAddr.city || '',
-      state: shippingAddr.province || shippingAddr.state || '',
-      zipCode: shippingAddr.zip || '',
+      state: shippingAddr.region || '',
+      zipCode: shippingAddr.postal_code || '',
       country: shippingAddr.country || 'US',
     },
   };

@@ -11,8 +11,8 @@
 import { eq, and, or, gte, lte, isNull, isNotNull, sql, desc, asc, inArray } from 'drizzle-orm';
 import { 
   pricing, 
-  transformPricingFromDb, 
-  transformPricingToDb, 
+  serializePricing,
+  deserializePricing,
   validatePricingObject, 
   generatePricingId,
   isValidPricingType,
@@ -26,12 +26,12 @@ import {
 } from '../../db/schema/pricing';
 import { getDb } from '../../db';
 import type { 
-  MACHPricing, 
-  MACHBulkPricingTier, 
-  MACHSegmentPricing, 
-  MACHTaxInfo 
-} from '../../types/mach/Pricing';
-import type { Money } from '../../types/';
+  Pricing, 
+  BulkPricingTier, 
+  SegmentPricing, 
+  TaxInfo,
+  Money
+} from '@/lib/types';
 
 // Get database instance
 const db = getDb();
@@ -43,7 +43,7 @@ const db = getDb();
 /**
  * Create a new pricing record
  */
-export async function createPricing(pricingData: Partial<MACHPricing>): Promise<MACHPricing> {
+export async function createPricing(pricingData: Partial<Pricing>): Promise<Pricing> {
   // Generate ID if not provided
   if (!pricingData.id) {
     pricingData.id = generatePricingId(
@@ -61,17 +61,17 @@ export async function createPricing(pricingData: Partial<MACHPricing>): Promise<
 
   // Set timestamps
   const now = new Date().toISOString();
-  const pricingToCreate: MACHPricing = {
+  const pricingToCreate: Pricing = {
     ...pricingData,
     created_at: pricingData.created_at || now,
     updated_at: pricingData.updated_at || now
-  } as MACHPricing;
+  } as Pricing;
 
   // Transform for database storage
-  const dbRecord = transformPricingToDb(pricingToCreate);
+  const dbRecord = serializePricing(pricingToCreate);
   const [inserted] = await db.insert(pricing).values(dbRecord).returning();
   
-  return transformPricingFromDb(inserted);
+  return deserializePricing(inserted);
 }
 
 /**
@@ -79,8 +79,8 @@ export async function createPricing(pricingData: Partial<MACHPricing>): Promise<
  */
 export async function updatePricing(
   id: string, 
-  updates: Partial<MACHPricing>
-): Promise<MACHPricing | null> {
+  updates: Partial<Pricing>
+): Promise<Pricing | null> {
   // Set updated timestamp
   const updatedData = {
     ...updates,
@@ -100,14 +100,14 @@ export async function updatePricing(
   }
 
   // Transform for database storage
-  const dbUpdates = transformPricingToDb(updatedData as MACHPricing);
+  const dbUpdates = serializePricing(updatedData as Pricing);
   const [updated] = await db
     .update(pricing)
     .set(dbUpdates)
     .where(eq(pricing.id, id))
     .returning();
 
-  return updated ? transformPricingFromDb(updated) : null;
+  return updated ? deserializePricing(updated) : null;
 }
 
 /**
@@ -129,14 +129,14 @@ export async function deletePricing(id: string): Promise<boolean> {
 /**
  * Get pricing by ID
  */
-export async function getPricingById(id: string): Promise<MACHPricing | null> {
+export async function getPricingById(id: string): Promise<Pricing | null> {
   const [result] = await db
     .select()
     .from(pricing)
     .where(eq(pricing.id, id))
     .limit(1);
 
-  return result ? transformPricingFromDb(result) : null;
+  return result ? deserializePricing(result) : null;
 }
 
 // =====================================================
@@ -149,12 +149,12 @@ export async function getPricingById(id: string): Promise<MACHPricing | null> {
 export async function getPricingForProduct(
   productId: string,
   options: {
-    status?: MACHPricing['status'][];
-    type?: MACHPricing['type'][];
+    status?: Pricing['status'][];
+    type?: Pricing['type'][];
     validAt?: Date;
     includeExpired?: boolean;
   } = {}
-): Promise<MACHPricing[]> {
+): Promise<Pricing[]> {
   const conditions = [eq(pricing.product_id, productId)];
 
   // Filter by status
@@ -192,7 +192,7 @@ export async function getPricingForProduct(
     .where(and(...conditions))
     .orderBy(desc(pricing.created_at));
     
-  return results.map(transformPricingFromDb);
+  return results.map(deserializePricing);
 }
 
 /**
@@ -208,7 +208,7 @@ export async function getEffectivePricing(
     quantity?: number;
     date?: Date;
   } = {}
-): Promise<MACHPricing | null> {
+): Promise<Pricing | null> {
   const validAt = context.date || new Date();
   const dateStr = validAt.toISOString();
 
@@ -228,7 +228,7 @@ export async function getEffectivePricing(
       .orderBy(desc(pricing.created_at))
       .limit(1);
     if (campaignResult) {
-      return transformPricingFromDb(campaignResult);
+  return deserializePricing(campaignResult);
     }
   }
 
@@ -240,7 +240,7 @@ export async function getEffectivePricing(
       .orderBy(desc(pricing.created_at))
       .limit(1);
     if (segmentResult) {
-      return transformPricingFromDb(segmentResult);
+  return deserializePricing(segmentResult);
     }
   }
 
@@ -252,7 +252,7 @@ export async function getEffectivePricing(
       .orderBy(desc(pricing.created_at))
       .limit(1);
     if (channelResult) {
-      return transformPricingFromDb(channelResult);
+  return deserializePricing(channelResult);
     }
   }
 
@@ -264,7 +264,7 @@ export async function getEffectivePricing(
       .orderBy(desc(pricing.created_at))
       .limit(1);
     if (regionResult) {
-      return transformPricingFromDb(regionResult);
+  return deserializePricing(regionResult);
     }
   }
 
@@ -284,7 +284,7 @@ export async function getEffectivePricing(
     .orderBy(desc(pricing.created_at))
     .limit(1);
 
-  return defaultResult ? transformPricingFromDb(defaultResult) : null;
+  return defaultResult ? deserializePricing(defaultResult) : null;
 }
 
 // =====================================================
@@ -296,8 +296,8 @@ export async function getEffectivePricing(
  */
 export async function getCampaignPricing(
   campaignId: string,
-  options: { status?: MACHPricing['status'][] } = {}
-): Promise<MACHPricing[]> {
+  options: { status?: Pricing['status'][] } = {}
+): Promise<Pricing[]> {
   const conditions = [eq(pricing.campaign_id, campaignId)];
 
   if (options.status && options.status.length > 0) {
@@ -313,7 +313,7 @@ export async function getCampaignPricing(
     .where(and(...conditions))
     .orderBy(asc(pricing.product_id));
     
-  return results.map(transformPricingFromDb);
+  return results.map(deserializePricing);
 }
 
 /**
@@ -332,10 +332,10 @@ export async function createCampaignPricing(
   commonSettings: {
     pricelist_id?: string;
     catalog_id?: string;
-    tax?: MACHTaxInfo;
+    tax?: TaxInfo;
     extensions?: Record<string, any>;
   } = {}
-): Promise<MACHPricing[]> {
+): Promise<Pricing[]> {
   const pricingRecords = productPricing.map(product => ({
     product_id: product.product_id,
     list_price: product.list_price,
@@ -349,7 +349,7 @@ export async function createCampaignPricing(
     ...commonSettings
   }));
 
-  const created: MACHPricing[] = [];
+  const created: Pricing[] = [];
   for (const record of pricingRecords) {
     created.push(await createPricing(record));
   }
@@ -368,9 +368,9 @@ export async function getSegmentPricing(
   customerSegmentId: string,
   options: {
     productIds?: string[];
-    status?: MACHPricing['status'][];
+    status?: Pricing['status'][];
   } = {}
-): Promise<MACHPricing[]> {
+): Promise<Pricing[]> {
   const conditions = [eq(pricing.customer_segment_id, customerSegmentId)];
 
   if (options.productIds && options.productIds.length > 0) {
@@ -390,7 +390,7 @@ export async function getSegmentPricing(
     .where(and(...conditions))
     .orderBy(asc(pricing.product_id));
     
-  return results.map(transformPricingFromDb);
+  return results.map(deserializePricing);
 }
 
 // =====================================================
@@ -403,7 +403,7 @@ export async function getSegmentPricing(
 export async function getBulkPricingForQuantity(
   productId: string,
   quantity: number
-): Promise<{ pricing: MACHPricing; effectivePrice: Money } | null> {
+): Promise<{ pricing: Pricing; effectivePrice: Money } | null> {
   const [bulkPricing] = await db
     .select()
     .from(pricing)
@@ -418,7 +418,7 @@ export async function getBulkPricingForQuantity(
 
   if (!bulkPricing) return null;
 
-  const pricingObj = transformPricingFromDb(bulkPricing);
+  const pricingObj = deserializePricing(bulkPricing);
   const effectivePrice = getEffectivePriceForQuantity(pricingObj, quantity);
 
   return { pricing: pricingObj, effectivePrice };
@@ -439,14 +439,14 @@ export async function searchPricing(options: {
   regionIds?: string[];
   pricelistIds?: string[];
   catalogIds?: string[];
-  status?: MACHPricing['status'][];
-  type?: MACHPricing['type'][];
+  status?: Pricing['status'][];
+  type?: Pricing['type'][];
   validAt?: Date;
   limit?: number;
   offset?: number;
   orderBy?: 'created_at' | 'updated_at' | 'product_id';
   orderDirection?: 'asc' | 'desc';
-}): Promise<MACHPricing[]> {
+}): Promise<Pricing[]> {
   const conditions = [];
 
   // Product filters
@@ -524,7 +524,7 @@ export async function searchPricing(options: {
     .limit(options.limit || 1000)
     .offset(options.offset || 0);
 
-  return results.map(transformPricingFromDb);
+  return results.map(deserializePricing);
 }
 
 /**
@@ -634,7 +634,7 @@ export async function getPricingStatistics(): Promise<{
  * Calculate effective price with tax
  */
 export function calculateEffectivePriceWithTax(
-  pricing: MACHPricing,
+  pricing: Pricing,
   quantity: number = 1
 ): { basePrice: Money; taxAmount: Money; totalPrice: Money } | null {
   if (!pricing.tax) {

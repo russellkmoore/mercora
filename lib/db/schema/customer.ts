@@ -7,7 +7,7 @@
  */
 
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
-import type { MACHCustomer } from "@/lib/types/mach/Customer";
+import type { Customer } from "@/lib/types";
 
 /**
  * Customers table - MACH Alliance compliant customer storage
@@ -72,56 +72,33 @@ export type InsertCustomer = typeof customers.$inferInsert;
 export type SelectCustomer = typeof customers.$inferSelect;
 
 /**
- * Transform database record to MACH Customer interface
+ * Helper: convert DB record to MACH Customer
  */
-export function transformToMACHCustomer(record: SelectCustomer): MACHCustomer {
+export function deserializeCustomer(record: SelectCustomer): Customer {
   return {
-    // Core identification - REQUIRED
     id: record.id,
     type: record.type as "person" | "company",
-    
-    // Status and lifecycle - OPTIONAL
     status: record.status as "active" | "inactive" | "suspended" | "archived" | "pending_verification" | undefined,
     external_references: record.externalReferences ? JSON.parse(record.externalReferences) : undefined,
-    
-    // Timestamps - OPTIONAL
     created_at: record.createdAt || undefined,
     updated_at: record.updatedAt || undefined,
-    
-    // Person-specific data (B2C) - OPTIONAL
     person: record.person ? JSON.parse(record.person) : undefined,
-    
-    // Company-specific data (B2B) - OPTIONAL
     company: record.company ? JSON.parse(record.company) : undefined,
-    
-    // Contact persons (primarily for B2B) - OPTIONAL
     contacts: record.contacts ? JSON.parse(record.contacts) : undefined,
-    
-    // Addresses - OPTIONAL
     addresses: record.addresses ? JSON.parse(record.addresses) : undefined,
-    
-    // Communication preferences - OPTIONAL
     communication_preferences: record.communicationPreferences ? JSON.parse(record.communicationPreferences) : undefined,
-    
-    // Segmentation - OPTIONAL
     segments: record.segments ? JSON.parse(record.segments) : undefined,
     tags: record.tags ? JSON.parse(record.tags) : undefined,
-    
-    // Loyalty information - OPTIONAL
     loyalty: record.loyalty ? JSON.parse(record.loyalty) : undefined,
-    
-    // Authentication settings - OPTIONAL
     authentication: record.authentication ? JSON.parse(record.authentication) : undefined,
-    
-    // Extensions - OPTIONAL
     extensions: record.extensions ? JSON.parse(record.extensions) : undefined,
   };
 }
 
 /**
- * Transform MACH Customer to database insert format
+ * Helper: convert MACH Customer to DB insert format
  */
-export function transformFromMACHCustomer(customer: MACHCustomer): InsertCustomer {
+export function serializeCustomer(customer: Customer): InsertCustomer {
   return {
     id: customer.id,
     type: customer.type,

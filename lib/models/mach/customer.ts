@@ -8,8 +8,8 @@
  * https://github.com/machalliance/standards/blob/main/models/entities/identity/customer.md
  */
 
-import { getDbAsync } from "../../db";
-import { customers, transformToMACHCustomer, transformFromMACHCustomer } from "../../db/schema/customer";
+import { getDbAsync } from "@/lib/db";
+import { customers, deserializeCustomer, serializeCustomer } from "../../db/schema/customer";
 import { eq, desc, asc, like, or, and, inArray, isNull, isNotNull, sql } from "drizzle-orm";
 import type { 
   MACHCustomer, 
@@ -302,9 +302,9 @@ export async function createCustomer(input: CreateCustomerInput): Promise<MACHCu
   }
   
   const db = await getDbAsync();
-  const record = transformFromMACHCustomer(machCustomer);
+  const record = serializeCustomer(machCustomer);
   const [created] = await db.insert(customers).values(record).returning();
-  return transformToMACHCustomer(created);
+  return deserializeCustomer(created);
 }
 
 /**
@@ -320,7 +320,7 @@ export async function getCustomer(id: string): Promise<MACHCustomer | null> {
     .limit(1);
     
   if (!record) return null;
-  return transformToMACHCustomer(record);
+  return deserializeCustomer(record);
 }
 
 /**
@@ -337,7 +337,7 @@ export async function getCustomerByEmail(email: string): Promise<MACHCustomer | 
     .where(eq(customers.type, "person"));
   
   for (const record of records) {
-    const customer = transformToMACHCustomer(record);
+    const customer = deserializeCustomer(record);
     if (customer.person?.email?.toLowerCase() === email.toLowerCase()) {
       return customer;
     }
@@ -358,7 +358,7 @@ export async function getCustomerByCompanyName(companyName: string): Promise<MAC
     .where(eq(customers.type, "company"));
   
   for (const record of records) {
-    const customer = transformToMACHCustomer(record);
+    const customer = deserializeCustomer(record);
     if (customer.company?.name?.toLowerCase() === companyName.toLowerCase()) {
       return customer;
     }
@@ -455,7 +455,7 @@ export async function listCustomers(filters: CustomerFilters = {}): Promise<MACH
   }
   
   const records = await query;
-  let filteredCustomers = records.map(record => transformToMACHCustomer(record));
+  let filteredCustomers = records.map(deserializeCustomer);
   
   // Apply additional filters that require JSON parsing
   if (filters.email) {
@@ -582,7 +582,7 @@ export async function updateCustomer(id: string, input: Partial<CreateCustomerIn
     throw new Error(`Customer validation failed: ${validation.errors.join(', ')}`);
   }
   
-  const record = transformFromMACHCustomer(updated);
+  const record = serializeCustomer(updated);
   await db.update(customers).set(record).where(eq(customers.id, id));
   
   return getCustomer(id);

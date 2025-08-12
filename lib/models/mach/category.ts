@@ -9,10 +9,9 @@
  */
 
 import { getDbAsync } from "@/lib/db";
-import { categories, transformToMACHCategory, transformFromMACHCategory } from "@/lib/db/schema/category";
+import { categories, deserializeCategory, serializeCategory } from "@/lib/db/schema/category";
 import { eq, desc, asc, like, or, and, inArray, isNull, isNotNull, sql } from "drizzle-orm";
-import type { MACHCategory, MACHCategoryReference } from "@/lib/types/mach/Category";
-import type { MACHMedia } from "@/lib/types/mach/Media";
+import type { Media, Category, CategoryReference } from "@/lib/types";
 
 // Category creation input type
 export interface CreateCategoryInput {
@@ -34,7 +33,7 @@ export interface CreateCategoryInput {
   external_references?: Record<string, string>; // Cross-system IDs
   
   // Hierarchy and products
-  children?: MACHCategoryReference[]; // Child category references
+  children?: CategoryReference[]; // Child category references
   product_count?: number; // Number of products in category
   
   // Metadata and classification
@@ -42,8 +41,8 @@ export interface CreateCategoryInput {
   tags?: string[]; // Tags for filtering and search
   
   // Media assets
-  primary_image?: MACHMedia; // Primary category image
-  media?: MACHMedia[]; // Additional images and assets
+  primary_image?: Media; // Primary category image
+  media?: Media[]; // Additional images and assets
   
   // SEO
   seo?: {
@@ -93,7 +92,7 @@ export interface CategoryValidationResult {
   isValid: boolean;
   errors: string[];
   warnings: string[];
-  suggestions?: Partial<MACHCategory>;
+  suggestions?: Partial<Category>;
 }
 
 /**
@@ -136,7 +135,7 @@ async function generateCategoryPath(parentId?: string, slug?: string | Record<st
 /**
  * Validate category data according to MACH Alliance standards
  */
-export function validateCategory(category: Partial<MACHCategory>): CategoryValidationResult {
+export function validateCategory(category: Partial<Category>): CategoryValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
   
@@ -187,7 +186,7 @@ export function validateCategory(category: Partial<MACHCategory>): CategoryValid
 /**
  * Create a new category
  */
-export async function createCategory(input: CreateCategoryInput): Promise<MACHCategory> {
+export async function createCategory(input: CreateCategoryInput): Promise<Category> {
   const id = input.id || generateCategoryId();
   const now = new Date().toISOString();
   
@@ -197,7 +196,7 @@ export async function createCategory(input: CreateCategoryInput): Promise<MACHCa
   // Generate path
   const path = await generateCategoryPath(input.parent_id, slug);
   
-  const machCategory: MACHCategory = {
+  const machCategory: Category = {
     id,
     name: input.name,
     description: input.description,
@@ -226,15 +225,15 @@ export async function createCategory(input: CreateCategoryInput): Promise<MACHCa
   }
   
   const db = await getDbAsync();
-  const record = transformFromMACHCategory(machCategory);
+  const record = serializeCategory(machCategory);
   const [created] = await db.insert(categories).values(record).returning();
-  return transformToMACHCategory(created);
+  return deserializeCategory(created);
 }
 
 /**
  * Get a category by ID
  */
-export async function getCategory(id: string): Promise<MACHCategory | null> {
+export async function getCategory(id: string): Promise<Category | null> {
   const db = await getDbAsync();
   
   const [record] = await db
@@ -244,13 +243,13 @@ export async function getCategory(id: string): Promise<MACHCategory | null> {
     .limit(1);
     
   if (!record) return null;
-  return transformToMACHCategory(record);
+  return deserializeCategory(record);
 }
 
 /**
  * Get a category by slug
  */
-export async function getCategoryBySlug(slug: string): Promise<MACHCategory | null> {
+export async function getCategoryBySlug(slug: string): Promise<Category | null> {
   const db = await getDbAsync();
   
   const [record] = await db
@@ -260,13 +259,13 @@ export async function getCategoryBySlug(slug: string): Promise<MACHCategory | nu
     .limit(1);
     
   if (!record) return null;
-  return transformToMACHCategory(record);
+  return deserializeCategory(record);
 }
 
 /**
  * Get category by path
  */
-export async function getCategoryByPath(path: string): Promise<MACHCategory | null> {
+export async function getCategoryByPath(path: string): Promise<Category | null> {
   const db = await getDbAsync();
   
   const [record] = await db
@@ -276,13 +275,13 @@ export async function getCategoryByPath(path: string): Promise<MACHCategory | nu
     .limit(1);
     
   if (!record) return null;
-  return transformToMACHCategory(record);
+  return deserializeCategory(record);
 }
 
 /**
  * List categories with filtering and pagination
  */
-export async function listCategories(filters: CategoryFilters = {}): Promise<MACHCategory[]> {
+export async function listCategories(filters: CategoryFilters = {}): Promise<Category[]> {
   const db = await getDbAsync();
   
   let query = db.select().from(categories);
@@ -410,7 +409,7 @@ export async function listCategories(filters: CategoryFilters = {}): Promise<MAC
   }
   
   const records = await query;
-  return records.map(record => transformToMACHCategory(record));
+  return records.map(deserializeCategory);
 }
 
 /**
@@ -424,24 +423,24 @@ export async function getCategoriesCount(filters: Omit<CategoryFilters, 'limit' 
 /**
  * Get root categories (categories without parent)
  */
-export async function getRootCategories(): Promise<MACHCategory[]> {
+export async function getRootCategories(): Promise<Category[]> {
   return listCategories({ parent_id: null });
 }
 
 /**
  * Get child categories of a parent
  */
-export async function getChildCategories(parentId: string): Promise<MACHCategory[]> {
+export async function getChildCategories(parentId: string): Promise<Category[]> {
   return listCategories({ parent_id: parentId });
 }
 
 /**
  * Get category hierarchy tree
  */
-export async function getCategoryTree(options: CategoryTreeOptions = {}): Promise<MACHCategory[]> {
+export async function getCategoryTree(options: CategoryTreeOptions = {}): Promise<Category[]> {
   const { max_depth = 10, status_filter = ["active"] } = options;
   
-  async function buildTree(parentId: string | null = null, currentDepth = 0): Promise<MACHCategory[]> {
+  async function buildTree(parentId: string | null = null, currentDepth = 0): Promise<Category[]> {
     if (currentDepth >= max_depth) return [];
     
     const categories = await listCategories({ 
@@ -475,8 +474,8 @@ export async function getCategoryTree(options: CategoryTreeOptions = {}): Promis
 /**
  * Get category breadcrumbs (path to root)
  */
-export async function getCategoryBreadcrumbs(categoryId: string): Promise<MACHCategory[]> {
-  const breadcrumbs: MACHCategory[] = [];
+export async function getCategoryBreadcrumbs(categoryId: string): Promise<Category[]> {
+  const breadcrumbs: Category[] = [];
   let currentId: string | undefined = categoryId;
   
   while (currentId) {
@@ -493,7 +492,7 @@ export async function getCategoryBreadcrumbs(categoryId: string): Promise<MACHCa
 /**
  * Update an existing category
  */
-export async function updateCategory(id: string, input: Partial<CreateCategoryInput>): Promise<MACHCategory | null> {
+export async function updateCategory(id: string, input: Partial<CreateCategoryInput>): Promise<Category | null> {
   const db = await getDbAsync();
   
   // Get existing category first
@@ -511,7 +510,7 @@ export async function updateCategory(id: string, input: Partial<CreateCategoryIn
   }
   
   // Create updated category object
-  const updated: MACHCategory = {
+  const updated: Category = {
     ...existing,
     ...input,
     id, // Ensure ID stays the same
@@ -526,7 +525,7 @@ export async function updateCategory(id: string, input: Partial<CreateCategoryIn
     throw new Error(`Category validation failed: ${validation.errors.join(', ')}`);
   }
   
-  const record = transformFromMACHCategory(updated);
+  const record = serializeCategory(updated);
   await db.update(categories).set(record).where(eq(categories.id, id));
   
   return getCategory(id);
@@ -553,7 +552,7 @@ export async function hardDeleteCategory(id: string): Promise<boolean> {
 /**
  * Move category to different parent
  */
-export async function moveCategoryToParent(categoryId: string, newParentId: string | null, position?: number): Promise<MACHCategory | null> {
+export async function moveCategoryToParent(categoryId: string, newParentId: string | null, position?: number): Promise<Category | null> {
   return updateCategory(categoryId, { 
     parent_id: newParentId || undefined, 
     position: position 
@@ -563,21 +562,21 @@ export async function moveCategoryToParent(categoryId: string, newParentId: stri
 /**
  * Update category product count
  */
-export async function updateCategoryProductCount(categoryId: string, count: number): Promise<MACHCategory | null> {
+export async function updateCategoryProductCount(categoryId: string, count: number): Promise<Category | null> {
   return updateCategory(categoryId, { product_count: count });
 }
 
 /**
  * Get categories by status
  */
-export async function getCategoriesByStatus(status: "active" | "inactive" | "archived"): Promise<MACHCategory[]> {
+export async function getCategoriesByStatus(status: "active" | "inactive" | "archived"): Promise<Category[]> {
   return listCategories({ status });
 }
 
 /**
  * Search categories by text
  */
-export async function searchCategories(searchTerm: string, limit?: number): Promise<MACHCategory[]> {
+export async function searchCategories(searchTerm: string, limit?: number): Promise<Category[]> {
   return listCategories({ 
     search: searchTerm, 
     limit: limit || 50 
@@ -587,28 +586,28 @@ export async function searchCategories(searchTerm: string, limit?: number): Prom
 /**
  * Get categories by tags
  */
-export async function getCategoriesByTags(tags: string | string[]): Promise<MACHCategory[]> {
+export async function getCategoriesByTags(tags: string | string[]): Promise<Category[]> {
   return listCategories({ tags });
 }
 
 /**
  * Get categories with products
  */
-export async function getCategoriesWithProducts(): Promise<MACHCategory[]> {
+export async function getCategoriesWithProducts(): Promise<Category[]> {
   return listCategories({ has_products: true });
 }
 
 /**
  * Get empty categories (no products)
  */
-export async function getEmptyCategories(): Promise<MACHCategory[]> {
+export async function getEmptyCategories(): Promise<Category[]> {
   return listCategories({ has_products: false });
 }
 
 /**
  * Format category name for display (handle localization)
  */
-export function getCategoryDisplayName(category: MACHCategory, locale = 'en'): string {
+export function getCategoryDisplayName(category: Category, locale = 'en'): string {
   if (typeof category.name === 'string') {
     return category.name;
   }
@@ -620,7 +619,7 @@ export function getCategoryDisplayName(category: MACHCategory, locale = 'en'): s
 /**
  * Format category description for display (handle localization)
  */
-export function getCategoryDescription(category: MACHCategory, locale = 'en'): string {
+export function getCategoryDescription(category: Category, locale = 'en'): string {
   if (!category.description) return '';
   
   if (typeof category.description === 'string') {
@@ -634,7 +633,7 @@ export function getCategoryDescription(category: MACHCategory, locale = 'en'): s
 /**
  * Get category URL slug (handle localization)
  */
-export function getCategorySlug(category: MACHCategory, locale = 'en'): string {
+export function getCategorySlug(category: Category, locale = 'en'): string {
   if (!category.slug) return '';
   
   if (typeof category.slug === 'string') {
