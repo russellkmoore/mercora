@@ -37,7 +37,7 @@
  */
 
 import { auth } from "@clerk/nextjs/server";
-import { getOrdersByCustomerId } from "@/lib/models/order";
+import { getOrdersByUserId } from "@/lib/models/order";
 import OrderCard from "@/components/OrderCard";
 
 /**
@@ -63,9 +63,8 @@ export default async function OrdersPage() {
     );
   }
 
-  // First get the customer ID from the Clerk user ID
-  // In our system, customer ID equals user ID for simplicity
-  const orders = await getOrdersByCustomerId(userId);
+  // Fetch user's order history from database
+  const orders = await getOrdersByUserId(userId);
 
   return (
     <main className="bg-neutral-900 text-white min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">

@@ -47,16 +47,7 @@ const getCachedCategories = unstable_cache(
  */
 export default async function Header() {
   // Fetch categories on the server for optimal performance with caching
-  const machCategories = await getCachedCategories();
-  
-  // Transform MACH categories to format expected by HeaderClient
-  const categories = machCategories.map((category, index) => ({
-    id: index + 1, // Generate numeric ID for compatibility
-    name: typeof category.name === 'object' 
-      ? category.name['en'] || Object.values(category.name)[0] || 'Unnamed Category'
-      : category.name,
-    slug: category.path.split('/').pop() || category.path // Extract slug from path
-  }));
+  const categories = await getCachedCategories();
   
   // Pass categories to client component for interactive functionality
   return <HeaderClient categories={categories} />;
