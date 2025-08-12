@@ -34,7 +34,7 @@
 "use client";
 
 import ProductCard from "@/components/ProductCard";
-import type { Product } from "@/lib/types/product";
+import type { Product } from "@/lib/types";
 import { useState, useEffect } from "react";
 import { useEnhancedUserContext } from "@/lib/hooks/useEnhancedUserContext";
 import { getPersonalizedRecommendations } from "@/lib/utils/personalized-recommendations";
@@ -55,103 +55,27 @@ export default function ProductRecommendations({
 }) {
   const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
   // Temporarily disable enhanced user context to debug cart issues
   // const userContext = useEnhancedUserContext();
   const userContext = null;
 
-  /**
-   * Load all products for personalized recommendation algorithm
-   */
   useEffect(() => {
-    const fetchAllProducts = async () => {
-      try {
-        const res = await fetch("/api/products");
-        if (res.ok) {
-          const products = await res.json() as Product[];
-          setAllProducts(products);
-        }
-      } catch (error) {
-        console.error("Error fetching products for recommendations:", error);
-      }
-    };
-
-    fetchAllProducts();
-  }, []);
-
-  /**
-   * Generate personalized recommendations using hybrid approach:
-   * 1. First try algorithmic personalization based on user context
-   * 2. Enhance with AI recommendations if needed
-   * 3. Fall back to basic similar products
-   */
-  useEffect(() => {
-    if (!product || allProducts.length === 0) return;
-
-    const generateRecommendations = async () => {
+    if (!product) return;
+    const fetchAndSetAIRecommendations = async () => {
       setIsLoading(true);
       try {
-        let recommendations: Product[] = [];
-
-        // Step 1: Try personalized algorithmic recommendations
-        if (userContext) {
-          recommendations = getPersonalizedRecommendations(
-            {
-              userContext,
-              currentProducts: [product],
-              viewingProduct: product,
-            },
-            allProducts,
-            maxRecommendations
-          );
-        }
-
-        // Step 2: If we don't have enough personalized recommendations, enhance with AI
-        // Temporarily disabled to debug cart issues
-        /*
-        if (recommendations.length < maxRecommendations) {
-          try {
-            const aiRecommendations = await fetchAIRecommendations(product, userContext);
-            
-            // Merge AI recommendations with personalized ones, avoiding duplicates
-            const existingIds = new Set(recommendations.map(p => p.id));
-            const newAIRecommendations = aiRecommendations.filter(p => 
-              !existingIds.has(p.id) && p.id !== product.id
-            );
-            
-            recommendations = [
-              ...recommendations,
-              ...newAIRecommendations.slice(0, maxRecommendations - recommendations.length)
-            ];
-          } catch (aiError) {
-            console.warn("AI recommendations failed, using personalized only:", aiError);
-          }
-        }
-        */
-
-        // Step 3: Final fallback to simple tag-based matching if still not enough
-        if (recommendations.length < maxRecommendations) {
-          const fallbackRecommendations = allProducts
-            .filter(p => 
-              p.id !== product.id && 
-              !recommendations.some(rec => rec.id === p.id) &&
-              p.tags.some(tag => product.tags.includes(tag))
-            )
-            .slice(0, maxRecommendations - recommendations.length);
-          
-          recommendations = [...recommendations, ...fallbackRecommendations];
-        }
-
-        setRecommendedProducts(recommendations);
+        const aiRecommendations = await fetchAIRecommendations(product, userContext);
+        setRecommendedProducts(aiRecommendations.slice(0, maxRecommendations));
       } catch (error) {
-        console.error("Error generating recommendations:", error);
+        console.error("Error fetching AI recommendations:", error);
+        setRecommendedProducts([]);
       } finally {
         setIsLoading(false);
       }
     };
-
-    generateRecommendations();
-  }, [product, allProducts, userContext, maxRecommendations]);
+    fetchAndSetAIRecommendations();
+  }, [product, userContext, maxRecommendations]);
+// ...existing code...
 
   /**
    * Fetch AI-powered recommendations with enhanced user context
@@ -162,10 +86,8 @@ export default function ProductRecommendations({
   ): Promise<Product[]> => {
     try {
       const productTags = currentProduct.tags?.join(", ") || "";
-      const productUseCases = currentProduct.useCases?.join(", ") || "";
-      
-      // Enhanced query with user context
-      let recommendationQuery = `I'm interested in the ${currentProduct.name}. It's used for ${productUseCases} and has tags: ${productTags}.`;
+  // Enhanced query with user context
+  let recommendationQuery = `I'm interested in the ${currentProduct.name}. It has tags: ${productTags}.`;
       
       if (userContext?.orders?.length > 0) {
         recommendationQuery += ` I'm a returning customer with ${userContext.orders.length} previous orders.`;

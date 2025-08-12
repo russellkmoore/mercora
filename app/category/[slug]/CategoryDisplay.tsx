@@ -37,12 +37,12 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ProductCard from "@/components/ProductCard";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ArrowUp, ArrowDown } from "lucide-react";
-import type { Category } from "@/lib/types/category";
-import type { Product } from "@/lib/types/product";
+import type { Category, Product } from "@/lib/types/";
+import { listProducts, getEffectivePrice } from "@/lib/models";
 
 interface CategoryDisplayProps {
   category: Category;
@@ -56,28 +56,25 @@ interface CategoryDisplayProps {
  */
 export default function CategoryDisplay({ category }: CategoryDisplayProps) {
   const [sortBy, setSortBy] = useState("featured");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  /**
-   * Calculate the effective price for a product (considers sale pricing)
-   * 
-   * @param p - Product object
-   * @returns The effective price (sale price if on sale, otherwise regular price)
-   */
-  const getEffectivePrice = (p: Product) =>
-    p.onSale && p.salePrice != null ? p.salePrice : p.price;
+  useEffect(() => {
+    setLoading(true);
+    listProducts().then((all) => {
+      setProducts(
+        all.filter((p) => Array.isArray(p.categories) && p.categories.includes(category.id))
+      );
+      setLoading(false);
+    });
+  }, [category.id]);
 
-  /**
-   * Sort products based on selected criteria
-   * Maintains stable sort for consistent ordering
-   */
-  const sortedProducts = [...category.products].sort((a, b) => {
-    if (sortBy === "price-high")
+  const sortedProducts = [...products].sort((a, b) => {
+    if (sortBy === "price-high") {
       return getEffectivePrice(b) - getEffectivePrice(a);
-    if (sortBy === "price-low")
+    }
+    if (sortBy === "price-low") {
       return getEffectivePrice(a) - getEffectivePrice(b);
-    if (sortBy === "availability") {
-      if (a.availability === b.availability) return 0;
-      return a.availability === "available" ? -1 : 1;
     }
     return 0;
   });

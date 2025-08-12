@@ -68,9 +68,9 @@ interface CartState {
   /** Add an item to the cart (merges quantities if item exists) */
   addItem: (item: CartItem) => void;
   /** Remove an item completely from the cart */
-  removeItem: (productId: number) => void;
+  removeItem: (variantId: string) => void;
   /** Update the quantity of a specific item */
-  updateQuantity: (productId: number, quantity: number) => void;
+  updateQuantity: (variantId: string, quantity: number) => void;
   /** Clear all items from the cart */
   clearCart: () => void;
   /** Calculate total price of all items in cart */
@@ -112,13 +112,13 @@ export const useCartStore = create<CartState>()(
        */
       addItem: (item) => {
         const items = get().items;
-        const existing = items.find((i) => i.productId === item.productId);
+        const existing = items.find((i) => i.variantId === item.variantId);
 
         if (existing) {
           // Merge quantities for existing items
           set({
             items: items.map((i) =>
-              i.productId === item.productId
+              i.variantId === item.variantId
                 ? { ...i, quantity: i.quantity + item.quantity }
                 : i
             ),
@@ -130,24 +130,24 @@ export const useCartStore = create<CartState>()(
       },
 
       /**
-       * Remove item completely from cart by product ID
+       * Remove item completely from cart by variant ID
        */
-      removeItem: (id) => {
-        set({ items: get().items.filter((i) => i.productId !== id) });
+      removeItem: (variantId) => {
+        set({ items: get().items.filter((i) => i.variantId !== variantId) });
       },
 
       /**
        * Update item quantity with validation (removes if quantity < 1)
        */
-      updateQuantity: (id, quantity) => {
+      updateQuantity: (variantId, quantity) => {
         if (quantity < 1) {
           // Remove item if quantity becomes invalid
-          get().removeItem(id);
+          get().removeItem(variantId);
         } else {
           // Update quantity for specified item
           set({
             items: get().items.map((i) =>
-              i.productId === id ? { ...i, quantity } : i
+              i.variantId === variantId ? { ...i, quantity } : i
             ),
           });
         }

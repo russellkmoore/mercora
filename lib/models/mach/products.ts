@@ -1,3 +1,23 @@
+
+/**
+ * Get a product by its slug (MACH-compliant)
+ * @param slug - The URL-friendly product identifier
+ * @returns Promise<Product | null>
+ */
+export async function getProductBySlug(slug: string): Promise<Product | null> {
+  const db = getDb();
+  // Some products may have slug as a string or as a localized object; handle both
+  const results = await db.select().from(products);
+  const match = results.find((p: any) => {
+    if (!p.slug) return false;
+    if (typeof p.slug === 'string') return p.slug === slug;
+    if (typeof p.slug === 'object' && p.slug !== null) {
+      return Object.values(p.slug).includes(slug);
+    }
+    return false;
+  });
+  return match ? (match as Product) : null;
+}
 /**
  * MACH Alliance Product Entity - Business Model
  * Core business logic for Product and ProductVariant management
@@ -341,4 +361,13 @@ export async function duplicateProduct(
   };
 
   return await createProduct(duplicateData);
+}
+
+/**
+ * Helper to get the effective price (lowest sale or regular) for a product
+ * Returns the price of the default variant, or the first variant if not set
+ */
+export function getEffectivePrice(product: Product): number {
+  const variant = product.variants?.find((v) => v.id === product.default_variant_id) || product.variants?.[0];
+  return variant?.price?.amount ?? Number.POSITIVE_INFINITY;
 }
