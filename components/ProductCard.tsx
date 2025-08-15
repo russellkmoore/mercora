@@ -76,9 +76,9 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
   const primaryImageUrl =
     typeof product.primary_image === "string"
       ? product.primary_image
-      : product.primary_image?.file?.url || null;
+      : product.primary_image?.url || null;
 
-  // Name/description logic
+  // Name/description/slug logic
   const name =
     typeof product.name === "string"
       ? product.name
@@ -87,9 +87,13 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
     typeof product.description === "string"
       ? product.description
       : Object.values(product.description || {})[0] || "";
+  const slug =
+    typeof product.slug === "string"
+      ? product.slug
+      : Object.values(product.slug || {})[0] || "";
 
   return (
-    <Link href={`/product/${product.slug}`} prefetch={true}>
+    <Link href={`/product/${slug}`} prefetch={true}>
       <div className="bg-neutral-800 rounded-lg overflow-hidden shadow hover:shadow-lg transition cursor-pointer">
         <div className="relative aspect-video bg-neutral-700">
           {primaryImageUrl ? (
@@ -150,7 +154,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
           </p>
 
           <Link
-            href={`/product/${product.slug}`}
+            href={`/product/${slug}`}
             className="text-orange-500 hover:underline text-sm font-medium"
             prefetch={true}
           >

@@ -261,3 +261,102 @@ INSERT INTO inventory (id, sku_id, location_id, quantities, status, stock_status
 ('inv_28', 'variant_28', 'warehouse_main', '{"on_hand": 115, "reserved": 0, "available": 115}', 'active', 'in_stock', '{"legacy_inventory_id": "28"}', datetime('now'), datetime('now'), NULL, 0, NULL, 10, 0, '{}'),
 ('inv_29', 'variant_29', 'warehouse_main', '{"on_hand": 95, "reserved": 0, "available": 95}', 'active', 'in_stock', '{"legacy_inventory_id": "29"}', datetime('now'), datetime('now'), NULL, 0, NULL, 10, 0, '{}'),
 ('inv_30', 'variant_30', 'warehouse_main', '{"on_hand": 110, "reserved": 0, "available": 110}', 'active', 'in_stock', '{"legacy_inventory_id": "30"}', datetime('now'), datetime('now'), NULL, 0, NULL, 10, 0, '{}');
+
+-- =====================================================
+-- Demo Promotions Data (MACH Alliance Compliant)
+-- =====================================================
+
+-- Demo promotions for testing discount code functionality
+-- Easy-to-remember codes for demo purposes
+INSERT INTO promotions (id, name, type, rules, status, description, slug, external_references, created_at, updated_at, valid_from, valid_to, activation_method, codes, usage_limits, eligibility, priority, stackable, extensions) VALUES
+
+-- Cart Discount: 20% off orders over $50
+('promo_cart_20', '{"en": "20% Off Orders Over $50"}', 'cart', 
+'{"actions": [{"type": "percentage_discount", "value": 20, "apply_to": "cart_subtotal"}], "conditions": [{"type": "cart_subtotal", "operator": "gte", "value": {"amount": 5000, "currency": "USD"}}]}', 
+'active', '{"en": "Save 20% on your entire order when you spend $50 or more!"}', 'save20', 
+'{"demo": "true", "campaign": "DEMO-CART-DISCOUNT"}', datetime('now'), datetime('now'), 
+datetime('now'), datetime('2025-12-31 23:59:59'), 'code', 
+'{"generation_type": "single", "single_code": "SAVE20"}', 
+'{"total_uses": 1000, "uses_remaining": 1000, "per_customer": 5}', 
+'{"customer_types": ["all"], "channels": ["web", "mobile"], "regions": ["US"]}', 
+100, 1, '{"demo_note": "Easy demo code for cart discount testing"}'),
+
+-- Free Shipping: Remove shipping cost entirely
+('promo_free_ship', '{"en": "Free Shipping"}', 'shipping', 
+'{"actions": [{"type": "shipping_percentage_discount", "value": 100, "apply_to": "shipping_cost"}]}', 
+'active', '{"en": "Get free shipping on your order - no minimum required!"}', 'freeship', 
+'{"demo": "true", "campaign": "DEMO-FREE-SHIPPING"}', datetime('now'), datetime('now'), 
+datetime('now'), datetime('2025-12-31 23:59:59'), 'code', 
+'{"generation_type": "single", "single_code": "FREESHIP"}', 
+'{"total_uses": 1000, "uses_remaining": 1000, "per_customer": 3}', 
+'{"customer_types": ["all"], "channels": ["web", "mobile"], "regions": ["US"]}', 
+50, 1, '{"demo_note": "Easy demo code for free shipping testing"}'),
+
+-- Fixed Amount Off: $10 off any order
+('promo_10off', '{"en": "$10 Off Any Order"}', 'cart', 
+'{"actions": [{"type": "fixed_discount", "value": {"amount": 1000, "currency": "USD"}, "apply_to": "cart_subtotal"}]}', 
+'active', '{"en": "Take $10 off your entire order - no minimum required!"}', 'tenoff', 
+'{"demo": "true", "campaign": "DEMO-FIXED-DISCOUNT"}', datetime('now'), datetime('now'), 
+datetime('now'), datetime('2025-12-31 23:59:59'), 'code', 
+'{"generation_type": "single", "single_code": "10OFF"}', 
+'{"total_uses": 500, "uses_remaining": 500, "per_customer": 2}', 
+'{"customer_types": ["all"], "channels": ["web", "mobile"], "regions": ["US"]}', 
+75, 1, '{"demo_note": "Easy demo code for fixed amount discount testing"}'),
+
+-- Product Category Discount: 30% off Tools
+('promo_tools_30', '{"en": "30% Off All Tools"}', 'product', 
+'{"actions": [{"type": "item_percentage_discount", "value": 30, "apply_to": "product_price"}], "conditions": [{"type": "product_category", "operator": "in", "value": ["cat_5"]}]}', 
+'active', '{"en": "Save 30% on all precision tools and tactical gear!"}', 'toolsale', 
+'{"demo": "true", "campaign": "DEMO-CATEGORY-DISCOUNT"}', datetime('now'), datetime('now'), 
+datetime('now'), datetime('2025-12-31 23:59:59'), 'code', 
+'{"generation_type": "single", "single_code": "TOOLS30"}', 
+'{"total_uses": 300, "uses_remaining": 300, "per_customer": 1}', 
+'{"customer_types": ["all"], "channels": ["web", "mobile"], "regions": ["US"]}', 
+60, 1, '{"demo_note": "Easy demo code for category-specific discount testing"}'),
+
+-- High Value Discount: 25% off orders over $100
+('promo_vip_25', '{"en": "VIP: 25% Off Orders Over $100"}', 'cart', 
+'{"actions": [{"type": "percentage_discount", "value": 25, "apply_to": "cart_subtotal"}], "conditions": [{"type": "cart_subtotal", "operator": "gte", "value": {"amount": 10000, "currency": "USD"}}]}', 
+'active', '{"en": "VIP customers save big - 25% off when you spend $100 or more!"}', 'vip25', 
+'{"demo": "true", "campaign": "DEMO-VIP-DISCOUNT"}', datetime('now'), datetime('now'), 
+datetime('now'), datetime('2025-12-31 23:59:59'), 'code', 
+'{"generation_type": "single", "single_code": "VIP25"}', 
+'{"total_uses": 100, "uses_remaining": 100, "per_customer": 1}', 
+'{"customer_types": ["all"], "channels": ["web", "mobile"], "regions": ["US"]}', 
+200, 0, '{"demo_note": "High-value discount code - non-stackable"}'),
+
+-- First Time Customer: 15% off first order
+('promo_welcome15', '{"en": "Welcome: 15% Off First Order"}', 'cart', 
+'{"actions": [{"type": "percentage_discount", "value": 15, "apply_to": "cart_subtotal"}]}', 
+'active', '{"en": "Welcome to Mercora! Save 15% on your first order with us."}', 'welcome15', 
+'{"demo": "true", "campaign": "DEMO-WELCOME-DISCOUNT"}', datetime('now'), datetime('now'), 
+datetime('now'), datetime('2025-12-31 23:59:59'), 'code', 
+'{"generation_type": "single", "single_code": "WELCOME15"}', 
+'{"total_uses": 1000, "uses_remaining": 1000, "per_customer": 1}', 
+'{"customer_types": ["new"], "channels": ["web", "mobile"], "regions": ["US"]}', 
+80, 1, '{"demo_note": "First-time customer discount code"}'),
+
+-- Small Shipping Discount: 50% off shipping
+('promo_halfship', '{"en": "50% Off Shipping"}', 'shipping', 
+'{"actions": [{"type": "shipping_percentage_discount", "value": 50, "apply_to": "shipping_cost"}]}', 
+'active', '{"en": "Cut your shipping costs in half with this exclusive offer!"}', 'halfship', 
+'{"demo": "true", "campaign": "DEMO-SHIPPING-DISCOUNT"}', datetime('now'), datetime('now'), 
+datetime('now'), datetime('2025-12-31 23:59:59'), 'code', 
+'{"generation_type": "single", "single_code": "HALFSHIP"}', 
+'{"total_uses": 500, "uses_remaining": 500, "per_customer": 2}', 
+'{"customer_types": ["all"], "channels": ["web", "mobile"], "regions": ["US"]}', 
+40, 1, '{"demo_note": "50% shipping discount for testing"}');
+
+-- =====================================================
+-- Demo Coupon Instances Data (MACH Alliance Compliant) 
+-- =====================================================
+
+-- Coupon instances for the demo promotions - individual code tracking
+INSERT INTO coupon_instances (id, promotion_id, code, status, usage_count, max_uses, created_at, updated_at, redeemed_by, redeemed_at, external_references, extensions) VALUES
+('coupon_save20', 'promo_cart_20', 'SAVE20', 'active', 0, 1000, datetime('now'), datetime('now'), NULL, NULL, '{"demo": "true"}', '{"description": "Demo: 20% off orders over $50"}'),
+('coupon_freeship', 'promo_free_ship', 'FREESHIP', 'active', 0, 1000, datetime('now'), datetime('now'), NULL, NULL, '{"demo": "true"}', '{"description": "Demo: Free shipping"}'),
+('coupon_10off', 'promo_10off', '10OFF', 'active', 0, 500, datetime('now'), datetime('now'), NULL, NULL, '{"demo": "true"}', '{"description": "Demo: $10 off any order"}'),
+('coupon_tools30', 'promo_tools_30', 'TOOLS30', 'active', 0, 300, datetime('now'), datetime('now'), NULL, NULL, '{"demo": "true"}', '{"description": "Demo: 30% off all tools"}'),
+('coupon_vip25', 'promo_vip_25', 'VIP25', 'active', 0, 100, datetime('now'), datetime('now'), NULL, NULL, '{"demo": "true"}', '{"description": "Demo: 25% off orders over $100"}'),
+('coupon_welcome15', 'promo_welcome15', 'WELCOME15', 'active', 0, 1000, datetime('now'), datetime('now'), NULL, NULL, '{"demo": "true"}', '{"description": "Demo: 15% off first order"}'),
+('coupon_halfship', 'promo_halfship', 'HALFSHIP', 'active', 0, 500, datetime('now'), datetime('now'), NULL, NULL, '{"demo": "true"}', '{"description": "Demo: 50% off shipping"});

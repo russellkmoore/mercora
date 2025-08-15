@@ -29,13 +29,13 @@
  * No props required - this is a top-level server component.
  */
 
-import { getCategories } from "@/lib/loaders/categories";
+import { listCategories } from "@/lib/models";
 import HeaderClient from "./HeaderClient";
 import { unstable_cache } from "next/cache";
 
 // Cache categories for better performance
 const getCachedCategories = unstable_cache(
-  async () => getCategories(),
+  async () => listCategories(),
   ['header-categories'],
   { revalidate: 3600 } // Cache for 1 hour
 );

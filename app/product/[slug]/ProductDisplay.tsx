@@ -46,19 +46,19 @@ import { toast } from "sonner";
 import type { Product } from "@/lib/types/";
 
 export default function ProductDisplay({ product }: { product: Product }) {
-  // Helper to get the best image URL from a MACHMedia object
+  // Helper to get the best image URL from a MACH Media object
   function getMediaUrl(media: any): string {
     if (!media) return "/placeholder.jpg";
     if (typeof media === "string") return media;
-    return media.url || media.src || media.path || media.file?.url || "/placeholder.jpg";
+    return media.url || "/placeholder.jpg";
   }
 
   // Build all images array: primary_image + media[]
   const allImages = Array.from(
     new Set([
-      product.primary_image,
+      product.primary_image?.url,
       ...(Array.isArray(product.media)
-        ? product.media.map((m) => m.file?.url).filter(Boolean)
+        ? product.media.map((m) => m.url).filter(Boolean)
         : [])
     ].filter(Boolean))
   ) as string[];
@@ -181,7 +181,7 @@ export default function ProductDisplay({ product }: { product: Product }) {
                   name: typeof product.name === "string" ? product.name : "",
                   price: price / 100,
                   quantity: 1,
-                  primaryImageUrl: getMediaUrl(product.primary_image),
+                  primaryImageUrl: product.primary_image?.url || "/placeholder.jpg",
                 });
                 toast("Added to Cart", {
                   description: `${typeof product.name === "string" ? product.name : ""} has been added to your cart.`,

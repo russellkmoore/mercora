@@ -1,24 +1,72 @@
 import { promotions, transformPromotionForDB, isActivePromotion, canBeUsedByCustomer, canBeUsedInChannel, canBeUsedInRegion, generatePromotionSlug, getActionsByType, getConditionsByType, hasCartSubtotalCondition, getCartMinimumAmount, getTotalUsesRemaining, isExpiredPromotion, isCodeBasedPromotion, isAutomaticPromotion, getLocalizedValue } from "../../db/schema/promotions";
+import { coupon_instances } from "../../db/schema/coupon-instances";
 import { eq, and, or, sql, isNotNull, isNull, gte, lte, desc, asc } from "drizzle-orm";
-import { 
-  type MACHPromotion,
-  type MACHPromotionRules,
-  type MACHPromotionCodes,
-  type MACHUsageLimits,
-  type MACHEligibility,
-  type MACHAction,
-  type MACHCondition
-} from "../../types/mach/Promotion";
+import { getDb } from "../../db/connection";
+import type { 
+  Promotion,
+  PromotionRules,
+  PromotionCodes,
+  UsageLimits,
+  Eligibility,
+  Action,
+  Condition,
+  CouponInstance
+} from "../../types";
 
-// Define additional types that weren't in the original file
-export type MACHPromotionType = "cart" | "product" | "shipping";
-export type MACHPromotionStatus = "draft" | "scheduled" | "active" | "paused" | "expired" | "archived";
-export type PromotionActivationMethod = "automatic" | "code" | "customer_specific" | "link";
+// =====================================================
+// Simple CRUD Functions (for API usage)
+// =====================================================
+
+/**
+ * List all promotions
+ */
+export async function listPromotions(): Promise<Promotion[]> {
+  const db = getDb();
+  const results = await db.select().from(promotions);
+  return results as Promotion[];
+}
+
+/**
+ * Get promotion by ID
+ */
+export async function getPromotionById(id: string): Promise<Promotion | null> {
+  const db = getDb();
+  const results = await db.select()
+    .from(promotions)
+    .where(eq(promotions.id, id))
+    .limit(1);
+  
+  return results.length > 0 ? results[0] as Promotion : null;
+}
+
+/**
+ * List all coupon instances
+ */
+export async function listCouponInstances(): Promise<CouponInstance[]> {
+  const db = getDb();
+  const results = await db.select().from(coupon_instances);
+  return results as CouponInstance[];
+}
+
+/**
+ * Get coupon instance by code
+ */
+export async function getCouponInstanceByCode(code: string): Promise<CouponInstance | null> {
+  const db = getDb();
+  const results = await db.select()
+    .from(coupon_instances)
+    .where(eq(coupon_instances.code, code.toUpperCase()))
+    .limit(1);
+  
+  return results.length > 0 ? results[0] as CouponInstance : null;
+}
+
+// All types are defined in the base MACH Promotion model - no additional types needed
 
 export interface PromotionFilterOptions {
-  type?: MACHPromotionType;
-  status?: MACHPromotionStatus | MACHPromotionStatus[];
-  activationMethod?: PromotionActivationMethod;
+  type?: Promotion['type'];
+  status?: Promotion['status'] | Promotion['status'][];
+  activationMethod?: Promotion['activation_method'];
   stackable?: boolean;
   validOn?: Date | string;
   priority?: { min?: number; max?: number };
@@ -28,14 +76,14 @@ export interface PromotionFilterOptions {
   sortOrder?: 'asc' | 'desc';
 }
 
-export interface PromotionCreateInput extends Partial<MACHPromotion> {
+export interface PromotionCreateInput extends Partial<Promotion> {
   id: string;
   name: string | Record<string, string>;
-  type: MACHPromotionType;
-  rules: MACHPromotionRules;
+  type: Promotion['type'];
+  rules: PromotionRules;
 }
 
-export interface PromotionUpdateInput extends Partial<MACHPromotion> {
+export interface PromotionUpdateInput extends Partial<Promotion> {
   id?: never; // Prevent ID updates
 }
 
@@ -57,7 +105,7 @@ export interface PromotionEvaluationContext {
 }
 
 // Utility functions for promotion validation and evaluation
-export function validatePromotionObject(data: Partial<MACHPromotion>): boolean {
+export function validatePromotionObject(data: Partial<Promotion>): boolean {
   if (!data.id || !data.name || !data.type || !data.rules) {
     return false;
   }
@@ -73,7 +121,7 @@ export function generatePromotionCode(length: number = 8): string {
   return result;
 }
 
-export function checkTimeValidity(promotion: MACHPromotion): boolean {
+export function checkTimeValidity(promotion: Promotion): boolean {
   const now = new Date();
   
   if (promotion.valid_from) {
@@ -89,7 +137,7 @@ export function checkTimeValidity(promotion: MACHPromotion): boolean {
   return true;
 }
 
-export function checkUsageLimits(promotion: MACHPromotion, context: PromotionEvaluationContext): boolean {
+export function checkUsageLimits(promotion: Promotion, context: PromotionEvaluationContext): boolean {
   if (!promotion.usage_limits) return true;
   
   const limits = promotion.usage_limits;
@@ -107,7 +155,7 @@ export function checkUsageLimits(promotion: MACHPromotion, context: PromotionEva
   return true;
 }
 
-export function checkPromotionEligibility(promotion: MACHPromotion, context: PromotionEvaluationContext): boolean {
+export function checkPromotionEligibility(promotion: Promotion, context: PromotionEvaluationContext): boolean {
   if (!promotion.eligibility) return true;
   
   // Check customer eligibility
@@ -128,7 +176,7 @@ export function checkPromotionEligibility(promotion: MACHPromotion, context: Pro
   return true;
 }
 
-export function evaluatePromotionConditions(rules: MACHPromotionRules, context: PromotionEvaluationContext): boolean {
+export function evaluatePromotionConditions(rules: PromotionRules, context: PromotionEvaluationContext): boolean {
   if (!rules.conditions || rules.conditions.length === 0) return true;
   
   // Default to 'and' operator for conditions
@@ -156,7 +204,7 @@ export function evaluatePromotionConditions(rules: MACHPromotionRules, context: 
   return conditionOperator === 'and' ? results.every(Boolean) : results.some(Boolean);
 }
 
-function evaluateNumericCondition(value: number, condition: MACHCondition): boolean {
+function evaluateNumericCondition(value: number, condition: Condition): boolean {
   const conditionValue = typeof condition.value === 'object' && condition.value?.amount 
     ? condition.value.amount : condition.value as number;
     
@@ -170,7 +218,7 @@ function evaluateNumericCondition(value: number, condition: MACHCondition): bool
   }
 }
 
-function evaluateArrayCondition(values: (string | undefined)[], condition: MACHCondition): boolean {
+function evaluateArrayCondition(values: (string | undefined)[], condition: Condition): boolean {
   const conditionValue = condition.value;
   
   switch (condition.operator) {
@@ -183,7 +231,7 @@ function evaluateArrayCondition(values: (string | undefined)[], condition: MACHC
   }
 }
 
-export function calculatePromotionDiscount(promotion: MACHPromotion, context: PromotionEvaluationContext): number {
+export function calculatePromotionDiscount(promotion: Promotion, context: PromotionEvaluationContext): number {
   let totalDiscount = 0;
   
   for (const action of promotion.rules.actions) {
@@ -230,14 +278,14 @@ export class PromotionModel {
   /**
    * Create a new promotion
    */
-  async createPromotion(data: PromotionCreateInput): Promise<MACHPromotion | null> {
+  async createPromotion(data: PromotionCreateInput): Promise<Promotion | null> {
     // Validate input data
-    if (!validatePromotionObject(data as MACHPromotion)) {
+    if (!validatePromotionObject(data as Promotion)) {
       throw new Error("Invalid promotion data");
     }
 
     // Transform data for storage
-    const transformedData = transformPromotionForDB(data as MACHPromotion);
+    const transformedData = transformPromotionForDB(data as Promotion);
 
     // Insert into database
     const result = await this.db.insert(promotions).values(transformedData).returning();
@@ -252,7 +300,7 @@ export class PromotionModel {
   /**
    * Get promotion by ID
    */
-  async getPromotionById(id: string): Promise<MACHPromotion | null> {
+  async getPromotionById(id: string): Promise<Promotion | null> {
     const result = await this.db.select().from(promotions).where(eq(promotions.id, id));
     
     if (!result[0]) {
@@ -265,7 +313,7 @@ export class PromotionModel {
   /**
    * Update existing promotion
    */
-  async updatePromotion(id: string, data: PromotionUpdateInput): Promise<MACHPromotion | null> {
+  async updatePromotion(id: string, data: PromotionUpdateInput): Promise<Promotion | null> {
     // Get existing promotion
     const existing = await this.getPromotionById(id);
     if (!existing) {
@@ -276,12 +324,12 @@ export class PromotionModel {
     const mergedData = { ...existing, ...data };
 
     // Validate merged data
-    if (!validatePromotionObject(mergedData as MACHPromotion)) {
+    if (!validatePromotionObject(mergedData as Promotion)) {
       throw new Error("Invalid promotion data");
     }
 
     // Transform data for storage
-    const transformedData = transformPromotionForDB(mergedData as MACHPromotion);
+    const transformedData = transformPromotionForDB(mergedData as Promotion);
 
     // Update in database
     const result = await this.db
@@ -312,7 +360,7 @@ export class PromotionModel {
   /**
    * Get all promotions with optional filtering
    */
-  async getPromotions(options: PromotionFilterOptions = {}): Promise<MACHPromotion[]> {
+  async getPromotions(options: PromotionFilterOptions = {}): Promise<Promotion[]> {
     const {
       type,
       status,

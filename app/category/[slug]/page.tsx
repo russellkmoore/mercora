@@ -15,8 +15,8 @@ export default async function CategoryPage({ params }: any) {
           {category.primary_image && (
             <>
               <Image
-                src={`/${category.primary_image}`}
-                alt={typeof category.name === "string" ? category.name : ""}
+                src={`/${category.primary_image.url}`}
+                alt={category.primary_image.alt_text || (typeof category.name === "string" ? category.name : "")}
                 layout="fill"
                 objectFit="cover"
                 sizes="100vw"

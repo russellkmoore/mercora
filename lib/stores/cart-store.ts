@@ -45,12 +45,30 @@ import type { BillingInfo } from "@/lib/types/billing";
 import type { ShippingOption } from "@/lib/types/shipping";
 
 /**
+ * Interface for applied discount information
+ */
+export interface AppliedDiscount {
+  promotionId: string;
+  code: string;
+  type: "cart" | "product" | "shipping";
+  description: string;
+  amount: number;
+  displayName: string; // e.g., "20% Off", "Free Shipping", "$10 Off"
+}
+
+/**
  * Cart store state interface defining all cart-related state and actions
  */
 interface CartState {
   // === Cart Items ===
   /** Array of items currently in the shopping cart */
   items: CartItem[];
+
+  // === Discount Information ===
+  /** Array of applied discounts and their details */
+  appliedDiscounts: AppliedDiscount[];
+  /** Total discount amount across all types */
+  totalDiscount: number;
 
   // === Checkout Information ===
   /** Customer shipping address */
@@ -76,6 +94,25 @@ interface CartState {
   /** Calculate total price of all items in cart */
   get total(): number;
 
+  // === Discount Management Actions ===
+  /** Apply a discount to the cart */
+  applyDiscount: (discount: AppliedDiscount) => void;
+  /** Remove a specific discount by promotion ID */
+  removeDiscount: (promotionId: string) => void;
+  /** Clear all applied discounts */
+  clearDiscounts: () => void;
+  /** Update shipping discount amounts when shipping option changes */
+  updateShippingDiscounts: () => void;
+  /** Calculate order totals with discounts applied */
+  calculateTotals: () => {
+    subtotal: number;
+    cartDiscount: number;
+    shippingCost: number;
+    shippingDiscount: number;
+    tax: number;
+    total: number;
+  };
+
   // === Checkout Information Setters ===
   /** Set customer shipping address */
   setShippingAddress: (address: Address) => void;
@@ -100,6 +137,8 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       // Initial state
       items: [],
+      appliedDiscounts: [],
+      totalDiscount: 0,
       shippingAddress: undefined,
       billingAddress: undefined,
       shippingOption: undefined,
@@ -170,12 +209,132 @@ export const useCartStore = create<CartState>()(
       clearCart: () =>
         set({
           items: [],
+          appliedDiscounts: [],
+          totalDiscount: 0,
           shippingAddress: undefined,
           billingAddress: undefined,
           shippingOption: undefined,
           billingInfo: undefined,
           taxAmount: undefined,
         }),
+
+      // === Discount Management Actions ===
+      
+      /**
+       * Apply a discount to the cart
+       * Prevents duplicate discounts and updates total discount amount
+       */
+      applyDiscount: (discount) => {
+        const state = get();
+        const existing = state.appliedDiscounts.find(d => d.promotionId === discount.promotionId);
+        
+        if (!existing) {
+          const newDiscounts = [...state.appliedDiscounts, discount];
+          const newTotalDiscount = newDiscounts.reduce((sum, d) => sum + d.amount, 0);
+          
+          set({
+            appliedDiscounts: newDiscounts,
+            totalDiscount: newTotalDiscount,
+          });
+        }
+      },
+
+      /**
+       * Remove a specific discount by promotion ID
+       */
+      removeDiscount: (promotionId) => {
+        const state = get();
+        const newDiscounts = state.appliedDiscounts.filter(d => d.promotionId !== promotionId);
+        const newTotalDiscount = newDiscounts.reduce((sum, d) => sum + d.amount, 0);
+        
+        set({
+          appliedDiscounts: newDiscounts,
+          totalDiscount: newTotalDiscount,
+        });
+      },
+
+      /**
+       * Clear all applied discounts
+       */
+      clearDiscounts: () => set({
+        appliedDiscounts: [],
+        totalDiscount: 0,
+      }),
+
+      /**
+       * Update shipping discount amounts when shipping option changes
+       * Recalculates shipping discounts based on current shipping cost
+       */
+      updateShippingDiscounts: () => {
+        const state = get();
+        const shippingCost = state.shippingOption?.cost || 0;
+        
+        const updatedDiscounts = state.appliedDiscounts.map(discount => {
+          if (discount.type === 'shipping') {
+            // Get the discount details from the displayName to determine type
+            if (discount.displayName.includes('Free Shipping') || discount.displayName.includes('100%')) {
+              // Free shipping (100% off)
+              return { ...discount, amount: shippingCost };
+            } else if (discount.displayName.includes('%')) {
+              // Percentage discount
+              const match = discount.displayName.match(/(\d+)%/);
+              if (match) {
+                const percentage = parseInt(match[1]);
+                return { ...discount, amount: shippingCost * (percentage / 100) };
+              }
+            } else if (discount.displayName.includes('$')) {
+              // Fixed amount discount
+              const match = discount.displayName.match(/\$(\d+)/);
+              if (match) {
+                const fixedAmount = parseInt(match[1]);
+                return { ...discount, amount: Math.min(fixedAmount, shippingCost) };
+              }
+            }
+          }
+          return discount;
+        });
+
+        const newTotalDiscount = updatedDiscounts.reduce((sum, d) => sum + d.amount, 0);
+        
+        set({
+          appliedDiscounts: updatedDiscounts,
+          totalDiscount: newTotalDiscount,
+        });
+      },
+
+      /**
+       * Calculate order totals with discounts applied
+       * Returns breakdown of all pricing components
+       */
+      calculateTotals: () => {
+        const state = get();
+        const subtotal = state.items.reduce((total, item) => total + (item.price * item.quantity), 0);
+        const shippingCost = state.shippingOption?.cost || 0;
+        
+        // Separate cart and shipping discounts
+        const cartDiscounts = state.appliedDiscounts.filter(d => d.type === 'cart');
+        const shippingDiscounts = state.appliedDiscounts.filter(d => d.type === 'shipping');
+        
+        const cartDiscountAmount = cartDiscounts.reduce((sum, d) => sum + d.amount, 0);
+        const shippingDiscountAmount = shippingDiscounts.reduce((sum, d) => sum + d.amount, 0);
+        
+        // Apply discounts with minimums of 0
+        const discountedSubtotal = Math.max(0, subtotal - cartDiscountAmount);
+        const discountedShipping = Math.max(0, shippingCost - shippingDiscountAmount);
+        
+        // Calculate tax on discounted amounts
+        const tax = state.taxAmount || 0;
+        const total = discountedSubtotal + discountedShipping + tax;
+        
+        return {
+          subtotal,
+          cartDiscount: cartDiscountAmount,
+          shippingCost,
+          shippingDiscount: shippingDiscountAmount,
+          tax,
+          total,
+        };
+      },
 
       // === Checkout Information Setters ===
       /** Set customer shipping address */

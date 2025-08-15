@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { Address } from "@/lib/types";
 
 type BillingFormProps = {
   disabled: boolean;
@@ -16,12 +17,7 @@ export type BillingInfo = {
   cardNumber: string;
   expiration: string;
   cvv: string;
-  address: string;
-  address2: string;
-  city: string;
-  state: string;
-  zip: string;
-  country: string;
+  billingAddress?: Partial<Address>;
 };
 
 export default function BillingForm({
@@ -35,17 +31,30 @@ export default function BillingForm({
     cardNumber: "",
     expiration: "",
     cvv: "",
-    address: "",
-    address2: "",
-    city: "",
-    state: "",
-    zip: "",
-    country: "",
+    billingAddress: {
+      line1: "",
+      line2: "",
+      city: "",
+      region: "",
+      postal_code: "",
+      country: "",
+    },
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setBilling((prev) => ({ ...prev, [name]: value }));
+    if (name.startsWith('billing_')) {
+      const addressField = name.replace('billing_', '') as keyof Address;
+      setBilling((prev) => ({
+        ...prev,
+        billingAddress: {
+          ...prev.billingAddress,
+          [addressField]: value,
+        },
+      }));
+    } else {
+      setBilling((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const isComplete =
@@ -54,11 +63,11 @@ export default function BillingForm({
     billing.expiration &&
     billing.cvv &&
     (sameAsShipping ||
-      (billing.address &&
-        billing.city &&
-        billing.state &&
-        billing.zip &&
-        billing.country));
+      (billing.billingAddress?.line1 &&
+        billing.billingAddress?.city &&
+        billing.billingAddress?.region &&
+        billing.billingAddress?.postal_code &&
+        billing.billingAddress?.country));
 
   const handleSubmit = () => {
     if (!disabled && isComplete) {
@@ -125,48 +134,48 @@ export default function BillingForm({
           <div className="space-y-4">
             <Input
               placeholder="Billing Address"
-              name="address"
-              value={billing.address}
+              name="billing_line1"
+              value={typeof billing.billingAddress?.line1 === 'string' ? billing.billingAddress.line1 : ""}
               onChange={handleChange}
               disabled={disabled}
             />
             <Input
               placeholder="Billing Address 2"
-              name="address2"
-              value={billing.address2}
+              name="billing_line2"
+              value={typeof billing.billingAddress?.line2 === 'string' ? billing.billingAddress.line2 || '' : ""}
               onChange={handleChange}
               disabled={disabled}
             />
             <div className="flex gap-4">
               <Input
                 placeholder="City"
-                name="city"
+                name="billing_city"
                 className="w-1/2"
-                value={billing.city}
+                value={typeof billing.billingAddress?.city === 'string' ? billing.billingAddress.city : ""}
                 onChange={handleChange}
                 disabled={disabled}
               />
               <Input
                 placeholder="State"
-                name="state"
+                name="billing_region"
                 className="w-1/4"
-                value={billing.state}
+                value={billing.billingAddress?.region || ""}
                 onChange={handleChange}
                 disabled={disabled}
               />
               <Input
                 placeholder="Zip"
-                name="zip"
+                name="billing_postal_code"
                 className="w-1/4"
-                value={billing.zip}
+                value={billing.billingAddress?.postal_code || ""}
                 onChange={handleChange}
                 disabled={disabled}
               />
             </div>
             <Input
               placeholder="Country"
-              name="country"
-              value={billing.country}
+              name="billing_country"
+              value={billing.billingAddress?.country || ""}
               onChange={handleChange}
               disabled={disabled}
             />

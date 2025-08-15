@@ -13,6 +13,7 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 ### 🛒 **Core eCommerce Foundation (Complete)**
 - ✅ **Product Catalog**: Dynamic categories, filtering, sorting, and responsive design
 - ✅ **Shopping Experience**: Product cards, detail pages, shopping cart, and checkout flow
+- ✅ **Discount System**: MACH Alliance-compliant promotional codes with percentage, fixed, and shipping discounts
 - ✅ **User Management**: Clerk authentication with secure login/registration
 - ✅ **Order Processing**: Complete order management with history and status tracking
 - ✅ **Performance**: Edge-optimized deployment with sub-100ms response times globally
@@ -54,8 +55,15 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 - **📋 Full Specification**: [Admin Dashboard Technical Documentation](/docs/admin-dashboard-specification.md)
 - [ ] **Product Management**: CRUD operations for catalog management
 - [ ] **Order Management**: View, update, and fulfill customer orders
-- [ ] **Analytics Dashboard**: Sales metrics, AI usage statistics, customer insights
+- [ ] **Promotion Management**: Create and manage discount codes and promotional campaigns
+- [ ] **Analytics Dashboard**: Sales metrics, AI usage statistics, customer insights, discount performance
 - [ ] **Content Management**: Update knowledge base and AI training content
+
+#### **🎟️ Promotional System Enhancement (Low Priority)**
+- [ ] **Admin Discount Management**: UI for creating and managing promotional campaigns
+- [ ] **Advanced Stacking Rules**: Complex promotion combinations and exclusions
+- [ ] **Usage Analytics**: Track discount code performance and ROI
+- [ ] **Automated Campaigns**: Time-based and trigger-based promotional activations
 
 #### **🔍 Search Enhancement (Medium Priority)**
 - [ ] **Traditional Search**: Keyword-based product search with filters

@@ -186,6 +186,19 @@ export async function getProductsByBrand(brand: string): Promise<Product[]> {
   return results as Product[];
 }
 
+export async function getProductsByCategory(categorySlug: string): Promise<Product[]> {
+  const db = getDb();
+  const results = await db.select().from(products);
+  
+  // Filter products that have the category in their categories array
+  const filteredResults = results.filter(product => {
+    if (!product.categories) return false;
+    return product.categories.includes(categorySlug);
+  });
+  
+  return filteredResults as Product[];
+}
+
 export async function getActiveProducts(): Promise<Product[]> {
   const db = getDb();
   const results = await db.select()
