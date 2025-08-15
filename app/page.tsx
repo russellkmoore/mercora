@@ -36,7 +36,7 @@
  */
 
 import ProductCard from "@/components/ProductCard";
-import { getProductsByCategory } from "@/lib/loaders/products";
+import { getProductsByCategory } from "@/lib/models/mach/products";
 
 /**
  * Home page component - main landing page for the application

@@ -39,7 +39,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import type { Product } from "@/lib/types/product";
+import type { Product, ProductVariant } from "@/lib/types/";
 import { getDarkBlurPlaceholder } from "@/lib/utils/image-placeholders";
 
 /**
@@ -52,24 +52,45 @@ interface ProductCardProps {
 
 /**
  * ProductCard component for displaying product information in a card layout
- * 
+ *
  * @param product - Product object containing all product data
  * @param priority - Whether to prioritize image loading (for above-the-fold content)
  * @returns JSX element representing a clickable product card
  */
 export default function ProductCard({ product, priority = false }: ProductCardProps) {
-  // Destructure product properties for easier access
-  const {
-    id,
-    name,
-    slug,
-    shortDescription,
-    primaryImageUrl,
-    price,
-    salePrice,
-    onSale = false,
-    availability,
-  } = product;
+  // Get default or first variant
+  const variants = product.variants || [];
+  const defaultVariant: ProductVariant | undefined =
+    variants.find((v) => v.id === product.default_variant_id) || variants[0];
+
+  // Price logic
+  const price = defaultVariant?.price?.amount ?? null;
+  const compareAt = defaultVariant?.compare_at_price?.amount;
+  const onSale = compareAt && compareAt > (price ?? 0);
+
+  // Availability logic
+  const quantityInStock = defaultVariant?.inventory?.quantity ?? 0;
+  const availability = quantityInStock > 0 ? "available" : "coming_soon";
+
+  // Image logic
+  const primaryImageUrl =
+    typeof product.primary_image === "string"
+      ? product.primary_image
+      : product.primary_image?.url || null;
+
+  // Name/description/slug logic
+  const name =
+    typeof product.name === "string"
+      ? product.name
+      : Object.values(product.name || {})[0] || "";
+  const shortDescription =
+    typeof product.description === "string"
+      ? product.description
+      : Object.values(product.description || {})[0] || "";
+  const slug =
+    typeof product.slug === "string"
+      ? product.slug
+      : Object.values(product.slug || {})[0] || "";
 
   return (
     <Link href={`/product/${slug}`} prefetch={true}>
@@ -95,19 +116,21 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
           )}
         </div>
         <div className="p-3 sm:p-4">
-          <h3 className="text-lg sm:text-xl font-semibold mb-2 line-clamp-2">{name}</h3>
+          <h3 className="text-lg sm:text-xl font-semibold mb-2 line-clamp-2">
+            {name}
+          </h3>
           <p className="text-gray-400 text-xs sm:text-sm mb-2 line-clamp-3">
             {shortDescription}
           </p>
           {price !== null && (
             <div className="text-sm">
-              {onSale && salePrice != null ? (
+              {onSale && compareAt != null ? (
                 <div className="text-green-400">
                   <span className="line-through text-gray-400 mr-2">
-                    ${(price / 100).toFixed(2)}
+                    ${(compareAt / 100).toFixed(2)}
                   </span>
                   <span className="font-semibold">
-                    ${(salePrice / 100).toFixed(2)}
+                    ${(price / 100).toFixed(2)}
                   </span>
                   <span className="ml-2 text-xs text-orange-500 font-bold">
                     On Sale

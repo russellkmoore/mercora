@@ -1,4 +1,4 @@
-import { getProductBySlug } from "@/lib/loaders/products";
+import { getProductBySlug } from "@/lib/models";
 import { notFound } from "next/navigation";
 import ProductDisplay from "./ProductDisplay";
 

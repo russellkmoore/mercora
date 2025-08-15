@@ -8,7 +8,7 @@ import OrderSummary from "./OrderSummary";
 import BillingForm from "./BillingForm";
 import ShippingForm from "./ShippingForm";
 import OrderConfirmationModal from "./OrderConfirmationModal";
-import type { ShippingOption } from "@/lib/types/shipping";
+import type { ShippingOption, Address } from "@/lib/types";
 
 type ShippingOptionsResponse = { options: ShippingOption[] };
 type ShippingOptionsError = { error: string };
@@ -25,6 +25,7 @@ export default function CheckoutClient(userId: any) {
     setBillingInfo,
     setTaxAmount,
     clearCart,
+    updateShippingDiscounts,
     shippingAddress,
     shippingOption,
     billingInfo,
@@ -32,14 +33,14 @@ export default function CheckoutClient(userId: any) {
   } = useCartStore();
 
   const [step, setStep] = useState<number>(0);
-  const [address, setAddress] = useState({
-    name: "",
+  const [address, setAddress] = useState<Partial<Address>>({
+    recipient: "",
     email: "",
-    address: "",
-    address2: "",
+    line1: "",
+    line2: "",
     city: "",
-    state: "",
-    zip: "",
+    region: "",
+    postal_code: "",
     country: "",
   });
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
@@ -72,7 +73,18 @@ export default function CheckoutClient(userId: any) {
       setShippingOptions(data.options);
       setShippingOption(undefined);
       setShippingError(null);
-      setShippingAddress(address);
+      setShippingAddress({
+        recipient: address.recipient || "",
+        email: address.email || "",
+        line1: address.line1 || "",
+        line2: address.line2,
+        city: address.city || "",
+        region: address.region || "",
+        postal_code: address.postal_code || "",
+        country: address.country || "",
+        type: "shipping",
+        status: "unverified",
+      } as Address);
       setStep(1);
     } catch (err) {
       if (err instanceof Error) setShippingError(err.message);
@@ -82,6 +94,8 @@ export default function CheckoutClient(userId: any) {
 
   async function handleShippingSelected(option: ShippingOption) {
     setShippingOption(option);
+    // Update shipping discounts when shipping option changes
+    updateShippingDiscounts();
     setStep(2);
     try {
       const res = await fetch("/api/tax", {
@@ -165,6 +179,7 @@ export default function CheckoutClient(userId: any) {
             items={items}
             shippingOption={shippingOption}
             taxAmount={taxAmount ?? 0}
+            showDiscountInput={step >= 1}
           />
           <BillingForm
             disabled={step < 2}

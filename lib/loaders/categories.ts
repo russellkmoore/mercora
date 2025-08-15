@@ -1,39 +1,43 @@
-import { getDbAsync } from "@/lib/db";
-import { eq } from "drizzle-orm";
-import { categories } from "@/lib/db/schema";
-import type { Category } from "@/lib/types/category";
-import { getCategoryProducts } from "../models/category";
+/**
+ * Category Loaders - App-level category data fetching
+ * 
+ * These functions provide app-specific category data loading functionality
+ * built on top of the MACH Alliance compliant category models.
+ */
 
+import { 
+  listCategories, 
+  getCategory, 
+  getCategoryBySlug,
+  getCategoryTree,
+  getCategoriesByStatus
+} from '@/lib/models/mach/category';
+import type { Category } from '@/lib/types';
+
+/**
+ * Get all categories
+ */
 export async function getCategories(): Promise<Category[]> {
-  const db = await getDbAsync();
-  const rows = await db.select().from(categories);
-  return rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    slug: row.slug,
-    description: row.description ?? undefined,
-    heroImageUrl: row.heroImageUrl ?? undefined,
-    products: [], // lazily fetched if needed
-  }));
+  return await getCategoriesByStatus('active');
 }
 
-export async function getCategoryBySlug(
-  slug: string
-): Promise<Category | null> {
-  const db = await getDbAsync();
-  const row = await db.query.categories.findFirst({
-    where: eq(categories.slug, slug),
-  });
-  if (!row) return null;
+/**
+ * Get category by slug
+ */
+export async function getCategoryBySlugLoader(slug: string): Promise<Category | null> {
+  return await getCategoryBySlug(slug);
+}
 
-  const products = await getCategoryProducts(slug);
+/**
+ * Get category by ID
+ */
+export async function getCategoryById(id: string): Promise<Category | null> {
+  return await getCategory(id);
+}
 
-  return {
-    id: row.id,
-    name: row.name,
-    slug: row.slug,
-    description: row.description ?? undefined,
-    heroImageUrl: row.heroImageUrl ?? undefined,
-    products,
-  };
+/**
+ * Get category hierarchy/tree
+ */
+export async function getCategoryHierarchy(): Promise<Category[]> {
+  return await getCategoryTree();
 }

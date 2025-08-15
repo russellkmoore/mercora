@@ -24,7 +24,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Product } from "@/lib/types/product";
+import type { Product } from "@/lib/types";
 
 /**
  * Represents a single chat message in the conversation

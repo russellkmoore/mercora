@@ -1,19 +1,20 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { Order } from "@/lib/types";
 
 type OrderStatus = "pending" | "paid" | "shipped" | "cancelled" | "incomplete";
 
-export default function OrderCard({ order }: { order: any }) {
-  const date = new Date(order.createdAt).toLocaleDateString(undefined, {
+export default function OrderCard({ order }: { order: Order }) {
+  const date = new Date(order.created_at || '').toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
 
-  const total = ((order.total ?? 0) / 100).toFixed(2);
+  const total = (order.total_amount?.amount ?? 0).toFixed(2);
   const itemCount = Array.isArray(order.items) ? order.items.length : 0;
-  const previewItem = order.items?.[0]?.name || "Item";
+  const previewItem = order.items?.[0]?.product_name || "Item";
 
   const statusColor =
     {

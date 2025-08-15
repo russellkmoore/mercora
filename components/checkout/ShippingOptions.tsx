@@ -1,12 +1,12 @@
 "use client";
 
 import { ShippingOption } from "@/lib/types/shipping";
-import type { Address } from "@/lib/types/address";
+import { Address } from "@/lib/types";
 import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Props {
-  address: Address;
+  address: Partial<Address>;
   options: ShippingOption[];
   selectedOptionId?: string;
   onSelect: (option: ShippingOption) => void;

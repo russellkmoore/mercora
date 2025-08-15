@@ -27,6 +27,7 @@ Mercora is a modern, AI-enhanced eCommerce platform specializing in outdoor gear
 - **Product Catalog**: Dynamic categories with filtering and sorting
 - **User Authentication**: Secure login/registration via Clerk
 - **Shopping Cart**: Persistent cart with real-time updates
+- **Discount System**: MACH Alliance-compliant promotional codes with multiple discount types
 - **Checkout Flow**: Complete order processing with shipping/billing
 - **Order Management**: User order history and status tracking
 
@@ -486,6 +487,22 @@ const vectorResults = await vectorize.query(embedding.data[0], {
 - **Code Documentation**: Follow the established JSDoc patterns
 - **Architecture Changes**: Update Mermaid diagrams in `/docs`
 - **API Changes**: Update API documentation accordingly
+
+## 🎟️ Demo Discount Codes
+
+The platform includes a comprehensive discount system with demo codes for testing:
+
+| Code | Type | Description | Requirements |
+|------|------|-------------|--------------|
+| **SAVE20** | Percentage | 20% off entire order | $50+ order minimum |
+| **FREESHIP** | Shipping | Free shipping | Any order |
+| **10OFF** | Fixed Amount | $10 off any order | No minimum |
+| **TOOLS30** | Category | 30% off tools category | Tools in cart |
+| **VIP25** | Percentage | 25% off for VIP customers | $100+ order minimum |
+| **WELCOME15** | New Customer | 15% off first order | First-time buyers only |
+| **HALFSHIP** | Shipping | 50% off shipping costs | Any order |
+
+> **💡 Demo Tip**: These codes appear automatically in development mode for easy testing. The discount system is built on MACH Alliance standards for maximum flexibility and extensibility.
 
 ## 📚 Technical Documentation
 

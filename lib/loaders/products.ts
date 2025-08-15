@@ -1,67 +1,53 @@
 /**
- * === Product Loaders ===
- *
- * High-level data loading functions for products throughout the application.
- * Provides clean, typed interfaces for common product retrieval patterns
- * with automatic hydration and relationship loading.
- *
- * === Features ===
- * - **Category Loading**: Get all products within a specific category
- * - **Slug Resolution**: Find products by URL-friendly slugs
- * - **Automatic Hydration**: All products returned with complete data
- * - **Type Safety**: Fully typed return values with Product interface
- * - **Error Handling**: Graceful null handling for missing products
- *
- * === Performance ===
- * - Leverages database query optimization
- * - Uses efficient single-query hydration where possible
- * - Implements proper indexing on slug and category lookups
- *
- * === Usage ===
- * ```typescript
- * // Get featured products for homepage
- * const featured = await getProductsByCategory("featured");
+ * Product Loaders - App-level product data fetching
  * 
- * // Get specific product for detail page
- * const product = await getProductBySlug("arctic-pulse-tool");
- * ```
+ * These functions provide app-specific product data loading functionality
+ * built on top of the MACH Alliance compliant product models.
  */
 
-import { getDbAsync } from "@/lib/db";
-import { eq } from "drizzle-orm";
-import { products } from "@/lib/db/schema";
-import { hydrateProduct } from "../models/product";
-import { getCategoryProducts } from "../models/category";
-import type { Product } from "@/lib/types/product";
+import { listProducts, getProduct, getProductBySlug } from '@/lib/models/mach/products';
+import type { Product } from '@/lib/types';
 
 /**
- * Load all products within a specific category with caching
- * 
- * @param categorySlug - URL slug of the category to load
- * @returns Promise<Product[]> - Array of fully hydrated products
+ * Get products by category slug
+ * This is a placeholder implementation - in a full implementation,
+ * you would have product-category relationships in your database
  */
-export async function getProductsByCategory(
-  categorySlug: string
-): Promise<Product[]> {
-  // For featured products on homepage, limit the query to improve performance
-  if (categorySlug === "featured") {
-    const products = await getCategoryProducts(categorySlug);
-    return products.slice(0, 3); // Only return first 3 for performance
+export async function getProductsByCategory(categorySlug: string): Promise<Product[]> {
+  // For now, return all active products
+  // In a real implementation, you'd join with a category relationship table
+  const allProducts = await listProducts({ status: ['active'], limit: 50 });
+  
+  // Simple filtering by category slug for demo purposes
+  // In production, this would be a proper database join
+  if (categorySlug === 'featured') {
+    // Return first 3 products as "featured"
+    return allProducts.slice(0, 3);
   }
-  return getCategoryProducts(categorySlug);
+  
+  return allProducts;
 }
 
 /**
- * Load a single product by its URL slug
- * 
- * @param slug - URL-friendly product identifier
- * @returns Promise<Product | null> - Hydrated product or null if not found
+ * Get a single product by its slug
  */
-export async function getProductBySlug(slug: string): Promise<Product | null> {
-  const db = await getDbAsync();
-  const product = await db.query.products.findFirst({
-    where: eq(products.slug, slug),
-  });
-  if (!product) return null;
-  return await hydrateProduct(product);
+export async function getProductBySlugLoader(slug: string): Promise<Product | null> {
+  return await getProductBySlug(slug);
+}
+
+/**
+ * Get a single product by ID
+ */
+export async function getProductById(id: string): Promise<Product | null> {
+  return await getProduct(id);
+}
+
+/**
+ * Get all products with optional filtering
+ */
+export async function getAllProducts(options?: {
+  limit?: number;
+  status?: ('active' | 'inactive' | 'archived' | 'draft')[];
+}): Promise<Product[]> {
+  return await listProducts(options);
 }
