@@ -25,9 +25,9 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
 
 import { eq, and, like, inArray } from 'drizzle-orm';
 import type {Product, ProductVariant, Money } from '@/lib/types/';
-import { products, product_variants } from '../../db/schema/products.js';
-import { validateProduct, validateProductVariant, transformProductForDB, transformVariantForDB } from '../../db/schema/products.js';
-import { getDb } from '../../db.js';
+import { products, product_variants } from '../../db/schema/products';
+import { validateProduct, validateProductVariant, transformProductForDB, transformVariantForDB } from '../../db/schema/products';
+import { getDb } from '../../db';
 
 /**
  * Core Product CRUD Operations

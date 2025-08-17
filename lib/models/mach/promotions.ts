@@ -1,7 +1,7 @@
 import { promotions, transformPromotionForDB, isActivePromotion, canBeUsedByCustomer, canBeUsedInChannel, canBeUsedInRegion, generatePromotionSlug, getActionsByType, getConditionsByType, hasCartSubtotalCondition, getCartMinimumAmount, getTotalUsesRemaining, isExpiredPromotion, isCodeBasedPromotion, isAutomaticPromotion, getLocalizedValue } from "../../db/schema/promotions";
-import { coupon_instances } from "../../db/schema/coupon-instances";
+import { coupon_instances } from "../../db/schema/couponInstance";
 import { eq, and, or, sql, isNotNull, isNull, gte, lte, desc, asc } from "drizzle-orm";
-import { getDb } from "../../db/connection";
+import { getDb } from "../../db";
 import type { 
   Promotion,
   PromotionRules,

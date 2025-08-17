@@ -1,17 +1,17 @@
 /**
- * MACH Alliance ProductType E) from '../../db/schema/product_types.js';tity - Business Model
+ * MACH Alliance ProductType Entity - Business Model
  * Complete business logic layer for MACH compliant ProductType entity
  */
 
 import { eq, and, or, isNull, isNotNull, like, desc, asc, inArray } from 'drizzle-orm';
-import { getDb } from '../../db.js';
-import { product_types } from '../../db/schema/product_types.js';
+import { getDb } from '../../db';
+import { product_types } from '../../db/schema/product_types';
 import { 
   type MACHProductType,
   type MACHAttributeDefinition,
   type MACHAttributeValidation,
   type MACHAttributeOption
-} from '../../types/mach/ProductType.js';
+} from '../../types/mach/ProductType';
 import {
   validateProductType,
   validateAttributeDefinition,
@@ -34,7 +34,7 @@ import {
   getLocalizedValue,
   isProductTypeLocalized,
   generateProductTypeSlug
-} from '../../db/schema/product_types.js';
+} from '../../db/schema/product_types';
 
 /**
  * ProductType Model - Business operations for product type management
