@@ -92,7 +92,7 @@ export default function DiscountCodeInput() {
       } else {
         setError(result.error || "Invalid discount code");
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Error applying discount:", err);
       setError("Failed to apply discount code");
     } finally {

@@ -40,7 +40,9 @@ Mercora is an AI-powered outdoor gear eCommerce platform featuring **Volt**, an 
   "drizzle-orm": "^0.35.2",
   "@clerk/nextjs": "^6.25.5",
   "@opennextjs/cloudflare": "^1.5.1",
-  "zustand": "^5.0.6"
+  "zustand": "^5.0.6",
+  "@stripe/stripe-js": "^7.8.0",
+  "stripe": "^18.4.0"
 }
 ```
 
@@ -81,7 +83,7 @@ mercora/
 ├── components/               # React components
 │   ├── agent/                # AI chat components
 │   ├── cart/                 # Shopping cart
-│   ├── checkout/             # Checkout forms
+│   ├── checkout/             # Complete checkout flow + Stripe payments
 │   └── ui/                   # shadcn/ui components
 ├── lib/                      # Core logic
 │   ├── db/                   # Database & schema
@@ -117,9 +119,12 @@ npx wrangler d1 migrations apply mercora-db          # Production
 ### Key Endpoints
 - `POST /api/agent-chat` - AI chat with context
 - `GET /api/products` - Product listing with filters
-- `GET /api/user-orders` - User order history
+- `GET /api/orders` - Unified order management (list/create/update)
 - `POST /api/vectorize-products` - Index products for AI
-- `POST /api/submit-order` - Process checkout
+- `POST /api/payment-intent` - Create Stripe payment intents
+- `POST /api/webhooks/stripe` - Handle Stripe webhook events
+- `POST /api/tax` - Calculate tax with Stripe Tax
+- `POST /api/validate-discount` - Validate discount codes
 
 ### Authentication
 All user-specific endpoints use Clerk middleware. User context is available via `auth()` helper.
@@ -173,6 +178,11 @@ User Query → BGE Embeddings → Vector Search → Context → Llama 3.1 → Re
 # Development (.env.local)
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
+
+# Stripe Configuration
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
 
 # Production (Cloudflare bindings)
 # DB, MEDIA, AI, VECTORIZE handled via wrangler.jsonc
@@ -236,7 +246,10 @@ CLERK_SECRET_KEY=sk_test_...
 - `README.md` - Complete project documentation
 - `docs/architecture.md` - System architecture diagrams
 - `docs/ai-pipeline.md` - AI implementation details
+- `docs/STRIPE_INTEGRATION.md` - Stripe payment setup guide
+- `docs/API_STRUCTURE.md` - **NEW**: Clean API architecture (eliminates redundancy)
 - `lib/types/mach/` - MACH Alliance type definitions
+- `lib/stripe.ts` - Stripe configuration and utilities
 - `wrangler.jsonc` - Cloudflare configuration
 
 ## Troubleshooting

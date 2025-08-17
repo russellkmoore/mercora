@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   const { address, items }: { address: Address; items: CartItem[] } =
     await req.json();
 
-  if (!address || !address.zip) {
+  if (!address || !address.postal_code) {
     return NextResponse.json(
       { error: "Missing address data" },
       { status: 400 }

@@ -59,6 +59,7 @@
    */
   "vars": {
     "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_bGVhcm5pbmctbGlnZXItMTAuY2xlcmsuYWNjb3VudHMuZGV2JA",
+    "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51Rwyc6LL7e1EcFUl2kqrcgWa8KDNzC9m4lc38wQQKiKVmekTxi3q6R6R2nohizFzRNNw9bHTeN8mripgZzgUYUDd00nlOhCWEs"
   },
   /**
    * Note: Use secrets to store sensitive data.
