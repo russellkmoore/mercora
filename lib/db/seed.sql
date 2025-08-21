@@ -352,11 +352,11 @@ datetime('now'), datetime('2025-12-31 23:59:59'), 'code',
 -- =====================================================
 
 -- Coupon instances for the demo promotions - individual code tracking
-INSERT INTO coupon_instances (id, promotion_id, code, status, usage_count, max_uses, created_at, updated_at, redeemed_by, redeemed_at, external_references, extensions) VALUES
-('coupon_save20', 'promo_cart_20', 'SAVE20', 'active', 0, 1000, datetime('now'), datetime('now'), NULL, NULL, '{"demo": "true"}', '{"description": "Demo: 20% off orders over $50"}'),
-('coupon_freeship', 'promo_free_ship', 'FREESHIP', 'active', 0, 1000, datetime('now'), datetime('now'), NULL, NULL, '{"demo": "true"}', '{"description": "Demo: Free shipping"}'),
-('coupon_10off', 'promo_10off', '10OFF', 'active', 0, 500, datetime('now'), datetime('now'), NULL, NULL, '{"demo": "true"}', '{"description": "Demo: $10 off any order"}'),
-('coupon_tools30', 'promo_tools_30', 'TOOLS30', 'active', 0, 300, datetime('now'), datetime('now'), NULL, NULL, '{"demo": "true"}', '{"description": "Demo: 30% off all tools"}'),
-('coupon_vip25', 'promo_vip_25', 'VIP25', 'active', 0, 100, datetime('now'), datetime('now'), NULL, NULL, '{"demo": "true"}', '{"description": "Demo: 25% off orders over $100"}'),
-('coupon_welcome15', 'promo_welcome15', 'WELCOME15', 'active', 0, 1000, datetime('now'), datetime('now'), NULL, NULL, '{"demo": "true"}', '{"description": "Demo: 15% off first order"}'),
-('coupon_halfship', 'promo_halfship', 'HALFSHIP', 'active', 0, 500, datetime('now'), datetime('now'), NULL, NULL, '{"demo": "true"}', '{"description": "Demo: 50% off shipping"});
+INSERT INTO coupon_instances (id, promotion_id, code, status, usage_count, usage_limit, created_at, updated_at, last_used_by, last_used_at, external_references, extensions) VALUES
+('coupon_save20', 'promo_cart_20', 'SAVE20', 'active', 0, 1000, datetime('now'), datetime('now'), NULL, NULL, NULL, NULL),
+('coupon_freeship', 'promo_free_ship', 'FREESHIP', 'active', 0, 1000, datetime('now'), datetime('now'), NULL, NULL, NULL, NULL),
+('coupon_10off', 'promo_10off', '10OFF', 'active', 0, 500, datetime('now'), datetime('now'), NULL, NULL, NULL, NULL),
+('coupon_tools30', 'promo_tools_30', 'TOOLS30', 'active', 0, 300, datetime('now'), datetime('now'), NULL, NULL, NULL, NULL),
+('coupon_vip25', 'promo_vip_25', 'VIP25', 'active', 0, 100, datetime('now'), datetime('now'), NULL, NULL, NULL, NULL),
+('coupon_welcome15', 'promo_welcome15', 'WELCOME15', 'active', 0, 1000, datetime('now'), datetime('now'), NULL, NULL, NULL, NULL),
+('coupon_halfship', 'promo_halfship', 'HALFSHIP', 'active', 0, 500, datetime('now'), datetime('now'), NULL, NULL, NULL, NULL);

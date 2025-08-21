@@ -75,8 +75,14 @@ User Query → AI Embeddings → Vector Search → Context Retrieval → LLM Res
 
 3. **Database Setup**
    ```bash
+   # Create the database (first time only)
    npx wrangler d1 create mercora-db
+   
+   # Apply schema migrations
    npx wrangler d1 migrations apply mercora-db --local
+   
+   # Load sample data (optional)
+   npx wrangler d1 execute mercora-db --local --file=lib/db/seed.sql
    ```
 
 4. **Start Development**
@@ -116,8 +122,9 @@ npm run build              # Build for production
 npm run deploy             # Deploy to Cloudflare
 
 # Database
-npx wrangler d1 migrations apply mercora-db --local  # Local migrations
-npx wrangler d1 migrations apply mercora-db          # Production migrations
+npx wrangler d1 migrations apply mercora-db --local    # Apply schema migrations (local)
+npx wrangler d1 migrations apply mercora-db            # Apply schema migrations (production)
+npx wrangler d1 execute mercora-db --local --file=lib/db/seed.sql  # Load sample data (local)
 
 # AI Content Management
 curl -X POST localhost:3000/api/vectorize-products   # Index products
