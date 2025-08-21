@@ -1,7 +1,12 @@
 import { promotions, transformPromotionForDB, isActivePromotion, canBeUsedByCustomer, canBeUsedInChannel, canBeUsedInRegion, generatePromotionSlug, getActionsByType, getConditionsByType, hasCartSubtotalCondition, getCartMinimumAmount, getTotalUsesRemaining, isExpiredPromotion, isCodeBasedPromotion, isAutomaticPromotion, getLocalizedValue } from "../../db/schema/promotions";
-import { coupon_instances } from "../../db/schema/couponInstance";
 import { eq, and, or, sql, isNotNull, isNull, gte, lte, desc, asc } from "drizzle-orm";
-import { getDb } from "../../db";
+import { getDbAsync } from "../../db";
+
+// Helper function to get database instance (consistent pattern)
+async function getDb() {
+  return await getDbAsync();
+}
+
 import type { 
   Promotion,
   PromotionRules,
@@ -21,44 +26,52 @@ import type {
  * List all promotions
  */
 export async function listPromotions(): Promise<Promotion[]> {
-  const db = getDb();
-  const results = await db.select().from(promotions);
-  return results as Promotion[];
+  const db = await getDbAsync();
+  const results = await (await getDb()).select().from(promotions);
+  return results.map(hydratePromotion);
 }
 
 /**
  * Get promotion by ID
  */
 export async function getPromotionById(id: string): Promise<Promotion | null> {
-  const db = getDb();
-  const results = await db.select()
+  const db = await getDbAsync();
+  const results = await (await getDb()).select()
     .from(promotions)
     .where(eq(promotions.id, id))
     .limit(1);
   
-  return results.length > 0 ? results[0] as Promotion : null;
+  return results.length > 0 ? hydratePromotion(results[0]) : null;
 }
 
-/**
- * List all coupon instances
- */
-export async function listCouponInstances(): Promise<CouponInstance[]> {
-  const db = getDb();
-  const results = await db.select().from(coupon_instances);
-  return results as CouponInstance[];
-}
+// Note: listCouponInstances and getCouponInstanceByCode are exported from ./couponInstance
+// to avoid duplicate exports in the index file
 
 /**
- * Get coupon instance by code
+ * Helper function to hydrate database promotion to MACH format
  */
-export async function getCouponInstanceByCode(code: string): Promise<CouponInstance | null> {
-  const db = getDb();
-  const results = await db.select()
-    .from(coupon_instances)
-    .where(eq(coupon_instances.code, code.toUpperCase()))
-    .limit(1);
-  
-  return results.length > 0 ? results[0] as CouponInstance : null;
+function hydratePromotion(record: any): Promotion {
+  return {
+    id: record.id,
+    name: typeof record.name === 'string' ? record.name : JSON.parse(record.name || '""'),
+    type: record.type,
+    rules: typeof record.rules === 'string' ? JSON.parse(record.rules) : record.rules,
+    status: record.status,
+    description: typeof record.description === 'string' ? record.description : JSON.parse(record.description || '""'),
+    slug: record.slug,
+    external_references: typeof record.external_references === 'string' ? JSON.parse(record.external_references || '{}') : record.external_references,
+    created_at: record.created_at,
+    updated_at: record.updated_at,
+    valid_from: record.valid_from,
+    valid_to: record.valid_to,
+    activation_method: record.activation_method,
+    codes: typeof record.codes === 'string' ? JSON.parse(record.codes || '{}') : record.codes,
+    usage_limits: typeof record.usage_limits === 'string' ? JSON.parse(record.usage_limits || '{}') : record.usage_limits,
+    eligibility: typeof record.eligibility === 'string' ? JSON.parse(record.eligibility || '{}') : record.eligibility,
+    priority: record.priority,
+    stackable: record.stackable === 1,
+    extensions: typeof record.extensions === 'string' ? JSON.parse(record.extensions || '{}') : record.extensions
+  };
 }
 
 // All types are defined in the base MACH Promotion model - no additional types needed
@@ -385,7 +398,10 @@ export class PromotionModel {
 
     if (status) {
       if (Array.isArray(status)) {
-        conditions.push(or(...status.map(s => eq(promotions.status, s))));
+        const validStatuses = status.filter(s => s !== undefined);
+        if (validStatuses.length > 0) {
+          conditions.push(or(...validStatuses.map(s => eq(promotions.status, s))));
+        }
       } else {
         conditions.push(eq(promotions.status, status));
       }
@@ -450,7 +466,7 @@ export class PromotionModel {
   /**
    * Get active promotions for a specific context
    */
-  async getActivePromotions(context?: PromotionEvaluationContext): Promise<MACHPromotion[]> {
+  async getActivePromotions(context?: PromotionEvaluationContext): Promise<Promotion[]> {
     const now = new Date().toISOString();
     
     const activePromotions = await this.getPromotions({
@@ -474,7 +490,7 @@ export class PromotionModel {
   /**
    * Search promotions by text
    */
-  async searchPromotions(searchTerm: string, options: PromotionFilterOptions = {}): Promise<MACHPromotion[]> {
+  async searchPromotions(searchTerm: string, options: PromotionFilterOptions = {}): Promise<Promotion[]> {
     // For SQLite, we'll do a simple text search on name and description
     // In a production system, you might want to use full-text search
     const results = await this.db
@@ -499,7 +515,7 @@ export class PromotionModel {
   /**
    * Evaluate promotion eligibility for a given context
    */
-  evaluatePromotionEligibility(promotion: MACHPromotion, context: PromotionEvaluationContext): boolean {
+  evaluatePromotionEligibility(promotion: Promotion, context: PromotionEvaluationContext): boolean {
     try {
       // Check time validity
       if (!checkTimeValidity(promotion)) {
@@ -531,7 +547,7 @@ export class PromotionModel {
   /**
    * Calculate discount amount for a promotion
    */
-  calculatePromotionValue(promotion: MACHPromotion, context: PromotionEvaluationContext): number {
+  calculatePromotionValue(promotion: Promotion, context: PromotionEvaluationContext): number {
     if (!this.evaluatePromotionEligibility(promotion, context)) {
       return 0;
     }
@@ -543,10 +559,10 @@ export class PromotionModel {
    * Apply promotions to a cart/order context
    */
   async applyPromotions(context: PromotionEvaluationContext): Promise<{
-    promotions: MACHPromotion[];
+    promotions: Promotion[];
     totalDiscount: number;
     appliedPromotions: Array<{
-      promotion: MACHPromotion;
+      promotion: Promotion;
       discount: number;
       description: string;
     }>;
@@ -582,7 +598,7 @@ export class PromotionModel {
   /**
    * Validate promotion code
    */
-  async validatePromotionCode(code: string, context?: PromotionEvaluationContext): Promise<MACHPromotion | null> {
+  async validatePromotionCode(code: string, context?: PromotionEvaluationContext): Promise<Promotion | null> {
     // Search for promotions with this code
     const codePromotions = await this.getPromotions({
       activationMethod: 'code',
@@ -647,11 +663,11 @@ export class PromotionModel {
   /**
    * Resolve promotion stacking rules
    */
-  private resolvePromotionStacking(promotions: MACHPromotion[]): MACHPromotion[] {
+  private resolvePromotionStacking(promotions: Promotion[]): Promotion[] {
     // Sort by priority (highest first)
     const sortedPromotions = [...promotions].sort((a, b) => (b.priority || 0) - (a.priority || 0));
     
-    const applicable: MACHPromotion[] = [];
+    const applicable: Promotion[] = [];
     let hasNonStackable = false;
 
     for (const promotion of sortedPromotions) {
@@ -675,7 +691,7 @@ export class PromotionModel {
   /**
    * Get promotion description for display
    */
-  private getPromotionDescription(promotion: MACHPromotion, discount: number): string {
+  private getPromotionDescription(promotion: Promotion, discount: number): string {
     const name = typeof promotion.name === 'string' ? promotion.name : promotion.name?.en || 'Promotion';
     
     if (discount === 0) {
@@ -692,16 +708,16 @@ export class PromotionModel {
   }
 
   /**
-   * Hydrate database promotion record to MACHPromotion
+   * Hydrate database promotion record to Promotion
    */
-  private hydrateDatabasePromotion(record: any): MACHPromotion {
+  private hydrateDatabasePromotion(record: any): Promotion {
     try {
-      const hydrated: MACHPromotion = {
+      const hydrated: Promotion = {
         id: record.id,
         name: this.parseJsonField(record.name) || record.name,
-        type: record.type as MACHPromotionType,
+        type: record.type as Promotion['type'],
         rules: this.parseJsonField(record.rules),
-        status: record.status as MACHPromotionStatus,
+        status: record.status as Promotion['status'],
         description: this.parseJsonField(record.description) || record.description,
         slug: record.slug,
         external_references: this.parseJsonField(record.external_references),
@@ -709,7 +725,7 @@ export class PromotionModel {
         updated_at: record.updated_at,
         valid_from: record.valid_from,
         valid_to: record.valid_to,
-        activation_method: record.activation_method as PromotionActivationMethod,
+        activation_method: record.activation_method as Promotion['activation_method'],
         codes: this.parseJsonField(record.codes),
         usage_limits: this.parseJsonField(record.usage_limits),
         eligibility: this.parseJsonField(record.eligibility),

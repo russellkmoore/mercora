@@ -24,17 +24,17 @@ import {
   isValidMoney,
   isValidTaxInfo
 } from '../../db/schema/pricing';
-import { getDb } from '../../db';
+import { getDbAsync } from '../../db';
+
+// Helper function to get database instance (consistent pattern)
+async function getDb() {
+  return await getDbAsync();
+}
 import type { 
   Pricing, 
-  BulkPricingTier, 
-  SegmentPricing, 
   TaxInfo,
   Money
 } from '@/lib/types';
-
-// Get database instance
-const db = getDb();
 
 // =====================================================
 // Core CRUD Operations
@@ -44,7 +44,7 @@ const db = getDb();
  * Create a new pricing record
  */
 export async function createPricing(pricingData: Partial<Pricing>): Promise<Pricing> {
-  // Generate ID if not provided
+    // Generate ID if not provided
   if (!pricingData.id) {
     pricingData.id = generatePricingId(
       pricingData.product_id || 'UNKNOWN',
@@ -69,7 +69,7 @@ export async function createPricing(pricingData: Partial<Pricing>): Promise<Pric
 
   // Transform for database storage
   const dbRecord = serializePricing(pricingToCreate);
-  const [inserted] = await db.insert(pricing).values(dbRecord).returning();
+    const [inserted] = await (await getDb()).insert(pricing).values(dbRecord).returning();
   
   return deserializePricing(inserted);
 }
@@ -81,7 +81,7 @@ export async function updatePricing(
   id: string, 
   updates: Partial<Pricing>
 ): Promise<Pricing | null> {
-  // Set updated timestamp
+    // Set updated timestamp
   const updatedData = {
     ...updates,
     updated_at: new Date().toISOString()
@@ -101,7 +101,7 @@ export async function updatePricing(
 
   // Transform for database storage
   const dbUpdates = serializePricing(updatedData as Pricing);
-  const [updated] = await db
+  const [updated] = await (await getDb())
     .update(pricing)
     .set(dbUpdates)
     .where(eq(pricing.id, id))
@@ -114,7 +114,7 @@ export async function updatePricing(
  * Delete a pricing record (soft delete by setting status)
  */
 export async function deletePricing(id: string): Promise<boolean> {
-  const result = await db
+    const result = await (await getDb())
     .update(pricing)
     .set({ 
       status: 'expired',
@@ -130,7 +130,7 @@ export async function deletePricing(id: string): Promise<boolean> {
  * Get pricing by ID
  */
 export async function getPricingById(id: string): Promise<Pricing | null> {
-  const [result] = await db
+    const [result] = await (await getDb())
     .select()
     .from(pricing)
     .where(eq(pricing.id, id))
@@ -155,7 +155,7 @@ export async function getPricingForProduct(
     includeExpired?: boolean;
   } = {}
 ): Promise<Pricing[]> {
-  const conditions = [eq(pricing.product_id, productId)];
+    const conditions = [eq(pricing.product_id, productId)];
 
   // Filter by status
   if (options.status && options.status.length > 0) {
@@ -186,7 +186,7 @@ export async function getPricingForProduct(
     );
   }
 
-  const results = await db
+  const results = await (await getDb())
     .select()
     .from(pricing)
     .where(and(...conditions))
@@ -209,7 +209,7 @@ export async function getEffectivePricing(
     date?: Date;
   } = {}
 ): Promise<Pricing | null> {
-  const validAt = context.date || new Date();
+    const validAt = context.date || new Date();
   const dateStr = validAt.toISOString();
 
   const baseConditions = [
@@ -221,7 +221,7 @@ export async function getEffectivePricing(
 
   // Try context-specific pricing first (campaign, then segment, then channel, then region)
   if (context.campaignId) {
-    const [campaignResult] = await db
+    const [campaignResult] = await (await getDb())
       .select()
       .from(pricing)
       .where(and(...baseConditions, eq(pricing.campaign_id, context.campaignId)))
@@ -233,7 +233,7 @@ export async function getEffectivePricing(
   }
 
   if (context.customerSegmentId) {
-    const [segmentResult] = await db
+    const [segmentResult] = await (await getDb())
       .select()
       .from(pricing)
       .where(and(...baseConditions, eq(pricing.customer_segment_id, context.customerSegmentId)))
@@ -245,7 +245,7 @@ export async function getEffectivePricing(
   }
 
   if (context.channelId) {
-    const [channelResult] = await db
+    const [channelResult] = await (await getDb())
       .select()
       .from(pricing)
       .where(and(...baseConditions, eq(pricing.channel_id, context.channelId)))
@@ -257,7 +257,7 @@ export async function getEffectivePricing(
   }
 
   if (context.regionId) {
-    const [regionResult] = await db
+    const [regionResult] = await (await getDb())
       .select()
       .from(pricing)
       .where(and(...baseConditions, eq(pricing.region_id, context.regionId)))
@@ -269,7 +269,7 @@ export async function getEffectivePricing(
   }
 
   // Fall back to default pricing
-  const [defaultResult] = await db
+  const [defaultResult] = await (await getDb())
     .select()
     .from(pricing)
     .where(
@@ -298,7 +298,7 @@ export async function getCampaignPricing(
   campaignId: string,
   options: { status?: Pricing['status'][] } = {}
 ): Promise<Pricing[]> {
-  const conditions = [eq(pricing.campaign_id, campaignId)];
+    const conditions = [eq(pricing.campaign_id, campaignId)];
 
   if (options.status && options.status.length > 0) {
     const validStatuses = options.status.filter(s => s !== undefined);
@@ -307,7 +307,7 @@ export async function getCampaignPricing(
     }
   }
 
-  const results = await db
+  const results = await (await getDb())
     .select()
     .from(pricing)
     .where(and(...conditions))
@@ -371,7 +371,7 @@ export async function getSegmentPricing(
     status?: Pricing['status'][];
   } = {}
 ): Promise<Pricing[]> {
-  const conditions = [eq(pricing.customer_segment_id, customerSegmentId)];
+    const conditions = [eq(pricing.customer_segment_id, customerSegmentId)];
 
   if (options.productIds && options.productIds.length > 0) {
     conditions.push(inArray(pricing.product_id, options.productIds));
@@ -384,7 +384,7 @@ export async function getSegmentPricing(
     }
   }
 
-  const results = await db
+  const results = await (await getDb())
     .select()
     .from(pricing)
     .where(and(...conditions))
@@ -404,7 +404,7 @@ export async function getBulkPricingForQuantity(
   productId: string,
   quantity: number
 ): Promise<{ pricing: Pricing; effectivePrice: Money } | null> {
-  const [bulkPricing] = await db
+  const [bulkPricing] = await (await getDb())
     .select()
     .from(pricing)
     .where(
@@ -447,7 +447,7 @@ export async function searchPricing(options: {
   orderBy?: 'created_at' | 'updated_at' | 'product_id';
   orderDirection?: 'asc' | 'desc';
 }): Promise<Pricing[]> {
-  const conditions = [];
+    const conditions = [];
 
   // Product filters
   if (options.productIds && options.productIds.length > 0) {
@@ -512,7 +512,7 @@ export async function searchPricing(options: {
   }
 
   // Build and execute query
-  const results = await db
+  const results = await (await getDb())
     .select()
     .from(pricing)
     .where(conditions.length > 0 ? and(...conditions) : undefined)
@@ -541,13 +541,13 @@ export async function getPricingStatistics(): Promise<{
   expired_pricing: number;
 }> {
   // Get total count
-  const [totalResult] = await db
+  const [totalResult] = await (await getDb())
     .select({ count: sql<number>`count(*)` })
     .from(pricing);
   const total = totalResult?.count || 0;
 
   // Get counts by status
-  const statusResults = await db
+  const statusResults = await (await getDb())
     .select({
       status: pricing.status,
       count: sql<number>`count(*)`
@@ -561,7 +561,7 @@ export async function getPricingStatistics(): Promise<{
   }, {} as Record<string, number>);
 
   // Get counts by type
-  const typeResults = await db
+  const typeResults = await (await getDb())
     .select({
       type: pricing.type,
       count: sql<number>`count(*)`
@@ -575,28 +575,28 @@ export async function getPricingStatistics(): Promise<{
   }, {} as Record<string, number>);
 
   // Get campaign count
-  const [campaignResult] = await db
+  const [campaignResult] = await (await getDb())
     .select({ count: sql<number>`count(*)` })
     .from(pricing)
     .where(isNotNull(pricing.campaign_id));
   const with_campaigns = campaignResult?.count || 0;
 
   // Get segment count
-  const [segmentResult] = await db
+  const [segmentResult] = await (await getDb())
     .select({ count: sql<number>`count(*)` })
     .from(pricing)
     .where(isNotNull(pricing.customer_segment_id));
   const with_segments = segmentResult?.count || 0;
 
   // Get bulk pricing count
-  const [bulkResult] = await db
+  const [bulkResult] = await (await getDb())
     .select({ count: sql<number>`count(*)` })
     .from(pricing)
     .where(eq(pricing.type, 'bulk'));
   const with_bulk_pricing = bulkResult?.count || 0;
 
   // Get active campaign pricing count
-  const [activeCampaignResult] = await db
+  const [activeCampaignResult] = await (await getDb())
     .select({ count: sql<number>`count(*)` })
     .from(pricing)
     .where(
@@ -608,7 +608,7 @@ export async function getPricingStatistics(): Promise<{
   const active_campaigns = activeCampaignResult?.count || 0;
 
   // Get expired pricing count
-  const [expiredResult] = await db
+  const [expiredResult] = await (await getDb())
     .select({ count: sql<number>`count(*)` })
     .from(pricing)
     .where(eq(pricing.status, 'expired'));

@@ -8,7 +8,7 @@
  * Mercora - First MACH Alliance Open Data Model Compliant Platform
  */
 
-import type { MACHMoney } from './Money.js';
+import type { Money } from '../money';
 
 /**
  * MACH Alliance Open Data Model - Promotion Entity v1.0
@@ -86,7 +86,7 @@ export interface MACHAction {
     | "bogo_discount" | "gift_item" | "tiered_discount";
   value?: any; // Discount value (percentage or Money object)
   apply_to?: string; // What to apply the discount to
-  max_discount?: MACHMoney; // Maximum discount amount (for percentage discounts)
+  max_discount?: Money; // Maximum discount amount (for percentage discounts)
 
   // BOGO specific properties
   buy_quantity?: number;
@@ -103,7 +103,7 @@ export interface MACHAction {
  * Discount tier for tiered promotions
  */
 export interface MACHDiscountTier {
-  min_value: MACHMoney;
+  min_value: Money;
   discount_type: "percentage" | "fixed";
   discount_value: number;
 }

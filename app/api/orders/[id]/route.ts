@@ -29,11 +29,11 @@ function hydrateOrder(dbOrder: typeof orders.$inferSelect): Order {
   };
 }
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { userId } = await auth();
     const db = await getDbAsync();
-    const orderId = params.id;
+    const { id: orderId } = await params;
     if (!orderId) {
       return NextResponse.json({ error: "Order ID is required" }, { status: 400 });
     }

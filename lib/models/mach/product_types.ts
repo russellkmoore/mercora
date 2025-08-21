@@ -4,8 +4,13 @@
  */
 
 import { eq, and, or, isNull, isNotNull, like, desc, asc, inArray } from 'drizzle-orm';
-import { getDb } from '../../db';
+import { getDbAsync } from '../../db';
 import { product_types } from '../../db/schema/product_types';
+
+// Helper function to get database instance (consistent pattern)
+async function getDb() {
+  return await getDbAsync();
+}
 import { 
   type MACHProductType,
   type MACHAttributeDefinition,
@@ -69,7 +74,7 @@ export class ProductTypeModel {
    * Create a new product type
    */
   static async create(productTypeData: MACHProductType): Promise<MACHProductType> {
-    const db = getDb();
+    const db = await getDbAsync();
     
     if (!validateProductType(productTypeData)) {
       throw new Error('Invalid product type data');
@@ -96,7 +101,7 @@ export class ProductTypeModel {
     const transformedData = transformProductTypeForDB(productTypeData);
     
     try {
-      await db.insert(product_types).values(transformedData);
+      await (await getDb()).insert(product_types).values(transformedData);
       return transformedData;
     } catch (error) {
       if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
@@ -110,8 +115,8 @@ export class ProductTypeModel {
    * Find product type by ID
    */
   static async findById(id: string): Promise<MACHProductType | null> {
-    const db = getDb();
-    const result = await db.select().from(product_types).where(eq(product_types.id, id)).limit(1);
+    const db = await getDbAsync();
+    const result = await (await getDb()).select().from(product_types).where(eq(product_types.id, id)).limit(1);
     return result[0] ? dbToMACHProductType(result[0]) : null;
   }
 
@@ -120,8 +125,8 @@ export class ProductTypeModel {
    */
   static async findByIds(ids: string[]): Promise<MACHProductType[]> {
     if (ids.length === 0) return [];
-    const db = getDb();
-    const result = await db.select().from(product_types).where(inArray(product_types.id, ids));
+    const db = await getDbAsync();
+    const result = await (await getDb()).select().from(product_types).where(inArray(product_types.id, ids));
     return dbToMACHProductTypes(result);
   }
 
@@ -132,7 +137,7 @@ export class ProductTypeModel {
     limit?: number;
     offset?: number;
   } = {}): Promise<MACHProductType[]> {
-    const db = getDb();
+    const db = await getDbAsync();
     const query = db.select()
       .from(product_types)
       .where(eq(product_types.status, 'active'))
@@ -153,10 +158,10 @@ export class ProductTypeModel {
    * Find product types by parent
    */
   static async findByParent(parentId: string | null): Promise<MACHProductType[]> {
-    const db = getDb();
+    const db = await getDbAsync();
     const whereClause = parentId ? eq(product_types.parent_type_id, parentId) : isNull(product_types.parent_type_id);
     
-    const result = await db.select()
+    const result = await (await getDb()).select()
       .from(product_types)
       .where(whereClause)
       .orderBy(asc(product_types.name));
@@ -182,8 +187,8 @@ export class ProductTypeModel {
    * Find product types by status
    */
   static async findByStatus(status: 'active' | 'inactive' | 'deprecated'): Promise<MACHProductType[]> {
-    const db = getDb();
-    const result = await db.select()
+    const db = await getDbAsync();
+    const result = await (await getDb()).select()
       .from(product_types)
       .where(eq(product_types.status, status))
       .orderBy(asc(product_types.name));
@@ -202,7 +207,7 @@ export class ProductTypeModel {
       offset?: number;
     } = {}
   ): Promise<MACHProductType[]> {
-    const db = getDb();
+    const db = await getDbAsync();
     let whereConditions: any[] = [like(product_types.name, `%${searchTerm}%`)];
     
     if (options.status) {
@@ -229,7 +234,7 @@ export class ProductTypeModel {
    * Update a product type
    */
   static async update(id: string, updateData: Partial<MACHProductType>): Promise<MACHProductType | null> {
-    const db = getDb();
+    const db = await getDbAsync();
     const existingProductType = await this.findById(id);
     if (!existingProductType) {
       throw new Error(`Product type '${id}' not found`);
@@ -271,7 +276,7 @@ export class ProductTypeModel {
       }
     }
 
-    await db.update(product_types)
+    await (await getDb()).update(product_types)
       .set(updatedData)
       .where(eq(product_types.id, id));
 
@@ -282,7 +287,7 @@ export class ProductTypeModel {
    * Delete a product type (soft delete by setting status to deprecated)
    */
   static async delete(id: string): Promise<boolean> {
-    const db = getDb();
+    const db = await getDbAsync();
     const existingProductType = await this.findById(id);
     if (!existingProductType) {
       return false;
@@ -294,7 +299,7 @@ export class ProductTypeModel {
       throw new Error('Cannot delete product type that has child types');
     }
 
-    await db.update(product_types)
+    await (await getDb()).update(product_types)
       .set({ 
         status: 'deprecated',
         updated_at: new Date().toISOString()
@@ -308,7 +313,7 @@ export class ProductTypeModel {
    * Hard delete a product type (permanent removal)
    */
   static async hardDelete(id: string): Promise<boolean> {
-    const db = getDb();
+    const db = await getDbAsync();
     const existingProductType = await this.findById(id);
     if (!existingProductType) {
       return false;
@@ -320,7 +325,7 @@ export class ProductTypeModel {
       throw new Error('Cannot delete product type that has child types');
     }
 
-    const result = await db.delete(product_types)
+    const result = await (await getDb()).delete(product_types)
       .where(eq(product_types.id, id));
 
     return result.meta.changes > 0;
@@ -330,8 +335,8 @@ export class ProductTypeModel {
    * Count product types by status
    */
   static async countByStatus(): Promise<Record<string, number>> {
-    const db = getDb();
-    const result = await db.select().from(product_types);
+    const db = await getDbAsync();
+    const result = await (await getDb()).select().from(product_types);
     const allTypes = dbToMACHProductTypes(result);
     
     const counts = {
@@ -357,8 +362,8 @@ export class ProductTypeModel {
     roots: MACHProductType[];
     children: Record<string, MACHProductType[]>;
   }> {
-    const db = getDb();
-    const result = await db.select().from(product_types);
+    const db = await getDbAsync();
+    const result = await (await getDb()).select().from(product_types);
     const allProductTypes = dbToMACHProductTypes(result);
     return buildProductTypeHierarchy(allProductTypes);
   }
@@ -367,9 +372,9 @@ export class ProductTypeModel {
    * Get ancestors of a product type (walk up the hierarchy)
    */
   static async getAncestors(id: string): Promise<MACHProductType[]> {
-    const db = getDb();
+    const db = await getDbAsync();
     const ancestors: MACHProductType[] = [];
-    const result = await db.select().from(product_types);
+    const result = await (await getDb()).select().from(product_types);
     const allTypes = dbToMACHProductTypes(result);
     
     let currentType = allTypes.find((t: MACHProductType) => t.id === id);
@@ -387,9 +392,9 @@ export class ProductTypeModel {
    * Get descendants of a product type (walk down the hierarchy)
    */
   static async getDescendants(id: string): Promise<MACHProductType[]> {
-    const db = getDb();
+    const db = await getDbAsync();
     const descendants: MACHProductType[] = [];
-    const result = await db.select().from(product_types);
+    const result = await (await getDb()).select().from(product_types);
     const allTypes = dbToMACHProductTypes(result);
     const { children } = buildProductTypeHierarchy(allTypes);
     
@@ -409,13 +414,13 @@ export class ProductTypeModel {
    * Get inherited attributes for a product type
    */
   static async getInheritedAttributesForType(id: string): Promise<Record<string, MACHAttributeDefinition>> {
-    const db = getDb();
+    const db = await getDbAsync();
     const productType = await this.findById(id);
     if (!productType) {
       throw new Error(`Product type '${id}' not found`);
     }
 
-    const result = await db.select().from(product_types);
+    const result = await (await getDb()).select().from(product_types);
     const allProductTypes = dbToMACHProductTypes(result);
     return getInheritedAttributes(productType, allProductTypes);
   }
@@ -424,13 +429,13 @@ export class ProductTypeModel {
    * Get inherited required attributes for a product type
    */
   static async getInheritedRequiredAttributesForType(id: string): Promise<string[]> {
-    const db = getDb();
+    const db = await getDbAsync();
     const productType = await this.findById(id);
     if (!productType) {
       throw new Error(`Product type '${id}' not found`);
     }
 
-    const result = await db.select().from(product_types);
+    const result = await (await getDb()).select().from(product_types);
     const allProductTypes = dbToMACHProductTypes(result);
     return getInheritedRequiredAttributes(productType, allProductTypes);
   }
@@ -618,8 +623,8 @@ export class ProductTypeModel {
    * Find product types applicable to a channel
    */
   static async findByChannel(channelId: string): Promise<MACHProductType[]> {
-    const db = getDb();
-    const result = await db.select().from(product_types);
+    const db = await getDbAsync();
+    const result = await (await getDb()).select().from(product_types);
     const allTypes = dbToMACHProductTypes(result);
     return allTypes.filter((type: MACHProductType) => {
       if (!type.applicable_channels) return true; // No restrictions
@@ -632,8 +637,8 @@ export class ProductTypeModel {
    * Find product types applicable to a region
    */
   static async findByRegion(regionId: string): Promise<MACHProductType[]> {
-    const db = getDb();
-    const result = await db.select().from(product_types);
+    const db = await getDbAsync();
+    const result = await (await getDb()).select().from(product_types);
     const allTypes = dbToMACHProductTypes(result);
     return allTypes.filter((type: MACHProductType) => {
       if (!type.applicable_regions) return true; // No restrictions

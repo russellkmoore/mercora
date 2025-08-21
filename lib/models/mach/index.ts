@@ -11,6 +11,7 @@ export * from './customer';
 export * from './inventory';
 export * from './language';
 export * from './media';
+export * from './orders';
 export * from './pricing';
 export * from './products';
 export * from './product_types';

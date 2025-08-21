@@ -95,15 +95,15 @@ export async function getOrdersByCustomerId(customerId: string) {
   return db.select().from(orders).where(eq(orders.customer_id, customerId));
 }
 
-// Get a specific order by ID
-export async function getOrderById(id: string) {
+// Get a specific order by ID (deprecated - use MACH orders module)
+async function getOrderByIdLegacy(id: string) {
   const db = await getDbAsync();
   const result = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
   return result[0] || null;
 }
 
-// Update order status
-export async function updateOrderStatus(
+// Update order status (deprecated - use MACH orders module)
+async function updateOrderStatusLegacy(
   id: string,
   status: (typeof orders.$inferSelect)["status"]
 ) {
@@ -115,8 +115,8 @@ export async function updateOrderStatus(
     .where(eq(orders.id, id));
 }
 
-// Update order with shipping information
-export async function updateOrderShipping(
+// Update order with shipping information (deprecated - use MACH orders module)
+async function updateOrderShippingLegacy(
   id: string,
   shippingData: {
     status?: (typeof orders.$inferSelect)["status"];
@@ -149,8 +149,8 @@ export async function updateOrderShipping(
     .where(eq(orders.id, id));
 }
 
-// Add cancellation information
-export async function cancelOrder(
+// Add cancellation information (deprecated - use MACH orders module)
+async function cancelOrderLegacy(
   id: string,
   cancellationReason: string,
   notes?: string
@@ -168,8 +168,8 @@ export async function cancelOrder(
     .where(eq(orders.id, id));
 }
 
-// Get orders by status
-export async function getOrdersByStatus(status: (typeof orders.$inferSelect)["status"]) {
+// Get orders by status (deprecated - use MACH orders module)
+async function getOrdersByStatusLegacy(status: (typeof orders.$inferSelect)["status"]) {
   const db = await getDbAsync();
   return db.select().from(orders).where(eq(orders.status, status));
 }

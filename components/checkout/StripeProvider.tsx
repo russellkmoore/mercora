@@ -43,6 +43,11 @@ export default function StripeProvider({
   clientSecret,
   options = {}
 }: StripeProviderProps) {
+  // Return early if no clientSecret provided
+  if (!clientSecret) {
+    return <div>{children}</div>;
+  }
+
   // Configure Elements options with theme
   const elementsOptions: StripeElementsOptions = {
     clientSecret,
@@ -56,6 +61,7 @@ export default function StripeProvider({
         fontFamily: 'system-ui, -apple-system, sans-serif',
         spacingUnit: '4px',
         borderRadius: '8px',
+        ...(options.appearance?.variables || {}),
       },
       rules: {
         '.Input': {
@@ -73,9 +79,12 @@ export default function StripeProvider({
           fontWeight: '500',
           marginBottom: '4px',
         },
+        ...(options.appearance?.rules || {}),
       },
     },
-    ...options,
+    // Only spread appearance-related options to avoid conflicts with clientSecret mode
+    ...(options.fonts && { fonts: options.fonts }),
+    ...(options.locale && { locale: options.locale }),
   };
 
   return (

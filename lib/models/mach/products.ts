@@ -5,9 +5,8 @@
  * @returns Promise<Product | null>
  */
 export async function getProductBySlug(slug: string): Promise<Product | null> {
-  const db = getDb();
-  // Some products may have slug as a string or as a localized object; handle both
-  const results = await db.select().from(products);
+    // Some products may have slug as a string or as a localized object; handle both
+  const results = await (await getDb()).select().from(products);
   const match = results.find((p: any) => {
     if (!p.slug) return false;
     if (typeof p.slug === 'string') return p.slug === slug;
@@ -27,7 +26,12 @@ import { eq, and, like, inArray } from 'drizzle-orm';
 import type {Product, ProductVariant, Money } from '@/lib/types/';
 import { products, product_variants } from '../../db/schema/products';
 import { validateProduct, validateProductVariant, transformProductForDB, transformVariantForDB } from '../../db/schema/products';
-import { getDb } from '../../db';
+import { getDbAsync } from '../../db';
+
+// Helper function to get database instance (consistent pattern)
+async function getDb() {
+  return await getDbAsync();
+}
 
 /**
  * Core Product CRUD Operations
@@ -38,33 +42,29 @@ export async function createProduct(productData: Product): Promise<Product> {
     throw new Error('Invalid product data provided');
   }
 
-  const db = getDb();
-  const product = transformProductForDB(productData);
+    const product = transformProductForDB(productData);
   
-  await db.insert(products).values(product);
+  await (await getDb()).insert(products).values(product);
   return product;
 }
 
 export async function getProduct(id: string): Promise<Product | null> {
-  const db = getDb();
-  const result = await db.select().from(products).where(eq(products.id, id));
+    const result = await (await getDb()).select().from(products).where(eq(products.id, id));
   return result[0] as Product || null;
 }
 
 export async function updateProduct(id: string, updates: Partial<Product>): Promise<Product | null> {
-  const db = getDb();
-  const updateData = {
+    const updateData = {
     ...updates,
     updated_at: new Date().toISOString()
   };
 
-  await db.update(products).set(updateData).where(eq(products.id, id));
+  await (await getDb()).update(products).set(updateData).where(eq(products.id, id));
   return getProduct(id);
 }
 
 export async function deleteProduct(id: string): Promise<boolean> {
-  const db = getDb();
-  const result = await db.delete(products).where(eq(products.id, id));
+    const result = await (await getDb()).delete(products).where(eq(products.id, id));
   return result.meta.changes > 0;
 }
 
@@ -75,8 +75,7 @@ export async function listProducts(options: {
   limit?: number;
   offset?: number;
 } = {}): Promise<Product[]> {
-  const db = getDb();
-  const results = await db.select().from(products);
+    const results = await (await getDb()).select().from(products);
   let filteredResults = results;
   
   // Apply filters in memory
@@ -118,10 +117,9 @@ export async function createProductVariant(variantData: ProductVariant): Promise
     throw new Error('Product ID is required for variant creation');
   }
 
-  const db = getDb();
-  const variant = transformVariantForDB(variantData);
+    const variant = transformVariantForDB(variantData);
   
-  await db.insert(product_variants).values({
+  await (await getDb()).insert(product_variants).values({
     ...variant,
     product_id: variant.product_id!
   });
@@ -130,39 +128,34 @@ export async function createProductVariant(variantData: ProductVariant): Promise
 }
 
 export async function getProductVariant(id: string): Promise<ProductVariant | null> {
-  const db = getDb();
-  const result = await db.select().from(product_variants).where(eq(product_variants.id, id));
+    const result = await (await getDb()).select().from(product_variants).where(eq(product_variants.id, id));
   return result[0] as ProductVariant || null;
 }
 
 export async function getProductVariants(productId: string): Promise<ProductVariant[]> {
-  const db = getDb();
-  const results = await db.select()
+    const results = await (await getDb()).select()
     .from(product_variants)
     .where(eq(product_variants.product_id, productId));
   return results as ProductVariant[];
 }
 
 export async function getVariantBySKU(sku: string): Promise<ProductVariant | null> {
-  const db = getDb();
-  const result = await db.select().from(product_variants).where(eq(product_variants.sku, sku));
+    const result = await (await getDb()).select().from(product_variants).where(eq(product_variants.sku, sku));
   return result[0] as ProductVariant || null;
 }
 
 export async function updateProductVariant(id: string, updates: Partial<ProductVariant>): Promise<ProductVariant | null> {
-  const db = getDb();
-  const updateData = {
+    const updateData = {
     ...updates,
     updated_at: new Date().toISOString()
   };
 
-  await db.update(product_variants).set(updateData).where(eq(product_variants.id, id));
+  await (await getDb()).update(product_variants).set(updateData).where(eq(product_variants.id, id));
   return getProductVariant(id);
 }
 
 export async function deleteProductVariant(id: string): Promise<boolean> {
-  const db = getDb();
-  const result = await db.delete(product_variants).where(eq(product_variants.id, id));
+    const result = await (await getDb()).delete(product_variants).where(eq(product_variants.id, id));
   return result.meta.changes > 0;
 }
 
@@ -171,24 +164,21 @@ export async function deleteProductVariant(id: string): Promise<boolean> {
  */
 
 export async function searchProducts(searchTerm: string): Promise<Product[]> {
-  const db = getDb();
-  const results = await db.select()
+    const results = await (await getDb()).select()
     .from(products)
     .where(like(products.name, `%${searchTerm}%`));
   return results as Product[];
 }
 
 export async function getProductsByBrand(brand: string): Promise<Product[]> {
-  const db = getDb();
-  const results = await db.select()
+    const results = await (await getDb()).select()
     .from(products)
     .where(eq(products.brand, brand));
   return results as Product[];
 }
 
 export async function getProductsByCategory(categorySlug: string): Promise<Product[]> {
-  const db = getDb();
-  const results = await db.select().from(products);
+    const results = await (await getDb()).select().from(products);
   
   // Filter products that have the category in their categories array
   const filteredResults = results.filter(product => {
@@ -200,8 +190,7 @@ export async function getProductsByCategory(categorySlug: string): Promise<Produ
 }
 
 export async function getActiveProducts(): Promise<Product[]> {
-  const db = getDb();
-  const results = await db.select()
+    const results = await (await getDb()).select()
     .from(products)
     .where(eq(products.status, 'active'));
   return results as Product[];
@@ -225,8 +214,7 @@ export async function getVariantByOptions(
 }
 
 export async function getAvailableVariants(productId: string): Promise<ProductVariant[]> {
-  const db = getDb();
-  const results = await db.select()
+    const results = await (await getDb()).select()
     .from(product_variants)
     .where(and(
       eq(product_variants.product_id, productId),
@@ -272,8 +260,7 @@ export async function bulkUpdateProductStatus(
   productIds: string[],
   status: 'active' | 'inactive' | 'archived' | 'draft'
 ): Promise<number> {
-  const db = getDb();
-  const result = await db.update(products)
+    const result = await (await getDb()).update(products)
     .set({ 
       status,
       updated_at: new Date().toISOString()
@@ -286,11 +273,10 @@ export async function bulkUpdateProductStatus(
 export async function bulkUpdateVariantPrices(
   updates: { id: string; price: Money }[]
 ): Promise<number> {
-  const db = getDb();
-  let totalUpdated = 0;
+    let totalUpdated = 0;
   
   for (const update of updates) {
-    const result = await db.update(product_variants)
+    const result = await (await getDb()).update(product_variants)
       .set({ 
         price: update.price,
         updated_at: new Date().toISOString()
@@ -331,11 +317,10 @@ export async function removeRelatedProduct(productId: string, relatedProductId: 
 }
 
 export async function getRelatedProducts(productId: string): Promise<Product[]> {
-  const db = getDb();
-  const product = await getProduct(productId);
+    const product = await getProduct(productId);
   if (!product || !product.related_products) return [];
 
-  const results = await db.select()
+  const results = await (await getDb()).select()
     .from(products)
     .where(inArray(products.id, product.related_products));
   return results as Product[];

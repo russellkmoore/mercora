@@ -76,7 +76,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
   const primaryImageUrl =
     typeof product.primary_image === "string"
       ? product.primary_image
-      : product.primary_image?.url || null;
+      : product.primary_image?.file.url || null;
 
   // Name/description/slug logic
   const name =

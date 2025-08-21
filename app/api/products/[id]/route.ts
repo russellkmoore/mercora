@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getProduct } from "@/lib/models/mach/products";
 import type { Product } from "@/lib/types";
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const productId = params.id;
+    const { id: productId } = await params;
     if (!productId) {
       return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
     }

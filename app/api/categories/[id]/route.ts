@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCategory } from "@/lib/models/";
 import type { Category } from "@/lib/types";
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const categoryId = params.id;
+    const { id: categoryId } = await params;
     if (!categoryId) {
       return NextResponse.json({ error: "Category ID is required" }, { status: 400 });
     }

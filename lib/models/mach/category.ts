@@ -11,6 +11,11 @@
 import { getDbAsync } from "@/lib/db";
 import { categories, deserializeCategory, serializeCategory } from "@/lib/db/schema/category";
 import { eq, desc, asc, like, or, and, inArray, isNull, isNotNull, sql } from "drizzle-orm";
+
+// Helper function to get database instance (consistent pattern)
+async function getDb() {
+  return await getDbAsync();
+}
 import type { Media, Category, CategoryReference } from "@/lib/types";
 
 // Category creation input type
@@ -224,9 +229,8 @@ export async function createCategory(input: CreateCategoryInput): Promise<Catego
     throw new Error(`Category validation failed: ${validation.errors.join(', ')}`);
   }
   
-  const db = await getDbAsync();
-  const record = serializeCategory(machCategory);
-  const [created] = await db.insert(categories).values(record).returning();
+    const record = serializeCategory(machCategory);
+  const [created] = await (await getDb()).insert(categories).values(record).returning();
   return deserializeCategory(created);
 }
 
@@ -234,9 +238,8 @@ export async function createCategory(input: CreateCategoryInput): Promise<Catego
  * Get a category by ID
  */
 export async function getCategory(id: string): Promise<Category | null> {
-  const db = await getDbAsync();
-  
-  const [record] = await db
+    
+  const [record] = await (await getDb())
     .select()
     .from(categories)
     .where(eq(categories.id, id))
@@ -250,9 +253,8 @@ export async function getCategory(id: string): Promise<Category | null> {
  * Get a category by slug
  */
 export async function getCategoryBySlug(slug: string): Promise<Category | null> {
-  const db = await getDbAsync();
-  
-  const [record] = await db
+    
+  const [record] = await (await getDb())
     .select()
     .from(categories)
     .where(like(categories.slug, `%"${slug}"%`))
@@ -266,9 +268,8 @@ export async function getCategoryBySlug(slug: string): Promise<Category | null> 
  * Get category by path
  */
 export async function getCategoryByPath(path: string): Promise<Category | null> {
-  const db = await getDbAsync();
-  
-  const [record] = await db
+    
+  const [record] = await (await getDb())
     .select()
     .from(categories)
     .where(eq(categories.path, path))
@@ -282,9 +283,8 @@ export async function getCategoryByPath(path: string): Promise<Category | null> 
  * List categories with filtering and pagination
  */
 export async function listCategories(filters: CategoryFilters = {}): Promise<Category[]> {
-  const db = await getDbAsync();
-  
-  let query = db.select().from(categories);
+    
+  let query = (await getDb()).select().from(categories);
   
   // Build where conditions
   const conditions: any[] = [];
@@ -493,8 +493,7 @@ export async function getCategoryBreadcrumbs(categoryId: string): Promise<Catego
  * Update an existing category
  */
 export async function updateCategory(id: string, input: Partial<CreateCategoryInput>): Promise<Category | null> {
-  const db = await getDbAsync();
-  
+    
   // Get existing category first
   const existing = await getCategory(id);
   if (!existing) return null;
@@ -526,7 +525,7 @@ export async function updateCategory(id: string, input: Partial<CreateCategoryIn
   }
   
   const record = serializeCategory(updated);
-  await db.update(categories).set(record).where(eq(categories.id, id));
+  await (await getDb()).update(categories).set(record).where(eq(categories.id, id));
   
   return getCategory(id);
 }
@@ -543,9 +542,8 @@ export async function deleteCategory(id: string): Promise<boolean> {
  * Hard delete a category (permanent removal)
  */
 export async function hardDeleteCategory(id: string): Promise<boolean> {
-  const db = await getDbAsync();
-  
-  await db.delete(categories).where(eq(categories.id, id));
+    
+  await (await getDb()).delete(categories).where(eq(categories.id, id));
   return true;
 }
 
