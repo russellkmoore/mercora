@@ -81,8 +81,12 @@ User Query → AI Embeddings → Vector Search → Context Retrieval → LLM Res
    # Apply schema migrations
    npx wrangler d1 migrations apply mercora-db --local
    
+   npx wrangler d1 migrations apply mercora-db --remote 
+
    # Load sample data (optional)
    npx wrangler d1 execute mercora-db --local --file=lib/db/seed.sql
+
+   npx wrangler d1 execute mercora-db --remote --file=lib/db/seed.sql
    ```
 
 4. **Start Development**
