@@ -53,15 +53,26 @@ export default function ProductDisplay({ product }: { product: Product }) {
     return media.file?.url || "/placeholder.jpg";
   }
 
-  // Build all images array: primary_image + media[]
-  const allImages = Array.from(
-    new Set([
-      product.primary_image?.file.url,
-      ...(Array.isArray(product.media)
-        ? product.media.map((m) => m.file.url).filter(Boolean)
-        : [])
-    ].filter(Boolean))
-  ) as string[];
+  // Build all images array: primary_image + media[] with error handling
+  const allImages = (() => {
+    try {
+      const primaryImg = (product.primary_image as any)?.url || (product.primary_image as any)?.file?.url;
+      const mediaImages = Array.isArray(product.media)
+        ? product.media.map((m: any) => {
+            try {
+              return m?.url || m?.file?.url;
+            } catch (e) {
+              return null;
+            }
+          }).filter(Boolean)
+        : [];
+      
+      return Array.from(new Set([primaryImg, ...mediaImages].filter(Boolean))) as string[];
+    } catch (error) {
+      console.warn('Error processing product images:', error);
+      return ["/placeholder.jpg"];
+    }
+  })();
 
   const [selectedImage, setSelectedImage] = useState<string | null>(
     allImages[0] || "/placeholder.jpg"
@@ -129,9 +140,9 @@ export default function ProductDisplay({ product }: { product: Product }) {
             {typeof product.name === "string" ? product.name : ""}
           </h1>
           <p className="text-gray-400 text-sm sm:text-base mb-4 sm:mb-6">
-            {typeof product.description === "string"
+            { typeof product.description === "string"
               ? product.description
-              : ""}
+              : Object.values(product.description || {})[0] || ""}
           </p>
 
           {/* Variant Selector */}
@@ -181,7 +192,13 @@ export default function ProductDisplay({ product }: { product: Product }) {
                   name: typeof product.name === "string" ? product.name : "",
                   price: price / 100,
                   quantity: 1,
-                  primaryImageUrl: product.primary_image?.file.url || "/placeholder.jpg",
+                  primaryImageUrl: (() => {
+                    try {
+                      return (product.primary_image as any)?.url || (product.primary_image as any)?.file?.url || "/placeholder.jpg";
+                    } catch (e) {
+                      return "/placeholder.jpg";
+                    }
+                  })(),
                 });
                 toast("Added to Cart", {
                   description: `${typeof product.name === "string" ? product.name : ""} has been added to your cart.`,

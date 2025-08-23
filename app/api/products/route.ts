@@ -6,7 +6,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { 
   listProducts, 
   createProduct, 
-  updateProduct
+  updateProduct,
+  getProductsByCategory
 } from "@/lib/models/mach/products";
 import type { ApiResponse, Product } from "@/lib/types";
 
@@ -22,11 +23,13 @@ export async function GET(request: NextRequest) {
     const search = url.searchParams.get('search');
     const category = url.searchParams.get('category');
 
-    const products = await listProducts({ 
-      status: status ? [status] : undefined,
-      limit, 
-      offset 
-    });
+    const products = category && category.trim()
+      ? await getProductsByCategory(category.trim())
+      : await listProducts({ 
+          status: status ? [status] : undefined,
+          limit, 
+          offset 
+        });
     // If you want total count, you can add a count function here
     const total = products.length;
     const response: ApiResponse<Product[]> = {

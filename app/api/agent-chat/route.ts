@@ -55,7 +55,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDbAsync } from "@/lib/db";
-import { products } from "@/lib/db/schema/products";
+import { products, deserializeProduct } from "@/lib/db/schema/products";
 import { inArray } from "drizzle-orm";
 import type { Product } from "@/lib/types";
 
@@ -385,8 +385,8 @@ Respond to this greeting warmly and ask what outdoor adventure they're planning.
           .from(products)
           .where(inArray(products.id, stringProductIds));
 
-  // Products from MACH schema are already MACH-compliant, return as-is
-  relatedProducts = productResults as Product[];
+  // Products from MACH schema need deserialization
+  relatedProducts = productResults.map(deserializeProduct);
   console.log("MACH products returned:", relatedProducts.length);
       } catch (productError) {
         console.error("Error fetching products:", productError);

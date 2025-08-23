@@ -45,7 +45,7 @@ import { getProductsByCategory } from "@/lib/models/mach/products";
  */
 export default async function HomePage() {
   // Fetch only 3 featured products with optimized query
-  const featuredProducts = (await getProductsByCategory("featured")).slice(0, 3);
+  const featuredProducts = (await getProductsByCategory("cat_1")).slice(0, 3);
 
   return (
     <main className="bg-neutral-900 text-white px-4 sm:px-6 lg:px-12 py-12 sm:py-16">

@@ -253,11 +253,10 @@ export async function getCategory(id: string): Promise<Category | null> {
  * Get a category by slug
  */
 export async function getCategoryBySlug(slug: string): Promise<Category | null> {
-    
   const [record] = await (await getDb())
     .select()
     .from(categories)
-    .where(like(categories.slug, `%"${slug}"%`))
+    .where(eq(categories.slug, slug))
     .limit(1);
     
   if (!record) return null;

@@ -63,6 +63,8 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
   const defaultVariant: ProductVariant | undefined =
     variants.find((v) => v.id === product.default_variant_id) || variants[0];
 
+    console.log("ProductCard rendering for product:", product);
+    console.log("Default variant:", defaultVariant);
   // Price logic
   const price = defaultVariant?.price?.amount ?? null;
   const compareAt = defaultVariant?.compare_at_price?.amount;
@@ -71,12 +73,6 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
   // Availability logic
   const quantityInStock = defaultVariant?.inventory?.quantity ?? 0;
   const availability = quantityInStock > 0 ? "available" : "coming_soon";
-
-  // Image logic
-  const primaryImageUrl =
-    typeof product.primary_image === "string"
-      ? product.primary_image
-      : product.primary_image?.file.url || null;
 
   // Name/description/slug logic
   const name =
@@ -91,15 +87,40 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
     typeof product.slug === "string"
       ? product.slug
       : Object.values(product.slug || {})[0] || "";
+  // Handle consistent flat JSON structure: {"url": "...", "alt_text": "..."}
+  const imageUrl = (() => {
+    try {
+      if (!product.primary_image) return "/products/placeholder.png";
+      
+      // If it's a JSON string, parse it first
+      let imageData = product.primary_image;
+      if (typeof imageData === "string" && (imageData as string).startsWith("{")) {
+        try {
+          imageData = JSON.parse(imageData);
+        } catch {
+          return "/products/placeholder.png";
+        }
+      }
+      
+      const img = imageData as any;
+      const url = img?.url;
+      
+      if (!url) return "/products/placeholder.png";
+      
+      return url.startsWith("/") ? url : "/" + url;
+    } catch {
+      return "/products/placeholder.png";
+    }
+  })();
+  const imageAlt = name;
 
   return (
     <Link href={`/product/${slug}`} prefetch={true}>
       <div className="bg-neutral-800 rounded-lg overflow-hidden shadow hover:shadow-lg transition cursor-pointer">
         <div className="relative aspect-video bg-neutral-700">
-          {primaryImageUrl ? (
             <Image
-              src={`/${primaryImageUrl}`}
-              alt={name}
+              src={imageUrl}
+              alt={imageAlt}
               fill
               sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
               className="object-cover transition-opacity duration-300"
@@ -109,11 +130,6 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
               placeholder="blur"
               blurDataURL={getDarkBlurPlaceholder()}
             />
-          ) : (
-            <div className="flex items-center justify-center h-full text-gray-500 text-lg sm:text-xl">
-              No Image
-            </div>
-          )}
         </div>
         <div className="p-3 sm:p-4">
           <h3 className="text-lg sm:text-xl font-semibold mb-2 line-clamp-2">

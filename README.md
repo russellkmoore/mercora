@@ -78,15 +78,16 @@ User Query → AI Embeddings → Vector Search → Context Retrieval → LLM Res
    # Create the database (first time only)
    npx wrangler d1 create mercora-db
    
-   # Apply schema migrations
-   npx wrangler d1 migrations apply mercora-db --local
+   # Update wrangler.jsonc with the database ID from the output above
+   # Copy the database ID and update the "database_id" field in the d1_databases section
    
-   npx wrangler d1 migrations apply mercora-db --remote 
+   # Apply schema migrations
+   npx wrangler d1 migrations apply mercora-db --local     # Local development
+   npx wrangler d1 migrations apply mercora-db --remote    # Remote production
 
    # Load sample data (optional)
-   npx wrangler d1 execute mercora-db --local --file=lib/db/seed.sql
-
-   npx wrangler d1 execute mercora-db --remote --file=lib/db/seed.sql
+   npx wrangler d1 execute mercora-db --local --file=lib/db/seed.sql   # Local
+   npx wrangler d1 execute mercora-db --remote --file=lib/db/seed.sql  # Remote
    ```
 
 4. **Start Development**

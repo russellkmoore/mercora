@@ -1,46 +1,86 @@
 import { getCategoryBySlug } from "@/lib/models";
-import { notFound } from "next/navigation";
+import { getProductsByCategory } from "@/lib/models/mach/products";
 import CategoryDisplay from "./CategoryDisplay";
 import Image from "next/image";
-import type { Category } from "@/lib/types/";
 
 export default async function CategoryPage({ params }: any) {
   const category = await getCategoryBySlug(params.slug);
-  if (!category) return notFound();
+  
+  if (!category) {
+    return <div>Category not found</div>;
+  }
+  
+  let products: any[] = [];
+  let error: string | null = null;
+  
+  try {
+    products = await getProductsByCategory(category.id as string);
+  } catch (e: any) {
+    error = e?.message || 'Unknown error';
+  }
+  
+  // Helper to get category image URL
+  const getCategoryImageUrl = (): string | null => {
+    return typeof category.primary_image === "string"
+      ? category.primary_image
+      : category.primary_image?.file?.url || null;
+  };
+
+  const categoryImageUrl = getCategoryImageUrl();
 
   return (
-    <main className="bg-neutral-900 text-white min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
-      <div className="max-w-6xl mx-auto mb-8 sm:mb-12">
-        <div className="relative w-full h-48 sm:h-64 lg:h-96 mb-4 sm:mb-6 rounded overflow-hidden">
-          {category.primary_image && (
-            <>
-              <Image
-                src={`/${category.primary_image.file.url}`}
-                alt={category.primary_image.accessibility?.alt_text || (typeof category.name === "string" ? category.name : "")}
-                layout="fill"
-                objectFit="cover"
-                sizes="100vw"
-                fill
-                className="object-cover"
-                priority
-              />
-              <div className="absolute bottom-0 left-0 w-full h-16 sm:h-24 bg-gradient-to-t from-neutral-900 to-transparent" />
-              <h1 className="absolute top-2 sm:top-4 right-4 sm:right-6 text-2xl sm:text-3xl lg:text-5xl font-extrabold text-white select-none drop-shadow-md z-10">
-                {typeof category.name === "string" ? category.name : ""}
+    <div className="mx-auto px-4 sm:px-6">
+      {/* Category Hero Image */}
+      {categoryImageUrl && (
+        <div className="relative w-full h-64 sm:h-80 lg:h-96 mb-8 rounded-lg overflow-hidden">
+          <Image
+            src={categoryImageUrl}
+            alt={typeof category.name === 'string' ? category.name : 'Category'}
+            fill
+            className="object-cover"
+            sizes="(min-width: 1024px) 100vw, 100vw"
+            priority={true}
+          />
+          <div className="absolute inset-0 bg-black bg-opacity-40 flex items-end">
+            <div className="p-6 sm:p-8 text-white">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2">
+                {typeof category.name === 'string' ? category.name : 'Category'}
               </h1>
-            </>
+              {category.description && (
+                <p className="text-gray-200 text-lg max-w-2xl">
+                  {typeof category.description === 'string' ? category.description : ''}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Category Header (fallback if no image) */}
+      {!categoryImageUrl && (
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl sm:text-4xl font-bold mb-4">
+            {typeof category.name === 'string' ? category.name : 'Category'}
+          </h1>
+          {category.description && (
+            <p className="text-gray-400 max-w-2xl mx-auto">
+              {typeof category.description === 'string' ? category.description : ''}
+            </p>
           )}
         </div>
-        <p className="text-gray-400 text-sm sm:text-base mb-6 sm:mb-10 px-2 sm:px-0">
-          {typeof category.description === "string"
-            ? category.description
-            : category.description
-            ? JSON.stringify(category.description)
-            : ""}
-        </p>
-      </div>
+      )}
 
-      <CategoryDisplay category={category} />
-    </main>
+      {/* Error Display */}
+      {error && (
+        <div className="text-center py-8">
+          <p className="text-red-400">Error loading products: {error}</p>
+        </div>
+      )}
+
+      {/* Products Grid with Sorting */}
+      {!error && (
+        <CategoryDisplay products={products} />
+      )}
+    </div>
   );
 }

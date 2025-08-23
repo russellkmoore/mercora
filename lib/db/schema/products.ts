@@ -21,25 +21,25 @@ import type {
 // Main products table
 export const products = sqliteTable('products', {
   id: text('id').primaryKey(),
-  name: text('name', { mode: 'json' }).$type<string | Record<string, string>>().notNull(),
-  description: text('description', { mode: 'json' }).$type<string | Record<string, string>>(),
+  name: text('name').notNull(),
+  description: text('description'),
   type: text('type'),
   status: text('status', { enum: ['active', 'inactive', 'archived', 'draft'] }).default('active'),
   slug: text('slug'),
   brand: text('brand'),
-  categories: text('categories', { mode: 'json' }).$type<string[]>(),
-  tags: text('tags', { mode: 'json' }).$type<string[]>(),
-  options: text('options', { mode: 'json' }).$type<ProductOption[]>(),
+  categories: text('categories'),
+  tags: text('tags'),
+  options: text('options'),
   default_variant_id: text('default_variant_id'),
   fulfillment_type: text('fulfillment_type', { enum: ['physical', 'digital', 'service'] }).default('physical'),
   tax_category: text('tax_category'),
-  primary_image: text('primary_image', { mode: 'json' }).$type<Media>(),
-  media: text('media', { mode: 'json' }).$type<Media[]>(),
-  seo: text('seo', { mode: 'json' }).$type<SEO>(),
-  rating: text('rating', { mode: 'json' }).$type<Rating>(),
-  related_products: text('related_products', { mode: 'json' }).$type<string[]>(),
-  external_references: text('external_references', { mode: 'json' }).$type<Record<string, string>>(),
-  extensions: text('extensions', { mode: 'json' }).$type<Record<string, any>>(),
+  primary_image: text('primary_image'),
+  media: text('media'),
+  seo: text('seo'),
+  rating: text('rating'),
+  related_products: text('related_products'),
+  external_references: text('external_references'),
+  extensions: text('extensions'),
   created_at: text('created_at'),
   updated_at: text('updated_at')
 });
@@ -107,6 +107,72 @@ export function transformVariantForDB(variant: ProductVariant) {
     ...variant,
     created_at: variant.created_at || new Date().toISOString(),
     updated_at: new Date().toISOString()
+  };
+}
+
+// Helper: parse stringified JSON or return as-is
+function parseMaybeJson(val: any) {
+  if (typeof val !== 'string') return val;
+  try {
+    return JSON.parse(val);
+  } catch {
+    return val;
+  }
+}
+
+// Helper: convert DB record to MACH Product
+export function deserializeProduct(record: any): Product {
+  return {
+    id: record.id,
+    name: parseMaybeJson(record.name),
+    description: record.description ? parseMaybeJson(record.description) : undefined,
+    type: record.type,
+    status: record.status,
+    slug: record.slug,
+    brand: record.brand,
+    categories: record.categories ? parseMaybeJson(record.categories) : undefined,
+    tags: record.tags ? parseMaybeJson(record.tags) : undefined,
+    options: record.options ? parseMaybeJson(record.options) : undefined,
+    default_variant_id: record.default_variant_id,
+    fulfillment_type: record.fulfillment_type,
+    tax_category: record.tax_category,
+    primary_image: record.primary_image ? parseMaybeJson(record.primary_image) : undefined,
+    media: record.media ? parseMaybeJson(record.media) : undefined,
+    seo: record.seo ? parseMaybeJson(record.seo) : undefined,
+    rating: record.rating ? parseMaybeJson(record.rating) : undefined,
+    related_products: record.related_products ? parseMaybeJson(record.related_products) : undefined,
+    external_references: record.external_references ? parseMaybeJson(record.external_references) : undefined,
+    extensions: record.extensions ? parseMaybeJson(record.extensions) : undefined,
+    created_at: record.created_at,
+    updated_at: record.updated_at
+  };
+}
+
+// Helper: convert MACH Product to DB insert format
+export function serializeProduct(product: Product) {
+  return {
+    id: product.id,
+    name: typeof product.name === 'string' ? product.name : JSON.stringify(product.name),
+    description: product.description ? (typeof product.description === 'string' ? product.description : JSON.stringify(product.description)) : undefined,
+    type: product.type,
+    status: product.status ?? 'active',
+    slug: product.slug,
+    brand: product.brand,
+    categories: product.categories ? JSON.stringify(product.categories) : undefined,
+    tags: product.tags ? JSON.stringify(product.tags) : undefined,
+    options: product.options ? JSON.stringify(product.options) : undefined,
+    default_variant_id: product.default_variant_id,
+    fulfillment_type: product.fulfillment_type ?? 'physical',
+    tax_category: product.tax_category,
+    primary_image: product.primary_image ? JSON.stringify(product.primary_image) : undefined,
+    media: product.media ? JSON.stringify(product.media) : undefined,
+    seo: product.seo ? JSON.stringify(product.seo) : undefined,
+    rating: product.rating ? JSON.stringify(product.rating) : undefined,
+    related_products: product.related_products ? JSON.stringify(product.related_products) : undefined,
+    external_references: product.external_references ? JSON.stringify(product.external_references) : undefined,
+    extensions: product.extensions ? JSON.stringify(product.extensions) : undefined,
+    created_at: product.created_at ?? new Date().toISOString(),
+    updated_at: product.updated_at ?? new Date().toISOString()
   };
 }
 
