@@ -234,12 +234,62 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 - **AI generation**: ~2-3s for contextual responses
 - **Image optimization**: Automatic WebP conversion via R2
 
+## Recent Fixes & Issues Resolved
+
+### ✅ **Product Variant Loading Issues (Aug 23, 2025)**
+**Problem**: Products from `getProductsByCategory` and `getProductBySlug` were showing $0 prices and "out of stock" status.
+
+**Root Cause**: 
+- Functions weren't loading variants properly
+- Seed data had inconsistent JSON formats (strings instead of proper JSON objects)
+- Parsing logic couldn't handle legacy data formats
+
+**Solution**:
+1. **Fixed `getProductsByCategory`**: Added variant loading with robust parsing helpers
+2. **Fixed `getProductBySlug`**: Applied same parsing logic for consistency  
+3. **Enhanced parsing logic**: Handles both proper JSON and legacy string formats
+4. **Backward compatibility**: Works with mixed data formats during migration
+
+**Key Files Modified**:
+- `lib/models/mach/products.ts` - Added robust variant parsing
+- `lib/db/seed.sql` - Partially fixed JSON formatting
+
+### ✅ **CartDrawer Functionality Issues (Aug 23, 2025)**
+**Problem**: Users could add items to cart but couldn't change quantities or remove items.
+
+**Root Cause**: Identifier mismatch between components and store
+- Cart store functions expect `variantId` as unique identifier
+- CartItemCard was using `item.productId` instead of `item.variantId`
+- CartDrawer was using wrong key for React reconciliation
+
+**Solution**:
+- **Updated CartItemCard.tsx**: Changed all cart operations to use `variantId`
+- **Updated CartDrawer.tsx**: Fixed React key to use `variantId`
+- **Preserved data integrity**: `productId` still used for product references
+
+**Key Files Modified**:
+- `components/cart/CartItemCard.tsx` - Fixed quantity controls and remove button
+- `components/cart/CartDrawer.tsx` - Fixed React keys
+
+### ✅ **Component Cleanup (Aug 23, 2025)**
+**Problem**: Duplicate components with inconsistent naming patterns.
+
+**Solution**:
+- **Refactored ProductsWithSorting → CategoryDisplay**: Maintained naming consistency with ProductDisplay
+- **Enhanced CategoryDisplay**: Ported working variant-based pricing logic
+- **Removed redundant files**: Cleaned up ProductsWithSorting.tsx
+- **Updated references**: Fixed imports in category page
+
+**Key Files Modified**:
+- `app/category/[slug]/CategoryDisplay.tsx` - Enhanced with proper variant logic
+- `app/category/[slug]/page.tsx` - Updated to use CategoryDisplay
+- Removed: `app/category/[slug]/ProductsWithSorting.tsx`
+
 ## Current Git Status
 
-**Branch**: `feature/mach-alliance-implementation`
-**Modified files**: 
-- `components/checkout/CheckoutClient.tsx`
-- `components/checkout/ShippingForm.tsx`
+**Branch**: `feature/mach-alliance-implementation`  
+**Status**: Clean working directory
+**Recent work**: Product variant loading and cart functionality fixes
 
 ## Important Files to Reference
 

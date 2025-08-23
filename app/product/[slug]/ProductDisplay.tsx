@@ -44,6 +44,13 @@ import ProductRecommendations from "@/components/ProductRecommendations";
 import { useCartStore } from "@/lib/stores/cart-store";
 import { toast } from "sonner";
 import type { Product } from "@/lib/types/";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function ProductDisplay({ product }: { product: Product }) {
   // Helper to get the best image URL from a MACH Media object
@@ -147,20 +154,35 @@ export default function ProductDisplay({ product }: { product: Product }) {
 
           {/* Variant Selector */}
           {variants.length > 1 && (
-            <div className="mb-4">
-              <label htmlFor="variant-select" className="block text-sm font-medium mb-1">Choose an option:</label>
-              <select
-                id="variant-select"
-                value={selectedVariantId}
-                onChange={e => setSelectedVariantId(e.target.value)}
-                className="w-full sm:w-auto px-3 py-2 border rounded bg-neutral-900 text-white"
+            <div className="mb-4 sm:mb-6">
+              <label className="block text-sm font-medium mb-2 text-white">Choose an option:</label>
+              <Select 
+                value={selectedVariantId} 
+                onValueChange={setSelectedVariantId}
               >
-                {variants.map((variant) => (
-                  <option key={variant.id} value={variant.id}>
-                    {variant.option_values?.map(ov => `${ov.value}`).join(", ") || `Variant ${variant.id}`}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full sm:w-auto bg-neutral-800 border-neutral-700 text-white hover:bg-neutral-700">
+                  <SelectValue placeholder="Select a variant" />
+                </SelectTrigger>
+                <SelectContent className="bg-neutral-800 border-neutral-700">
+                  {variants.map((variant) => {
+                    const optionDisplay = variant.option_values?.map(ov => `${ov.value}`).join(", ") || `Variant ${variant.id}`;
+                    const priceDisplay = variant.price ? `$${(variant.price.amount / 100).toFixed(2)}` : "";
+                    
+                    return (
+                      <SelectItem 
+                        key={variant.id} 
+                        value={variant.id}
+                        className="text-white hover:bg-neutral-700 focus:bg-neutral-700"
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span>{optionDisplay}</span>
+                          {priceDisplay && <span className="ml-2 text-orange-400 font-semibold">{priceDisplay}</span>}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
             </div>
           )}
 
