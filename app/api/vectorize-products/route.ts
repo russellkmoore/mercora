@@ -59,10 +59,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Query all products and all variants from the MACH database
+    // Query all products and all variants from the MACH database - using raw SQL to avoid schema issues
     const db = await getDbAsync();
-  const allProducts = await db.select().from(products);
-  const allVariants = await db.select().from(product_variants);
+    const allProducts = await db.all('SELECT * FROM products');
+    const allVariants = await db.all('SELECT * FROM product_variants');
 
     console.log(`Found ${allProducts.length} products to process`);
 
