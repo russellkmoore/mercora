@@ -60,19 +60,44 @@ export default function ProductRecommendations({
   const userContext = useEnhancedUserContext();
   
   // Create stable reference for user context values we actually need
-  const stableUserContext = useMemo(() => ({
-    userId: userContext.userId,
-    firstName: userContext.firstName,
-    orders: userContext.orders,
-    isVipCustomer: userContext.isVipCustomer,
-    orderCount: userContext.orders?.length || 0,
-    isLoading: userContext.isLoading,
-  }), [
+  const stableUserContext = useMemo(() => {
+    // Extract all purchased products from order history
+    const purchasedProducts = userContext.orders?.flatMap(order => 
+      (order.items || []).map(item => ({
+        name: item.product_name,
+        id: item.product_id,
+      }))
+    ).filter(product => product.name || product.id) || [];
+
+    // Deduplicate by name and ID
+    const uniquePurchasedProducts = purchasedProducts.reduce((acc, product) => {
+      const key = product.name || product.id;
+      if (key && !acc.some(p => (p.name && p.name === product.name) || (p.id && p.id === product.id))) {
+        acc.push(product);
+      }
+      return acc;
+    }, [] as typeof purchasedProducts);
+
+    return {
+      userId: userContext.userId,
+      firstName: userContext.firstName,
+      orders: userContext.orders,
+      isVipCustomer: userContext.isVipCustomer,
+      orderCount: userContext.orders?.length || 0,
+      isLoading: userContext.isLoading,
+      purchasedProducts: uniquePurchasedProducts,
+      purchasedProductNames: uniquePurchasedProducts.map(p => p.name).filter(Boolean),
+    };
+  }, [
     userContext.userId, 
     userContext.firstName, 
     userContext.orders?.length, 
     userContext.isVipCustomer,
-    userContext.isLoading
+    userContext.isLoading,
+    // Include orders in dependency so we recalculate when orders change
+    JSON.stringify(userContext.orders?.map(o => ({ 
+      items: o.items?.map(i => ({ name: i.product_name, id: i.product_id })) 
+    })))
   ]);
 
   useEffect(() => {
@@ -93,7 +118,7 @@ export default function ProductRecommendations({
     }, 500); // 500ms debounce
 
     return () => clearTimeout(timeoutId);
-  }, [product?.id, stableUserContext.userId, stableUserContext.orderCount, maxRecommendations]);
+  }, [product?.id, stableUserContext.userId, stableUserContext.purchasedProductNames.length, maxRecommendations]);
 
   /**
    * Fetch AI-powered recommendations with enhanced user context
@@ -104,17 +129,24 @@ export default function ProductRecommendations({
   ): Promise<Product[]> => {
     try {
       const productTags = currentProduct.tags?.join(", ") || "";
-  // Enhanced query with user context
+  // Enhanced query with user context and purchase history
   let recommendationQuery = `I'm interested in the ${currentProduct.name}. It has tags: ${productTags}.`;
       
       if (userContext.orderCount > 0) {
         recommendationQuery += ` I'm a returning customer with ${userContext.orderCount} previous orders.`;
+        
+        // Include purchased products to avoid duplicates
+        if (userContext.purchasedProductNames.length > 0) {
+          recommendationQuery += ` I already own these products: ${userContext.purchasedProductNames.slice(0, 10).join(", ")}.`;
+          recommendationQuery += " Please recommend products I don't already have.";
+        }
+        
         if (userContext.isVipCustomer) {
           recommendationQuery += " I'm interested in premium products.";
         }
       }
       
-      recommendationQuery += " Can you recommend 3 similar or complementary products?";
+      recommendationQuery += " Can you recommend 3 similar or complementary products that would work well with what I'm interested in?";
       
       const res = await fetch("/api/agent-chat", {
         method: "POST",
@@ -128,6 +160,7 @@ export default function ProductRecommendations({
             orders: userContext.orders?.slice(0, 3) || [], // Last 3 orders for context
             isVipCustomer: userContext.isVipCustomer || false,
             totalOrders: userContext.orderCount,
+            purchasedProducts: userContext.purchasedProductNames.slice(0, 15), // Limit to prevent too long requests
           },
           history: []
         }),
@@ -174,7 +207,7 @@ export default function ProductRecommendations({
   return (
     <div className="mt-20 text-center relative">
       <div className="border-t border-neutral-700 w-full relative mb-10">
-        <span className="text-orange-400 text-2xl font-semibold bg-neutral-900 px-4 absolute -top-4 left-1/2 transform -translate-x-1/2 font-serif">
+        <span className="text-orange-400 text-xl font-semibold bg-neutral-900 px-4 absolute -top-4 left-1/2 transform -translate-x-1/2 font-serif">
           {sectionTitle}
         </span>
       </div>
