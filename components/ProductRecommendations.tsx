@@ -35,7 +35,7 @@
 
 import ProductCard from "@/components/ProductCard";
 import type { Product } from "@/lib/types";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useEnhancedUserContext } from "@/lib/hooks/useEnhancedUserContext";
 import { getPersonalizedRecommendations } from "@/lib/utils/personalized-recommendations";
 import Image from "next/image";
@@ -59,13 +59,21 @@ export default function ProductRecommendations({
   const [agentAnswer, setAgentAnswer] = useState<string | null>(null);
   const userContext = useEnhancedUserContext();
   
+  // Create stable reference for user context values we actually need
+  const stableUserContext = useMemo(() => ({
+    userId: userContext.userId,
+    firstName: userContext.firstName,
+    orders: userContext.orders,
+    isVipCustomer: userContext.isVipCustomer,
+    orderCount: userContext.orders?.length || 0,
+  }), [userContext.userId, userContext.firstName, userContext.orders?.length, userContext.isVipCustomer]);
 
   useEffect(() => {
     if (!product) return;
     const fetchAndSetAIRecommendations = async () => {
       setIsLoading(true);
       try {
-        const aiRecommendations = await fetchAIRecommendations(product, userContext);
+        const aiRecommendations = await fetchAIRecommendations(product, stableUserContext);
         setRecommendedProducts(aiRecommendations.slice(0, maxRecommendations));
       } catch (error) {
         console.error("Error fetching AI recommendations:", error);
@@ -75,22 +83,22 @@ export default function ProductRecommendations({
       }
     };
     fetchAndSetAIRecommendations();
-  }, [product, userContext, maxRecommendations]);
+  }, [product, stableUserContext, maxRecommendations]);
 
   /**
    * Fetch AI-powered recommendations with enhanced user context
    */
   const fetchAIRecommendations = async (
     currentProduct: Product, 
-    userContext: any
+    userContext: typeof stableUserContext
   ): Promise<Product[]> => {
     try {
       const productTags = currentProduct.tags?.join(", ") || "";
   // Enhanced query with user context
   let recommendationQuery = `I'm interested in the ${currentProduct.name}. It has tags: ${productTags}.`;
       
-      if (userContext?.orders?.length > 0) {
-        recommendationQuery += ` I'm a returning customer with ${userContext.orders.length} previous orders.`;
+      if (userContext.orderCount > 0) {
+        recommendationQuery += ` I'm a returning customer with ${userContext.orderCount} previous orders.`;
         if (userContext.isVipCustomer) {
           recommendationQuery += " I'm interested in premium products.";
         }
@@ -105,12 +113,12 @@ export default function ProductRecommendations({
         },
         body: JSON.stringify({ 
           question: recommendationQuery,
-          userName: userContext?.user?.firstName || "Guest",
-          userContext: userContext ? {
+          userName: userContext.firstName || "Guest",
+          userContext: {
             orders: userContext.orders?.slice(0, 3) || [], // Last 3 orders for context
             isVipCustomer: userContext.isVipCustomer || false,
-            totalOrders: userContext.orders?.length || 0,
-          } : undefined,
+            totalOrders: userContext.orderCount,
+          },
           history: []
         }),
       });
@@ -146,11 +154,11 @@ export default function ProductRecommendations({
   // Determine section title based on personalization  
   let sectionTitle = "You may also like";
   if (isLoading) {
-    sectionTitle = userContext?.orders.length > 0 
+    sectionTitle = stableUserContext.orderCount > 0 
     ? "Finding personalized recommendations..." 
     : "Finding recommendations...";
-  } else if (userContext?.orders.length > 0 && hasRecommendations) {
-     sectionTitle = "Recommended for {userContext?.firstName || 'you'}";
+  } else if (stableUserContext.orderCount > 0 && hasRecommendations) {
+     sectionTitle = `Recommended for ${stableUserContext.firstName || 'you'}`;
   }
 
   return (
