@@ -34,10 +34,11 @@
 "use client";
 
 import ProductCard from "@/components/ProductCard";
-import type { Product } from "@/lib/types/product";
-import { useState, useEffect } from "react";
+import type { Product } from "@/lib/types";
+import { useState, useEffect, useMemo } from "react";
 import { useEnhancedUserContext } from "@/lib/hooks/useEnhancedUserContext";
 import { getPersonalizedRecommendations } from "@/lib/utils/personalized-recommendations";
+import Image from "next/image";
 
 /**
  * ProductRecommendations component that displays personalized product suggestions
@@ -55,127 +56,99 @@ export default function ProductRecommendations({
 }) {
   const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
-  // Temporarily disable enhanced user context to debug cart issues
-  // const userContext = useEnhancedUserContext();
-  const userContext = null;
+  const [agentAnswer, setAgentAnswer] = useState<string | null>(null);
+  const userContext = useEnhancedUserContext();
+  
+  // Create stable reference for user context values we actually need
+  const stableUserContext = useMemo(() => {
+    // Extract all purchased products from order history
+    const purchasedProducts = userContext.orders?.flatMap(order => 
+      (order.items || []).map(item => ({
+        name: item.product_name,
+        id: item.product_id,
+      }))
+    ).filter(product => product.name || product.id) || [];
 
-  /**
-   * Load all products for personalized recommendation algorithm
-   */
-  useEffect(() => {
-    const fetchAllProducts = async () => {
-      try {
-        const res = await fetch("/api/products");
-        if (res.ok) {
-          const products = await res.json() as Product[];
-          setAllProducts(products);
-        }
-      } catch (error) {
-        console.error("Error fetching products for recommendations:", error);
+    // Deduplicate by name and ID
+    const uniquePurchasedProducts = purchasedProducts.reduce((acc, product) => {
+      const key = product.name || product.id;
+      if (key && !acc.some(p => (p.name && p.name === product.name) || (p.id && p.id === product.id))) {
+        acc.push(product);
       }
+      return acc;
+    }, [] as typeof purchasedProducts);
+
+    return {
+      userId: userContext.userId,
+      firstName: userContext.firstName,
+      orders: userContext.orders,
+      isVipCustomer: userContext.isVipCustomer,
+      orderCount: userContext.orders?.length || 0,
+      isLoading: userContext.isLoading,
+      purchasedProducts: uniquePurchasedProducts,
+      purchasedProductNames: uniquePurchasedProducts.map(p => p.name).filter(Boolean),
     };
+  }, [
+    userContext.userId, 
+    userContext.firstName, 
+    userContext.orders?.length, 
+    userContext.isVipCustomer,
+    userContext.isLoading,
+    // Include orders in dependency so we recalculate when orders change
+    JSON.stringify(userContext.orders?.map(o => ({ 
+      items: o.items?.map(i => ({ name: i.product_name, id: i.product_id })) 
+    })))
+  ]);
 
-    fetchAllProducts();
-  }, []);
-
-  /**
-   * Generate personalized recommendations using hybrid approach:
-   * 1. First try algorithmic personalization based on user context
-   * 2. Enhance with AI recommendations if needed
-   * 3. Fall back to basic similar products
-   */
   useEffect(() => {
-    if (!product || allProducts.length === 0) return;
-
-    const generateRecommendations = async () => {
+    if (!product || stableUserContext.isLoading) return;
+    
+    // Debounce to prevent rapid consecutive calls
+    const timeoutId = setTimeout(async () => {
       setIsLoading(true);
       try {
-        let recommendations: Product[] = [];
-
-        // Step 1: Try personalized algorithmic recommendations
-        if (userContext) {
-          recommendations = getPersonalizedRecommendations(
-            {
-              userContext,
-              currentProducts: [product],
-              viewingProduct: product,
-            },
-            allProducts,
-            maxRecommendations
-          );
-        }
-
-        // Step 2: If we don't have enough personalized recommendations, enhance with AI
-        // Temporarily disabled to debug cart issues
-        /*
-        if (recommendations.length < maxRecommendations) {
-          try {
-            const aiRecommendations = await fetchAIRecommendations(product, userContext);
-            
-            // Merge AI recommendations with personalized ones, avoiding duplicates
-            const existingIds = new Set(recommendations.map(p => p.id));
-            const newAIRecommendations = aiRecommendations.filter(p => 
-              !existingIds.has(p.id) && p.id !== product.id
-            );
-            
-            recommendations = [
-              ...recommendations,
-              ...newAIRecommendations.slice(0, maxRecommendations - recommendations.length)
-            ];
-          } catch (aiError) {
-            console.warn("AI recommendations failed, using personalized only:", aiError);
-          }
-        }
-        */
-
-        // Step 3: Final fallback to simple tag-based matching if still not enough
-        if (recommendations.length < maxRecommendations) {
-          const fallbackRecommendations = allProducts
-            .filter(p => 
-              p.id !== product.id && 
-              !recommendations.some(rec => rec.id === p.id) &&
-              p.tags.some(tag => product.tags.includes(tag))
-            )
-            .slice(0, maxRecommendations - recommendations.length);
-          
-          recommendations = [...recommendations, ...fallbackRecommendations];
-        }
-
-        setRecommendedProducts(recommendations);
+        const aiRecommendations = await fetchAIRecommendations(product, stableUserContext);
+        setRecommendedProducts(aiRecommendations.slice(0, maxRecommendations));
       } catch (error) {
-        console.error("Error generating recommendations:", error);
+        console.error("Error fetching AI recommendations:", error);
+        setRecommendedProducts([]);
       } finally {
         setIsLoading(false);
       }
-    };
+    }, 500); // 500ms debounce
 
-    generateRecommendations();
-  }, [product, allProducts, userContext, maxRecommendations]);
+    return () => clearTimeout(timeoutId);
+  }, [product?.id, stableUserContext.userId, stableUserContext.purchasedProductNames.length, maxRecommendations]);
 
   /**
    * Fetch AI-powered recommendations with enhanced user context
    */
   const fetchAIRecommendations = async (
     currentProduct: Product, 
-    userContext: any
+    userContext: typeof stableUserContext
   ): Promise<Product[]> => {
     try {
       const productTags = currentProduct.tags?.join(", ") || "";
-      const productUseCases = currentProduct.useCases?.join(", ") || "";
+  // Enhanced query with user context and purchase history
+  let recommendationQuery = `I'm interested in the ${currentProduct.name}. It has tags: ${productTags}.`;
       
-      // Enhanced query with user context
-      let recommendationQuery = `I'm interested in the ${currentProduct.name}. It's used for ${productUseCases} and has tags: ${productTags}.`;
-      
-      if (userContext?.orders?.length > 0) {
-        recommendationQuery += ` I'm a returning customer with ${userContext.orders.length} previous orders.`;
+      if (userContext.orderCount > 0) {
+        recommendationQuery += ` I'm a returning customer with ${userContext.orderCount} previous orders.`;
+        
+        // Include purchased products to avoid duplicates
+        if (userContext.purchasedProductNames.length > 0) {
+          recommendationQuery += ` I already own these products: ${userContext.purchasedProductNames.slice(0, 10).join(", ")}.`;
+          recommendationQuery += " Please recommend products I don't already have.";
+        }
+        
         if (userContext.isVipCustomer) {
           recommendationQuery += " I'm interested in premium products.";
         }
       }
       
-      recommendationQuery += " Can you recommend 3 similar or complementary products?";
-      
+      recommendationQuery += " Can you recommend 3 similar or complementary products that would work well with what I'm interested in?";
+      recommendationQuery += " The answer should be short and concise with a little wit.";
+
       const res = await fetch("/api/agent-chat", {
         method: "POST",
         headers: {
@@ -183,12 +156,13 @@ export default function ProductRecommendations({
         },
         body: JSON.stringify({ 
           question: recommendationQuery,
-          userName: userContext?.user?.firstName || "Guest",
-          userContext: userContext ? {
+          userName: userContext.firstName || "Guest",
+          userContext: {
             orders: userContext.orders?.slice(0, 3) || [], // Last 3 orders for context
             isVipCustomer: userContext.isVipCustomer || false,
-            totalOrders: userContext.orders?.length || 0,
-          } : undefined,
+            totalOrders: userContext.orderCount,
+            purchasedProducts: userContext.purchasedProductNames.slice(0, 15), // Limit to prevent too long requests
+          },
           history: []
         }),
       });
@@ -198,13 +172,10 @@ export default function ProductRecommendations({
         return [];
       }
       
-      const data = await res.json() as { 
-        answer: string; 
-        products?: Product[];
-        productIds?: number[];
-      };
-      
+      const data = await res.json() as { answer: string; products?: Product[]; productIds?: number[] };
+      setAgentAnswer(data.answer || null);
       return data.products?.filter((p: Product) => p.id !== currentProduct.id) || [];
+      
     } catch (error) {
       console.error("fetchAIRecommendations error:", error);
       return []; // Return empty array instead of throwing
@@ -218,6 +189,7 @@ export default function ProductRecommendations({
 
   // Show loading state or results
   const hasRecommendations = recommendedProducts.length > 0;
+  const hasAgentAnswer = agentAnswer && agentAnswer.trim().length > 0;
   const shouldShowSection = isLoading || hasRecommendations;
 
   if (!shouldShowSection) {
@@ -227,19 +199,17 @@ export default function ProductRecommendations({
   // Determine section title based on personalization  
   let sectionTitle = "You may also like";
   if (isLoading) {
-    sectionTitle = "Finding recommendations...";
-    // sectionTitle = userContext?.orders.length > 0 
-    //   ? "Finding personalized recommendations..." 
-    //   : "Finding recommendations...";
+    sectionTitle = stableUserContext.orderCount > 0 
+    ? "Finding personalized recommendations..." 
+    : "Finding recommendations...";
+  } else if (hasRecommendations) {
+     sectionTitle = `Recommended for ${stableUserContext.firstName || 'you'}`;
   }
-  // } else if (userContext?.orders.length > 0 && hasRecommendations) {
-  //   sectionTitle = "Recommended for you";
-  // }
 
   return (
     <div className="mt-20 text-center relative">
       <div className="border-t border-neutral-700 w-full relative mb-10">
-        <span className="text-orange-400 text-2xl font-semibold bg-neutral-900 px-4 absolute -top-4 left-1/2 transform -translate-x-1/2 font-serif">
+        <span className="text-orange-400 text-xl font-semibold bg-neutral-900 px-4 absolute -top-4 left-1/2 transform -translate-x-1/2 font-serif">
           {sectionTitle}
         </span>
       </div>
@@ -254,7 +224,7 @@ export default function ProductRecommendations({
             </div>
           ))}
         </div>
-      ) : (
+      ) : hasRecommendations ? (
         <div className={`grid gap-10 ${
           recommendedProducts.length === 1 
             ? "grid-cols-1 max-w-sm mx-auto" 
@@ -271,14 +241,44 @@ export default function ProductRecommendations({
             }
           })}
         </div>
-      )}
+      ) : null}
       
-      {/* Optional: Show personalization indicator for VIP customers */}
-      {/* {userContext?.isVipCustomer && hasRecommendations && !isLoading && (
-        <div className="mt-4 text-sm text-orange-400/70">
-          ✨ Curated selections for valued customers
+      {/* Show agent answer only when we have product recommendations */}
+      {hasRecommendations && hasAgentAnswer && (
+        <div className="flex justify-start items-start mt-10 w-full px-4">
+          <div className="flex-shrink-0 mr-4">
+            <Image
+              src="/volt.svg"
+              alt="Volt mascot"
+              width={60}
+              height={60}
+              className="z-10"
+            />
+          </div>
+          <div className="flex-1 min-w-0 max-w-4xl">
+            <div className="bg-neutral-900 text-white px-6 py-4 rounded-2xl shadow-lg relative text-left"
+                style={{ border: "1px solid #f59e42" }}>
+              <span className="whitespace-pre-wrap break-words block">{agentAnswer}</span>
+              <span
+                className="absolute left-[-18px] top-6 w-0 h-0"
+                style={{
+                  borderTop: "12px solid transparent",
+                  borderBottom: "12px solid transparent",
+                  borderRight: "18px solid #f59e42"
+                }}
+              />
+              <span
+                className="absolute left-[-16px] top-6 w-0 h-0"
+                style={{
+                  borderTop: "10px solid transparent",
+                  borderBottom: "10px solid transparent",
+                  borderRight: "16px solid #1a1a1a"
+                }}
+              />
+            </div>
+          </div>
         </div>
-      )} */}
+      )}
     </div>
   );
 }

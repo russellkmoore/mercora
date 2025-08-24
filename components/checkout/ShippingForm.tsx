@@ -9,13 +9,13 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import type { Address } from "@/lib/types/address";
+import { Address } from "@/lib/types";
 
 interface Props {
-  address: Address;
+  address: Partial<Address>;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSelectCountry: (value: string) => void;
-  onSubmit: (address: Address) => void;
+  onSubmit: (address: Partial<Address>) => void;
   error?: string | null;
   disabled?: boolean;
 }
@@ -31,12 +31,12 @@ export default function ShippingForm({
   const isSubmitDisabled =
     disabled ||
     !(
-      address.name &&
+      address.recipient &&
       address.email &&
-      address.address &&
+      address.line1 &&
       address.city &&
-      address.state &&
-      address.zip &&
+      address.region &&
+      address.postal_code &&
       address.country
     );
 
@@ -50,27 +50,27 @@ export default function ShippingForm({
 
       <div className="space-y-4">
         <Input
-          name="name"
+          name="recipient"
           placeholder="Full Name"
-          value={address.name}
+          value={address.recipient || ""}
           onChange={onChange}
         />
         <Input
           name="email"
           placeholder="Email"
-          value={address.email}
+          value={address.email || ""}
           onChange={onChange}
         />
         <Input
-          name="address"
+          name="line1"
           placeholder="Street Address"
-          value={address.address}
+          value={typeof address.line1 === "string" ? address.line1 : ""}
           onChange={onChange}
         />
         <Input
-          name="address2"
+          name="line2"
           placeholder="Street Address 2"
-          value={address.address2}
+          value={typeof address.line2 === "string" ? address.line2 || "" : ""}
           onChange={onChange}
         />
         <div className="flex gap-2">
@@ -78,28 +78,28 @@ export default function ShippingForm({
             name="city"
             placeholder="City"
             className="flex-[2]"
-            value={address.city}
+            value={typeof address.city === "string" ? address.city : ""}
             onChange={onChange}
           />
           <Input
-            name="state"
+            name="region"
             placeholder="State"
             className="flex-1"
-            value={address.state}
+            value={address.region || ""}
             onChange={onChange}
           />
           <Input
-            name="zip"
+            name="postal_code"
             placeholder="Zip Code"
             className="flex-1"
-            value={address.zip}
+            value={address.postal_code || ""}
             onChange={onChange}
           />
         </div>
 
         <div className="flex gap-2 items-end">
           <div className="flex-[3]">
-            <Select onValueChange={onSelectCountry} value={address.country}>
+            <Select onValueChange={onSelectCountry} value={address.country || ""}>
               <SelectTrigger id="country" className="bg-white text-black">
                 <SelectValue placeholder="Select Country" />
               </SelectTrigger>

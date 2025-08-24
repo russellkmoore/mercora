@@ -128,7 +128,7 @@ export default function CartDrawer() {
           ) : (
             <div className="space-y-4">
               {items.map((item) => (
-                <CartItemCard key={item.productId} item={item} />
+                <CartItemCard key={item.variantId} item={item} />
               ))}
               
               <div className="border-t border-gray-700 pt-4">

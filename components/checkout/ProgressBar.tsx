@@ -7,7 +7,7 @@ export default function ProgressBar({ step }: { step: number }) {
   const steps = [
     "Shipping Address",
     "Shipping Method",
-    "Billing Information",
+    "Payment Information",
     "Order Submitted",
   ];
 

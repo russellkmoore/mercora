@@ -37,7 +37,7 @@
  */
 
 import { auth } from "@clerk/nextjs/server";
-import { getOrdersByUserId } from "@/lib/models/order";
+import { getOrdersByUserId } from "@/lib/models/";
 import OrderCard from "@/components/OrderCard";
 
 /**

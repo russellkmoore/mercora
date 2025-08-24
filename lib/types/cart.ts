@@ -1,4 +1,4 @@
-import { CartItem } from "./cartitem";
+import { CartItem } from ".";
 export interface Cart {
   id: string; // could be session ID or user ID
   userId?: number;

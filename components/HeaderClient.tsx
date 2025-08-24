@@ -57,12 +57,13 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import CartDrawer from "@/components/cart/CartDrawer";
 import { CartHydrationGuard } from "@/components/cart/CartHydrationGuard";
 import ClientOnly from "@/components/ClientOnly";
+import type { MACHCategory } from '@/lib/types/mach';
 
 /**
  * Props interface for HeaderClient component
  */
 interface HeaderClientProps {
-  categories: { id: number; name: string; slug: string }[];
+  categories: MACHCategory[];
 }
 
 /**
@@ -111,11 +112,11 @@ export default function HeaderClient({
                 asChild
               >
                 <Link 
-                  href={`/category/${category.slug}`} 
+                  href={`/category/${typeof category.slug === 'string' ? category.slug : (category.slug?.en || Object.values(category.slug || {})[0] || category.id)}`} 
                   className="w-full"
                   prefetch={true}
                 >
-                  {category.name}
+                  {typeof category.name === 'string' ? category.name : category.name.en || Object.values(category.name)[0]}
                 </Link>
               </DropdownMenuItem>
             ))}
@@ -168,12 +169,12 @@ export default function HeaderClient({
                   {categories.map((category) => (
                     <Link
                       key={category.id}
-                      href={`/category/${category.slug}`}
+                      href={`/category/${typeof category.slug === 'string' ? category.slug : (category.slug?.en || Object.values(category.slug || {})[0] || category.id)}`}
                       onClick={() => setIsMobileMenuOpen(false)}
                       className="block text-white hover:text-orange-500 py-2 px-2 rounded hover:bg-neutral-800"
                       prefetch={true}
                     >
-                      {category.name}
+                      {typeof category.name === 'string' ? category.name : category.name.en || Object.values(category.name)[0]}
                     </Link>
                   ))}
                 </div>

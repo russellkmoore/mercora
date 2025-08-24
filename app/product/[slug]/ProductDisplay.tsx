@@ -43,33 +43,62 @@ import Image from "next/image";
 import ProductRecommendations from "@/components/ProductRecommendations";
 import { useCartStore } from "@/lib/stores/cart-store";
 import { toast } from "sonner";
-import type { Product } from "@/lib/types/product";
+import type { Product } from "@/lib/types/";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-/**
- * ProductDisplay component for showcasing individual product details
- * 
- * @param product - The product object to display
- * @returns JSX element with complete product detail view
- */
 export default function ProductDisplay({ product }: { product: Product }) {
-  const [selectedImage, setSelectedImage] = useState(product.primaryImageUrl);
+  // Helper to get the best image URL from a MACH Media object
+  function getMediaUrl(media: any): string {
+    if (!media) return "/placeholder.jpg";
+    if (typeof media === "string") return media;
+    return media.file?.url || "/placeholder.jpg";
+  }
 
-  /**
-   * Format image source URL with fallback handling
-   * 
-   * @param src - Image source URL or path
-   * @returns Properly formatted image URL
-   */
-  const formatImageSrc = (src: string | null) =>
-    src?.startsWith("http") ? src : `/${src || "placeholder.jpg"}`;
+  // Build all images array: primary_image + media[] with error handling
+  const allImages = (() => {
+    try {
+      const primaryImg = (product.primary_image as any)?.url || (product.primary_image as any)?.file?.url;
+      const mediaImages = Array.isArray(product.media)
+        ? product.media.map((m: any) => {
+            try {
+              return m?.url || m?.file?.url;
+            } catch (e) {
+              return null;
+            }
+          }).filter(Boolean)
+        : [];
+      
+      return Array.from(new Set([primaryImg, ...mediaImages].filter(Boolean))) as string[];
+    } catch (error) {
+      console.warn('Error processing product images:', error);
+      return ["/placeholder.jpg"];
+    }
+  })();
 
-  /**
-   * Generate unique image array from primary image and additional images
-   * Ensures no duplicate images in the gallery
-   */
-  const allImages = Array.from(
-    new Set([product.primaryImageUrl, ...product.images].filter(Boolean))
-  ) as string[];
+  const [selectedImage, setSelectedImage] = useState<string | null>(
+    allImages[0] || "/placeholder.jpg"
+  );
+
+  // Variant selection state
+  const variants = product.variants || [];
+  const defaultVariant = variants.find((v) => v.id === product.default_variant_id) || variants[0];
+  const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(defaultVariant?.id);
+  const selectedVariant = variants.find((v) => v.id === selectedVariantId) || defaultVariant;
+
+  // Price logic (MACH: price is on variant)
+  const price = selectedVariant?.price?.amount ?? 0;
+  const compareAt = selectedVariant?.compare_at_price?.amount;
+  const onSale = compareAt && compareAt > price;
+
+  // Stock logic (MACH: inventory is on variant)
+  const quantityInStock = selectedVariant?.inventory?.quantity ?? 0;
+  const available = quantityInStock > 0;
 
   return (
     <>
@@ -80,8 +109,8 @@ export default function ProductDisplay({ product }: { product: Product }) {
           {/* Primary Image Display */}
           <div className="relative w-full rounded overflow-hidden bg-neutral-800 aspect-[3/4]">
             <Image
-              src={formatImageSrc(selectedImage)}
-              alt={product.name}
+              src={getMediaUrl(selectedImage)}
+              alt={typeof product.name === "string" ? product.name : ""}
               fill
               sizes="(min-width: 1024px) 50vw, 100vw"
               style={{ objectFit: "cover" }}
@@ -102,7 +131,7 @@ export default function ProductDisplay({ product }: { product: Product }) {
                 }`}
               >
                 <Image
-                  src={formatImageSrc(img)}
+                  src={getMediaUrl(img)}
                   alt={`Thumbnail ${idx}`}
                   fill
                   style={{ objectFit: "cover" }}
@@ -114,46 +143,91 @@ export default function ProductDisplay({ product }: { product: Product }) {
 
         {/* Product Information Section */}
         <div className="mt-6 lg:mt-0">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold mb-3 sm:mb-4">{product.name}</h1>
-          <p className="text-gray-400 text-sm sm:text-base mb-4 sm:mb-6">{product.longDescription}</p>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold mb-3 sm:mb-4">
+            {typeof product.name === "string" ? product.name : ""}
+          </h1>
+          <p className="text-gray-400 text-sm sm:text-base mb-4 sm:mb-6">
+            { typeof product.description === "string"
+              ? product.description
+              : Object.values(product.description || {})[0] || ""}
+          </p>
+
+          {/* Variant Selector */}
+          {variants.length > 1 && (
+            <div className="mb-4 sm:mb-6">
+              <label className="block text-sm font-medium mb-2 text-white">Choose an option:</label>
+              <Select 
+                value={selectedVariantId} 
+                onValueChange={setSelectedVariantId}
+              >
+                <SelectTrigger className="w-full sm:w-auto bg-neutral-800 border-neutral-700 text-white hover:bg-neutral-700">
+                  <SelectValue placeholder="Select a variant" />
+                </SelectTrigger>
+                <SelectContent className="bg-neutral-800 border-neutral-700">
+                  {variants.map((variant) => {
+                    const optionDisplay = variant.option_values?.map(ov => `${ov.value}`).join(", ") || `Variant ${variant.id}`;
+                    const priceDisplay = variant.price ? `$${(variant.price.amount / 100).toFixed(2)}` : "";
+                    
+                    return (
+                      <SelectItem 
+                        key={variant.id} 
+                        value={variant.id}
+                        className="text-white hover:bg-neutral-700 focus:bg-neutral-700"
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span>{optionDisplay}</span>
+                          {priceDisplay && <span className="ml-2 text-orange-400 font-semibold">{priceDisplay}</span>}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Pricing Display with Sale Logic */}
-          {product.salePrice && product.onSale ? (
+          {onSale ? (
             <div className="mb-4">
               <p className="text-gray-500 line-through text-base sm:text-lg">
-                ${(product.price / 100).toFixed(2)}
+                ${(compareAt! / 100).toFixed(2)}
               </p>
               <p className="text-green-400 text-lg sm:text-xl font-bold">
-                ${(product.salePrice / 100).toFixed(2)}
+                ${(price / 100).toFixed(2)}
               </p>
               <p className="text-xs sm:text-sm text-orange-400 italic">on sale</p>
             </div>
           ) : (
             <p className="text-lg sm:text-xl font-semibold text-white mb-4">
-              ${(product.price / 100).toFixed(2)}
+              ${(price / 100).toFixed(2)}
             </p>
           )}
 
           {/* Add to Cart Button with Stock Availability */}
-          {product.quantityInStock > 0 &&
-          product.availability === "available" ? (
+          {available ? (
             <button
               className="mt-4 sm:mt-6 w-full sm:w-auto px-6 py-3 bg-orange-500 text-black font-bold rounded hover:bg-orange-400 transition"
               onClick={() => {
-                // Add product to cart with appropriate pricing
+                const productName = typeof product.name === "string" ? product.name : "";
+                const variantDisplay = selectedVariant?.option_values?.map(ov => `${ov.value}`).join(", ") || "";
+                const fullName = variantDisplay ? `${productName} - ${variantDisplay}` : productName;
+                
                 useCartStore.getState().addItem({
                   productId: product.id,
-                  name: product.name,
-                  price:
-                    (product.onSale && product.salePrice
-                      ? product.salePrice
-                      : product.price) / 100,
+                  variantId: selectedVariant?.id,
+                  name: fullName,
+                  price: price / 100,
                   quantity: 1,
-                  primaryImageUrl: product.primaryImageUrl ?? "placeholder.jpg",
+                  primaryImageUrl: (() => {
+                    try {
+                      return (product.primary_image as any)?.url || (product.primary_image as any)?.file?.url || "/placeholder.jpg";
+                    } catch (e) {
+                      return "/placeholder.jpg";
+                    }
+                  })(),
                 });
-                // Show success notification
                 toast("Added to Cart", {
-                  description: `${product.name} has been added to your cart.`,
+                  description: `${fullName} has been added to your cart.`,
                   icon: "🔥",
                 });
               }}
