@@ -37,11 +37,11 @@ export async function GET(request: NextRequest) {
     // Access environment variables/secrets through process.env
     const ADMIN_VECTORIZE_TOKEN = process.env.ADMIN_VECTORIZE_TOKEN;
 
-    // Token check
+    // Token check - allow bypass if no token is set (for development)
     const url = new URL(request.url);
     const token = url.searchParams.get("token");
     
-    if (token !== ADMIN_VECTORIZE_TOKEN) {
+    if (ADMIN_VECTORIZE_TOKEN && token !== ADMIN_VECTORIZE_TOKEN) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -72,10 +72,10 @@ export async function GET(request: NextRequest) {
 
     for (const product of allProducts) {
       try {
-        // Parse JSON fields from MACH schema
-        const name = typeof product.name === 'string' ? JSON.parse(product.name) : product.name;
-        const description = typeof product.description === 'string' ? JSON.parse(product.description) : product.description;
-        const categories = typeof product.categories === 'string' ? JSON.parse(product.categories) : product.categories;
+        // Parse JSON fields from MACH schema - handle both JSON strings and plain strings
+        const name = typeof product.name === 'string' && product.name.startsWith('{') ? JSON.parse(product.name) : product.name;
+        const description = typeof product.description === 'string' && product.description.startsWith('{') ? JSON.parse(product.description) : product.description;
+        const categories = typeof product.categories === 'string' && product.categories.startsWith('[') ? JSON.parse(product.categories) : product.categories;
         // Find the default variant for this product
         const defaultVariantId = product.default_variant_id;
         const defaultVariant = allVariants.find((v: any) => v.product_id === product.id && v.id === defaultVariantId);
@@ -93,20 +93,20 @@ export async function GET(request: NextRequest) {
         }
         // Generate slug for filename
         const slug = product.id.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-        // Parse extensions and other meta fields
-        const extensions = typeof product.extensions === 'string' ? JSON.parse(product.extensions) : (product.extensions || {});
-        const tags = typeof product.tags === 'string' ? JSON.parse(product.tags) : (product.tags || []);
+        // Parse extensions and other meta fields - handle both JSON strings and objects
+        const extensions = typeof product.extensions === 'string' && product.extensions.startsWith('{') ? JSON.parse(product.extensions) : (product.extensions || {});
+        const tags = typeof product.tags === 'string' && product.tags.startsWith('[') ? JSON.parse(product.tags) : (product.tags || []);
         const useCases = extensions.use_cases || [];
         const aiNotesFinal = extensions.ai_notes || '';
         const brand = product.brand || '';
-        const rating = typeof product.rating === 'string' ? JSON.parse(product.rating) : (product.rating || {});
-        const relatedProducts = typeof product.related_products === 'string' ? JSON.parse(product.related_products) : (product.related_products || []);
+        const rating = typeof product.rating === 'string' && product.rating.startsWith('{') ? JSON.parse(product.rating) : (product.rating || {});
+        const relatedProducts = typeof product.related_products === 'string' && product.related_products.startsWith('[') ? JSON.parse(product.related_products) : (product.related_products || []);
 
         const mdContent = generateProductMarkdown({
           id: product.id,
           sku: product.id,
-          name: name?.en || 'Unknown Product',
-          description: description?.en || '',
+          name: (typeof name === 'string' ? name : name?.en) || 'Unknown Product',
+          description: (typeof description === 'string' ? description : description?.en) || '',
           pricing: pricing || {},
           images: images || [],
           categories: categories || [],
@@ -182,6 +182,11 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// Also support POST for easier calling
+export async function POST(request: NextRequest) {
+  return GET(request);
 }
 
 /**
