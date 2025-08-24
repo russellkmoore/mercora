@@ -23,7 +23,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDbAsync } from "@/lib/db";
 // TODO: Create products schema - temporarily commented out  
-import { products, product_variants } from "@/lib/db/schema/";
+// Removed schema imports to avoid any JSON parsing issues
+// import { products, product_variants } from "@/lib/db/schema/";
 
 export async function GET(request: NextRequest) {
   try {
@@ -69,9 +70,13 @@ export async function GET(request: NextRequest) {
     const results = [];
     const errors = [];
 
-    for (const product of allProducts) {
+    // Test just the first product to debug
+    const firstProduct = allProducts[0];
+    console.log('First product raw data:', JSON.stringify(firstProduct, null, 2));
+    
+    for (const product of allProducts.slice(0, 1)) {  // Only process first product for debugging
       try {
-        console.log('Processing product:', product.id, 'name:', product.name, 'typeof name:', typeof product.name);
+        console.log('Processing product:', (product as any).id, 'name:', (product as any).name, 'typeof name:', typeof (product as any).name);
         
         // Helper function to safely parse JSON fields
         const safeJsonParse = (field: any, expectedStart: string = '{') => {
