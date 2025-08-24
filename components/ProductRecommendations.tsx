@@ -147,7 +147,8 @@ export default function ProductRecommendations({
       }
       
       recommendationQuery += " Can you recommend 3 similar or complementary products that would work well with what I'm interested in?";
-      
+      recommendationQuery += " The answer should be short and concise with a little wit.";
+
       const res = await fetch("/api/agent-chat", {
         method: "POST",
         headers: {
@@ -188,6 +189,7 @@ export default function ProductRecommendations({
 
   // Show loading state or results
   const hasRecommendations = recommendedProducts.length > 0;
+  const hasAgentAnswer = agentAnswer && agentAnswer.trim().length > 0;
   const shouldShowSection = isLoading || hasRecommendations;
 
   if (!shouldShowSection) {
@@ -200,7 +202,7 @@ export default function ProductRecommendations({
     sectionTitle = stableUserContext.orderCount > 0 
     ? "Finding personalized recommendations..." 
     : "Finding recommendations...";
-  } else if (stableUserContext.orderCount > 0 && hasRecommendations) {
+  } else if (hasRecommendations) {
      sectionTitle = `Recommended for ${stableUserContext.firstName || 'you'}`;
   }
 
@@ -222,7 +224,7 @@ export default function ProductRecommendations({
             </div>
           ))}
         </div>
-      ) : (
+      ) : hasRecommendations ? (
         <div className={`grid gap-10 ${
           recommendedProducts.length === 1 
             ? "grid-cols-1 max-w-sm mx-auto" 
@@ -239,11 +241,12 @@ export default function ProductRecommendations({
             }
           })}
         </div>
-      )}
+      ) : null}
       
-      {agentAnswer && (
-        <div className="flex justify-center items-start mt-10 relative">
-          <div className="relative">
+      {/* Show agent answer only when we have product recommendations */}
+      {hasRecommendations && hasAgentAnswer && (
+        <div className="flex justify-start items-start mt-10 w-full px-4">
+          <div className="flex-shrink-0 mr-4">
             <Image
               src="/volt.svg"
               alt="Volt mascot"
@@ -251,27 +254,27 @@ export default function ProductRecommendations({
               height={60}
               className="z-10"
             />
-            <div className="absolute left-14 top-1">
-              <div className="bg-neutral-900 text-white px-6 py-4 rounded-2xl shadow-lg relative max-w-md text-left"
-                  style={{ border: "1px solid #f59e42" }}>
-                <span>{agentAnswer}</span>
-                <span
-                  className="absolute left-[-18px] top-6 w-0 h-0"
-                  style={{
-                    borderTop: "12px solid transparent",
-                    borderBottom: "12px solid transparent",
-                    borderRight: "18px solid #f59e42"
-                  }}
-                />
-                <span
-                  className="absolute left-[-16px] top-6 w-0 h-0"
-                  style={{
-                    borderTop: "10px solid transparent",
-                    borderBottom: "10px solid transparent",
-                    borderRight: "16px solid #1a1a1a"
-                  }}
-                />
-              </div>
+          </div>
+          <div className="flex-1 min-w-0 max-w-4xl">
+            <div className="bg-neutral-900 text-white px-6 py-4 rounded-2xl shadow-lg relative text-left"
+                style={{ border: "1px solid #f59e42" }}>
+              <span className="whitespace-pre-wrap break-words block">{agentAnswer}</span>
+              <span
+                className="absolute left-[-18px] top-6 w-0 h-0"
+                style={{
+                  borderTop: "12px solid transparent",
+                  borderBottom: "12px solid transparent",
+                  borderRight: "18px solid #f59e42"
+                }}
+              />
+              <span
+                className="absolute left-[-16px] top-6 w-0 h-0"
+                style={{
+                  borderTop: "10px solid transparent",
+                  borderBottom: "10px solid transparent",
+                  borderRight: "16px solid #1a1a1a"
+                }}
+              />
             </div>
           </div>
         </div>
