@@ -1,3 +1,4 @@
+
 /**
  * === Personalized Product Recommendations ===
  * 
@@ -5,8 +6,7 @@
  * preferences, and behavior to provide more relevant product suggestions.
  */
 
-import type { Product } from "@/lib/types/product";
-import type { Order } from "@/lib/types/order";
+import type { Product, Order } from "@/lib/types";
 import type { EnhancedUserContext } from "@/lib/hooks/useEnhancedUserContext";
 
 export interface RecommendationContext {
@@ -28,8 +28,8 @@ export function getPersonalizedRecommendations(
   
   // Filter out products user is currently viewing or has in current context
   const excludeIds = new Set([
-    ...currentProducts.map(p => p.id),
-    ...(viewingProduct ? [viewingProduct.id] : [])
+  ...currentProducts.map(p => p.id),
+  ...(viewingProduct ? [viewingProduct.id] : [])
   ]);
   
   const availableProducts = allProducts.filter(p => !excludeIds.has(p.id));
@@ -65,17 +65,11 @@ function calculatePersonalizationScore(
   // Base score
   score += 1;
 
-  // Tag and use case matching
+  // Tag matching
   if (viewingProduct && product.tags?.some((tag: string) => 
     viewingProduct.tags?.includes(tag)
   )) {
     score += 3; // Same tags as viewed product
-  }
-
-  if (viewingProduct && product.useCases?.some((useCase: string) => 
-    viewingProduct.useCases?.includes(useCase)
-  )) {
-    score += 2; // Similar use cases
   }
 
   if (category && product.tags?.includes(category)) {
@@ -86,8 +80,7 @@ function calculatePersonalizationScore(
   if (userContext.orders.length > 0) {
     // Check if user has bought similar products
     const purchasedProductIds = userContext.orders
-      .flatMap(order => order.items.map(item => String(item.productId)));
-    
+      .flatMap(order => order.items.map(item => String(item.product_id)));
     if (purchasedProductIds.includes(String(product.id))) {
       score -= 5; // Don't recommend products user already bought
     }
@@ -99,26 +92,39 @@ function calculatePersonalizationScore(
 
   // Price range matching
   if (userContext.preferredPriceRange) {
-    const productPrice = product.salePrice || product.price;
+    // Use variant price if available, else fallback to product.extensions?.price
+    let productPrice = undefined;
+    if (product.variants && product.variants.length > 0) {
+      productPrice = product.variants[0].price?.amount;
+    } else if (product.extensions?.price) {
+      productPrice = product.extensions.price;
+    }
     const { min, max } = userContext.preferredPriceRange;
-    
-    if (productPrice >= min && productPrice <= max) {
-      score += 2; // Within user's typical spending range
-    } else if (productPrice > max) {
-      score -= 1; // Above typical range
+    if (typeof productPrice === 'number') {
+      if (productPrice >= min && productPrice <= max) {
+        score += 2; // Within user's typical spending range
+      } else if (productPrice > max) {
+        score -= 1; // Above typical range
+      }
     }
   }
 
   // VIP customer boost
   if (userContext.isVipCustomer) {
     // Recommend premium products to VIP customers
-    if (product.price > 5000) { // $50+ products
+    let price = undefined;
+    if (product.variants && product.variants.length > 0) {
+      price = product.variants[0].price?.amount;
+    } else if (product.extensions?.price) {
+      price = product.extensions.price;
+    }
+    if (typeof price === 'number' && price > 5000) { // $50+ products
       score += 1;
     }
   }
 
   // Sale products boost
-  if (product.onSale) {
+  if (product.extensions?.onSale) {
     score += 1;
   }
 
@@ -146,12 +152,16 @@ export function explainRecommendation(
   )) {
     reasons.push("similar tags");
   }
-
-  if (userContext.isVipCustomer && product.price > 5000) {
+  let price = undefined;
+  if (product.variants && product.variants.length > 0) {
+    price = product.variants[0].price?.amount;
+  } else if (product.extensions?.price) {
+    price = product.extensions.price;
+  }
+  if (userContext.isVipCustomer && typeof price === 'number' && price > 5000) {
     reasons.push("premium recommendation for VIP");
   }
-
-  if (product.onSale) {
+  if (product.extensions?.onSale) {
     reasons.push("on sale");
   }
 
@@ -169,17 +179,14 @@ export function formatOrderHistoryForAI(orders: Order[]): string {
   if (orders.length === 0) {
     return "No previous orders - first-time customer";
   }
-
   const recentOrders = orders
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .sort((a, b) => new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime())
     .slice(0, 3);
-
   return recentOrders.map(order => {
     const itemCount = order.items?.length || 0;
-    const total = (order.total / 100).toFixed(2);
+    const total = order.total_amount?.amount ? (order.total_amount.amount / 100).toFixed(2) : "0.00";
     const status = order.status;
-    const date = new Date(order.createdAt).toLocaleDateString();
-    
+    const date = order.created_at ? new Date(order.created_at).toLocaleDateString() : "";
     return `${date}: ${itemCount} items ($${total}) - ${status}`;
   }).join(' | ');
 }

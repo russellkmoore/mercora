@@ -1,6 +1,8 @@
 # API Architecture Documentation
 
-## API Route Overview
+## Current API Structure Overview
+
+The API has been refactored to eliminate redundancy and follow RESTful principles with clean, top-level endpoints.
 
 ```mermaid
 graph TB
@@ -12,13 +14,17 @@ graph TB
     end
 
     %% API Gateway
-    subgraph "API Layer"
+    subgraph "Unified API Layer"
         AgentChat[🤖 /api/agent-chat]
-        VectorizeProducts[📦 /api/vectorize-products]
-        VectorizeKnowledge[📚 /api/vectorize-knowledge]
+        Orders[📦 /api/orders]
+        PaymentIntent[💳 /api/payment-intent]
+        Tax[💰 /api/tax]
+        Products[📋 /api/products]
+        Categories[📂 /api/categories]
         ShippingOptions[🚚 /api/shipping-options]
-        SubmitOrder[📋 /api/submit-order]
-        TaxCalculation[💰 /api/tax]
+        VectorizeProducts[🔍 /api/vectorize-products]
+        VectorizeKnowledge[📚 /api/vectorize-knowledge]
+        StripeWebhooks[🔔 /api/webhooks/stripe]
     end
 
     %% Core Services
@@ -26,8 +32,9 @@ graph TB
         AIService[🧠 AI Processing]
         VectorService[🔍 Vector Search]
         OrderService[📦 Order Management]
-        PaymentService[💳 Payment Processing]
+        PaymentService[💳 Stripe Integration]
         ShippingService[🚚 Shipping Logic]
+        TaxService[💰 Stripe Tax]
     end
 
     %% Data Layer
@@ -40,30 +47,39 @@ graph TB
 
     %% Connections
     WebApp --> AgentChat
+    WebApp --> Orders
+    WebApp --> PaymentIntent
+    WebApp --> Tax
+    WebApp --> Products
     WebApp --> ShippingOptions
-    WebApp --> SubmitOrder
-    WebApp --> TaxCalculation
     
     Mobile --> AgentChat
-    Mobile --> SubmitOrder
+    Mobile --> Orders
+    Mobile --> Products
     
     Admin --> VectorizeProducts
     Admin --> VectorizeKnowledge
+    Admin --> Orders
+    Admin --> Products
+    Admin --> Categories
 
     AgentChat --> AIService
     AgentChat --> VectorService
     VectorizeProducts --> VectorService
     VectorizeKnowledge --> VectorService
     
+    Orders --> OrderService
+    PaymentIntent --> PaymentService
+    Tax --> TaxService
     ShippingOptions --> ShippingService
-    SubmitOrder --> OrderService
-    TaxCalculation --> PaymentService
+    StripeWebhooks --> OrderService
 
     AIService --> VectorDatabase
     VectorService --> VectorDatabase
     VectorService --> R2Storage
     OrderService --> D1Database
-    PaymentService --> ExternalAPIs
+    PaymentService --> StripeAPI[🔌 Stripe API]
+    TaxService --> StripeAPI
     ShippingService --> ExternalAPIs
 
     %% Styling
@@ -73,10 +89,112 @@ graph TB
     classDef data fill:#fff3e0
 
     class WebApp,Mobile,Admin client
-    class AgentChat,VectorizeProducts,VectorizeKnowledge,ShippingOptions,SubmitOrder,TaxCalculation api
-    class AIService,VectorService,OrderService,PaymentService,ShippingService service
-    class D1Database,VectorDatabase,R2Storage,ExternalAPIs data
+    class AgentChat,Orders,PaymentIntent,Tax,Products,Categories,ShippingOptions,VectorizeProducts,VectorizeKnowledge,StripeWebhooks api
+    class AIService,VectorService,OrderService,PaymentService,TaxService,ShippingService service
+    class D1Database,VectorDatabase,R2Storage,StripeAPI,ExternalAPIs data
 ```
+
+## 📋 Unified API Endpoints
+
+### **Core Resources**
+```
+├── /api/orders              # UNIFIED order management
+│   ├── GET    - List orders (with filtering)
+│   ├── POST   - Create new orders  
+│   └── PUT    - Update order status
+├── /api/orders/[id]         # Specific order operations
+│   ├── GET    - Get order details
+│   └── PUT    - Update specific order
+```
+
+### **Payment & Tax (Stripe Integration)**
+```
+├── /api/payment-intent      # Stripe payment creation
+│   └── POST   - Create payment intent (requires pre-calculated tax)
+├── /api/tax                 # Tax calculation (Stripe Tax)
+│   └── POST   - Calculate tax based on address + items
+├── /api/webhooks/stripe     # Payment status updates
+│   └── POST   - Handle Stripe webhook events
+├── /api/validate-discount   # Discount validation
+│   └── POST   - Validate discount codes
+```
+
+### **Products & Categories** 
+```
+├── /api/products            # Product catalog
+│   ├── GET    - List products (with filters)
+│   └── POST   - Add products (admin)
+├── /api/products/[id]       # Specific product
+│   ├── GET    - Get product details
+│   └── PUT    - Update product (admin)
+├── /api/categories          # Product categories
+│   ├── GET    - List categories
+│   └── POST   - Add categories (admin)
+├── /api/categories/[id]     # Specific category
+│   ├── GET    - Get category details
+│   └── PUT    - Update category (admin)
+```
+
+### **Commerce Support**
+```
+├── /api/shipping-options    # Shipping calculation
+│   └── POST   - Get shipping options for address
+```
+
+### **AI & Content**
+```
+├── /api/agent-chat          # AI assistant
+│   └── POST   - Chat with Volt AI assistant
+├── /api/vectorize-products  # Content indexing
+│   └── POST   - Index products for AI search
+├── /api/vectorize-knowledge # Knowledge indexing
+│   └── POST   - Index support articles for AI
+```
+
+## 🎯 Checkout Flow
+
+The unified checkout process follows this clear separation of concerns:
+
+```javascript
+// 1. Calculate tax
+const taxResponse = await fetch('/api/tax', {
+  method: 'POST',
+  body: JSON.stringify({ items, shippingAddress, shippingCost })
+});
+
+// 2. Create payment intent
+const paymentResponse = await fetch('/api/payment-intent', {
+  method: 'POST', 
+  body: JSON.stringify({ 
+    amount: total, 
+    taxAmount: tax, 
+    shippingAddress, 
+    orderId 
+  })
+});
+
+// 3. Process payment (Stripe handles)
+// 4. Create order after payment success
+const orderResponse = await fetch('/api/orders', {
+  method: 'POST',
+  body: JSON.stringify({ items, shipping_address, tax_amount, payment_intent_id })
+});
+```
+
+## 🔒 Authentication Patterns
+
+### **User Endpoints** (Clerk Auth)
+- `/api/orders` (user's own orders)
+- `/api/payment-intent` 
+- `/api/tax`
+
+### **Admin Endpoints** (API Key Auth)
+- `/api/orders?admin=true`
+- `/api/orders` (PUT with admin permissions)
+- `/api/products` (POST/PUT)
+
+### **Webhook Endpoints** (Signature Auth)
+- `/api/webhooks/stripe` (Stripe signature verification)
 
 ## Agent Chat API Flow
 

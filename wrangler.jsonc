@@ -19,7 +19,7 @@
     {
       "binding": "DB",
       "database_name": "mercora-db",
-      "database_id": "c1ea0c17-14ae-48cc-ade8-4433e9130594"
+      "database_id": "a27c0044-672d-4355-aa47-4410746f45f9"
     }
   ],
   "r2_buckets": [
@@ -59,6 +59,7 @@
    */
   "vars": {
     "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_bGVhcm5pbmctbGlnZXItMTAuY2xlcmsuYWNjb3VudHMuZGV2JA",
+    "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51Rwyc6LL7e1EcFUl2kqrcgWa8KDNzC9m4lc38wQQKiKVmekTxi3q6R6R2nohizFzRNNw9bHTeN8mripgZzgUYUDd00nlOhCWEs"
   },
   /**
    * Note: Use secrets to store sensitive data.

@@ -1,68 +1,30 @@
 /**
- * === Vectorize Products API ===
+ * === Enhanced Vectorize Products API ===
  *
- * This endpoint loads all Markdown files from the `products_md/` folder in the
- * bound R2 bucket (`MEDIA`), embeds them using Cloudflare AI's BAAI model,
- * and stores the resulting vectors in the bound `VECTORIZE` index.
+ * This endpoint now performs a complete workflow:
+ * 1. Queries products from the MACH-compliant database
+ * 2. Includes AI notes from the extension table 
+ * 3. Generates individual MD files per product
+ * 4. Uploads them to R2 under the products_md/ prefix
+ * 5. Embeds them using Cloudflare AI and stores in Vectorize
  *
- * Each file is expected to be a product entry with structured Markdown,
- * including optional frontmatter and `ai_notes`.
+ * This replaces the static MD file approach with a dynamic database-driven system
+ * that automatically includes all product data and AI context for better search.
  *
  * === Security ===
- * This route is protected with an access token passed via query string.
+ * Protected with an access token passed via query string.
  * The expected token value must match the secret stored as `ADMIN_VECTORIZE_TOKEN`.
  *
- * === Setup ===
- * 1. Bind R2, Vectorize, and AI in `wrangler.jsonc`:
- *
- *    ```jsonc
- *    "r2_buckets": [
- *      {
- *        "binding": "MEDIA",
- *        "bucket_name": "voltique-images"
- *      }
- *    ],
- *    "vectorize": [
- *      {
- *        "binding": "VECTORIZE",
- *        "index_name": "voltique-index"
- *      }
- *    ],
- *    "ai": {
- *      "binding": "AI"
- *    }
- *    ```
- *
- * 2. Upload Markdown files to R2 under `products_md/` prefix.
- *
- * 3. Set the admin secret token:
- *
- *    ```bash
- *    npx wrangler secret put ADMIN_VECTORIZE_TOKEN
- *    ```
- *
- * 4. Deploy the route and trigger it with:
- *
- *    ```
- *    GET /api/vectorize-products?token=your-token-here
- *    ```
- *
- * === Example Usage ===
- *
- *    curl "https://yourdomain.com/api/vectorize-products?token=mercora-vector-admin"
- *
  * === Returns ===
- * A plain-text summary of how many files were vectorized, including slugs.
- *
- * === Notes ===
- * - Only `.md` files in `products_md/` are processed.
- * - Files with insufficient content are skipped.
- * - Vector entries are stored using the product slug as the document ID.
- * - ProductId is extracted from filename for metadata compatibility.
+ * A JSON response showing how many products were processed and vectorized.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getDbAsync } from "@/lib/db";
+// TODO: Create products schema - temporarily commented out  
+import { products, product_variants } from "@/lib/db/schema/";
+import { eq } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   try {
@@ -98,44 +60,83 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // List .md files in products_md/
-    const list = await media.list({ prefix: "products_md/" });
+    // Query all products and all variants from the MACH database
+    const db = await getDbAsync();
+  const allProducts = await db.select().from(products);
+  const allVariants = await db.select().from(product_variants);
+
+    console.log(`Found ${allProducts.length} products to process`);
+
     const results = [];
     const errors = [];
 
-    for (const obj of list.objects) {
-      if (!obj.key.endsWith(".md")) continue;
-
+    for (const product of allProducts) {
       try {
-        const slug = obj.key.replace("products_md/", "").replace(".md", "");
-        const file = await media.get(obj.key);
-        if (!file) {
-          errors.push(`File not found: ${obj.key}`);
+        // Parse JSON fields from MACH schema
+        const name = typeof product.name === 'string' ? JSON.parse(product.name) : product.name;
+        const description = typeof product.description === 'string' ? JSON.parse(product.description) : product.description;
+        const categories = typeof product.categories === 'string' ? JSON.parse(product.categories) : product.categories;
+        // Find the default variant for this product
+        const defaultVariantId = product.default_variant_id;
+        const defaultVariant = allVariants.find((v: any) => v.product_id === product.id && v.id === defaultVariantId);
+        let pricing = {};
+        let images = [];
+        let attributes = {};
+        if (defaultVariant) {
+          pricing = {
+            basePrice: defaultVariant.price ? (typeof defaultVariant.price === 'string' ? JSON.parse(defaultVariant.price).amount : defaultVariant.price.amount) : undefined,
+            compareAtPrice: defaultVariant.compare_at_price ? (typeof defaultVariant.compare_at_price === 'string' ? JSON.parse(defaultVariant.compare_at_price).amount : defaultVariant.compare_at_price.amount) : undefined,
+            currency: defaultVariant.price ? (typeof defaultVariant.price === 'string' ? JSON.parse(defaultVariant.price).currency : defaultVariant.price.currency) : undefined
+          };
+          images = defaultVariant.media ? (typeof defaultVariant.media === 'string' ? JSON.parse(defaultVariant.media) : defaultVariant.media) : [];
+          attributes = defaultVariant.attributes ? (typeof defaultVariant.attributes === 'string' ? JSON.parse(defaultVariant.attributes) : defaultVariant.attributes) : {};
+        }
+        // Generate slug for filename
+        const slug = product.id.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        // Parse extensions and other meta fields
+        const extensions = typeof product.extensions === 'string' ? JSON.parse(product.extensions) : (product.extensions || {});
+        const tags = typeof product.tags === 'string' ? JSON.parse(product.tags) : (product.tags || []);
+        const useCases = extensions.use_cases || [];
+        const aiNotesFinal = extensions.ai_notes || '';
+        const brand = product.brand || '';
+        const rating = typeof product.rating === 'string' ? JSON.parse(product.rating) : (product.rating || {});
+        const relatedProducts = typeof product.related_products === 'string' ? JSON.parse(product.related_products) : (product.related_products || []);
+
+        const mdContent = generateProductMarkdown({
+          id: product.id,
+          sku: product.id,
+          name: name?.en || 'Unknown Product',
+          description: description?.en || '',
+          pricing: pricing || {},
+          images: images || [],
+          categories: categories || [],
+          attributes: attributes || {},
+          tags: tags,
+          useCases: useCases,
+          aiNotes: aiNotesFinal,
+          brand: brand,
+          rating: rating,
+          relatedProducts: relatedProducts,
+          extensions: extensions,
+          createdAt: product.created_at || '',
+          updatedAt: product.updated_at || ''
+        });
+
+        if (!mdContent || mdContent.trim().length < 10) {
+          errors.push(`Insufficient content generated for product ${product.id}`);
           continue;
         }
 
-        const text = await file.text();
-        if (!text || text.trim().length < 10) {
-          errors.push(`Insufficient content: ${slug}`);
-          continue;
-        }
-
-        // Extract product ID from the content or filename
-        // Look for ID in frontmatter or use a numeric extraction from slug
-        let productId: number | undefined;
-        const frontmatterMatch = text.match(/^---[\s\S]*?id:\s*(\d+)/);
-        if (frontmatterMatch) {
-          productId = parseInt(frontmatterMatch[1], 10);
-        } else {
-          // Try to extract numeric ID from slug if no frontmatter
-          const numericMatch = slug.match(/(\d+)/);
-          if (numericMatch) {
-            productId = parseInt(numericMatch[1], 10);
+        // Upload to R2
+        const fileName = `products_md/${slug}.md`;
+        await media.put(fileName, mdContent, {
+          httpMetadata: {
+            contentType: 'text/markdown'
           }
-        }
+        });
 
         // Embed with Cloudflare AI (using 768-dimension model to match existing index)
-        const embedding = await ai.run("@cf/baai/bge-base-en-v1.5", { text });
+        const embedding = await ai.run("@cf/baai/bge-base-en-v1.5", { text: mdContent });
 
         // Store vector in index with productId for agent-chat compatibility
         await vectorize.upsert([
@@ -145,23 +146,32 @@ export async function GET(request: NextRequest) {
             metadata: {
               slug,
               source: "product",
-              text: text.substring(0, 1000), // Store first 1000 chars for context
-              productId: productId?.toString() || "",
+              text: mdContent.substring(0, 1000), // Store first 1000 chars for context
+              productId: product.id,
             },
           },
         ]);
 
-        results.push(slug + (productId ? ` (ID: ${productId})` : ""));
+        results.push(`${slug} (ID: ${product.id})`);
+        
       } catch (error) {
-        errors.push(`Error processing ${obj.key}: ${error}`);
+        errors.push(`Error processing product ${product.id}: ${error}`);
       }
     }
 
     const response = {
       success: true,
-      message: `Vectorization complete. Indexed ${results.length} files.`,
+      message: `Vectorization complete. Generated and indexed ${results.length} products from database.`,
+      totalProducts: allProducts.length,
       indexed: results,
       errors: errors.length > 0 ? errors : undefined,
+      workflow: [
+        "1. Queried products from MACH database",
+        "2. Retrieved AI notes from extension table",
+        "3. Generated markdown files with full product data",
+        "4. Uploaded to R2 under products_md/ prefix",
+        "5. Embedded and stored in Vectorize index"
+      ]
     };
 
     return NextResponse.json(response, { status: 200 });
@@ -172,4 +182,126 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Generate comprehensive markdown content for a product
+ */
+function generateProductMarkdown(product: {
+  id: string;
+  sku: string;
+  name: string;
+  description: string;
+  pricing: any;
+  images: any[];
+  categories: any[];
+  attributes: any;
+  tags?: string[];
+  useCases?: string[];
+  aiNotes?: string;
+  brand?: string;
+  rating?: any;
+  relatedProducts?: string[];
+  extensions?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}): string {
+  const { id, sku, name, description, pricing, images, categories, attributes, tags = [], useCases = [], aiNotes = '', brand = '', rating = {}, relatedProducts = [], extensions = {}, createdAt, updatedAt } = product;
+
+  // YAML frontmatter with all metadata
+  let md = '---\n';
+  md += 'id: ' + id + '\n';
+  md += 'sku: ' + sku + '\n';
+  md += 'name: ' + name + '\n';
+  md += 'brand: ' + brand + '\n';
+  md += 'created: ' + createdAt + '\n';
+  md += 'updated: ' + updatedAt + '\n';
+  if (pricing.basePrice) md += 'price: ' + pricing.basePrice + '\n';
+  if (pricing.compareAtPrice && pricing.compareAtPrice > pricing.basePrice) md += 'sale_price: ' + pricing.basePrice + '\nregular_price: ' + pricing.compareAtPrice + '\n';
+  if (Array.isArray(tags) && tags.length > 0) md += 'tags: [' + tags.map((t: string) => `'${t}'`).join(', ') + ']\n';
+  if (Array.isArray(useCases) && useCases.length > 0) md += 'use_cases: [' + useCases.map((u: string) => `'${u}'`).join(', ') + ']\n';
+  if (Array.isArray(categories) && categories.length > 0) md += 'categories: [' + categories.map((cat: any) => `'${cat.name?.en || cat.name}'`).join(', ') + ']\n';
+  if (Array.isArray(relatedProducts) && relatedProducts.length > 0) md += 'related_products: [' + relatedProducts.map((r: string) => `'${r}'`).join(', ') + ']\n';
+  if (rating.average) md += 'rating: ' + rating.average + '\n';
+  if (rating.count) md += 'rating_count: ' + rating.count + '\n';
+  // Add all extensions fields to frontmatter (except ai_notes/use_cases already handled)
+  for (const [key, value] of Object.entries(extensions)) {
+    if (key === 'ai_notes' || key === 'use_cases') continue;
+    if (Array.isArray(value)) {
+      md += key + ': [' + (value as any[]).map((v: any) => `'${v}'`).join(', ') + ']\n';
+    } else if (typeof value === 'object' && value !== null) {
+      md += key + ': ' + JSON.stringify(value) + '\n';
+    } else {
+      md += key + ": '" + value + "'\n";
+    }
+  }
+  md += '---\n\n';
+
+  md += '# ' + name + '\n\n';
+  md += '## Product Information\n- **SKU**: ' + sku + '\n- **Product ID**: ' + id + '\n';
+  if (brand) md += '- **Brand**: ' + brand + '\n';
+  if (pricing.basePrice) {
+    md += '- **Price**: $' + pricing.basePrice.toFixed(2);
+    if (pricing.compareAtPrice && pricing.compareAtPrice > pricing.basePrice) {
+      md += ' (On Sale! Regular $' + pricing.compareAtPrice.toFixed(2) + ')';
+    }
+    md += '\n';
+  }
+  if (categories && categories.length > 0) {
+    md += '- **Categories**: ' + categories.map((cat: any) => cat.name?.en || cat.name).join(', ') + '\n';
+  }
+  if (tags.length > 0) {
+    md += '- **Tags**: ' + tags.join(', ') + '\n';
+  }
+  if (useCases.length > 0) {
+    md += '- **Use Cases**: ' + useCases.join(', ') + '\n';
+  }
+  if (relatedProducts.length > 0) {
+    md += '- **Related Products**: ' + relatedProducts.join(', ') + '\n';
+  }
+  if (rating.average) {
+    md += '- **Rating**: ' + rating.average + ' (' + (rating.count || 0) + ' reviews)\n';
+  }
+
+  // Add description
+  if (description) {
+    md += '\n## Description\n' + description + '\n';
+  }
+
+  // Add attributes/specifications
+  if (attributes && Object.keys(attributes).length > 0) {
+    md += '\n## Specifications\n';
+    for (const [key, value] of Object.entries(attributes)) {
+      md += '- **' + key + '**: ' + value + '\n';
+    }
+  }
+
+  // Add images
+  if (images && images.length > 0) {
+    md += '\n## Images\n';
+    images.forEach((img: any, index: number) => {
+      md += (index + 1) + '. ' + img.url + (img.alt ? ' (' + img.alt + ')' : '') + '\n';
+    });
+  }
+
+  // Add all extensions fields as sections (except ai_notes/use_cases)
+  for (const [key, value] of Object.entries(extensions)) {
+    if (key === 'ai_notes' || key === 'use_cases') continue;
+    const heading = key.replace(/_/g, ' ').replace(/\b\w/g, function(l) { return l.toUpperCase(); });
+    md += '\n## ' + heading + '\n';
+    if (Array.isArray(value)) {
+      value.forEach((v: any) => { md += '- ' + v + '\n'; });
+    } else if (typeof value === 'object' && value !== null) {
+      md += JSON.stringify(value, null, 2) + '\n';
+    } else {
+      md += value + '\n';
+    }
+  }
+
+  // Add AI notes if present
+  if (aiNotes && aiNotes.trim().length > 0) {
+    md += '\n## AI Assistant Notes\n' + aiNotes + '\n';
+  }
+
+  return md;
 }

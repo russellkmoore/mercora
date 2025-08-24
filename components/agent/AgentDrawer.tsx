@@ -40,6 +40,7 @@ import { useUser } from "@clerk/nextjs";
 import { useEnhancedUserContext, formatUserContextForAI } from "@/lib/hooks/useEnhancedUserContext";
 import ProductCard from "./ProductCard";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import Image from "next/image";
 
 /**
  * Main AgentDrawer component providing AI chat interface
@@ -277,8 +278,14 @@ export default function AgentDrawer({
           >
             {messages.length === 0 && !isLoading ? (
               <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 space-y-3">
-                <div className="h-12 w-12 flex items-center justify-center bg-orange-500 rounded-full text-white text-lg font-bold">
-                  V
+                <div className="h-12 w-12 flex items-center justify-center">
+                  <Image
+                    src="/volt.svg"        // use PNG for crisp CF-resized avatars
+                    alt="Volt mascot"
+                    width={40}                    // a bit of padding inside the circle
+                    height={40}
+                    priority
+                  />
                 </div>
                 <div className="space-y-2">
                   <p className="font-semibold text-gray-700">Hi! I'm Volt, your gear expert.</p>
@@ -303,8 +310,13 @@ export default function AgentDrawer({
                   </div>
                 ) : (
                   <div key={i} className="flex items-start space-x-2">
-                    <div className="h-6 w-6 flex items-center justify-center bg-orange-500 rounded-full text-white text-xs font-bold">
-                      V
+                    <div className="h-6 w-6 flex items-center justify-center">
+                      <Image
+                        src="/volt.svg"
+                        alt="Volt mascot"
+                        width={20}
+                        height={20}
+                      />
                     </div>
                     <div className="bg-white text-gray-800 px-3 py-2 rounded-lg max-w-[75%] shadow-sm border">
                       <p>
