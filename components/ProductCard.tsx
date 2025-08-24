@@ -63,8 +63,6 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
   const defaultVariant: ProductVariant | undefined =
     variants.find((v) => v.id === product.default_variant_id) || variants[0];
 
-    console.log("ProductCard rendering for product:", product);
-    console.log("Default variant:", defaultVariant);
   // Price logic
   const price = defaultVariant?.price?.amount ?? null;
   const compareAt = defaultVariant?.compare_at_price?.amount;
