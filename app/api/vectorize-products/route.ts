@@ -85,9 +85,9 @@ export async function GET(request: NextRequest) {
         };
 
         // Parse JSON fields from MACH schema - handle both JSON strings and plain strings  
-        const name = safeJsonParse(product.name);
-        const description = safeJsonParse(product.description);
-        const categories = safeJsonParse(product.categories, '[');
+        const name = product.name || 'Unknown Product';
+        const description = product.description || '';
+        const categories = product.categories || [];
         // Find the default variant for this product
         const defaultVariantId = product.default_variant_id;
         const defaultVariant = allVariants.find((v: any) => v.product_id === product.id && v.id === defaultVariantId);
@@ -120,8 +120,8 @@ export async function GET(request: NextRequest) {
         const mdContent = generateProductMarkdown({
           id: product.id,
           sku: product.id,
-          name: (typeof name === 'string' ? name : name?.en) || 'Unknown Product',
-          description: (typeof description === 'string' ? description : description?.en) || '',
+          name: typeof name === 'string' ? name : 'Unknown Product',
+          description: typeof description === 'object' ? description?.en || '' : (description || ''),
           pricing: pricing || {},
           images: images || [],
           categories: categories || [],
