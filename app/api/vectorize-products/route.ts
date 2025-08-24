@@ -84,12 +84,12 @@ export async function GET(request: NextRequest) {
         let attributes = {};
         if (defaultVariant) {
           pricing = {
-            basePrice: defaultVariant.price ? (typeof defaultVariant.price === 'string' ? JSON.parse(defaultVariant.price).amount : defaultVariant.price.amount) : undefined,
-            compareAtPrice: defaultVariant.compare_at_price ? (typeof defaultVariant.compare_at_price === 'string' ? JSON.parse(defaultVariant.compare_at_price).amount : defaultVariant.compare_at_price.amount) : undefined,
-            currency: defaultVariant.price ? (typeof defaultVariant.price === 'string' ? JSON.parse(defaultVariant.price).currency : defaultVariant.price.currency) : undefined
+            basePrice: defaultVariant.price ? (typeof defaultVariant.price === 'string' && defaultVariant.price.startsWith('{') ? JSON.parse(defaultVariant.price).amount : (typeof defaultVariant.price === 'object' ? defaultVariant.price.amount : defaultVariant.price)) : undefined,
+            compareAtPrice: defaultVariant.compare_at_price ? (typeof defaultVariant.compare_at_price === 'string' && defaultVariant.compare_at_price.startsWith('{') ? JSON.parse(defaultVariant.compare_at_price).amount : (typeof defaultVariant.compare_at_price === 'object' ? defaultVariant.compare_at_price.amount : defaultVariant.compare_at_price)) : undefined,
+            currency: defaultVariant.price ? (typeof defaultVariant.price === 'string' && defaultVariant.price.startsWith('{') ? JSON.parse(defaultVariant.price).currency : (typeof defaultVariant.price === 'object' ? defaultVariant.price.currency : 'USD')) : undefined
           };
-          images = defaultVariant.media ? (typeof defaultVariant.media === 'string' ? JSON.parse(defaultVariant.media) : defaultVariant.media) : [];
-          attributes = defaultVariant.attributes ? (typeof defaultVariant.attributes === 'string' ? JSON.parse(defaultVariant.attributes) : defaultVariant.attributes) : {};
+          images = defaultVariant.media ? (typeof defaultVariant.media === 'string' && defaultVariant.media.startsWith('[') ? JSON.parse(defaultVariant.media) : defaultVariant.media) : [];
+          attributes = defaultVariant.attributes ? (typeof defaultVariant.attributes === 'string' && defaultVariant.attributes.startsWith('{') ? JSON.parse(defaultVariant.attributes) : defaultVariant.attributes) : {};
         }
         // Generate slug for filename
         const slug = product.id.toLowerCase().replace(/[^a-z0-9]+/g, '-');
