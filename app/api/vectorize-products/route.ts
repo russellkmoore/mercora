@@ -189,6 +189,14 @@ export async function POST(request: NextRequest) {
   return GET(request);
 }
 
+// Test endpoint to verify deployment
+export async function OPTIONS(request: NextRequest) {
+  return NextResponse.json({ 
+    message: "Vectorize API v2.1 - Fixed JSON parsing", 
+    timestamp: new Date().toISOString() 
+  });
+}
+
 /**
  * Generate comprehensive markdown content for a product
  */
