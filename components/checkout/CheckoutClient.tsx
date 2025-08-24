@@ -28,7 +28,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useCartStore } from '@/lib/stores/cart-store';
 import StripeProvider from './StripeProvider';
 import PaymentForm from './PaymentForm';
@@ -54,6 +54,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
     setShippingAddress,
     setShippingOption,
     setTaxAmount,
+    updateShippingDiscounts,
     clearCart,
   } = useCartStore();
 
@@ -132,6 +133,9 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
 
     try {
       setShippingOption(option);
+      
+      // Update shipping discounts based on new shipping cost
+      updateShippingDiscounts();
 
       // Calculate tax with shipping address and cost
       const taxRes = await fetch('/api/tax', {
@@ -214,15 +218,36 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items,
+          items: items.map(item => ({
+            product_id: item.productId,
+            variant_id: item.variantId,
+            sku: `${item.productId}-${item.variantId || 'default'}`, // Generate a simple SKU
+            quantity: item.quantity,
+            unit_price: {
+              amount: Math.round(item.price * 100), // Convert to cents
+              currency: 'USD'
+            },
+            total_price: {
+              amount: Math.round(item.price * item.quantity * 100), // Convert to cents
+              currency: 'USD'
+            },
+            product_name: item.name, // This now includes variant info like "Vivid Mission Pack - Regular"
+          })),
+          total_amount: {
+            amount: Math.round((items.reduce((sum, item) => sum + item.price * item.quantity, 0) + (shippingOption?.cost || 0) + (taxAmount || 0)) * 100), // Convert to cents
+            currency: 'USD'
+          },
+          currency_code: 'USD',
           shipping_address: shippingAddress,
           billing_address: shippingAddress, // Use same as shipping for now
           shipping_method: shippingOption?.label || 'standard',
-          shipping_cost: shippingOption?.cost || 0,
-          tax_amount: Math.round((taxAmount || 0) * 100), // Convert to cents
           payment_method: 'stripe',
-          payment_intent_id: paymentIntentId,
-          status: 'pending',
+          extensions: {
+            payment_intent_id: paymentIntentId,
+            shipping_cost: shippingOption?.cost || 0,
+            tax_amount: Math.round((taxAmount || 0) * 100), // Convert to cents
+            subtotal: Math.round(items.reduce((sum, item) => sum + item.price * item.quantity, 0) * 100), // Convert to cents
+          }
         }),
       });
 
@@ -245,6 +270,13 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
     setError(errorMessage);
   };
 
+  // Handle going back to shipping step
+  const handleBackToShipping = () => {
+    setCurrentStep('shipping');
+    setClientSecret(''); // Clear payment intent
+    setError(''); // Clear any errors
+  };
+
   // If no items in cart, show empty state
   if (!items || items.length === 0) {
     return (
@@ -256,7 +288,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <ProgressBar step={currentStep === 'shipping' ? 0 : currentStep === 'payment' ? 2 : 3} />
 
       {error && (
@@ -265,11 +297,12 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="space-y-6">
-          {/* Shipping Form */}
-          {currentStep === 'shipping' && (
-            <>
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.6fr] gap-4 lg:gap-6 min-w-0 w-full">
+        <div className="space-y-6 min-w-0">
+          {/* Shipping Address Section */}
+          {currentStep === 'shipping' ? (
+            <div className="bg-white p-6 rounded-xl">
+              <h3 className="text-lg font-semibold mb-4 text-gray-900">Shipping Address</h3>
               <ShippingForm
                 address={address}
                 onChange={handleAddressChange}
@@ -279,29 +312,60 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
                 onSubmit={handleAddressSubmit}
                 error={null}
               />
-              
-              {shippingOptions.length > 0 && (
-                <ShippingOptions
-                  address={address}
-                  options={shippingOptions}
-                  onSelect={handleShippingSelected}
-                  selectedOptionId={shippingOption?.id}
+            </div>
+          ) : (currentStep === 'payment' || currentStep === 'confirmation') && shippingAddress && (
+            <div className="bg-gray-50 p-4 rounded-lg border-l-4 border-orange-500">
+              <div className="flex justify-between items-start mb-2">
+                <h4 className="font-semibold text-gray-900">Shipping Address</h4>
+                <button
+                  onClick={handleBackToShipping}
+                  className="text-sm text-orange-600 hover:text-orange-700 font-medium"
                   disabled={isLoading}
-                />
-              )}
-            </>
+                >
+                  Edit
+                </button>
+              </div>
+              <div className="text-sm text-gray-600 space-y-1">
+                <p>{typeof shippingAddress.recipient === 'string' ? shippingAddress.recipient : 'Customer'}</p>
+                <p>{typeof shippingAddress.line1 === 'string' ? shippingAddress.line1 : ''}</p>
+                {shippingAddress.line2 && <p>{typeof shippingAddress.line2 === 'string' ? shippingAddress.line2 : ''}</p>}
+                <p>{typeof shippingAddress.city === 'string' ? shippingAddress.city : ''}, {typeof shippingAddress.region === 'string' ? shippingAddress.region : ''} {typeof shippingAddress.postal_code === 'string' ? shippingAddress.postal_code : ''}</p>
+              </div>
+            </div>
           )}
 
-          {/* Payment Form */}
-          {currentStep === 'payment' && clientSecret && (
-            <StripeProvider clientSecret={clientSecret}>
-              <PaymentForm
-                clientSecret={clientSecret}
-                onSuccess={handlePaymentSuccess}
-                onError={handlePaymentError}
+          {/* Shipping Options Section */}
+          {currentStep === 'shipping' && shippingOptions.length > 0 && (
+            <div className="bg-white p-6 rounded-xl">
+              <h3 className="text-lg font-semibold mb-4 text-gray-900">Shipping Method</h3>
+              <ShippingOptions
+                address={address}
+                options={shippingOptions}
+                onSelect={handleShippingSelected}
+                selectedOptionId={shippingOption?.id}
                 disabled={isLoading}
               />
-            </StripeProvider>
+            </div>
+          )}
+
+          {/* Shipping Method Summary */}
+          {(currentStep === 'payment' || currentStep === 'confirmation') && shippingOption && (
+            <div className="bg-gray-50 p-4 rounded-lg border-l-4 border-orange-500">
+              <div className="flex justify-between items-start mb-2">
+                <h4 className="font-semibold text-gray-900">Shipping Method</h4>
+                <button
+                  onClick={handleBackToShipping}
+                  className="text-sm text-orange-600 hover:text-orange-700 font-medium"
+                  disabled={isLoading}
+                >
+                  Edit
+                </button>
+              </div>
+              <div className="text-sm text-gray-600">
+                <p>{shippingOption.label}</p>
+                <p className="text-gray-500">${shippingOption.cost?.toFixed(2) || '0.00'} - {shippingOption.estimatedDays ? `${shippingOption.estimatedDays} business days` : 'Standard delivery'}</p>
+              </div>
+            </div>
           )}
 
           {/* Confirmation */}
@@ -315,7 +379,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
           )}
         </div>
 
-        {/* Order Summary */}
+        {/* Right Column: Order Summary & Payment */}
         <div className="space-y-6">
           <OrderSummary
             items={items}
@@ -323,6 +387,21 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
             taxAmount={taxAmount ?? 0}
             showDiscountInput={currentStep !== 'confirmation'}
           />
+
+          {/* Payment Form */}
+          {currentStep === 'payment' && clientSecret && (
+            <div className="bg-white p-6 rounded-xl min-w-0">
+              <h3 className="text-lg font-semibold mb-4 text-gray-900">Payment Information</h3>
+              <StripeProvider clientSecret={clientSecret}>
+                <PaymentForm
+                  clientSecret={clientSecret}
+                  onSuccess={handlePaymentSuccess}
+                  onError={handlePaymentError}
+                  disabled={isLoading}
+                />
+              </StripeProvider>
+            </div>
+          )}
         </div>
       </div>
     </div>

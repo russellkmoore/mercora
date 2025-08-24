@@ -32,7 +32,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe, formatAmountForStripe } from '@/lib/stripe';
+import { createPaymentIntent, formatAmountForStripe } from '@/lib/stripe';
 import type { Address } from '@/lib/types';
 
 interface PaymentIntentRequest {
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Create Payment Intent
-    const paymentIntent = await stripe.paymentIntents.create({
+    const paymentIntent = await createPaymentIntent({
       amount: formatAmountForStripe(amount),
       currency: 'usd',
       automatic_payment_methods: {
@@ -102,8 +102,8 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({
-      clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id,
+      clientSecret: (paymentIntent as any).client_secret,
+      paymentIntentId: (paymentIntent as any).id,
       amount,
     });
 

@@ -208,10 +208,14 @@ export default function ProductDisplay({ product }: { product: Product }) {
             <button
               className="mt-4 sm:mt-6 w-full sm:w-auto px-6 py-3 bg-orange-500 text-black font-bold rounded hover:bg-orange-400 transition"
               onClick={() => {
+                const productName = typeof product.name === "string" ? product.name : "";
+                const variantDisplay = selectedVariant?.option_values?.map(ov => `${ov.value}`).join(", ") || "";
+                const fullName = variantDisplay ? `${productName} - ${variantDisplay}` : productName;
+                
                 useCartStore.getState().addItem({
                   productId: product.id,
                   variantId: selectedVariant?.id,
-                  name: typeof product.name === "string" ? product.name : "",
+                  name: fullName,
                   price: price / 100,
                   quantity: 1,
                   primaryImageUrl: (() => {
@@ -223,7 +227,7 @@ export default function ProductDisplay({ product }: { product: Product }) {
                   })(),
                 });
                 toast("Added to Cart", {
-                  description: `${typeof product.name === "string" ? product.name : ""} has been added to your cart.`,
+                  description: `${fullName} has been added to your cart.`,
                   icon: "🔥",
                 });
               }}

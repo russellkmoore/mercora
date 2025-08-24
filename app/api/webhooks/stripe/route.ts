@@ -29,7 +29,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe, getWebhookSecret } from '@/lib/stripe';
+import { getStripe, getWebhookSecret } from '@/lib/stripe';
 import Stripe from 'stripe';
 
 /**
@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // Verify webhook signature for security
+    const stripe = getStripe();
     event = stripe.webhooks.constructEvent(
       body,
       signature,

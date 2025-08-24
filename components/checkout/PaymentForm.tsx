@@ -64,6 +64,15 @@ export default function PaymentForm({
   const paymentElementOptions: StripePaymentElementOptions = {
     layout: 'tabs',
     paymentMethodOrder: ['card', 'apple_pay', 'google_pay'],
+    wallets: {
+      applePay: 'auto', // Will show only if device supports it and domain is verified
+      googlePay: 'auto', // Will show only if device supports it
+    },
+    fields: {
+      billingDetails: {
+        address: 'auto',
+      },
+    },
   };
 
   /**
@@ -115,12 +124,10 @@ export default function PaymentForm({
   };
 
   return (
-    <div className="bg-white p-6 rounded-xl text-black">
-      <h2 className="text-lg font-bold mb-4">Payment Information</h2>
-      
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="text-black min-w-0">
+      <form onSubmit={handleSubmit} className="space-y-6">
         {/* Stripe Payment Element */}
-        <div className="min-h-[200px]">
+        <div className="min-h-[300px] w-full">
           <PaymentElement 
             id="payment-element"
             options={paymentElementOptions}

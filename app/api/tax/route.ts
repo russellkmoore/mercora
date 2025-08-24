@@ -34,7 +34,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import type { CartItem } from "@/lib/types/cartitem";
 import type { Address } from "@/lib/types";
-import { stripe, formatAmountForStripe, formatAmountFromStripe } from "@/lib/stripe";
+import { calculateTax, formatAmountForStripe, formatAmountFromStripe } from "@/lib/stripe";
 
 // Fallback tax rate for when Stripe Tax is unavailable
 const FALLBACK_TAX_RATE = 0.07;
@@ -153,19 +153,18 @@ async function calculateStripeToleratedTax(
   if (shippingCost > 0) {
     lineItems.push({
       amount: formatAmountForStripe(shippingCost),
-      reference: 'shipping',
+      reference: 'shipping_cost',
       tax_code: 'txcd_92010001', // Shipping
     });
   }
 
   // Create tax calculation with Stripe
-  const calculation = await stripe.tax.calculations.create({
+  const calculation = await calculateTax({
     currency: 'usd',
     line_items: lineItems,
     customer_details: {
       address: {
         line1: String(shippingAddress.line1),
-        line2: shippingAddress.line2 ? String(shippingAddress.line2) : undefined,
         city: String(shippingAddress.city),
         state: String(shippingAddress.region),
         postal_code: String(shippingAddress.postal_code),
@@ -177,7 +176,7 @@ async function calculateStripeToleratedTax(
   });
 
   // Sum up all tax amounts
-  const totalTaxAmount = calculation.tax_amount_exclusive || 0;
+  const totalTaxAmount = (calculation as any).tax_amount_exclusive || 0;
   
   return formatAmountFromStripe(totalTaxAmount);
 }

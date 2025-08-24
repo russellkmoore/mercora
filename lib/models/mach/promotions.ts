@@ -48,29 +48,45 @@ export async function getPromotionById(id: string): Promise<Promotion | null> {
 // to avoid duplicate exports in the index file
 
 /**
+ * Helper function to safely parse JSON fields
+ */
+function parseJsonField(field: any): any {
+  if (!field) return undefined;
+  if (typeof field === 'object') return field; // Already parsed
+  if (typeof field === 'string') {
+    try {
+      return JSON.parse(field);
+    } catch {
+      return field; // Return as string if not valid JSON
+    }
+  }
+  return field;
+}
+
+/**
  * Helper function to hydrate database promotion to MACH format
  */
 function hydratePromotion(record: any): Promotion {
   return {
     id: record.id,
-    name: typeof record.name === 'string' ? record.name : JSON.parse(record.name || '""'),
+    name: parseJsonField(record.name) || record.name,
     type: record.type,
-    rules: typeof record.rules === 'string' ? JSON.parse(record.rules) : record.rules,
+    rules: parseJsonField(record.rules),
     status: record.status,
-    description: typeof record.description === 'string' ? record.description : JSON.parse(record.description || '""'),
+    description: parseJsonField(record.description) || record.description,
     slug: record.slug,
-    external_references: typeof record.external_references === 'string' ? JSON.parse(record.external_references || '{}') : record.external_references,
+    external_references: parseJsonField(record.external_references),
     created_at: record.created_at,
     updated_at: record.updated_at,
     valid_from: record.valid_from,
     valid_to: record.valid_to,
     activation_method: record.activation_method,
-    codes: typeof record.codes === 'string' ? JSON.parse(record.codes || '{}') : record.codes,
-    usage_limits: typeof record.usage_limits === 'string' ? JSON.parse(record.usage_limits || '{}') : record.usage_limits,
-    eligibility: typeof record.eligibility === 'string' ? JSON.parse(record.eligibility || '{}') : record.eligibility,
+    codes: parseJsonField(record.codes),
+    usage_limits: parseJsonField(record.usage_limits),
+    eligibility: parseJsonField(record.eligibility),
     priority: record.priority,
     stackable: record.stackable === 1,
-    extensions: typeof record.extensions === 'string' ? JSON.parse(record.extensions || '{}') : record.extensions
+    extensions: parseJsonField(record.extensions)
   };
 }
 
