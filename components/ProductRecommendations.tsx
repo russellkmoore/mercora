@@ -38,6 +38,7 @@ import type { Product } from "@/lib/types";
 import { useState, useEffect } from "react";
 import { useEnhancedUserContext } from "@/lib/hooks/useEnhancedUserContext";
 import { getPersonalizedRecommendations } from "@/lib/utils/personalized-recommendations";
+import Image from "next/image";
 
 /**
  * ProductRecommendations component that displays personalized product suggestions
@@ -55,9 +56,9 @@ export default function ProductRecommendations({
 }) {
   const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  // Temporarily disable enhanced user context to debug cart issues
-  // const userContext = useEnhancedUserContext();
-  const userContext = null;
+  const [agentAnswer, setAgentAnswer] = useState<string | null>(null);
+  const userContext = useEnhancedUserContext();
+  
 
   useEffect(() => {
     if (!product) return;
@@ -75,7 +76,6 @@ export default function ProductRecommendations({
     };
     fetchAndSetAIRecommendations();
   }, [product, userContext, maxRecommendations]);
-// ...existing code...
 
   /**
    * Fetch AI-powered recommendations with enhanced user context
@@ -120,13 +120,10 @@ export default function ProductRecommendations({
         return [];
       }
       
-      const data = await res.json() as { 
-        answer: string; 
-        products?: Product[];
-        productIds?: number[];
-      };
-      
+      const data = await res.json() as { answer: string; products?: Product[]; productIds?: number[] };
+      setAgentAnswer(data.answer || null);
       return data.products?.filter((p: Product) => p.id !== currentProduct.id) || [];
+      
     } catch (error) {
       console.error("fetchAIRecommendations error:", error);
       return []; // Return empty array instead of throwing
@@ -149,14 +146,12 @@ export default function ProductRecommendations({
   // Determine section title based on personalization  
   let sectionTitle = "You may also like";
   if (isLoading) {
-    sectionTitle = "Finding recommendations...";
-    // sectionTitle = userContext?.orders.length > 0 
-    //   ? "Finding personalized recommendations..." 
-    //   : "Finding recommendations...";
+    sectionTitle = userContext?.orders.length > 0 
+    ? "Finding personalized recommendations..." 
+    : "Finding recommendations...";
+  } else if (userContext?.orders.length > 0 && hasRecommendations) {
+     sectionTitle = "Recommended for {userContext?.firstName || 'you'}";
   }
-  // } else if (userContext?.orders.length > 0 && hasRecommendations) {
-  //   sectionTitle = "Recommended for you";
-  // }
 
   return (
     <div className="mt-20 text-center relative">
@@ -195,12 +190,41 @@ export default function ProductRecommendations({
         </div>
       )}
       
-      {/* Optional: Show personalization indicator for VIP customers */}
-      {/* {userContext?.isVipCustomer && hasRecommendations && !isLoading && (
-        <div className="mt-4 text-sm text-orange-400/70">
-          ✨ Curated selections for valued customers
+      {agentAnswer && (
+        <div className="flex justify-center items-start mt-10 relative">
+          <div className="relative">
+            <Image
+              src="/volt.svg"
+              alt="Volt mascot"
+              width={60}
+              height={60}
+              className="z-10"
+            />
+            <div className="absolute left-14 top-1">
+              <div className="bg-neutral-900 text-white px-6 py-4 rounded-2xl shadow-lg relative max-w-md text-left"
+                  style={{ border: "1px solid #f59e42" }}>
+                <span>{agentAnswer}</span>
+                <span
+                  className="absolute left-[-18px] top-6 w-0 h-0"
+                  style={{
+                    borderTop: "12px solid transparent",
+                    borderBottom: "12px solid transparent",
+                    borderRight: "18px solid #f59e42"
+                  }}
+                />
+                <span
+                  className="absolute left-[-16px] top-6 w-0 h-0"
+                  style={{
+                    borderTop: "10px solid transparent",
+                    borderBottom: "10px solid transparent",
+                    borderRight: "16px solid #1a1a1a"
+                  }}
+                />
+              </div>
+            </div>
+          </div>
         </div>
-      )} */}
+      )}
     </div>
   );
 }
