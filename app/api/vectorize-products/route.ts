@@ -71,6 +71,7 @@ export async function GET(request: NextRequest) {
 
     for (const product of allProducts) {
       try {
+        console.log('Processing product:', product.id, 'name:', product.name);
         // Helper function to safely parse JSON fields
         const safeJsonParse = (field: any, expectedStart: string = '{') => {
           if (typeof field === 'string' && field.startsWith(expectedStart)) {
