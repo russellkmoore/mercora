@@ -71,16 +71,22 @@ export async function GET(request: NextRequest) {
 
     for (const product of allProducts) {
       try {
-        console.log('Processing product:', product.id, 'name:', product.name);
+        console.log('Processing product:', product.id, 'name:', product.name, 'typeof name:', typeof product.name);
+        
         // Helper function to safely parse JSON fields
         const safeJsonParse = (field: any, expectedStart: string = '{') => {
+          console.log('safeJsonParse called with field:', field, 'type:', typeof field);
           if (typeof field === 'string' && field.startsWith(expectedStart)) {
             try {
-              return JSON.parse(field);
+              const parsed = JSON.parse(field);
+              console.log('Successfully parsed JSON:', parsed);
+              return parsed;
             } catch (e) {
+              console.log('JSON parse failed, returning original field:', field);
               return field;
             }
           }
+          console.log('Field not a JSON string, returning as-is:', field);
           return field;
         };
 
@@ -88,6 +94,7 @@ export async function GET(request: NextRequest) {
         const name = product.name || 'Unknown Product';
         const description = product.description || '';
         const categories = product.categories || [];
+        console.log('Parsed name:', name, 'description type:', typeof description);
         // Find the default variant for this product
         const defaultVariantId = product.default_variant_id;
         const defaultVariant = allVariants.find((v: any) => v.product_id === product.id && v.id === defaultVariantId);
@@ -117,14 +124,15 @@ export async function GET(request: NextRequest) {
         const rating = safeJsonParse(product.rating) || {};
         const relatedProducts = safeJsonParse(product.related_products, '[') || [];
 
+        console.log('About to call generateProductMarkdown...');
         const mdContent = generateProductMarkdown({
           id: product.id,
           sku: product.id,
           name: typeof name === 'string' ? name : 'Unknown Product',
-          description: typeof description === 'object' ? description?.en || '' : (description || ''),
+          description: typeof description === 'object' ? (description as any)?.en || '' : (description || ''),
           pricing: pricing || {},
           images: images || [],
-          categories: categories || [],
+          categories: Array.isArray(categories) ? categories : [],
           attributes: attributes || {},
           tags: tags,
           useCases: useCases,
@@ -136,6 +144,7 @@ export async function GET(request: NextRequest) {
           createdAt: product.created_at || '',
           updatedAt: product.updated_at || ''
         });
+        console.log('generateProductMarkdown completed successfully');
 
         if (!mdContent || mdContent.trim().length < 10) {
           errors.push(`Insufficient content generated for product ${product.id}`);
