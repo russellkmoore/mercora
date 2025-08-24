@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
 
     // Test just the first product to debug
     const firstProduct = allProducts[0];
-    console.log('First product raw data:', JSON.stringify(firstProduct, null, 2));
+    console.log('First product raw data (safe):', firstProduct?.id, firstProduct?.name);
     
     for (const product of allProducts.slice(0, 1)) {  // Only process first product for debugging
       try {
