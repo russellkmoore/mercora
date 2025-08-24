@@ -66,10 +66,22 @@ export default function ProductRecommendations({
     orders: userContext.orders,
     isVipCustomer: userContext.isVipCustomer,
     orderCount: userContext.orders?.length || 0,
-  }), [userContext.userId, userContext.firstName, userContext.orders?.length, userContext.isVipCustomer]);
+    isLoading: userContext.isLoading,
+  }), [
+    userContext.userId, 
+    userContext.firstName, 
+    userContext.orders?.length, 
+    userContext.isVipCustomer,
+    userContext.isLoading
+  ]);
 
+  // TEMPORARILY DISABLE RECOMMENDATIONS TO STOP INFINITE LOOP
+  // TODO: Fix the infinite loop and re-enable
+  
+  /*
   useEffect(() => {
     if (!product) return;
+    
     const fetchAndSetAIRecommendations = async () => {
       setIsLoading(true);
       try {
@@ -82,8 +94,13 @@ export default function ProductRecommendations({
         setIsLoading(false);
       }
     };
-    fetchAndSetAIRecommendations();
-  }, [product, stableUserContext, maxRecommendations]);
+    
+    // Only run once per product
+    if (!stableUserContext.isLoading) {
+      fetchAndSetAIRecommendations();
+    }
+  }, [product?.id, maxRecommendations]);
+  */
 
   /**
    * Fetch AI-powered recommendations with enhanced user context
