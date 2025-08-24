@@ -24,7 +24,6 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDbAsync } from "@/lib/db";
 // TODO: Create products schema - temporarily commented out  
 import { products, product_variants } from "@/lib/db/schema/";
-import { eq } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   try {
@@ -72,10 +71,22 @@ export async function GET(request: NextRequest) {
 
     for (const product of allProducts) {
       try {
-        // Parse JSON fields from MACH schema - handle both JSON strings and plain strings
-        const name = typeof product.name === 'string' && product.name.startsWith('{') ? JSON.parse(product.name) : product.name;
-        const description = typeof product.description === 'string' && product.description.startsWith('{') ? JSON.parse(product.description) : product.description;
-        const categories = typeof product.categories === 'string' && product.categories.startsWith('[') ? JSON.parse(product.categories) : product.categories;
+        // Helper function to safely parse JSON fields
+        const safeJsonParse = (field: any, expectedStart: string = '{') => {
+          if (typeof field === 'string' && field.startsWith(expectedStart)) {
+            try {
+              return JSON.parse(field);
+            } catch (e) {
+              return field;
+            }
+          }
+          return field;
+        };
+
+        // Parse JSON fields from MACH schema - handle both JSON strings and plain strings  
+        const name = safeJsonParse(product.name);
+        const description = safeJsonParse(product.description);
+        const categories = safeJsonParse(product.categories, '[');
         // Find the default variant for this product
         const defaultVariantId = product.default_variant_id;
         const defaultVariant = allVariants.find((v: any) => v.product_id === product.id && v.id === defaultVariantId);
@@ -83,24 +94,27 @@ export async function GET(request: NextRequest) {
         let images = [];
         let attributes = {};
         if (defaultVariant) {
+          const parsedPrice = safeJsonParse(defaultVariant.price);
+          const parsedComparePrice = safeJsonParse(defaultVariant.compare_at_price);
+          
           pricing = {
-            basePrice: defaultVariant.price ? (typeof defaultVariant.price === 'string' && defaultVariant.price.startsWith('{') ? JSON.parse(defaultVariant.price).amount : (typeof defaultVariant.price === 'object' ? defaultVariant.price.amount : defaultVariant.price)) : undefined,
-            compareAtPrice: defaultVariant.compare_at_price ? (typeof defaultVariant.compare_at_price === 'string' && defaultVariant.compare_at_price.startsWith('{') ? JSON.parse(defaultVariant.compare_at_price).amount : (typeof defaultVariant.compare_at_price === 'object' ? defaultVariant.compare_at_price.amount : defaultVariant.compare_at_price)) : undefined,
-            currency: defaultVariant.price ? (typeof defaultVariant.price === 'string' && defaultVariant.price.startsWith('{') ? JSON.parse(defaultVariant.price).currency : (typeof defaultVariant.price === 'object' ? defaultVariant.price.currency : 'USD')) : undefined
+            basePrice: parsedPrice ? (typeof parsedPrice === 'object' ? parsedPrice.amount : parsedPrice) : undefined,
+            compareAtPrice: parsedComparePrice ? (typeof parsedComparePrice === 'object' ? parsedComparePrice.amount : parsedComparePrice) : undefined,
+            currency: parsedPrice ? (typeof parsedPrice === 'object' ? parsedPrice.currency : 'USD') : undefined
           };
-          images = defaultVariant.media ? (typeof defaultVariant.media === 'string' && defaultVariant.media.startsWith('[') ? JSON.parse(defaultVariant.media) : defaultVariant.media) : [];
-          attributes = defaultVariant.attributes ? (typeof defaultVariant.attributes === 'string' && defaultVariant.attributes.startsWith('{') ? JSON.parse(defaultVariant.attributes) : defaultVariant.attributes) : {};
+          images = safeJsonParse(defaultVariant.media, '[') || [];
+          attributes = safeJsonParse(defaultVariant.attributes) || {};
         }
         // Generate slug for filename
         const slug = product.id.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-        // Parse extensions and other meta fields - handle both JSON strings and objects
-        const extensions = typeof product.extensions === 'string' && product.extensions.startsWith('{') ? JSON.parse(product.extensions) : (product.extensions || {});
-        const tags = typeof product.tags === 'string' && product.tags.startsWith('[') ? JSON.parse(product.tags) : (product.tags || []);
+        // Parse extensions and other meta fields using the safe parser
+        const extensions = safeJsonParse(product.extensions) || {};
+        const tags = safeJsonParse(product.tags, '[') || [];
         const useCases = extensions.use_cases || [];
         const aiNotesFinal = extensions.ai_notes || '';
         const brand = product.brand || '';
-        const rating = typeof product.rating === 'string' && product.rating.startsWith('{') ? JSON.parse(product.rating) : (product.rating || {});
-        const relatedProducts = typeof product.related_products === 'string' && product.related_products.startsWith('[') ? JSON.parse(product.related_products) : (product.related_products || []);
+        const rating = safeJsonParse(product.rating) || {};
+        const relatedProducts = safeJsonParse(product.related_products, '[') || [];
 
         const mdContent = generateProductMarkdown({
           id: product.id,
