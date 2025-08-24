@@ -75,14 +75,11 @@ export default function ProductRecommendations({
     userContext.isLoading
   ]);
 
-  // TEMPORARILY DISABLE RECOMMENDATIONS TO STOP INFINITE LOOP
-  // TODO: Fix the infinite loop and re-enable
-  
-  /*
   useEffect(() => {
-    if (!product) return;
+    if (!product || stableUserContext.isLoading) return;
     
-    const fetchAndSetAIRecommendations = async () => {
+    // Debounce to prevent rapid consecutive calls
+    const timeoutId = setTimeout(async () => {
       setIsLoading(true);
       try {
         const aiRecommendations = await fetchAIRecommendations(product, stableUserContext);
@@ -93,14 +90,10 @@ export default function ProductRecommendations({
       } finally {
         setIsLoading(false);
       }
-    };
-    
-    // Only run once per product
-    if (!stableUserContext.isLoading) {
-      fetchAndSetAIRecommendations();
-    }
-  }, [product?.id, maxRecommendations]);
-  */
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [product?.id, stableUserContext.userId, stableUserContext.orderCount, maxRecommendations]);
 
   /**
    * Fetch AI-powered recommendations with enhanced user context
