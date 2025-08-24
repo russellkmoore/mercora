@@ -79,10 +79,11 @@ export function useEnhancedUserContext(): EnhancedUserContext {
       try {
         setIsLoading(true);
         
-        // Fetch user's order history
-        const ordersResponse = await fetch(`/api/user-orders?userId=${user.id}`);
+        // Fetch user's order history (using consolidated orders API)
+        const ordersResponse = await fetch(`/api/orders?userId=${user.id}`);
         if (ordersResponse.ok) {
-          const userOrders: Order[] = await ordersResponse.json();
+          const response = await ordersResponse.json() as { data?: Order[] };
+          const userOrders: Order[] = response.data || [];
           setOrders(userOrders);
         }
         

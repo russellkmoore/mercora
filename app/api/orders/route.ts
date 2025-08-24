@@ -26,6 +26,7 @@ import { eq, desc, and } from "drizzle-orm";
 import { authenticateRequest, PERMISSIONS } from "@/lib/auth/unified-auth";
 import { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail, type OrderData } from "@/lib/utils/email";
 import type { Order, CreateOrderRequest, UpdateOrderRequest } from "@/lib/types/order";
+import { getCustomer, createCustomer } from "@/lib/models/mach/customer";
 
 
 
@@ -152,9 +153,41 @@ export async function POST(request: NextRequest) {
     const orderId = `WEB-${safeUserId}-${now}`;
 
     const db = await getDbAsync();
+    
+    // Handle customer_id - ensure there's a valid customer record or null for guest orders
+    let customerId = userId || body.customer_id || null;
+    if (customerId === "guest") {
+      customerId = null;
+    }
+    
+    // If we have a customer ID, make sure the customer exists in the database
+    if (customerId) {
+      try {
+        let customer = await getCustomer(customerId);
+        if (!customer) {
+          // Create a customer record if it doesn't exist
+          const user = await currentUser();
+          customer = await createCustomer({
+            id: customerId,
+            type: "person",
+            person: {
+              email: user?.emailAddresses?.[0]?.emailAddress || body.extensions?.email || '',
+              first_name: user?.firstName || '',
+              last_name: user?.lastName || '',
+              full_name: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '',
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Error handling customer record:', error);
+        // If customer creation fails, proceed as guest order
+        customerId = null;
+      }
+    }
+
     const machOrder: any = {
       id: orderId,
-      customer_id: userId || body.customer_id || "guest",
+      customer_id: customerId,
       status: 'pending',
       total_amount: JSON.stringify(body.total_amount),
       currency_code: body.currency_code,
@@ -365,7 +398,7 @@ export async function PUT(request: NextRequest) {
 function hydrateOrder(dbOrder: typeof orders.$inferSelect): Order {
   return {
     id: dbOrder.id ?? undefined,
-    customer_id: dbOrder.customer_id ?? undefined,
+    customer_id: dbOrder.customer_id || undefined,
     status: dbOrder.status,
     total_amount: typeof dbOrder.total_amount === 'string' ? JSON.parse(dbOrder.total_amount) : { amount: 0, currency: dbOrder.currency_code },
     currency_code: dbOrder.currency_code,

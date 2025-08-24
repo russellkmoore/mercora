@@ -256,8 +256,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
         throw new Error(err.error || 'Failed to create order');
       }
 
-      // Clear cart and show confirmation
-      clearCart();
+      // Show confirmation first, then clear cart
       setCurrentStep('confirmation');
 
     } catch (err: unknown) {
@@ -277,8 +276,8 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
     setError(''); // Clear any errors
   };
 
-  // If no items in cart, show empty state
-  if (!items || items.length === 0) {
+  // If no items in cart and not showing confirmation, show empty state
+  if ((!items || items.length === 0) && currentStep !== 'confirmation') {
     return (
       <div className="text-center py-12">
         <h2 className="text-2xl font-bold text-white mb-4">Your cart is empty</h2>
@@ -372,7 +371,11 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
           {currentStep === 'confirmation' && (
             <OrderConfirmationModal
               isOpen={true}
-              onClose={() => setCurrentStep('confirmation')}
+              onClose={() => {
+                clearCart();
+                // Optional: redirect to home page or orders page
+                window.location.href = '/';
+              }}
               orderId={orderId}
               userId={userId}
             />

@@ -142,24 +142,15 @@ async function calculateStripeToleratedTax(
   shippingAddress: Address, 
   shippingCost: number
 ): Promise<number> {
-  // Build line items for Stripe Tax calculation
+  // Build line items for Stripe Tax calculation (products only)
   const lineItems = items.map((item, index) => ({
     amount: formatAmountForStripe(item.price * item.quantity),
     reference: `item_${index}_${item.productId}`,
     tax_code: 'txcd_99999999', // General - Tangible Goods
   }));
 
-  // Add shipping as a line item if present
-  if (shippingCost > 0) {
-    lineItems.push({
-      amount: formatAmountForStripe(shippingCost),
-      reference: 'shipping_cost',
-      tax_code: 'txcd_92010001', // Shipping
-    });
-  }
-
-  // Create tax calculation with Stripe
-  const calculation = await calculateTax({
+  // Build the calculation parameters
+  const calculationParams: any = {
     currency: 'usd',
     line_items: lineItems,
     customer_details: {
@@ -173,7 +164,18 @@ async function calculateStripeToleratedTax(
       address_source: 'shipping',
     },
     expand: ['line_items.data.tax_breakdown'],
-  });
+  };
+
+  // Add shipping cost as a parameter (not as a line item)
+  if (shippingCost > 0) {
+    calculationParams.shipping_cost = {
+      amount: formatAmountForStripe(shippingCost),
+      tax_code: 'txcd_92010001', // Shipping tax code
+    };
+  }
+
+  // Create tax calculation with Stripe
+  const calculation = await calculateTax(calculationParams);
 
   // Sum up all tax amounts
   const totalTaxAmount = (calculation as any).tax_amount_exclusive || 0;
