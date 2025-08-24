@@ -1,5 +1,6 @@
 export interface CartItem {
-  productId: number;
+  variantId: string; // Unique identifier for the variant in the cart
+  productId: string; // Parent product reference (string for MACH)
   name: string;
   price: number;
   quantity: number;

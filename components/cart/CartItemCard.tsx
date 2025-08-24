@@ -35,7 +35,7 @@ export default function CartItemCard({ item }: CartItemCardProps) {
             <Button
               size="sm"
               className="bg-neutral-100 text-black border border-gray-300 hover:bg-neutral-200 h-7 w-7 p-0 text-sm"
-              onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+              onClick={() => updateQuantity(item.variantId, item.quantity - 1)}
             >
               -
             </Button>
@@ -45,7 +45,7 @@ export default function CartItemCard({ item }: CartItemCardProps) {
             <Button
               size="sm"
               className="bg-neutral-100 text-black border border-gray-300 hover:bg-neutral-200 h-7 w-7 p-0 text-sm"
-              onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+              onClick={() => updateQuantity(item.variantId, item.quantity + 1)}
             >
               +
             </Button>
@@ -60,7 +60,7 @@ export default function CartItemCard({ item }: CartItemCardProps) {
             variant="outline"
             size="sm"
             className="text-red-600 mt-2 border border-red-200 bg-red-50 hover:bg-orange-500 hover:text-white text-xs h-7"
-            onClick={() => removeItem(item.productId)}
+            onClick={() => removeItem(item.variantId)}
           >
             Remove
           </Button>

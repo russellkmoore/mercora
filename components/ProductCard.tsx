@@ -39,7 +39,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import type { Product } from "@/lib/types/product";
+import type { Product, ProductVariant } from "@/lib/types/";
 import { getDarkBlurPlaceholder } from "@/lib/utils/image-placeholders";
 
 /**
@@ -52,33 +52,75 @@ interface ProductCardProps {
 
 /**
  * ProductCard component for displaying product information in a card layout
- * 
+ *
  * @param product - Product object containing all product data
  * @param priority - Whether to prioritize image loading (for above-the-fold content)
  * @returns JSX element representing a clickable product card
  */
 export default function ProductCard({ product, priority = false }: ProductCardProps) {
-  // Destructure product properties for easier access
-  const {
-    id,
-    name,
-    slug,
-    shortDescription,
-    primaryImageUrl,
-    price,
-    salePrice,
-    onSale = false,
-    availability,
-  } = product;
+  // Get default or first variant
+  const variants = product.variants || [];
+  const defaultVariant: ProductVariant | undefined =
+    variants.find((v) => v.id === product.default_variant_id) || variants[0];
+
+    console.log("ProductCard rendering for product:", product);
+    console.log("Default variant:", defaultVariant);
+  // Price logic
+  const price = defaultVariant?.price?.amount ?? null;
+  const compareAt = defaultVariant?.compare_at_price?.amount;
+  const onSale = compareAt && compareAt > (price ?? 0);
+
+  // Availability logic
+  const quantityInStock = defaultVariant?.inventory?.quantity ?? 0;
+  const availability = quantityInStock > 0 ? "available" : "coming_soon";
+
+  // Name/description/slug logic
+  const name =
+    typeof product.name === "string"
+      ? product.name
+      : Object.values(product.name || {})[0] || "";
+  const shortDescription =
+    typeof product.description === "string"
+      ? product.description
+      : Object.values(product.description || {})[0] || "";
+  const slug =
+    typeof product.slug === "string"
+      ? product.slug
+      : Object.values(product.slug || {})[0] || "";
+  // Handle consistent flat JSON structure: {"url": "...", "alt_text": "..."}
+  const imageUrl = (() => {
+    try {
+      if (!product.primary_image) return "/products/placeholder.png";
+      
+      // If it's a JSON string, parse it first
+      let imageData = product.primary_image;
+      if (typeof imageData === "string" && (imageData as string).startsWith("{")) {
+        try {
+          imageData = JSON.parse(imageData);
+        } catch {
+          return "/products/placeholder.png";
+        }
+      }
+      
+      const img = imageData as any;
+      const url = img?.url;
+      
+      if (!url) return "/products/placeholder.png";
+      
+      return url.startsWith("/") ? url : "/" + url;
+    } catch {
+      return "/products/placeholder.png";
+    }
+  })();
+  const imageAlt = name;
 
   return (
     <Link href={`/product/${slug}`} prefetch={true}>
       <div className="bg-neutral-800 rounded-lg overflow-hidden shadow hover:shadow-lg transition cursor-pointer">
         <div className="relative aspect-video bg-neutral-700">
-          {primaryImageUrl ? (
             <Image
-              src={`/${primaryImageUrl}`}
-              alt={name}
+              src={imageUrl}
+              alt={imageAlt}
               fill
               sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
               className="object-cover transition-opacity duration-300"
@@ -88,26 +130,23 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
               placeholder="blur"
               blurDataURL={getDarkBlurPlaceholder()}
             />
-          ) : (
-            <div className="flex items-center justify-center h-full text-gray-500 text-lg sm:text-xl">
-              No Image
-            </div>
-          )}
         </div>
         <div className="p-3 sm:p-4">
-          <h3 className="text-lg sm:text-xl font-semibold mb-2 line-clamp-2">{name}</h3>
+          <h3 className="text-lg sm:text-xl font-semibold mb-2 line-clamp-2">
+            {name}
+          </h3>
           <p className="text-gray-400 text-xs sm:text-sm mb-2 line-clamp-3">
             {shortDescription}
           </p>
           {price !== null && (
             <div className="text-sm">
-              {onSale && salePrice != null ? (
+              {onSale && compareAt != null ? (
                 <div className="text-green-400">
                   <span className="line-through text-gray-400 mr-2">
-                    ${(price / 100).toFixed(2)}
+                    ${(compareAt / 100).toFixed(2)}
                   </span>
                   <span className="font-semibold">
-                    ${(salePrice / 100).toFixed(2)}
+                    ${(price / 100).toFixed(2)}
                   </span>
                   <span className="ml-2 text-xs text-orange-500 font-bold">
                     On Sale

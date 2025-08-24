@@ -55,10 +55,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDbAsync } from "@/lib/db";
-import { products } from "@/lib/db/schema";
+import { products, deserializeProduct } from "@/lib/db/schema/products";
 import { inArray } from "drizzle-orm";
-import { hydrateProduct } from "@/lib/models/product";
-import type { Product } from "@/lib/types/product";
+import type { Product } from "@/lib/types";
 
 /**
  * Handles chat interactions with the Volt AI assistant
@@ -78,6 +77,17 @@ export async function POST(req: NextRequest) {
     } = await req.json();
     const { userId } = await auth();
     const { question, userName = "Guest", userContext = "", orders = [], history = [] } = body;
+
+    // Extract Cloudflare location data from request headers
+    const requestLocation = {
+      country: req.headers.get('CF-IPCountry') || undefined,
+      city: req.headers.get('CF-IPCity') || undefined,
+      region: req.headers.get('CF-Region') || undefined, 
+      timezone: req.headers.get('CF-Timezone') || undefined,
+      continent: req.headers.get('CF-IPContinent') || undefined,
+      latitude: req.headers.get('CF-IPLatitude') || undefined,
+      longitude: req.headers.get('CF-IPLongitude') || undefined,
+    };
 
     if (!question) {
       return NextResponse.json({ error: "Missing question" }, { status: 400 });
@@ -162,36 +172,52 @@ export async function POST(req: NextRequest) {
     // Build the conversation history for context
     const recentMessages = history.slice(-6); // Keep last 6 messages for context
 
-    // Cheeky personality prompt with retrieved context
+    // Enhanced personality prompt with rich user context
     const systemPrompt = `You are Volt, a cheeky and opinionated outdoor gear expert working for Voltique. You're helpful, sarcastic when needed, and brilliant with product insights. Your goal is to assist customers in finding products from our product catalog and answering online shopping questions.
 
-Key personality traits:
+PERSONALITY TRAITS:
 - Witty and slightly sarcastic but always helpful
 - Deep knowledge of outdoor gear and adventures
 - Makes camping and hiking recommendations with humor
 - Always respond positively to greetings like "hi" or "hello" - be welcoming and enthusiastic
 - NEVER make assumptions about what the user wants - respond only to what they actually said
-- hint that you ahve a secret s'mores recipe 
-- hint that you believe in unicorns and their magical camping abilities
-- keep messages short and light, but helpful and informative
+- Hint that you have a secret s'mores recipe 
+- Hint that you believe in unicorns and their magical camping abilities
+- Keep messages short and light, but helpful and informative
+- Adapt your tone and suggestions based on customer insights
 ${
   userName !== "Guest"
     ? `- The user's name is ${userName}, use it naturally in conversation`
     : ""
 }
 
-USER CONTEXT:
-${userContext ? `${userContext}` : "No user purchase history available"}
-${orders.length > 0 ? `\nRecent orders: ${orders.slice(0, 3).map(order => 
-  `Order ${order.id} (${order.status}): ${order.items?.length || 0} items, $${(order.total / 100).toFixed(2)}`
-).join(', ')}` : ''}
+CUSTOMER INSIGHTS: ${userContext || "New visitor - no data available"}
+${orders.length > 0 ? `\nPURCHASE HISTORY: ${orders.slice(0, 3).map(order => 
+  `Order ${order.id} (${order.status}): ${order.items?.length || 0} items, $${((order.total_amount?.amount || order.total || 0) / 100).toFixed(2)}`
+).join(' | ')}` : ''}
 
-PERSONALIZATION GUIDELINES:
-- Use order history to provide personalized recommendations
-- If user asks about order status, reference their actual orders
-- Consider their past purchases when suggesting complementary products
-- For returning customers, acknowledge their loyalty
-- For VIP customers (high spending), offer premium recommendations
+CURRENT REQUEST LOCATION: ${requestLocation.country ? 
+  `${requestLocation.country}${requestLocation.region ? ', ' + requestLocation.region : ''}${requestLocation.city ? ', ' + requestLocation.city : ''}` : 
+  'Unknown'
+}${requestLocation.timezone ? ` | Timezone: ${requestLocation.timezone}` : ''}
+
+LOCATION & SEASONAL PERSONALIZATION:
+- Consider current season and weather patterns for location-appropriate gear
+- For winter locations: Emphasize insulation, waterproofing, cold weather gear
+- For summer locations: Focus on sun protection, cooling, hydration gear  
+- For tropical locations: Highlight moisture-wicking, quick-dry, UV protection
+- For mountainous regions: Suggest altitude-appropriate gear, layering systems
+- For multiple shipping locations: Acknowledge their travel/shipping patterns
+- Use timezone awareness for greeting appropriateness (good morning/evening)
+
+PERSONALIZATION STRATEGY:
+- New customers (< 7 days): Welcome warmly, offer beginner guidance, focus on essentials
+- Active customers: Acknowledge their engagement, suggest complementary gear
+- Champion/VIP customers (>$2000 spent): Recommend premium products, recognize loyalty
+- Returning after absence: Welcome back enthusiastically, ask about recent adventures
+- Incomplete profiles: Gently suggest profile completion for better recommendations
+- High engagement users: Match their enthusiasm with detailed product insights
+- Low engagement users: Keep responses simple and focused
 
 CRITICAL PRODUCT RULES - READ CAREFULLY:
 - YOU MUST ONLY mention products that are explicitly listed in the "Available product context" section below
@@ -346,21 +372,22 @@ Respond to this greeting warmly and ask what outdoor adventure they're planning.
     }
 
     // Fetch full product data if we have product IDs
-    let relatedProducts: Product[] = [];
+  let relatedProducts: Product[] = [];
     console.log("Product IDs found from vectorize:", productIds);
     if (productIds.length > 0) {
       try {
+        // Convert number IDs to strings for MACH schema compatibility
+        const stringProductIds = productIds.map(id => id.toString());
+        
         const db = await getDbAsync();
         const productResults = await db
           .select()
           .from(products)
-          .where(inArray(products.id, productIds));
+          .where(inArray(products.id, stringProductIds));
 
-        // Hydrate each product with related data
-        relatedProducts = await Promise.all(
-          productResults.map((product) => hydrateProduct(product))
-        );
-        console.log("Hydrated products:", relatedProducts.length);
+  // Products from MACH schema need deserialization
+  relatedProducts = productResults.map(deserializeProduct);
+  console.log("MACH products returned:", relatedProducts.length);
       } catch (productError) {
         console.error("Error fetching products:", productError);
         // Continue without products if fetch fails

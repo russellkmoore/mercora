@@ -7,7 +7,7 @@
  *
  * === Features ===
  * - **Product Sorting**: Multiple sort options (featured, price, availability)
- * - **Smart Pricing**: Handles sale price calculations automatically
+ * - **Smart Pricing**: Handles variant price calculations automatically
  * - **Interactive Controls**: Toggle group for sorting selection
  * - **Responsive Grid**: Adaptive layout for different screen sizes
  * - **Visual Indicators**: Icons and states for sorting direction
@@ -16,23 +16,23 @@
  *
  * === Sorting Options ===
  * - **Featured**: Default category ordering
- * - **Price High**: Highest to lowest price (considers sale prices)
- * - **Price Low**: Lowest to highest price (considers sale prices)
- * - **Availability**: Available products first, then coming soon
+ * - **Price High**: Highest to lowest price (considers variant prices)
+ * - **Price Low**: Lowest to highest price (considers variant prices)
+ * - **Availability**: Available products first, then out of stock
  *
  * === Technical Implementation ===
  * - **Client Component**: Interactive sorting state management
- * - **TypeScript Safety**: Fully typed with Category and Product interfaces
- * - **Price Logic**: Smart sale price handling with fallback to regular price
+ * - **TypeScript Safety**: Fully typed with Product interfaces
+ * - **Price Logic**: Smart variant price handling with default variant priority
  * - **Performance**: Efficient array sorting with stable sort algorithms
  *
  * === Usage ===
  * ```tsx
- * <CategoryDisplay category={categoryData} />
+ * <CategoryDisplay products={productArray} />
  * ```
  *
  * === Props ===
- * @param category - Category object containing products and metadata
+ * @param products - Array of Product objects to display
  */
 
 "use client";
@@ -41,51 +41,54 @@ import { useState } from "react";
 import ProductCard from "@/components/ProductCard";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ArrowUp, ArrowDown } from "lucide-react";
-import type { Category } from "@/lib/types/category";
-import type { Product } from "@/lib/types/product";
+import type { Product } from "@/lib/types/";
 
 interface CategoryDisplayProps {
-  category: Category;
+  products: Product[];
 }
 
 /**
  * CategoryDisplay component for browsing products within a category
  * 
- * @param category - The category object containing products to display
+ * @param products - Array of products to display
  * @returns JSX element with category products and sorting controls
  */
-export default function CategoryDisplay({ category }: CategoryDisplayProps) {
+export default function CategoryDisplay({ products }: CategoryDisplayProps) {
   const [sortBy, setSortBy] = useState("featured");
 
-  /**
-   * Calculate the effective price for a product (considers sale pricing)
-   * 
-   * @param p - Product object
-   * @returns The effective price (sale price if on sale, otherwise regular price)
-   */
-  const getEffectivePrice = (p: Product) =>
-    p.onSale && p.salePrice != null ? p.salePrice : p.price;
+  // Smart price extraction for sorting from product variants
+  const getPrice = (product: Product) => {
+    // Get default variant or first variant
+    const variants = product.variants || [];
+    const defaultVariant = variants.find((v) => v.id === product.default_variant_id) || variants[0];
+    return defaultVariant?.price?.amount ?? 0;
+  };
 
-  /**
-   * Sort products based on selected criteria
-   * Maintains stable sort for consistent ordering
-   */
-  const sortedProducts = [...category.products].sort((a, b) => {
-    if (sortBy === "price-high")
-      return getEffectivePrice(b) - getEffectivePrice(a);
-    if (sortBy === "price-low")
-      return getEffectivePrice(a) - getEffectivePrice(b);
-    if (sortBy === "availability") {
-      if (a.availability === b.availability) return 0;
-      return a.availability === "available" ? -1 : 1;
+  // Availability logic for sorting
+  const getAvailability = (product: Product) => {
+    const variants = product.variants || [];
+    const defaultVariant = variants.find((v) => v.id === product.default_variant_id) || variants[0];
+    const quantityInStock = defaultVariant?.inventory?.quantity ?? 0;
+    return quantityInStock > 0 ? 1 : 0; // 1 for available, 0 for not available
+  };
+
+  const sortedProducts = [...products].sort((a, b) => {
+    if (sortBy === "price-high") {
+      return getPrice(b) - getPrice(a);
     }
-    return 0;
+    if (sortBy === "price-low") {
+      return getPrice(a) - getPrice(b);
+    }
+    if (sortBy === "availability") {
+      return getAvailability(b) - getAvailability(a); // Available first
+    }
+    return 0; // Featured (original order)
   });
 
   return (
     <div className="mx-auto px-4 sm:px-6">
       {/* Sorting Controls */}
-      {sortedProducts.length > 0 && (
+      {products.length > 0 && (
         <div className="mb-6 sm:mb-8 flex justify-center sm:justify-end">
           <ToggleGroup
             variant="outline"
