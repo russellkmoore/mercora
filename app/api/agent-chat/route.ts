@@ -55,8 +55,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDbAsync } from "@/lib/db";
-import { products, deserializeProduct } from "@/lib/db/schema/products";
-import { inArray } from "drizzle-orm";
+import { products, deserializeProduct, product_variants } from "@/lib/db/schema/products";
+import { inArray, eq } from "drizzle-orm";
 import type { Product } from "@/lib/types";
 
 /**
@@ -385,9 +385,109 @@ Respond to this greeting warmly and ask what outdoor adventure they're planning.
           .from(products)
           .where(inArray(products.id, stringProductIds));
 
-  // Products from MACH schema need deserialization
-  relatedProducts = productResults.map(deserializeProduct);
-  console.log("MACH products returned:", relatedProducts.length);
+        // Fetch variants for each product and build complete Product objects
+        relatedProducts = await Promise.all(productResults.map(async (productRecord) => {
+          try {
+            // Get variants for this product
+            const variants = await db.select().from(product_variants).where(eq(product_variants.product_id, productRecord.id));
+            
+            // Deserialize the product
+            const product = deserializeProduct(productRecord);
+            
+            // Parse and attach variants with proper typing
+            product.variants = variants.map((v: any) => {
+              try {
+                // Helper function to parse price or inventory fields
+                const parseMoneyField = (field: any) => {
+                  if (!field) return { amount: 0, currency: 'USD' };
+                  if (typeof field === 'object') return field;
+                  if (typeof field === 'string') {
+                    if (field.startsWith('{')) {
+                      return JSON.parse(field);
+                    }
+                    const amount = parseInt(field, 10);
+                    return { amount: isNaN(amount) ? 0 : amount, currency: 'USD' };
+                  }
+                  if (typeof field === 'number') {
+                    return { amount: field, currency: 'USD' };
+                  }
+                  return { amount: 0, currency: 'USD' };
+                };
+                
+                const parseInventoryField = (field: any) => {
+                  if (!field) return { quantity: 0, status: 'out_of_stock' };
+                  if (typeof field === 'object') return field;
+                  if (typeof field === 'string') {
+                    if (field.startsWith('{')) {
+                      return JSON.parse(field);
+                    }
+                    const quantity = parseInt(field, 10);
+                    return { 
+                      quantity: isNaN(quantity) ? 0 : quantity, 
+                      status: quantity > 0 ? 'in_stock' : 'out_of_stock' 
+                    };
+                  }
+                  if (typeof field === 'number') {
+                    return { quantity: field, status: field > 0 ? 'in_stock' : 'out_of_stock' };
+                  }
+                  return { quantity: 0, status: 'out_of_stock' };
+                };
+                
+                return {
+                  id: v.id,
+                  product_id: v.product_id,
+                  sku: v.sku,
+                  option_values: v.option_values ? (typeof v.option_values === 'string' ? JSON.parse(v.option_values) : v.option_values) : [],
+                  price: parseMoneyField(v.price),
+                  status: v.status || 'active',
+                  position: v.position || 0,
+                  compare_at_price: v.compare_at_price ? parseMoneyField(v.compare_at_price) : null,
+                  cost: v.cost ? parseMoneyField(v.cost) : null,
+                  weight: v.weight ? (typeof v.weight === 'string' ? JSON.parse(v.weight) : v.weight) : null,
+                  dimensions: v.dimensions ? (typeof v.dimensions === 'string' ? JSON.parse(v.dimensions) : v.dimensions) : null,
+                  barcode: v.barcode,
+                  inventory: parseInventoryField(v.inventory),
+                  tax_category: v.tax_category,
+                  shipping_required: v.shipping_required !== 0,
+                  media: v.media ? (typeof v.media === 'string' ? JSON.parse(v.media) : v.media) : [],
+                  attributes: v.attributes ? (typeof v.attributes === 'string' ? JSON.parse(v.attributes) : v.attributes) : {},
+                  created_at: v.created_at,
+                  updated_at: v.updated_at
+                };
+              } catch (variantError) {
+                console.error(`Error parsing variant ${v.id}:`, variantError);
+                return {
+                  id: v.id,
+                  product_id: v.product_id,
+                  sku: v.sku || 'DEFAULT',
+                  option_values: [],
+                  price: { amount: 0, currency: 'USD' },
+                  status: 'active',
+                  position: 0,
+                  compare_at_price: null,
+                  cost: null,
+                  weight: null,
+                  dimensions: null,
+                  barcode: null,
+                  inventory: { quantity: 0, status: 'out_of_stock' },
+                  tax_category: null,
+                  shipping_required: true,
+                  media: [],
+                  attributes: {},
+                  created_at: v.created_at,
+                  updated_at: v.updated_at
+                };
+              }
+            });
+            
+            return product;
+          } catch (error) {
+            console.error("Error processing product:", error);
+            return deserializeProduct(productRecord);
+          }
+        }));
+        
+        console.log("MACH products with variants returned:", relatedProducts.length);
       } catch (productError) {
         console.error("Error fetching products:", productError);
         // Continue without products if fetch fails
