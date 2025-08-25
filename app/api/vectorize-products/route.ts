@@ -10,21 +10,13 @@
  *
  * This replaces the static MD file approach with a dynamic database-driven system
  * that automatically includes all product data and AI context for better search.
- *
- * === Security ===
- * Protected with an access token passed via query string.
- * The expected token value must match the secret stored as `ADMIN_VECTORIZE_TOKEN`.
- *
- * === Returns ===
- * A JSON response showing how many products were processed and vectorized.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDbAsync } from "@/lib/db";
-// TODO: Create products schema - temporarily commented out  
-// Removed schema imports to avoid any JSON parsing issues
-// import { products, product_variants } from "@/lib/db/schema/";
+import { products, deserializeProduct, product_variants } from "@/lib/db/schema/products";
+import { eq } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   try {
@@ -53,106 +45,120 @@ export async function GET(request: NextRequest) {
             MEDIA: !!media,
             VECTORIZE: !!vectorize,
             AI: !!ai
-          },
-          note: "Bindings should be available in globalThis when deployed to Cloudflare Workers"
+          }
         },
         { status: 500 }
       );
     }
 
-    // Query all products and all variants from the MACH database - using raw SQL to avoid schema issues
+    // Get all products from the database using the schema
     const db = await getDbAsync();
-    const allProducts = await db.all('SELECT * FROM products');
-    const allVariants = await db.all('SELECT * FROM product_variants');
+    const allProducts = await db.select().from(products);
 
     console.log(`Found ${allProducts.length} products to process`);
 
-    const results = [];
-    const errors = [];
+    const results: string[] = [];
+    const errors: string[] = [];
 
-    // Test just the first product to debug
-    const firstProduct = allProducts[0];
-    console.log('First product raw data (safe):', firstProduct?.id, firstProduct?.name);
-    
-    for (const product of allProducts.slice(0, 1)) {  // Only process first product for debugging
+    for (const productRecord of allProducts) {
       try {
-        console.log('Processing product:', (product as any).id, 'name:', (product as any).name, 'typeof name:', typeof (product as any).name);
+        // Get variants for this product
+        const variants = await db.select().from(product_variants).where(eq(product_variants.product_id, productRecord.id));
         
-        // Helper function to safely parse JSON fields
-        const safeJsonParse = (field: any, expectedStart: string = '{') => {
-          console.log('safeJsonParse called with field:', field, 'type:', typeof field);
-          if (typeof field === 'string' && field.startsWith(expectedStart)) {
-            try {
-              const parsed = JSON.parse(field);
-              console.log('Successfully parsed JSON:', parsed);
-              return parsed;
-            } catch (e) {
-              console.log('JSON parse failed, returning original field:', field);
-              return field;
-            }
+        // Deserialize the product
+        const product = deserializeProduct(productRecord);
+        
+        // Parse and attach variants (using same logic as agent-chat)
+        product.variants = variants.map((v: any) => {
+          try {
+            // Helper function to parse price or inventory fields
+            const parseMoneyField = (field: any) => {
+              if (!field) return { amount: 0, currency: 'USD' };
+              if (typeof field === 'object') return field;
+              if (typeof field === 'number') {
+                return { amount: field, currency: 'USD' };
+              }
+              if (typeof field === 'string') {
+                if (field.startsWith('{')) {
+                  return JSON.parse(field);
+                }
+                const amount = parseInt(field, 10);
+                return { amount: isNaN(amount) ? 0 : amount, currency: 'USD' };
+              }
+              return { amount: 0, currency: 'USD' };
+            };
+
+            const parseInventoryField = (field: any) => {
+              if (!field) return { quantity: 0, track: false };
+              if (typeof field === 'object') return field;
+              if (typeof field === 'string') {
+                try {
+                  return JSON.parse(field);
+                } catch (e) {
+                  return { quantity: 0, track: false };
+                }
+              }
+              return { quantity: 0, track: false };
+            };
+
+            return {
+              id: v.id,
+              product_id: v.product_id,
+              sku: v.sku,
+              option_values: v.option_values ? (typeof v.option_values === 'string' ? JSON.parse(v.option_values) : v.option_values) : [],
+              price: parseMoneyField(v.price),
+              status: v.status || 'active',
+              position: v.position || 0,
+              compare_at_price: v.compare_at_price ? parseMoneyField(v.compare_at_price) : null,
+              cost: v.cost ? parseMoneyField(v.cost) : null,
+              weight: v.weight ? (typeof v.weight === 'string' ? JSON.parse(v.weight) : v.weight) : null,
+              dimensions: v.dimensions ? (typeof v.dimensions === 'string' ? JSON.parse(v.dimensions) : v.dimensions) : null,
+              barcode: v.barcode,
+              inventory: parseInventoryField(v.inventory),
+              tax_category: v.tax_category,
+              attributes: typeof v.attributes === 'string' ? JSON.parse(v.attributes || '{}') : (v.attributes || {}),
+              created_at: v.created_at,
+              updated_at: v.updated_at
+            };
+          } catch (variantError) {
+            console.error("Error parsing variant:", variantError);
+            return v;
           }
-          console.log('Field not a JSON string, returning as-is:', field);
-          return field;
-        };
-
-        // Parse JSON fields from MACH schema - handle both JSON strings and plain strings  
-        const name = product.name || 'Unknown Product';
-        const description = product.description || '';
-        const categories = product.categories || [];
-        console.log('Parsed name:', name, 'description type:', typeof description);
-        // Find the default variant for this product
-        const defaultVariantId = product.default_variant_id;
-        const defaultVariant = allVariants.find((v: any) => v.product_id === product.id && v.id === defaultVariantId);
-        let pricing = {};
-        let images = [];
-        let attributes = {};
-        if (defaultVariant) {
-          const parsedPrice = safeJsonParse(defaultVariant.price);
-          const parsedComparePrice = safeJsonParse(defaultVariant.compare_at_price);
-          
-          pricing = {
-            basePrice: parsedPrice ? (typeof parsedPrice === 'object' ? parsedPrice.amount : parsedPrice) : undefined,
-            compareAtPrice: parsedComparePrice ? (typeof parsedComparePrice === 'object' ? parsedComparePrice.amount : parsedComparePrice) : undefined,
-            currency: parsedPrice ? (typeof parsedPrice === 'object' ? parsedPrice.currency : 'USD') : undefined
-          };
-          images = safeJsonParse(defaultVariant.media, '[') || [];
-          attributes = safeJsonParse(defaultVariant.attributes) || {};
-        }
-        // Generate slug for filename
-        const slug = product.id.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-        // Parse extensions and other meta fields using the safe parser
-        const extensions = safeJsonParse(product.extensions) || {};
-        const tags = safeJsonParse(product.tags, '[') || [];
-        const useCases = extensions.use_cases || [];
-        const aiNotesFinal = extensions.ai_notes || '';
-        const brand = product.brand || '';
-        const rating = safeJsonParse(product.rating) || {};
-        const relatedProducts = safeJsonParse(product.related_products, '[') || [];
-
-        console.log('About to call generateProductMarkdown...');
-        const mdContent = generateProductMarkdown({
-          id: product.id,
-          sku: product.id,
-          name: typeof name === 'string' ? name : 'Unknown Product',
-          description: typeof description === 'object' ? (description as any)?.en || '' : (description || ''),
-          pricing: pricing || {},
-          images: images || [],
-          categories: Array.isArray(categories) ? categories : [],
-          attributes: attributes || {},
-          tags: tags,
-          useCases: useCases,
-          aiNotes: aiNotesFinal,
-          brand: brand,
-          rating: rating,
-          relatedProducts: relatedProducts,
-          extensions: extensions,
-          createdAt: product.created_at || '',
-          updatedAt: product.updated_at || ''
         });
-        console.log('generateProductMarkdown completed successfully');
+
+        // Map the product data for the markdown generator (with proper pricing)
+        const mappedProduct = {
+          id: product.id,
+          sku: product.default_variant_id || product.id,
+          name: typeof product.name === 'string' ? product.name : (product.name?.en || 'Unknown Product'),
+          description: typeof product.description === 'string' ? product.description : 
+                      (product.description?.en || JSON.stringify(product.description) || ''),
+          pricing: {
+            basePrice: product.variants?.[0]?.price?.amount ? product.variants[0].price.amount / 100 : 0,
+            compareAtPrice: product.variants?.[0]?.compare_at_price?.amount ? product.variants[0].compare_at_price.amount / 100 : null
+          },
+          images: product.media || (product.primary_image ? [product.primary_image] : []),
+          categories: product.categories || [],
+          attributes: product.variants?.[0]?.attributes || {},
+          tags: product.tags || [],
+          useCases: product.extensions?.use_cases || [],
+          aiNotes: product.extensions?.ai_notes || '',
+          brand: product.brand || 'Mercora',
+          rating: product.rating || {},
+          relatedProducts: product.related_products || [],
+          extensions: product.extensions || {},
+          createdAt: product.created_at || new Date().toISOString(),
+          updatedAt: product.updated_at || new Date().toISOString()
+        };
+        
+        // Generate comprehensive markdown content
+        const mdContent = generateProductMarkdown(mappedProduct);
+
+        const productAny = product as any;
+        const slug = productAny.id.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
         if (!mdContent || mdContent.trim().length < 10) {
-          errors.push(`Insufficient content generated for product ${product.id}`);
+          errors.push(`Insufficient content generated for product ${productAny.id}`);
           continue;
         }
 
@@ -164,27 +170,28 @@ export async function GET(request: NextRequest) {
           }
         });
 
-        // Embed with Cloudflare AI (using 768-dimension model to match existing index)
+        // Embed with Cloudflare AI 
         const embedding = await ai.run("@cf/baai/bge-base-en-v1.5", { text: mdContent });
 
-        // Store vector in index with productId for agent-chat compatibility
+        // Store vector in index - use product ID as vector ID for consistency
         await vectorize.upsert([
           {
-            id: slug,
-            values: embedding.data[0], // Extract the actual vector array
+            id: productAny.id,
+            values: embedding.data[0],
             metadata: {
               slug,
               source: "product",
-              text: mdContent.substring(0, 1000), // Store first 1000 chars for context
-              productId: product.id,
+              text: mdContent.substring(0, 1000),
+              productId: productAny.id,
             },
           },
         ]);
 
-        results.push(`${slug} (ID: ${product.id})`);
+        results.push(`${slug} (ID: ${productAny.id})`);
         
       } catch (error) {
-        errors.push(`Error processing product ${product.id}: ${error}`);
+        const productAny = productRecord as any;
+        errors.push(`Error processing product ${productAny.id}: ${error}`);
       }
     }
 
@@ -213,22 +220,149 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Also support POST for easier calling
 export async function POST(request: NextRequest) {
   return GET(request);
 }
 
-// Test endpoint to verify deployment
-export async function OPTIONS(request: NextRequest) {
-  return NextResponse.json({ 
-    message: "Vectorize API v2.1 - Fixed JSON parsing", 
-    timestamp: new Date().toISOString() 
-  });
+// Debug endpoint to check raw variant data from database
+export async function PATCH(request: NextRequest) {
+  try {
+    const db = await getDbAsync();
+    const productResults = await db.select().from(products).where(eq(products.id, 'prod_2')).limit(1);
+    
+    if (productResults.length === 0) {
+      return NextResponse.json({ error: "Product not found" });
+    }
+    
+    const productRecord = productResults[0];
+    const variants = await db.select().from(product_variants).where(eq(product_variants.product_id, productRecord.id));
+    
+    return NextResponse.json({
+      message: "Raw database data for prod_2 Dusty Fire Tool",
+      productRecord: productRecord,
+      variants: variants,
+      variantCount: variants.length,
+      firstVariantPrice: variants[0]?.price,
+      firstVariantPriceType: typeof variants[0]?.price,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    return NextResponse.json({ 
+      message: "Database debug ERROR", 
+      error: String(error)
+    });
+  }
 }
 
-/**
- * Generate comprehensive markdown content for a product
- */
+// Test endpoint to verify deployment and markdown generation
+export async function OPTIONS(request: NextRequest) {
+  try {
+    // Get one product and test markdown generation
+    const db = await getDbAsync();
+    const productResults = await db.select().from(products).where(eq(products.id, 'prod_2')).limit(1);
+    
+    if (productResults.length === 0) {
+      return NextResponse.json({ error: "Product not found" });
+    }
+    
+    const productRecord = productResults[0];
+    const variants = await db.select().from(product_variants).where(eq(product_variants.product_id, productRecord.id));
+    const product = deserializeProduct(productRecord);
+    
+    // Parse and attach variants (EXACT same logic as main GET)
+    product.variants = variants.map((v: any) => {
+      try {
+        const parseMoneyField = (field: any) => {
+          if (!field) return { amount: 0, currency: 'USD' };
+          if (typeof field === 'object') return field;
+          if (typeof field === 'number') {
+            return { amount: field, currency: 'USD' };
+          }
+          if (typeof field === 'string') {
+            if (field.startsWith('{')) {
+              return JSON.parse(field);
+            }
+            const amount = parseInt(field, 10);
+            return { amount: isNaN(amount) ? 0 : amount, currency: 'USD' };
+          }
+          return { amount: 0, currency: 'USD' };
+        };
+
+        return {
+          ...v,
+          price: parseMoneyField(v.price),
+          compare_at_price: parseMoneyField(v.compare_at_price),
+          attributes: typeof v.attributes === 'string' ? JSON.parse(v.attributes || '{}') : (v.attributes || {}),
+          inventory: typeof v.inventory === 'string' ? JSON.parse(v.inventory || '{}') : (v.inventory || {}),
+        };
+      } catch (variantError) {
+        return v;
+      }
+    });
+    
+    // Map the product data
+    const mappedProduct = {
+      id: product.id,
+      sku: product.default_variant_id || product.id,
+      name: typeof product.name === 'string' ? product.name : (product.name?.en || 'Unknown Product'),
+      description: typeof product.description === 'string' ? product.description : 
+                  (product.description?.en || JSON.stringify(product.description) || ''),
+      pricing: {
+        basePrice: product.variants?.[0]?.price?.amount ? product.variants[0].price.amount / 100 : 0,
+        compareAtPrice: product.variants?.[0]?.compare_at_price?.amount ? product.variants[0].compare_at_price.amount / 100 : null
+      },
+      images: product.media || (product.primary_image ? [product.primary_image] : []),
+      categories: product.categories || [],
+      attributes: product.variants?.[0]?.attributes || {},
+      tags: product.tags || [],
+      useCases: product.extensions?.use_cases || [],
+      aiNotes: product.extensions?.ai_notes || '',
+      brand: product.brand || 'Mercora',
+      rating: product.rating || {},
+      relatedProducts: product.related_products || [],
+      extensions: product.extensions || {},
+      createdAt: product.created_at || new Date().toISOString(),
+      updatedAt: product.updated_at || new Date().toISOString()
+    };
+    
+    // Test markdown generation
+    let mdContent: string;
+    let error = null;
+    
+    try {
+      mdContent = generateProductMarkdown(mappedProduct);
+    } catch (mdError) {
+      error = String(mdError);
+      mdContent = `FALLBACK: generateProductMarkdown failed with: ${error}`;
+    }
+    
+    return NextResponse.json({ 
+      message: "Vectorize API v2.2 - Testing markdown generation with fixed variant parsing", 
+      timestamp: new Date().toISOString(),
+      rawVariant: variants[0],
+      parsedVariant: product.variants?.[0],
+      product: {
+        id: product.id,
+        name: product.name,
+        pricing: mappedProduct.pricing,
+        variantCount: product.variants?.length || 0
+      },
+      markdownLength: mdContent.length,
+      markdownPreview: mdContent.substring(0, 500),
+      error: error,
+      success: !error
+    });
+    
+  } catch (error) {
+    return NextResponse.json({ 
+      message: "Vectorize API v2.2 - ERROR", 
+      timestamp: new Date().toISOString(),
+      error: String(error)
+    });
+  }
+}
+
 function generateProductMarkdown(product: {
   id: string;
   sku: string;

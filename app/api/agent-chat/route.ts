@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
     // Use Cloudflare Vectorize to find relevant products and knowledge base content
     // This provides context for the AI to make accurate recommendations
     let contextSnippets = "";
-    let productIds: number[] = [];
+    let productIds: string[] = [];
 
     try {
       // Access Cloudflare Worker bindings for AI and Vectorize
@@ -106,18 +106,28 @@ export async function POST(req: NextRequest) {
       const vectorize = (env as any).VECTORIZE;
 
       if (ai && vectorize) {
+        console.log("Starting vector search for question:", question);
+        
         // Step 1: Convert user question to vector using same model as indexed content
         // This ensures semantic similarity matching works correctly
         const questionEmbedding = await ai.run("@cf/baai/bge-base-en-v1.5", {
           text: question,
         });
+        console.log("Generated embedding successfully");
 
-        // Step 2: Search vectorized index for semantically similar content
-        // Returns top 5 most relevant products/knowledge articles
-        const vectorResults = await vectorize.query(questionEmbedding.data[0], {
+        // Step 2: Search vectorized index with timeout protection
+        // Use Promise.race to implement timeout
+        const vectorSearchPromise = vectorize.query(questionEmbedding.data[0], {
           topK: 5, // Get top 5 matches
           returnMetadata: true, // Include text snippets and product IDs
         });
+        
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Vectorize query timeout after 10 seconds')), 10000)
+        );
+        
+        const vectorResults = await Promise.race([vectorSearchPromise, timeoutPromise]);
+        console.log("Vector search completed, matches:", vectorResults?.matches?.length || 0);
 
         if (vectorResults && vectorResults.matches) {
           // Extract text snippets to provide context to the AI
@@ -128,8 +138,9 @@ export async function POST(req: NextRequest) {
           // Extract product IDs for fetching full product data later
           productIds = vectorResults.matches
             .map((match: any) => match.metadata?.productId)
-            .filter((id: any) => id !== undefined && !isNaN(Number(id)))
-            .map((id: any) => Number(id));
+            .filter((id: any) => id !== undefined && id !== null && id !== "");
+          
+          console.log("Extracted product IDs:", productIds);
         }
       } else {
         console.warn("Vectorize or AI binding not available");
@@ -376,14 +387,11 @@ Respond to this greeting warmly and ask what outdoor adventure they're planning.
     console.log("Product IDs found from vectorize:", productIds);
     if (productIds.length > 0) {
       try {
-        // Convert number IDs to strings for MACH schema compatibility
-        const stringProductIds = productIds.map(id => id.toString());
-        
         const db = await getDbAsync();
         const productResults = await db
           .select()
           .from(products)
-          .where(inArray(products.id, stringProductIds));
+          .where(inArray(products.id, productIds));
 
         // Fetch variants for each product and build complete Product objects
         relatedProducts = await Promise.all(productResults.map(async (productRecord) => {
