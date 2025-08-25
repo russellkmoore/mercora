@@ -130,7 +130,7 @@ export default function ProductRecommendations({
     try {
       const productTags = currentProduct.tags?.join(", ") || "";
   // Enhanced query with user context and purchase history
-  let recommendationQuery = `I'm interested in the ${currentProduct.name}. It has tags: ${productTags}.`;
+  let recommendationQuery = `I'm currently browsing the site in the ${currentProduct.name} page. It has tags: ${productTags}.`;
       
       if (userContext.orderCount > 0) {
         recommendationQuery += ` I'm a returning customer with ${userContext.orderCount} previous orders.`;
@@ -142,7 +142,7 @@ export default function ProductRecommendations({
         }
         
         if (userContext.isVipCustomer) {
-          recommendationQuery += " I'm interested in premium products.";
+          recommendationQuery += " I'm only interested in premium products.";
         }
       }
       

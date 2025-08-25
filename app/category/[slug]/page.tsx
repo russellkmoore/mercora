@@ -7,7 +7,7 @@ export default async function CategoryPage({ params }: any) {
   const category = await getCategoryBySlug(params.slug);
   
   if (!category) {
-    return <div>Category not found</div>;
+    return <div>Category not found for slug: {params.slug}</div>;
   }
   
   let products: any[] = [];
@@ -21,21 +21,37 @@ export default async function CategoryPage({ params }: any) {
   
   // Helper to get category image URL
   const getCategoryImageUrl = (): string | null => {
-    return typeof category.primary_image === "string"
-      ? category.primary_image
-      : category.primary_image?.file?.url || null;
+    if (!category.primary_image) return null;
+    
+    // Handle string URLs directly
+    if (typeof category.primary_image === "string") {
+      return category.primary_image;
+    }
+    
+    // Handle Media object with url field
+    if (typeof category.primary_image === "object") {
+      const imageUrl = (category.primary_image as any).url || category.primary_image.file?.url || null;
+      // For debugging: try full R2 URL
+      if (imageUrl && !imageUrl.startsWith('http')) {
+        return `https://voltique-images.russellkmoore.me/${imageUrl}`;
+      }
+      return imageUrl;
+    }
+    
+    return null;
   };
 
   const categoryImageUrl = getCategoryImageUrl();
 
   return (
     <div className="mx-auto px-4 sm:px-6">
+      
       {/* Category Hero Image */}
       {categoryImageUrl && (
         <div className="relative w-full h-64 sm:h-80 lg:h-96 mb-8 rounded-lg overflow-hidden">
           <Image
             src={categoryImageUrl}
-            alt={typeof category.name === 'string' ? category.name : 'Category'}
+            alt={typeof category.name === 'string' ? category.name : (category.name?.en || 'Category')}
             fill
             className="object-cover"
             sizes="(min-width: 1024px) 100vw, 100vw"
@@ -44,11 +60,11 @@ export default async function CategoryPage({ params }: any) {
           <div className="absolute inset-0 bg-black bg-opacity-40 flex items-end">
             <div className="p-6 sm:p-8 text-white">
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2">
-                {typeof category.name === 'string' ? category.name : 'Category'}
+                {typeof category.name === 'string' ? category.name : (category.name?.en || 'Category')}
               </h1>
               {category.description && (
                 <p className="text-gray-200 text-lg max-w-2xl">
-                  {typeof category.description === 'string' ? category.description : ''}
+                  {typeof category.description === 'string' ? category.description : (category.description?.en || '')}
                 </p>
               )}
             </div>
@@ -60,11 +76,11 @@ export default async function CategoryPage({ params }: any) {
       {!categoryImageUrl && (
         <div className="mb-8 text-center">
           <h1 className="text-3xl sm:text-4xl font-bold mb-4">
-            {typeof category.name === 'string' ? category.name : 'Category'}
+            {typeof category.name === 'string' ? category.name : (category.name?.en || 'Category')}
           </h1>
           {category.description && (
             <p className="text-gray-400 max-w-2xl mx-auto">
-              {typeof category.description === 'string' ? category.description : ''}
+              {typeof category.description === 'string' ? category.description : (category.description?.en || '')}
             </p>
           )}
         </div>

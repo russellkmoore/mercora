@@ -33,7 +33,7 @@ type ChatMessage = {
   role?: "user" | "assistant";
   content: string;
   created_at: string;
-  productIds?: number[]; // Optional product IDs associated with this message
+  productIds?: string[]; // Optional product IDs associated with this message
 };
 
 /**
@@ -42,13 +42,13 @@ type ChatMessage = {
 interface ChatState {
   // === State ===
   messages: ChatMessage[];        // Complete conversation history
-  productIds: number[];          // Currently displayed product IDs
+  productIds: string[];          // Currently displayed product IDs
   products: Product[];           // Full product objects for recommendations
   
   // === Actions ===
   addMessage: (msg: ChatMessage) => void;              // Add new message to conversation
   setAssistantMessage: (msg: ChatMessage) => void;     // Update last assistant message
-  setProductIds: (ids: number[]) => void;              // Update displayed product IDs
+  setProductIds: (ids: string[]) => void;              // Update displayed product IDs
   setProducts: (products: Product[]) => void;          // Update product recommendations
   clearMessages: () => void;                           // Clear entire conversation
 }

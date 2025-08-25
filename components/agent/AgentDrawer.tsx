@@ -66,7 +66,6 @@ export default function AgentDrawer({
     messages,
     addMessage,
     setAssistantMessage,
-    productIds,
     setProductIds,
     products,
     setProducts,
@@ -183,7 +182,7 @@ export default function AgentDrawer({
       }, 100);
       
       
-      setProductIds((data.productIds || []).map(id => Number(id)));
+      setProductIds(data.productIds || []);
       setProducts(data.products || []);
     } catch (error) {
       addMessage({
@@ -380,10 +379,10 @@ export default function AgentDrawer({
 
         {/* Products area - scrollable */}
         <div className="flex-1 overflow-y-auto text-sm text-gray-600">
-          {productIds.length > 0 ? (
+          {products.length > 0 ? (
             <div className="space-y-2">
               <h3 className="font-semibold text-base text-black sticky top-0 bg-[#fdfdfb] pb-2">
-                Recommended Products
+                Recommended Products ({products.length})
               </h3>
               <div className="space-y-2 pb-4">
                 {products.map((product) => (
