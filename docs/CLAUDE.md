@@ -120,11 +120,14 @@ npx wrangler d1 migrations apply mercora-db          # Production
 - `POST /api/agent-chat` - AI chat with context
 - `GET /api/products` - Product listing with filters
 - `GET /api/orders` - Unified order management (list/create/update)
-- `POST /api/vectorize-products` - Index products for AI
+- `GET /api/vectorize` - Consolidated vectorization (products + knowledge)
 - `POST /api/payment-intent` - Create Stripe payment intents
 - `POST /api/webhooks/stripe` - Handle Stripe webhook events
 - `POST /api/tax` - Calculate tax with Stripe Tax
 - `POST /api/validate-discount` - Validate discount codes
+
+### Vectorization
+Use `GET /api/vectorize?token=voltique-admin` for complete atomic rebuild of both products and knowledge articles.
 
 ### Authentication
 All user-specific endpoints use Clerk middleware. User context is available via `auth()` helper.
@@ -195,6 +198,22 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 
 ## Deployment
 
+### Live Environment
+- **Test URL**: https://voltique.russellkmoore.me
+- **Production**: Deployed on Cloudflare Workers
+- **Admin Token**: `voltique-admin` (for vectorize endpoints)
+
+### Build & Deploy Steps
+```bash
+# IMPORTANT: For new API routes or major changes, use OpenNext build
+npx opennextjs-cloudflare build   # Build with OpenNext for Cloudflare
+npx wrangler deploy               # Deploy to Cloudflare Workers
+
+# For minor changes only
+npm run build                     # Standard Next.js build  
+npx wrangler deploy               # Deploy to Cloudflare Workers
+```
+
 ### Cloudflare Configuration (wrangler.jsonc)
 ```json
 {
@@ -205,16 +224,24 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 }
 ```
 
+### When to Use OpenNext Build
+- **New API routes**: Always use `npx opennextjs-cloudflare build`
+- **Route changes**: Modified route files or new endpoints
+- **Major changes**: Significant structural modifications
+- **Build issues**: If standard build doesn't work properly
+
 ### Deployment Process
 1. `npm run clean` - Remove old builds
-2. `npm run deploy` - Build and deploy to Cloudflare
-3. Monitor via Cloudflare dashboard
+2. Choose appropriate build command above
+3. `npx wrangler deploy` - Deploy to Cloudflare
+4. Test at https://voltique.russellkmoore.me
+5. Monitor via Cloudflare dashboard
 
 ## Common Tasks
 
 ### Adding New Products
 1. Create markdown file in `data/products_md/`
-2. Run `POST /api/vectorize-products` to index
+2. Run `GET /api/vectorize?token=voltique-admin` to index
 3. Products automatically appear in catalog and AI context
 
 ### Modifying AI Behavior
