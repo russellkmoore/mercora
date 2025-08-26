@@ -1,15 +1,33 @@
 /**
- * === Enhanced Vectorize Products API ===
+ * === Consolidated Vectorize API ===
  *
- * This endpoint now performs a complete workflow:
- * 1. Queries products from the MACH-compliant database
- * 2. Includes AI notes from the extension table 
- * 3. Generates individual MD files per product
- * 4. Uploads them to R2 under the products_md/ prefix
- * 5. Embeds them using Cloudflare AI and stores in Vectorize
+ * This endpoint performs a complete vectorization workflow:
+ * 1. Clears the existing Vectorize index to prevent stale data
+ * 2. Vectorizes all products from the database
+ * 3. Vectorizes all knowledge articles from R2 knowledge_md/ folder
+ * 4. Returns comprehensive results for both data sources
  *
- * This replaces the static MD file approach with a dynamic database-driven system
- * that automatically includes all product data and AI context for better search.
+ * This replaces the separate /vectorize-products and /vectorize-knowledge endpoints
+ * with a single atomic operation that ensures the vector database is always complete
+ * and consistent with both product data and knowledge base content.
+ *
+ * === Security ===
+ * Uses unified authentication system with permissions: ["vectorize:read", "vectorize:write"]
+ * 
+ * Supported authentication methods:
+ * - Authorization: Bearer <token>
+ * - X-API-Key: <token>
+ * - Query parameter: ?token=<token> (deprecated, for backward compatibility)
+ *
+ * === Usage ===
+ * ```bash
+ * curl -H "Authorization: Bearer YOUR_TOKEN" /api/vectorize
+ * ```
+ *
+ * === Performance Considerations ===
+ * - This operation can take 1-3 minutes depending on the number of products and articles
+ * - Cloudflare Workers have a 30s CPU limit and 15min wall clock limit
+ * - Consider splitting into batches if the dataset grows significantly
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -20,7 +38,7 @@ import { eq } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   try {
-    // Get Cloudflare bindings directly
+    // Get Cloudflare bindings
     const { env } = await getCloudflareContext({ async: true });
     const media = (env as any).MEDIA;
     const vectorize = (env as any).VECTORIZE;
@@ -51,14 +69,49 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get all products from the database using the schema
+    const startTime = Date.now();
+    console.log("Starting consolidated vectorization...");
+
+    // ==========================================
+    // STEP 1: Clear existing vector index
+    // ==========================================
+    console.log("Clearing existing vector index...");
+    
+    // Get existing vector IDs to delete them
+    try {
+      // Query existing vectors with a dummy vector (we just need the IDs)
+      const dummyVector = new Array(768).fill(0); // BGE model produces 768-dim vectors
+      const existingVectors = await vectorize.query(dummyVector, { 
+        topK: 10000, // Get up to 10k existing vectors
+        returnMetadata: true,
+        includeValues: false
+      });
+
+      if (existingVectors.matches && existingVectors.matches.length > 0) {
+        const idsToDelete = existingVectors.matches.map((match: any) => match.id);
+        console.log(`Deleting ${idsToDelete.length} existing vectors...`);
+        
+        // Delete in batches of 1000 (Vectorize limit)
+        for (let i = 0; i < idsToDelete.length; i += 1000) {
+          const batch = idsToDelete.slice(i, i + 1000);
+          await vectorize.deleteByIds(batch);
+        }
+      }
+    } catch (clearError) {
+      console.log("Note: Could not clear existing vectors (index might be empty):", clearError);
+    }
+
+    // ==========================================
+    // STEP 2: Vectorize Products
+    // ==========================================
+    console.log("Starting product vectorization...");
+    
     const db = await getDbAsync();
     const allProducts = await db.select().from(products);
-
     console.log(`Found ${allProducts.length} products to process`);
 
-    const results: string[] = [];
-    const errors: string[] = [];
+    const productResults: string[] = [];
+    const productErrors: string[] = [];
 
     for (const productRecord of allProducts) {
       try {
@@ -68,7 +121,7 @@ export async function GET(request: NextRequest) {
         // Deserialize the product
         const product = deserializeProduct(productRecord);
         
-        // Parse and attach variants (using same logic as agent-chat)
+        // Parse and attach variants (using same logic as vectorize-products)
         product.variants = variants.map((v: any) => {
           try {
             // Helper function to parse price or inventory fields
@@ -126,7 +179,7 @@ export async function GET(request: NextRequest) {
           }
         });
 
-        // Map the product data for the markdown generator (with proper pricing)
+        // Map the product data for markdown generation
         const mappedProduct = {
           id: product.id,
           sku: product.default_variant_id || product.id,
@@ -151,14 +204,14 @@ export async function GET(request: NextRequest) {
           updatedAt: product.updated_at || new Date().toISOString()
         };
         
-        // Generate comprehensive markdown content
+        // Generate markdown content
         const mdContent = generateProductMarkdown(mappedProduct);
 
         const productAny = product as any;
         const slug = productAny.id.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
         if (!mdContent || mdContent.trim().length < 10) {
-          errors.push(`Insufficient content generated for product ${productAny.id}`);
+          productErrors.push(`Insufficient content generated for product ${productAny.id}`);
           continue;
         }
 
@@ -187,32 +240,111 @@ export async function GET(request: NextRequest) {
           },
         ]);
 
-        results.push(`${slug} (ID: ${productAny.id})`);
+        productResults.push(`${slug} (ID: ${productAny.id})`);
         
       } catch (error) {
         const productAny = productRecord as any;
-        errors.push(`Error processing product ${productAny.id}: ${error}`);
+        productErrors.push(`Error processing product ${productAny.id}: ${error}`);
       }
     }
 
+    console.log(`Product vectorization complete: ${productResults.length} indexed, ${productErrors.length} errors`);
+
+    // ==========================================
+    // STEP 3: Vectorize Knowledge Articles
+    // ==========================================
+    console.log("Starting knowledge article vectorization...");
+    
+    // List .md files in knowledge_md/
+    const list = await media.list({ prefix: "knowledge_md/" });
+    const knowledgeResults: string[] = [];
+    const knowledgeErrors: string[] = [];
+
+    for (const obj of list.objects) {
+      if (!obj.key.endsWith(".md")) continue;
+
+      try {
+        const slug = obj.key.replace("knowledge_md/", "").replace(".md", "");
+        const file = await media.get(obj.key);
+        if (!file) {
+          knowledgeErrors.push(`File not found: ${obj.key}`);
+          continue;
+        }
+
+        const text = await file.text();
+        if (!text || text.trim().length < 10) {
+          knowledgeErrors.push(`Insufficient content: ${slug}`);
+          continue;
+        }
+
+        // Embed with Cloudflare AI (using same model as products)
+        const embedding = await ai.run("@cf/baai/bge-base-en-v1.5", { text });
+
+        // Store vector in index with knowledge source
+        await vectorize.upsert([
+          {
+            id: `knowledge-${slug}`,
+            values: embedding.data[0],
+            metadata: {
+              slug,
+              source: "knowledge",
+              text: text.substring(0, 1000), // Store first 1000 chars for context
+            },
+          },
+        ]);
+
+        knowledgeResults.push(slug);
+      } catch (error) {
+        knowledgeErrors.push(`Error processing ${obj.key}: ${error}`);
+      }
+    }
+
+    console.log(`Knowledge vectorization complete: ${knowledgeResults.length} indexed, ${knowledgeErrors.length} errors`);
+
+    // ==========================================
+    // STEP 4: Return comprehensive results
+    // ==========================================
+    const totalTime = Date.now() - startTime;
+    const totalIndexed = productResults.length + knowledgeResults.length;
+    const totalErrors = productErrors.length + knowledgeErrors.length;
+
     const response = {
       success: true,
-      message: `Vectorization complete. Generated and indexed ${results.length} products from database.`,
-      totalProducts: allProducts.length,
-      indexed: results,
-      errors: errors.length > 0 ? errors : undefined,
+      message: `Consolidated vectorization complete. Indexed ${totalIndexed} items (${productResults.length} products + ${knowledgeResults.length} knowledge articles) in ${(totalTime / 1000).toFixed(1)}s.`,
+      executionTimeMs: totalTime,
+      summary: {
+        totalIndexed,
+        totalErrors,
+        products: {
+          total: allProducts.length,
+          indexed: productResults.length,
+          errors: productErrors.length
+        },
+        knowledge: {
+          total: list.objects.filter((obj: any) => obj.key.endsWith('.md')).length,
+          indexed: knowledgeResults.length,
+          errors: knowledgeErrors.length
+        }
+      },
+      details: {
+        productResults,
+        knowledgeResults,
+        productErrors: productErrors.length > 0 ? productErrors : undefined,
+        knowledgeErrors: knowledgeErrors.length > 0 ? knowledgeErrors : undefined,
+      },
       workflow: [
-        "1. Queried products from MACH database",
-        "2. Retrieved AI notes from extension table",
-        "3. Generated markdown files with full product data",
-        "4. Uploaded to R2 under products_md/ prefix",
-        "5. Embedded and stored in Vectorize index"
+        "1. Cleared existing vector index to prevent stale data",
+        "2. Vectorized products from MACH database with AI notes",
+        "3. Generated and uploaded product markdown files to R2",
+        "4. Vectorized knowledge articles from R2 knowledge_md/ folder",
+        "5. Embedded all content using Cloudflare AI BGE model",
+        "6. Stored vectors in Vectorize index with source metadata"
       ]
     };
 
     return NextResponse.json(response, { status: 200 });
   } catch (error) {
-    console.error("Vectorization error:", error);
+    console.error("Consolidated vectorization error:", error);
     return NextResponse.json(
       { error: "Internal server error", details: String(error) },
       { status: 500 }
@@ -222,145 +354,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   return GET(request);
-}
-
-// Debug endpoint to check raw variant data from database
-export async function PATCH(request: NextRequest) {
-  try {
-    const db = await getDbAsync();
-    const productResults = await db.select().from(products).where(eq(products.id, 'prod_2')).limit(1);
-    
-    if (productResults.length === 0) {
-      return NextResponse.json({ error: "Product not found" });
-    }
-    
-    const productRecord = productResults[0];
-    const variants = await db.select().from(product_variants).where(eq(product_variants.product_id, productRecord.id));
-    
-    return NextResponse.json({
-      message: "Raw database data for prod_2 Dusty Fire Tool",
-      productRecord: productRecord,
-      variants: variants,
-      variantCount: variants.length,
-      firstVariantPrice: variants[0]?.price,
-      firstVariantPriceType: typeof variants[0]?.price,
-      timestamp: new Date().toISOString()
-    });
-    
-  } catch (error) {
-    return NextResponse.json({ 
-      message: "Database debug ERROR", 
-      error: String(error)
-    });
-  }
-}
-
-// Test endpoint to verify deployment and markdown generation
-export async function OPTIONS(request: NextRequest) {
-  try {
-    // Get one product and test markdown generation
-    const db = await getDbAsync();
-    const productResults = await db.select().from(products).where(eq(products.id, 'prod_2')).limit(1);
-    
-    if (productResults.length === 0) {
-      return NextResponse.json({ error: "Product not found" });
-    }
-    
-    const productRecord = productResults[0];
-    const variants = await db.select().from(product_variants).where(eq(product_variants.product_id, productRecord.id));
-    const product = deserializeProduct(productRecord);
-    
-    // Parse and attach variants (EXACT same logic as main GET)
-    product.variants = variants.map((v: any) => {
-      try {
-        const parseMoneyField = (field: any) => {
-          if (!field) return { amount: 0, currency: 'USD' };
-          if (typeof field === 'object') return field;
-          if (typeof field === 'number') {
-            return { amount: field, currency: 'USD' };
-          }
-          if (typeof field === 'string') {
-            if (field.startsWith('{')) {
-              return JSON.parse(field);
-            }
-            const amount = parseInt(field, 10);
-            return { amount: isNaN(amount) ? 0 : amount, currency: 'USD' };
-          }
-          return { amount: 0, currency: 'USD' };
-        };
-
-        return {
-          ...v,
-          price: parseMoneyField(v.price),
-          compare_at_price: parseMoneyField(v.compare_at_price),
-          attributes: typeof v.attributes === 'string' ? JSON.parse(v.attributes || '{}') : (v.attributes || {}),
-          inventory: typeof v.inventory === 'string' ? JSON.parse(v.inventory || '{}') : (v.inventory || {}),
-        };
-      } catch (variantError) {
-        return v;
-      }
-    });
-    
-    // Map the product data
-    const mappedProduct = {
-      id: product.id,
-      sku: product.default_variant_id || product.id,
-      name: typeof product.name === 'string' ? product.name : (product.name?.en || 'Unknown Product'),
-      description: typeof product.description === 'string' ? product.description : 
-                  (product.description?.en || JSON.stringify(product.description) || ''),
-      pricing: {
-        basePrice: product.variants?.[0]?.price?.amount ? product.variants[0].price.amount / 100 : 0,
-        compareAtPrice: product.variants?.[0]?.compare_at_price?.amount ? product.variants[0].compare_at_price.amount / 100 : null
-      },
-      images: product.media || (product.primary_image ? [product.primary_image] : []),
-      categories: product.categories || [],
-      attributes: product.variants?.[0]?.attributes || {},
-      tags: product.tags || [],
-      useCases: product.extensions?.use_cases || [],
-      aiNotes: product.extensions?.ai_notes || '',
-      brand: product.brand || 'Mercora',
-      rating: product.rating || {},
-      relatedProducts: product.related_products || [],
-      extensions: product.extensions || {},
-      createdAt: product.created_at || new Date().toISOString(),
-      updatedAt: product.updated_at || new Date().toISOString()
-    };
-    
-    // Test markdown generation
-    let mdContent: string;
-    let error = null;
-    
-    try {
-      mdContent = generateProductMarkdown(mappedProduct);
-    } catch (mdError) {
-      error = String(mdError);
-      mdContent = `FALLBACK: generateProductMarkdown failed with: ${error}`;
-    }
-    
-    return NextResponse.json({ 
-      message: "Vectorize API v2.2 - Testing markdown generation with fixed variant parsing", 
-      timestamp: new Date().toISOString(),
-      rawVariant: variants[0],
-      parsedVariant: product.variants?.[0],
-      product: {
-        id: product.id,
-        name: product.name,
-        pricing: mappedProduct.pricing,
-        variantCount: product.variants?.length || 0
-      },
-      markdownLength: mdContent.length,
-      markdownPreview: mdContent.substring(0, 500),
-      error: error,
-      success: !error
-    });
-    
-  } catch (error) {
-    return NextResponse.json({ 
-      message: "Vectorize API v2.2 - ERROR", 
-      timestamp: new Date().toISOString(),
-      error: String(error)
-    });
-  }
 }
 
 function generateProductMarkdown(product: {

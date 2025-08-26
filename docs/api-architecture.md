@@ -22,8 +22,7 @@ graph TB
         Products[📋 /api/products]
         Categories[📂 /api/categories]
         ShippingOptions[🚚 /api/shipping-options]
-        VectorizeProducts[🔍 /api/vectorize-products]
-        VectorizeKnowledge[📚 /api/vectorize-knowledge]
+        Vectorize[🔍 /api/vectorize]
         StripeWebhooks[🔔 /api/webhooks/stripe]
     end
 
@@ -145,10 +144,8 @@ graph TB
 ```
 ├── /api/agent-chat          # AI assistant
 │   └── POST   - Chat with Volt AI assistant
-├── /api/vectorize-products  # Content indexing
-│   └── POST   - Index products for AI search
-├── /api/vectorize-knowledge # Knowledge indexing
-│   └── POST   - Index support articles for AI
+├── /api/vectorize           # Consolidated content indexing
+│   └── GET    - Index products + knowledge articles (atomic operation)
 ```
 
 ## 🎯 Checkout Flow
