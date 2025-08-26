@@ -21,7 +21,8 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 ### 🤖 **AI-Powered Intelligence System (Complete)**
 - ✅ **Volt AI Assistant**: Conversational shopping expert with cheeky personality
 - ✅ **Vector Search**: Semantic product discovery using BGE embeddings (38 indexed items)
-- ✅ **Knowledge Base**: AI-powered customer support with vectorized FAQ/policies
+- ✅ **Consolidated Vectorization**: Unified `/api/vectorize` endpoint for atomic product + knowledge indexing
+- ✅ **Knowledge Base**: AI-powered customer support with vectorized FAQ/policies  
 - ✅ **Contextual Recommendations**: AI suggests relevant products based on user queries
 - ✅ **Anti-Hallucination**: Strict guardrails prevent fake product recommendations
 

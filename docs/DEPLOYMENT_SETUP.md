@@ -247,26 +247,16 @@ Ensure you have content in:
 - `data/products_md/` - Product descriptions
 - `data/knowledge_md/` - Support articles
 
-### **Step 2: Index Products**
+### **Step 2: Index Content for AI**
 ```bash
 # Deploy first, then index
 npm run deploy
 
-# Index products (requires admin token)
-curl -X POST https://yourdomain.com/api/vectorize-products \
-  -H "Authorization: Bearer your-admin-token" \
-  -H "Content-Type: application/json"
+# Index both products and knowledge articles (consolidated endpoint)
+curl -X GET "https://yourdomain.com/api/vectorize?token=voltique-admin"
 ```
 
-### **Step 3: Index Knowledge Base**
-```bash
-# Index support articles
-curl -X POST https://yourdomain.com/api/vectorize-knowledge \
-  -H "Authorization: Bearer your-admin-token" \
-  -H "Content-Type: application/json"
-```
-
-### **Step 4: Verify AI Setup**
+### **Step 3: Verify AI Setup**
 Test the AI assistant to ensure it can access vectorized content.
 
 ---
