@@ -59,6 +59,13 @@ export default function ProductRecommendations({
   const [agentAnswer, setAgentAnswer] = useState<string | null>(null);
   const userContext = useEnhancedUserContext();
   
+  console.log('ProductRecommendations component mount/render:', {
+    productId: product?.id,
+    productName: product?.name,
+    userContextLoading: userContext.isLoading,
+    userContextUserId: userContext.userId
+  });
+  
   // Create stable reference for user context values we actually need
   const stableUserContext = useMemo(() => {
     // Extract all purchased products from order history
@@ -99,15 +106,33 @@ export default function ProductRecommendations({
       items: o.items?.map(i => ({ name: i.product_name, id: i.product_id })) 
     })))
   ]);
-
+  
+  
+  // Fetch AI-powered recommendations with enhanced user context
   useEffect(() => {
-    if (!product || stableUserContext.isLoading) return;
+    console.log('ProductRecommendations useEffect:', { 
+      productId: product?.id, 
+      productName: product?.name,
+      isLoading: stableUserContext.isLoading,
+      hasProduct: !!product 
+    });
+    
+    if (!product) {
+      console.log('Early return: no product');
+      return;
+    }
+    
+    // Don't wait for user context - proceed with generic recommendations if user data isn't ready
+    console.log('User context loading, but proceeding with recommendations anyway');
+    
+    console.log('Starting AI recommendations fetch for:', product.name);
     
     // Debounce to prevent rapid consecutive calls
     const timeoutId = setTimeout(async () => {
       setIsLoading(true);
       try {
         const aiRecommendations = await fetchAIRecommendations(product, stableUserContext);
+        console.log('AI recommendations received:', aiRecommendations.length, 'products');
         setRecommendedProducts(aiRecommendations.slice(0, maxRecommendations));
       } catch (error) {
         console.error("Error fetching AI recommendations:", error);
@@ -118,7 +143,7 @@ export default function ProductRecommendations({
     }, 500); // 500ms debounce
 
     return () => clearTimeout(timeoutId);
-  }, [product?.id, stableUserContext.userId, stableUserContext.purchasedProductNames.length, maxRecommendations]);
+  }, [product?.id]);
 
   /**
    * Fetch AI-powered recommendations with enhanced user context
@@ -149,6 +174,11 @@ export default function ProductRecommendations({
       recommendationQuery += " Can you recommend 3 similar or complementary products that would work well with what I'm interested in?";
       recommendationQuery += " The answer should be short and concise with a little wit.";
 
+      console.log('Making AI recommendation request:', { 
+        query: recommendationQuery.substring(0, 100) + '...',
+        userName: userContext.firstName || "Guest" 
+      });
+      
       const res = await fetch("/api/agent-chat", {
         method: "POST",
         headers: {
@@ -192,7 +222,16 @@ export default function ProductRecommendations({
   const hasAgentAnswer = agentAnswer && agentAnswer.trim().length > 0;
   const shouldShowSection = isLoading || hasRecommendations;
 
+  console.log('ProductRecommendations render:', { 
+    isLoading, 
+    hasRecommendations, 
+    hasAgentAnswer, 
+    shouldShowSection,
+    recommendedProductsCount: recommendedProducts.length 
+  });
+
   if (!shouldShowSection) {
+    console.log('Not showing recommendations section');
     return null;
   }
 
