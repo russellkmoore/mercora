@@ -86,8 +86,8 @@ User Query → AI Embeddings → Vector Search → Context Retrieval → LLM Res
    npx wrangler d1 migrations apply mercora-db --remote    # Remote production
 
    # Load sample data (optional)
-   npx wrangler d1 execute mercora-db --local --file=lib/db/seed.sql   # Local
-   npx wrangler d1 execute mercora-db --remote --file=lib/db/seed.sql  # Remote
+   npx wrangler d1 execute mercora-db --local --file=data/d1/seed.sql   # Local
+   npx wrangler d1 execute mercora-db --remote --file=data/d1/seed.sql  # Remote
    ```
 
 4. **Start Development**
@@ -129,7 +129,7 @@ npm run deploy             # Deploy to Cloudflare
 # Database
 npx wrangler d1 migrations apply mercora-db --local    # Apply schema migrations (local)
 npx wrangler d1 migrations apply mercora-db            # Apply schema migrations (production)
-npx wrangler d1 execute mercora-db --local --file=lib/db/seed.sql  # Load sample data (local)
+npx wrangler d1 execute mercora-db --local --file=data/d1/seed.sql  # Load sample data (local)
 
 # AI Content Management
 curl -X GET "localhost:3000/api/vectorize?token=voltique-admin"  # Index products + knowledge (consolidated)
@@ -154,8 +154,13 @@ mercora/
 │   ├── types/                # TypeScript definitions
 │   └── stripe.ts             # Stripe configuration
 ├── data/                     # Content & Data
-│   ├── products_md/          # Product descriptions (vectorized)
-│   └── knowledge_md/         # Support articles (vectorized)
+│   ├── d1/                   # D1 Database files
+│   │   └── seed.sql          # Database seed data
+│   └── r2/                   # R2 Object Storage files
+│       ├── categories/       # Category images
+│       ├── products/         # Product images
+│       ├── products_md/      # Product descriptions (vectorized)
+│       └── knowledge_md/     # Support articles (vectorized)
 └── docs/                     # Comprehensive documentation
 ```
 
