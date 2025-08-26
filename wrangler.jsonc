@@ -12,6 +12,13 @@
     "binding": "ASSETS",
     "directory": ".open-next/assets"
   },
+  "rules": [
+    {
+      "type": "*",
+      "globs": ["data/**", "docs/**", "migrations/**"],
+      "fallthrough": false
+    }
+  ],
   "observability": {
     "enabled": true
   },
