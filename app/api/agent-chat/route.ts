@@ -98,6 +98,7 @@ export async function POST(req: NextRequest) {
     // This provides context for the AI to make accurate recommendations
     let contextSnippets = "";
     let productIds: string[] = [];
+    let vectorResults: any = null;
 
     try {
       // Access Cloudflare Worker bindings for AI and Vectorize
@@ -118,7 +119,7 @@ export async function POST(req: NextRequest) {
         // Step 2: Search vectorized index with timeout protection
         // Use Promise.race to implement timeout
         const vectorSearchPromise = vectorize.query(questionEmbedding.data[0], {
-          topK: 5, // Get top 5 matches
+          topK: 7, // Get top 7 matches
           returnMetadata: true, // Include text snippets and product IDs
         });
         
@@ -126,7 +127,7 @@ export async function POST(req: NextRequest) {
           setTimeout(() => reject(new Error('Vectorize query timeout after 10 seconds')), 10000)
         );
         
-        const vectorResults = await Promise.race([vectorSearchPromise, timeoutPromise]);
+        vectorResults = await Promise.race([vectorSearchPromise, timeoutPromise]);
         console.log("Vector search completed, matches:", vectorResults?.matches?.length || 0);
 
         if (vectorResults && vectorResults.matches) {
@@ -236,11 +237,22 @@ CRITICAL PRODUCT RULES - READ CAREFULLY:
 - NEVER create, invent, or hallucinate product names like "Vista Pan Set", "IceGuard Container", "Quickstep Base Layer", or "Storm Shield Jacket"
 - If no products are provided in context, give general advice about what TYPE of gear to look for, but mention NO specific product names
 - When asked about products but no context is available, say "I don't have specific product information available right now, but I can help you understand what to look for in [type of gear]"
+- NEVER refer to products by their IDs or numbers - always use the product NAME only
+- When recommending products, refer to them by their full product name as shown in the context
 
 Available product context (ONLY use products mentioned here):
 ${
   contextSnippets || "No specific product information available for this query."
 }
+
+RECOMMENDATION OUTPUT FORMAT:
+When recommending specific products, you MUST format your response to clearly indicate which products you're recommending  in your first couple of sentances.
+these products must match the products by Product IDs provided in order in the context above - ${productIds.length > 0 ? productIds.join(', ') : 'None'}
+For example:
+"I'd also recommend the Patagonia Down Sweater for warmth and the Black Diamond Headlamp for visibility.
+or
+"Here are three products that'll complement the Echo Sky Kit nicely: the Bright Echo Kit, the Signal Glade Tool, and the Rapid Wave Kit."
+
 
 MANDATORY REQUIREMENTS: 
 - If the context above says "No specific product information available", you MUST NOT mention any product names
@@ -306,7 +318,6 @@ Respond to this greeting warmly and ask what outdoor adventure they're planning.
             temperature: 0.1, // Lower temperature for more consistent, less creative responses
           });
 
-          console.log("AI prompt context:", contextSnippets);
           console.log("AI response:", response.response);
           assistantReply =
             response.response ||
@@ -382,16 +393,70 @@ Respond to this greeting warmly and ask what outdoor adventure they're planning.
       });
     }
 
+    // Parse agent's recommended products from the response text
+    let agentRecommendedProductIds: string[] = [];
+    
+    // Extract product names mentioned in bold formatting (**Product Name**)
+    const boldProductMatches = assistantReply.match(/\*\*([^*]+)\*\*/g);
+    
+    if (boldProductMatches) {
+      const recommendedProductNames = boldProductMatches
+        .map(match => match.replace(/\*\*/g, '').trim())
+        .map(name => name.replace(/^The\s+/i, '').trim()) // Remove "The" prefix but keep the rest
+        .filter(name => name.length > 0);
+      
+      // Map product names back to IDs using vector results metadata
+      if (vectorResults && vectorResults.matches) {
+        
+        for (const productName of recommendedProductNames) {
+          // Find the matching vector result by checking if the product name appears in the text
+          const matchingResult = vectorResults.matches.find((match: any) => {
+            const text = match.metadata?.text || '';
+            // Check if the product name appears in the text (case insensitive)
+            return text.toLowerCase().includes(productName.toLowerCase());
+          });
+          
+          if (matchingResult && matchingResult.metadata?.productId) {
+            // Avoid duplicates - only add if not already in the array
+            if (!agentRecommendedProductIds.includes(matchingResult.metadata.productId)) {
+              agentRecommendedProductIds.push(matchingResult.metadata.productId);
+            }
+          } else {
+            console.log(`Failed to map product: "${productName}"`);
+          }
+        }
+      }
+      
+      // Clean up the assistant reply by removing bold formatting for better UI display
+      assistantReply = assistantReply.replace(/\*\*([^*]+)\*\*/g, '$1');
+    }
+
+    // Use agent's recommended products if available, otherwise fall back to vector search results
+    // But if the agent mentioned specific products in bold but we couldn't map them, return empty array
+    // rather than returning all vector results that the agent didn't actually recommend
+    let finalProductIds: string[] = [];
+    
+    if (agentRecommendedProductIds.length > 0) {
+      // Agent successfully recommended specific products - use those
+      finalProductIds = agentRecommendedProductIds;
+    } else if (boldProductMatches && boldProductMatches.length > 0) {
+      // Agent mentioned products in bold but we couldn't map them - return empty rather than wrong products
+      finalProductIds = [];
+    } else {
+      // No specific product mentions detected - use vector search results
+      finalProductIds = productIds;
+    }
+    
     // Fetch full product data if we have product IDs
-  let relatedProducts: Product[] = [];
-    console.log("Product IDs found from vectorize:", productIds);
-    if (productIds.length > 0) {
+    let relatedProducts: Product[] = [];
+    console.log(`Attempting to fetch ${finalProductIds.length} products:`, finalProductIds);
+    if (finalProductIds.length > 0) {
       try {
         const db = await getDbAsync();
         const productResults = await db
           .select()
           .from(products)
-          .where(inArray(products.id, productIds));
+          .where(inArray(products.id, finalProductIds));
 
         // Fetch variants for each product and build complete Product objects
         relatedProducts = await Promise.all(productResults.map(async (productRecord) => {
@@ -496,6 +561,7 @@ Respond to this greeting warmly and ask what outdoor adventure they're planning.
         }));
         
         console.log("MACH products with variants returned:", relatedProducts.length);
+        console.log("Product names returned:", relatedProducts.map(p => p.name));
       } catch (productError) {
         console.error("Error fetching products:", productError);
         // Continue without products if fetch fails
@@ -505,7 +571,7 @@ Respond to this greeting warmly and ask what outdoor adventure they're planning.
     // Return the response with updated history
     return NextResponse.json({
       answer: assistantReply,
-      productIds,
+      productIds: finalProductIds,
       products: relatedProducts,
       history: [
         ...history,
