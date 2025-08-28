@@ -132,7 +132,7 @@ npx wrangler d1 migrations apply mercora-db            # Apply schema migrations
 npx wrangler d1 execute mercora-db --local --file=data/d1/seed.sql  # Load sample data (local)
 
 # AI Content Management
-curl -X GET "localhost:3000/api/vectorize?token=voltique-admin"  # Index products + knowledge (consolidated)
+curl -X GET "localhost:3000/api/admin/vectorize?token=$ADMIN_VECTORIZE_TOKEN"  # Index products + knowledge (consolidated)
 ```
 
 ### **Project Structure**

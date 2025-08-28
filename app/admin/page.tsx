@@ -5,99 +5,244 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
-  BarChart3, Package, FileText, Percent, Users, 
-  ShoppingCart, TrendingUp, AlertTriangle, Bot,
-  Calendar, Clock, DollarSign
+  BarChart3, Package, Users, 
+  ShoppingCart, AlertTriangle,
+  Calendar, Clock, DollarSign, Brain, Lightbulb
 } from "lucide-react";
 import Link from "next/link";
 
 interface DashboardStats {
   totalProducts: number;
   activeProducts: number;
+  inactiveProducts: number;
+  draftProducts: number;
   totalOrders: number;
+  pendingOrders: number;
+  processingOrders: number;
+  shippedOrders: number;
+  deliveredOrders: number;
+  cancelledOrders: number;
   totalRevenue: number;
   totalCustomers: number;
-  activePromotions: number;
-  knowledgeArticles: number;
   lowStockAlerts: number;
 }
 
-interface QuickAction {
-  title: string;
-  description: string;
-  href: string;
-  icon: React.ReactNode;
-  color: string;
+interface AIAnalytics {
+  insights: string;
+  alerts: string[];
+  recommendations: string[];
+  metrics: {
+    totalRevenue: number;
+    totalOrders: number;
+    averageOrderValue: number;
+    activeProducts: number;
+    lowStockProducts: number;
+    conversionRate: string;
+  };
+  trends: {
+    orderTrends: string;
+    topCategories: string[];
+    timeframe: string;
+    analysisDate: string;
+  };
+  loading: boolean;
+  error?: string;
 }
+
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
     activeProducts: 0,
+    inactiveProducts: 0,
+    draftProducts: 0,
     totalOrders: 0,
+    pendingOrders: 0,
+    processingOrders: 0,
+    shippedOrders: 0,
+    deliveredOrders: 0,
+    cancelledOrders: 0,
     totalRevenue: 0,
     totalCustomers: 0,
-    activePromotions: 0,
-    knowledgeArticles: 0,
     lowStockAlerts: 0
   });
   const [loading, setLoading] = useState(true);
+  
+  const [aiAnalytics, setAiAnalytics] = useState<AIAnalytics>({
+    insights: "",
+    alerts: [],
+    recommendations: [],
+    metrics: {
+      totalRevenue: 0,
+      totalOrders: 0,
+      averageOrderValue: 0,
+      activeProducts: 0,
+      lowStockProducts: 0,
+      conversionRate: "0%",
+    },
+    trends: {
+      orderTrends: "",
+      topCategories: [],
+      timeframe: "week",
+      analysisDate: "",
+    },
+    loading: false,
+    error: undefined,
+  });
 
   const fetchDashboardStats = async () => {
     try {
-      // TODO: Replace with actual API calls
-      // Mock data for now
+      // Fetch products data
+      const productsResponse = await fetch("/api/products?limit=1000");
+      let totalProducts = 0;
+      let activeProducts = 0;
+      let inactiveProducts = 0;
+      let draftProducts = 0;
+      let lowStockAlerts = 0;
+      
+      if (productsResponse.ok) {
+        const productsResult: any = await productsResponse.json();
+        const products = productsResult.data || [];
+        totalProducts = productsResult.meta?.total || products.length;
+        activeProducts = products.filter((p: any) => p.status === 'active').length;
+        inactiveProducts = products.filter((p: any) => p.status === 'inactive').length;
+        draftProducts = products.filter((p: any) => p.status === 'draft').length;
+        
+        // Count products with low stock (quantity < 10)
+        lowStockAlerts = products.filter((p: any) => {
+          const inventory = p.inventory;
+          return inventory && inventory.track_inventory && (inventory.quantity || 0) < 10;
+        }).length;
+      }
+
+      // Fetch orders data
+      const ordersResponse = await fetch("/api/orders?limit=1000");
+      let totalOrders = 0;
+      let pendingOrders = 0;
+      let processingOrders = 0;
+      let shippedOrders = 0;
+      let deliveredOrders = 0;
+      let cancelledOrders = 0;
+      let totalRevenue = 0;
+      
+      if (ordersResponse.ok) {
+        const ordersResult: any = await ordersResponse.json();
+        const orders = ordersResult.data || [];
+        totalOrders = ordersResult.meta?.total || orders.length;
+        pendingOrders = orders.filter((o: any) => o.status === 'pending').length;
+        processingOrders = orders.filter((o: any) => o.status === 'processing').length;
+        shippedOrders = orders.filter((o: any) => o.status === 'shipped').length;
+        deliveredOrders = orders.filter((o: any) => o.status === 'delivered').length;
+        cancelledOrders = orders.filter((o: any) => o.status === 'cancelled').length;
+        
+        // Calculate total revenue from delivered orders
+        totalRevenue = orders
+          .filter((o: any) => o.status === 'delivered')
+          .reduce((sum: number, order: any) => {
+            const amount = order.total_amount?.amount || 0;
+            return sum + amount;
+          }, 0);
+      }
+
       setStats({
-        totalProducts: 47,
-        activeProducts: 42,
-        totalOrders: 1834,
-        totalRevenue: 89425,
-        totalCustomers: 456,
-        activePromotions: 3,
-        knowledgeArticles: 8,
-        lowStockAlerts: 5
+        totalProducts,
+        activeProducts,
+        inactiveProducts,
+        draftProducts,
+        totalOrders,
+        pendingOrders,
+        processingOrders,
+        shippedOrders,
+        deliveredOrders,
+        cancelledOrders,
+        totalRevenue,
+        totalCustomers: 0, // No customer API yet
+        lowStockAlerts
       });
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
+      setStats({
+        totalProducts: 0,
+        activeProducts: 0,
+        inactiveProducts: 0,
+        draftProducts: 0,
+        totalOrders: 0,
+        pendingOrders: 0,
+        processingOrders: 0,
+        shippedOrders: 0,
+        deliveredOrders: 0,
+        cancelledOrders: 0,
+        totalRevenue: 0,
+        totalCustomers: 0,
+        lowStockAlerts: 0
+      });
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchAIAnalytics = async (timeframe: "day" | "week" | "month" | "quarter" = "week") => {
+    setAiAnalytics(prev => ({ ...prev, loading: true, error: undefined }));
+    
+    try {
+      const response = await fetch("/api/admin/analytics?token=voltique-admin-secure-token-1756375065", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          question: "Analyze current business performance and trends",
+          timeframe,
+          focus: "all"
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Analytics request failed: ${response.statusText}`);
+      }
+
+      const data = await response.json() as any;
+      
+      if (data.success) {
+        setAiAnalytics({
+          insights: data.insights || "",
+          alerts: data.alerts || [],
+          recommendations: data.recommendations || [],
+          metrics: data.metrics || {
+            totalRevenue: 0,
+            totalOrders: 0,
+            averageOrderValue: 0,
+            activeProducts: 0,
+            lowStockProducts: 0,
+            conversionRate: "0%",
+          },
+          trends: data.trends || {
+            orderTrends: "",
+            topCategories: [],
+            timeframe,
+            analysisDate: new Date().toISOString(),
+          },
+          loading: false,
+          error: undefined,
+        });
+      } else {
+        throw new Error(data.error || "Analytics request failed");
+      }
+    } catch (error) {
+      console.error("Error fetching AI analytics:", error);
+      setAiAnalytics(prev => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error.message : "Failed to fetch analytics",
+      }));
+    }
+  };
+
   useEffect(() => {
     fetchDashboardStats();
+    fetchAIAnalytics();
   }, []);
 
-  const quickActions: QuickAction[] = [
-    {
-      title: "Add Product",
-      description: "Create a new product with AI assistance",
-      href: "/admin/products",
-      icon: <Package className="w-5 h-5" />,
-      color: "bg-blue-600 hover:bg-blue-700"
-    },
-    {
-      title: "New Knowledge Article",
-      description: "Write a new help article for customers",
-      href: "/admin/knowledge",
-      icon: <FileText className="w-5 h-5" />,
-      color: "bg-green-600 hover:bg-green-700"
-    },
-    {
-      title: "Create Promotion",
-      description: "Set up discount codes and campaigns",
-      href: "/admin/promotions",
-      icon: <Percent className="w-5 h-5" />,
-      color: "bg-purple-600 hover:bg-purple-700"
-    },
-    {
-      title: "Ask Volt AI",
-      description: "Get insights about your store performance",
-      href: "#",
-      icon: <Bot className="w-5 h-5" />,
-      color: "bg-orange-600 hover:bg-orange-700"
-    }
-  ];
 
   if (loading) {
     return (
@@ -124,9 +269,9 @@ export default function AdminDashboard() {
             <div>
               <p className="text-sm text-gray-400">Total Revenue</p>
               <p className="text-2xl font-bold text-green-400">
-                ${stats.totalRevenue.toLocaleString()}
+                ${(stats.totalRevenue / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
-              <p className="text-xs text-green-500 mt-1">↑ 12% from last month</p>
+              <p className="text-xs text-gray-500 mt-1">From delivered orders</p>
             </div>
             <div className="w-12 h-12 bg-green-600/20 rounded-lg flex items-center justify-center">
               <DollarSign className="w-6 h-6 text-green-400" />
@@ -139,7 +284,7 @@ export default function AdminDashboard() {
             <div>
               <p className="text-sm text-gray-400">Total Orders</p>
               <p className="text-2xl font-bold text-blue-400">{stats.totalOrders}</p>
-              <p className="text-xs text-blue-500 mt-1">↑ 8% from last month</p>
+              <p className="text-xs text-gray-500 mt-1">{stats.pendingOrders} pending, {stats.processingOrders} processing</p>
             </div>
             <div className="w-12 h-12 bg-blue-600/20 rounded-lg flex items-center justify-center">
               <ShoppingCart className="w-6 h-6 text-blue-400" />
@@ -154,7 +299,7 @@ export default function AdminDashboard() {
               <p className="text-2xl font-bold text-orange-400">
                 {stats.activeProducts}/{stats.totalProducts}
               </p>
-              <p className="text-xs text-gray-500 mt-1">{stats.totalProducts - stats.activeProducts} inactive</p>
+              <p className="text-xs text-gray-500 mt-1">{stats.inactiveProducts} inactive, {stats.draftProducts} draft</p>
             </div>
             <div className="w-12 h-12 bg-orange-600/20 rounded-lg flex items-center justify-center">
               <Package className="w-6 h-6 text-orange-400" />
@@ -165,37 +310,198 @@ export default function AdminDashboard() {
         <Card className="bg-neutral-800 border-neutral-700 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-400">Customers</p>
-              <p className="text-2xl font-bold text-purple-400">{stats.totalCustomers}</p>
-              <p className="text-xs text-purple-500 mt-1">↑ 15% from last month</p>
+              <p className="text-sm text-gray-400">Low Stock Alerts</p>
+              <p className="text-2xl font-bold text-red-400">{stats.lowStockAlerts}</p>
+              <p className="text-xs text-gray-500 mt-1">Items with &lt;10 quantity</p>
             </div>
-            <div className="w-12 h-12 bg-purple-600/20 rounded-lg flex items-center justify-center">
-              <Users className="w-6 h-6 text-purple-400" />
+            <div className="w-12 h-12 bg-red-600/20 rounded-lg flex items-center justify-center">
+              <AlertTriangle className="w-6 h-6 text-red-400" />
             </div>
           </div>
         </Card>
       </div>
 
-      {/* Quick Actions */}
-      <div>
-        <h2 className="text-xl font-semibold text-white mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {quickActions.map((action, index) => (
-            <Link key={index} href={action.href}>
-              <Card className="bg-neutral-800 border-neutral-700 p-6 hover:bg-neutral-750 transition-colors cursor-pointer">
-                <div className="flex items-start space-x-4">
-                  <div className={`w-10 h-10 ${action.color} rounded-lg flex items-center justify-center text-white`}>
-                    {action.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-white text-sm">{action.title}</h3>
-                    <p className="text-gray-400 text-xs mt-1">{action.description}</p>
-                  </div>
+      {/* AI Business Insights */}
+      <div className="space-y-6">
+        <Card className="bg-gradient-to-r from-purple-900/20 to-blue-800/20 border-purple-500/30 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center">
+                <Brain className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">AI Business Intelligence</h3>
+                <p className="text-sm text-gray-400">Powered by advanced analytics</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                onClick={() => fetchAIAnalytics("week")}
+                disabled={aiAnalytics.loading}
+                variant="outline"
+                size="sm"
+                className="border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white"
+              >
+                {aiAnalytics.loading ? "Analyzing..." : "Refresh"}
+              </Button>
+            </div>
+          </div>
+
+          {aiAnalytics.loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-gray-400">AI is analyzing your business data...</div>
+            </div>
+          ) : aiAnalytics.error ? (
+            <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
+              <p className="text-red-400 text-sm">Error: {aiAnalytics.error}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* AI Insights */}
+              <div className="lg:col-span-2">
+                <h4 className="text-white font-medium mb-3 flex items-center">
+                  <Lightbulb className="w-4 h-4 mr-2 text-yellow-400" />
+                  AI Analysis
+                </h4>
+                <div className="bg-neutral-800/50 rounded-lg p-4">
+                  <p className="text-gray-300 text-sm whitespace-pre-line">{aiAnalytics.insights}</p>
                 </div>
-              </Card>
-            </Link>
-          ))}
-        </div>
+              </div>
+
+              {/* Alerts and Recommendations */}
+              <div className="space-y-4">
+                {/* Smart Alerts */}
+                {aiAnalytics.alerts.length > 0 && (
+                  <div>
+                    <h4 className="text-white font-medium mb-3 flex items-center">
+                      <AlertTriangle className="w-4 h-4 mr-2 text-red-400" />
+                      Smart Alerts
+                    </h4>
+                    <div className="space-y-2">
+                      {aiAnalytics.alerts.map((alert, index) => (
+                        <div key={index} className="bg-red-900/20 border border-red-500/30 rounded-lg p-3">
+                          <p className="text-red-300 text-xs">{alert}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recommendations */}
+                {aiAnalytics.recommendations.length > 0 && (
+                  <div>
+                    <h4 className="text-white font-medium mb-3 flex items-center">
+                      <Lightbulb className="w-4 h-4 mr-2 text-green-400" />
+                      Opportunities
+                    </h4>
+                    <div className="space-y-2">
+                      {aiAnalytics.recommendations.map((rec, index) => (
+                        <div key={index} className="bg-green-900/20 border border-green-500/30 rounded-lg p-3">
+                          <p className="text-green-300 text-xs">{rec}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* Order Status Overview */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Order Status Distribution */}
+        <Card className="bg-neutral-800 border-neutral-700 p-6 lg:col-span-2">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white">Order Status Distribution</h3>
+            <BarChart3 className="w-5 h-5 text-blue-400" />
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm text-gray-300">Pending</p>
+                <div className="w-full bg-neutral-700 rounded-full h-3 mt-1">
+                  <div className="bg-yellow-400 h-3 rounded-full" style={{width: `${stats.totalOrders > 0 ? (stats.pendingOrders / stats.totalOrders) * 100 : 0}%`}}></div>
+                </div>
+              </div>
+              <span className="text-sm text-gray-400 ml-3">{stats.pendingOrders}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm text-gray-300">Processing</p>
+                <div className="w-full bg-neutral-700 rounded-full h-3 mt-1">
+                  <div className="bg-blue-400 h-3 rounded-full" style={{width: `${stats.totalOrders > 0 ? (stats.processingOrders / stats.totalOrders) * 100 : 0}%`}}></div>
+                </div>
+              </div>
+              <span className="text-sm text-gray-400 ml-3">{stats.processingOrders}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm text-gray-300">Shipped</p>
+                <div className="w-full bg-neutral-700 rounded-full h-3 mt-1">
+                  <div className="bg-orange-400 h-3 rounded-full" style={{width: `${stats.totalOrders > 0 ? (stats.shippedOrders / stats.totalOrders) * 100 : 0}%`}}></div>
+                </div>
+              </div>
+              <span className="text-sm text-gray-400 ml-3">{stats.shippedOrders}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm text-gray-300">Delivered</p>
+                <div className="w-full bg-neutral-700 rounded-full h-3 mt-1">
+                  <div className="bg-green-400 h-3 rounded-full" style={{width: `${stats.totalOrders > 0 ? (stats.deliveredOrders / stats.totalOrders) * 100 : 0}%`}}></div>
+                </div>
+              </div>
+              <span className="text-sm text-gray-400 ml-3">{stats.deliveredOrders}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm text-gray-300">Cancelled</p>
+                <div className="w-full bg-neutral-700 rounded-full h-3 mt-1">
+                  <div className="bg-red-400 h-3 rounded-full" style={{width: `${stats.totalOrders > 0 ? (stats.cancelledOrders / stats.totalOrders) * 100 : 0}%`}}></div>
+                </div>
+              </div>
+              <span className="text-sm text-gray-400 ml-3">{stats.cancelledOrders}</span>
+            </div>
+          </div>
+        </Card>
+
+        {/* Product Status Breakdown */}
+        <Card className="bg-neutral-800 border-neutral-700 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white">Product Status</h3>
+            <Package className="w-5 h-5 text-orange-400" />
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+                <span className="text-sm text-gray-300">Active</span>
+              </div>
+              <span className="text-lg font-semibold text-green-400">{stats.activeProducts}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
+                <span className="text-sm text-gray-300">Inactive</span>
+              </div>
+              <span className="text-lg font-semibold text-gray-400">{stats.inactiveProducts}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                <span className="text-sm text-gray-300">Draft</span>
+              </div>
+              <span className="text-lg font-semibold text-yellow-400">{stats.draftProducts}</span>
+            </div>
+            <div className="pt-2 border-t border-neutral-700">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-white">Total Products</span>
+                <span className="text-xl font-bold text-white">{stats.totalProducts}</span>
+              </div>
+            </div>
+          </div>
+        </Card>
       </div>
 
       {/* Status Overview */}
@@ -214,8 +520,8 @@ export default function AdminDashboard() {
               <Badge variant="default" className="bg-green-600 text-white text-xs">Excellent</Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-gray-300 text-sm">AI Assistant (Volt)</span>
-              <Badge variant="default" className="bg-green-600 text-white text-xs">Online</Badge>
+              <span className="text-gray-300 text-sm">Search & Recommendations</span>
+              <Badge variant="default" className="bg-green-600 text-white text-xs">Active</Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-gray-300 text-sm">Payment Processing</span>
@@ -254,7 +560,7 @@ export default function AdminDashboard() {
             <div className="flex items-start space-x-3">
               <div className="w-2 h-2 bg-orange-400 rounded-full mt-2"></div>
               <div className="flex-1">
-                <p className="text-gray-300 text-sm">Volt AI knowledge base reindexed</p>
+                <p className="text-gray-300 text-sm">Search index updated</p>
                 <p className="text-gray-500 text-xs">1 hour ago</p>
               </div>
             </div>
@@ -291,26 +597,6 @@ export default function AdminDashboard() {
         </Card>
       )}
 
-      {/* AI Assistant Card */}
-      <Card className="bg-gradient-to-r from-orange-900/20 to-orange-800/20 border-orange-500/30 p-6">
-        <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 bg-orange-600 rounded-lg flex items-center justify-center">
-            <Bot className="w-6 h-6 text-white" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-white mb-2">
-              Volt AI Assistant
-            </h3>
-            <p className="text-gray-300 text-sm">
-              Your AI-powered assistant is ready to help with inventory insights, customer analysis, 
-              and content optimization. Ask questions about your store performance or get help with tasks.
-            </p>
-          </div>
-          <Button variant="outline" className="border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-black">
-            Ask Volt AI
-          </Button>
-        </div>
-      </Card>
     </div>
   );
 }

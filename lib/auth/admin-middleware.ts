@@ -13,8 +13,13 @@ export async function checkAdminPermissions(request: NextRequest): Promise<Admin
     const authToken = request.headers.get("authorization")?.replace("Bearer ", "") ||
                      request.nextUrl.searchParams.get("token");
     
-    if (authToken === "voltique-admin") {
-      return { success: true };
+    if (authToken) {
+      // Use the same token pattern as vectorize endpoint
+      const adminToken = process.env.ADMIN_VECTORIZE_TOKEN;
+      
+      if (adminToken && authToken === adminToken) {
+        return { success: true };
+      }
     }
 
     // Check Clerk authentication

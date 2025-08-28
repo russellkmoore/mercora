@@ -174,9 +174,13 @@ export default function KnowledgeManagement() {
   const triggerVectorization = async () => {
     setIsVectorizing(true);
     try {
-      const response = await fetch("/api/vectorize?token=voltique-admin");
+      // Direct call to admin vectorize endpoint
+      // Token validation happens server-side via admin middleware
+      const response = await fetch("/api/admin/vectorize");
       if (response.ok) {
         console.log("Vectorization triggered successfully");
+      } else {
+        throw new Error("Vectorization request failed");
       }
     } catch (error) {
       console.error("Error triggering vectorization:", error);

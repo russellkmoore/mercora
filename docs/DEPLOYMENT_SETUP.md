@@ -253,7 +253,7 @@ Ensure you have content in:
 npm run deploy
 
 # Index both products and knowledge articles (consolidated endpoint)
-curl -X GET "https://yourdomain.com/api/vectorize?token=voltique-admin"
+curl -X GET "https://yourdomain.com/api/admin/vectorize?token=voltique-admin"
 ```
 
 ### **Step 3: Verify AI Setup**
