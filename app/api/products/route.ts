@@ -23,6 +23,15 @@ export async function GET(request: NextRequest) {
     const search = url.searchParams.get('search');
     const category = url.searchParams.get('category');
 
+    // Get total count first (without limit/offset)
+    const allProducts = category && category.trim()
+      ? await getProductsByCategory(category.trim())
+      : await listProducts({ 
+          status: status ? [status] : undefined
+        });
+    const total = allProducts.length;
+    
+    // Then get the paginated results
     const products = category && category.trim()
       ? await getProductsByCategory(category.trim())
       : await listProducts({ 
@@ -30,8 +39,6 @@ export async function GET(request: NextRequest) {
           limit, 
           offset 
         });
-    // If you want total count, you can add a count function here
-    const total = products.length;
     const response: ApiResponse<Product[]> = {
       data: products,
       meta: {

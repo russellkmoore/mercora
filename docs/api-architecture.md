@@ -22,7 +22,7 @@ graph TB
         Products[📋 /api/products]
         Categories[📂 /api/categories]
         ShippingOptions[🚚 /api/shipping-options]
-        Vectorize[🔍 /api/vectorize]
+        Vectorize[🔍 /api/admin/vectorize]
         StripeWebhooks[🔔 /api/webhooks/stripe]
     end
 
@@ -144,7 +144,7 @@ graph TB
 ```
 ├── /api/agent-chat          # AI assistant
 │   └── POST   - Chat with Volt AI assistant
-├── /api/vectorize           # Consolidated content indexing
+├── /api/admin/vectorize           # Consolidated content indexing
 │   └── GET    - Index products + knowledge articles (atomic operation)
 ```
 

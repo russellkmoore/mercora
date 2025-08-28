@@ -11,12 +11,14 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100);
     const offset = parseInt(url.searchParams.get('offset') || '0');
     const statusParam = url.searchParams.get('status');
+    const includeInactive = url.searchParams.get('include_inactive') === 'true';
     const allowedStatuses = ['active', 'inactive', 'archived'] as const;
     const status = allowedStatuses.includes(statusParam as any) ? (statusParam as typeof allowedStatuses[number]) : null;
     const search = url.searchParams.get('search');
 
     const categories = await listCategories({
       status: status ? [status] : undefined,
+      include_inactive: includeInactive,
       limit,
       offset,
       search: search || undefined

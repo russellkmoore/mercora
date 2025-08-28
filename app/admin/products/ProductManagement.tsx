@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Edit, Trash2, Bot, RefreshCw } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Bot, RefreshCw, Tag } from "lucide-react";
+import ProductEditor from "@/components/admin/ProductEditor";
 import type { Product } from "@/lib/types/";
 
 interface ProductTableProps {
@@ -21,6 +22,7 @@ function ProductTable({ products, onEdit, onDelete }: ProductTableProps) {
         <thead className="bg-neutral-700">
           <tr>
             <th className="text-left p-4 text-sm font-medium text-gray-300">Product</th>
+            <th className="text-left p-4 text-sm font-medium text-gray-300">Categories</th>
             <th className="text-left p-4 text-sm font-medium text-gray-300">Price</th>
             <th className="text-left p-4 text-sm font-medium text-gray-300">Stock</th>
             <th className="text-left p-4 text-sm font-medium text-gray-300">Status</th>
@@ -45,6 +47,25 @@ function ProductTable({ products, onEdit, onDelete }: ProductTableProps) {
                       <div className="font-medium text-white">{name}</div>
                       <div className="text-sm text-gray-400">ID: {product.id}</div>
                     </div>
+                  </div>
+                </td>
+                <td className="p-4">
+                  <div className="flex flex-wrap gap-1">
+                    {product.categories && product.categories.length > 0 ? (
+                      product.categories.slice(0, 3).map((categoryId) => (
+                        <Badge key={categoryId} variant="outline" className="text-xs">
+                          <Tag className="w-3 h-3 mr-1" />
+                          {categoryId}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-gray-500 text-sm">No categories</span>
+                    )}
+                    {product.categories && product.categories.length > 3 && (
+                      <Badge variant="outline" className="text-xs">
+                        +{product.categories.length - 3}
+                      </Badge>
+                    )}
                   </div>
                 </td>
                 <td className="p-4 text-white">
@@ -95,14 +116,34 @@ export default function ProductManagement() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isVectorizing, setIsVectorizing] = useState(false);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [productsPerPage] = useState(20);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalActiveProducts, setTotalActiveProducts] = useState(0);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [showProductEditor, setShowProductEditor] = useState(false);
+  const [isNewProduct, setIsNewProduct] = useState(false);
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (page: number = 1) => {
     try {
-      const response = await fetch("/api/products");
+      const offset = (page - 1) * productsPerPage;
+      const url = `/api/products?limit=${productsPerPage}&offset=${offset}`;
+      const response = await fetch(url);
+      
       if (response.ok) {
-        const data: Product[] = await response.json();
-        setProducts(data);
-        setFilteredProducts(data);
+        const result: any = await response.json();
+        const products: Product[] = result.data || result || [];
+        const meta = result.meta || {};
+        
+        // Update totals from API metadata
+        const total = meta.total || products.length;
+        setTotalProducts(total);
+        setTotalPages(Math.ceil(total / productsPerPage));
+        setCurrentPage(page);
+        
+        setProducts(products);
+        setFilteredProducts(products);
       }
     } catch (error) {
       console.error("Error fetching products:", error);
@@ -114,10 +155,14 @@ export default function ProductManagement() {
   const triggerVectorization = async () => {
     setIsVectorizing(true);
     try {
-      const response = await fetch("/api/vectorize?token=voltique-admin");
+      // Direct call to admin vectorize endpoint
+      // Token validation happens server-side via admin middleware
+      const response = await fetch("/api/admin/vectorize");
       if (response.ok) {
         // Show success message or notification
         console.log("Vectorization triggered successfully");
+      } else {
+        throw new Error("Vectorization request failed");
       }
     } catch (error) {
       console.error("Error triggering vectorization:", error);
@@ -127,8 +172,13 @@ export default function ProductManagement() {
   };
 
   useEffect(() => {
-    fetchProducts();
+    fetchProducts(1);
   }, []);
+
+  const handlePageChange = (page: number) => {
+    setLoading(true);
+    fetchProducts(page);
+  };
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -150,16 +200,73 @@ export default function ProductManagement() {
     setFilteredProducts(filtered);
   }, [searchQuery, products]);
 
+  const handleSaveProduct = async (productData: Partial<Product>) => {
+    try {
+      console.log("Saving product:", productData);
+      const url = isNewProduct ? "/api/products" : `/api/products/${productData.id}`;
+      const method = isNewProduct ? "POST" : "PUT";
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(productData),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("Product saved successfully:", result);
+        await fetchProducts(currentPage);
+      } else {
+        const error: any = await response.json();
+        console.error("Failed to save product:", error);
+        throw new Error(error.error || "Failed to save product");
+      }
+    } catch (error) {
+      console.error("Error saving product:", error);
+      throw error;
+    }
+  };
+
   const handleEdit = (product: Product) => {
-    // TODO: Open edit modal or navigate to edit page
-    console.log("Edit product:", product);
+    setSelectedProduct(product);
+    setIsNewProduct(false);
+    setShowProductEditor(true);
+  };
+
+  const handleNewProduct = () => {
+    setSelectedProduct(null);
+    setIsNewProduct(true);
+    setShowProductEditor(true);
+  };
+
+  const handleCloseProductEditor = () => {
+    setShowProductEditor(false);
+    setSelectedProduct(null);
+    setIsNewProduct(false);
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
     
-    // TODO: Implement delete functionality
-    console.log("Delete product:", id);
+    try {
+      const response = await fetch(`/api/products/${id}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        await fetchProducts(currentPage);
+        console.log("Product deleted successfully");
+      } else {
+        const error: any = await response.json();
+        console.error("Failed to delete product:", error);
+        alert("Failed to delete product: " + (error.error || "Unknown error"));
+      }
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      alert("Failed to delete product");
+    }
   };
 
   if (loading) {
@@ -195,7 +302,7 @@ export default function ProductManagement() {
             {isVectorizing ? "Vectorizing..." : "Reindex AI"}
           </Button>
         </div>
-        <Button className="bg-orange-600 hover:bg-orange-700 text-white">
+        <Button onClick={handleNewProduct} className="bg-orange-600 hover:bg-orange-700 text-white">
           <Plus className="w-4 h-4 mr-2" />
           Add Product
         </Button>
@@ -204,14 +311,14 @@ export default function ProductManagement() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="bg-neutral-800 border-neutral-700 p-4">
-          <div className="text-2xl font-bold text-white">{products.length}</div>
+          <div className="text-2xl font-bold text-white">{totalProducts}</div>
           <div className="text-sm text-gray-400">Total Products</div>
         </Card>
         <Card className="bg-neutral-800 border-neutral-700 p-4">
           <div className="text-2xl font-bold text-green-400">
             {products.filter(p => p.status === "active").length}
           </div>
-          <div className="text-sm text-gray-400">Active Products</div>
+          <div className="text-sm text-gray-400">Active Products (Page)</div>
         </Card>
         <Card className="bg-neutral-800 border-neutral-700 p-4">
           <div className="text-2xl font-bold text-orange-400">
@@ -220,7 +327,7 @@ export default function ProductManagement() {
               return stock > 0 && stock < 10;
             }).length}
           </div>
-          <div className="text-sm text-gray-400">Low Stock</div>
+          <div className="text-sm text-gray-400">Low Stock (Page)</div>
         </Card>
         <Card className="bg-neutral-800 border-neutral-700 p-4">
           <div className="text-2xl font-bold text-red-400">
@@ -229,7 +336,7 @@ export default function ProductManagement() {
               return stock === 0;
             }).length}
           </div>
-          <div className="text-sm text-gray-400">Out of Stock</div>
+          <div className="text-sm text-gray-400">Out of Stock (Page)</div>
         </Card>
       </div>
 
@@ -261,11 +368,67 @@ export default function ProductManagement() {
         onDelete={handleDelete}
       />
 
+      {/* Pagination Controls */}
+      {!searchQuery && totalPages > 1 && (
+        <div className="flex items-center justify-between mt-6">
+          <div className="text-sm text-gray-400">
+            Showing {((currentPage - 1) * productsPerPage) + 1}-{Math.min(currentPage * productsPerPage, totalProducts)} of {totalProducts} products
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1 || loading}
+              className="border-neutral-700 text-gray-300 hover:bg-neutral-700"
+            >
+              Previous
+            </Button>
+            <div className="flex items-center space-x-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const pageNum = Math.max(1, currentPage - 2) + i;
+                if (pageNum > totalPages) return null;
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={pageNum === currentPage ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => handlePageChange(pageNum)}
+                    disabled={loading}
+                    className={pageNum === currentPage ? "bg-orange-600 hover:bg-orange-700" : "text-gray-300 hover:bg-neutral-700"}
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages || loading}
+              className="border-neutral-700 text-gray-300 hover:bg-neutral-700"
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+
       {filteredProducts.length === 0 && !loading && (
         <div className="text-center py-8 text-gray-400">
           {searchQuery ? "No products found matching your search." : "No products available."}
         </div>
       )}
+
+      {/* Product Editor Modal */}
+      <ProductEditor
+        product={selectedProduct}
+        isOpen={showProductEditor}
+        onClose={handleCloseProductEditor}
+        onSave={handleSaveProduct}
+        isNew={isNewProduct}
+      />
     </div>
   );
 }

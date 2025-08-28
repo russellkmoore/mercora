@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import ProductManagement from "./ProductManagement";
 
 export default function AdminProductsPage() {
@@ -11,9 +10,7 @@ export default function AdminProductsPage() {
         </p>
       </div>
       
-      <Suspense fallback={<div className="text-gray-400">Loading products...</div>}>
-        <ProductManagement />
-      </Suspense>
+      <ProductManagement />
     </div>
   );
 }

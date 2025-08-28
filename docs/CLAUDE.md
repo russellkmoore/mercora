@@ -120,17 +120,42 @@ npx wrangler d1 migrations apply mercora-db          # Production
 - `POST /api/agent-chat` - AI chat with context
 - `GET /api/products` - Product listing with filters
 - `GET /api/orders` - Unified order management (list/create/update)
-- `GET /api/vectorize` - Consolidated vectorization (products + knowledge)
+- `POST /api/admin/analytics` - AI-powered business intelligence and insights
+- `GET /api/admin/vectorize` - Consolidated vectorization (products + knowledge)
 - `POST /api/payment-intent` - Create Stripe payment intents
 - `POST /api/webhooks/stripe` - Handle Stripe webhook events
 - `POST /api/tax` - Calculate tax with Stripe Tax
 - `POST /api/validate-discount` - Validate discount codes
 
 ### Vectorization
-Use `GET /api/vectorize?token=voltique-admin` for complete atomic rebuild of both products and knowledge articles.
+Use `GET /api/admin/vectorize?token=<ADMIN_VECTORIZE_TOKEN>` for complete atomic rebuild of both products and knowledge articles. The admin token is securely managed via Cloudflare secrets in production and environment variables in development.
 
 ### Authentication
 All user-specific endpoints use Clerk middleware. User context is available via `auth()` helper.
+
+### Admin Token Configuration
+All admin endpoints use the same token authentication pattern as vectorize.
+
+The admin endpoints require an `ADMIN_VECTORIZE_TOKEN` environment variable:
+
+**Local Development:**
+```bash
+# Add to .env.local
+ADMIN_VECTORIZE_TOKEN=your-secure-admin-token-here
+```
+
+**Production (Cloudflare):**
+```bash
+# Set as Cloudflare Worker secret
+npx wrangler secret put ADMIN_VECTORIZE_TOKEN
+```
+
+**Authentication Methods:**
+- Query parameter: `?token=<ADMIN_VECTORIZE_TOKEN>`  
+- Authorization header: `Authorization: Bearer <ADMIN_VECTORIZE_TOKEN>`
+- X-API-Key header: `X-API-Key: <ADMIN_VECTORIZE_TOKEN>`
+
+Admin UI components use Clerk authentication, while direct API access uses token authentication.
 
 ## AI System (Volt Assistant)
 
@@ -241,7 +266,7 @@ npx wrangler deploy               # Deploy to Cloudflare Workers
 
 ### Adding New Products
 1. Create markdown file in `data/products_md/`
-2. Run `GET /api/vectorize?token=voltique-admin` to index
+2. Run `GET /api/admin/vectorize?token=<ADMIN_VECTORIZE_TOKEN>` to index (or use the admin UI)
 3. Products automatically appear in catalog and AI context
 
 ### Modifying AI Behavior

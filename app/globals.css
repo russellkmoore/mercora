@@ -30,3 +30,101 @@
     -moz-osx-font-smoothing: grayscale;
   }
 }
+
+/* Admin Layout Specific Styles */
+@layer components {
+  /* Admin layout container */
+  .admin-layout {
+    min-height: 100vh;
+    background-color: rgb(10 10 10); /* neutral-950 */
+  }
+  
+  /* Admin sidebar styling */
+  .admin-sidebar {
+    background-color: rgb(23 23 23); /* neutral-900 */
+    border-color: rgb(64 64 64); /* neutral-700 */
+  }
+  
+  /* Admin header styling */
+  .admin-header {
+    background-color: rgb(23 23 23); /* neutral-900 */
+    border-color: rgb(64 64 64); /* neutral-700 */
+  }
+  
+  /* Admin content area */
+  .admin-content {
+    background-color: rgb(10 10 10); /* neutral-950 */
+    min-height: calc(100vh - 80px); /* Account for header height */
+  }
+  
+  /* Admin navigation active states */
+  .admin-nav-active {
+    background-color: rgb(234 88 12); /* orange-600 */
+    color: rgb(255 255 255);
+  }
+  
+  .admin-nav-inactive {
+    color: rgb(209 213 219); /* gray-300 */
+  }
+  
+  .admin-nav-inactive:hover {
+    background-color: rgb(38 38 38); /* neutral-800 */
+    color: rgb(255 255 255);
+  }
+  
+  /* Admin card and component styling */
+  .admin-card {
+    background-color: rgb(23 23 23); /* neutral-900 */
+    border-color: rgb(64 64 64); /* neutral-700 */
+  }
+  
+  /* Admin button variants */
+  .admin-button-primary {
+    background-color: rgb(234 88 12); /* orange-600 */
+    color: rgb(255 255 255);
+  }
+  
+  .admin-button-primary:hover {
+    background-color: rgb(194 65 12); /* orange-700 */
+  }
+  
+  .admin-button-secondary {
+    background-color: rgb(38 38 38); /* neutral-800 */
+    color: rgb(255 255 255);
+    border-color: rgb(64 64 64); /* neutral-700 */
+  }
+  
+  .admin-button-secondary:hover {
+    background-color: rgb(64 64 64); /* neutral-700 */
+  }
+  
+  /* Admin input styling */
+  .admin-input {
+    background-color: rgb(38 38 38); /* neutral-800 */
+    border-color: rgb(64 64 64); /* neutral-700 */
+    color: rgb(255 255 255);
+  }
+  
+  .admin-input:focus {
+    border-color: rgb(234 88 12); /* orange-600 */
+    box-shadow: 0 0 0 1px rgb(234 88 12); /* orange-600 */
+  }
+  
+  /* Admin scrollbar styling */
+  .admin-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .admin-scrollbar::-webkit-scrollbar-track {
+    background: rgb(23 23 23); /* neutral-900 */
+  }
+  
+  .admin-scrollbar::-webkit-scrollbar-thumb {
+    background: rgb(64 64 64); /* neutral-700 */
+    border-radius: 3px;
+  }
+  
+  .admin-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgb(82 82 82); /* neutral-600 */
+  }
+}
