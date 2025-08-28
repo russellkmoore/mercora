@@ -135,12 +135,19 @@ export async function POST(request: NextRequest) {
 
     // Trigger vectorization
     try {
-      const vectorizeUrl = new URL('/api/vectorize', request.url);
-      vectorizeUrl.searchParams.set('token', 'voltique-admin');
-      
-      await fetch(vectorizeUrl.toString(), {
-        method: 'GET'
-      });
+      // Use the same token pattern as vectorize endpoint
+      const adminToken = process.env.ADMIN_VECTORIZE_TOKEN;
+
+      if (!adminToken) {
+        console.warn("ADMIN_VECTORIZE_TOKEN not configured, skipping vectorization");
+      } else {
+        const vectorizeUrl = new URL('/api/admin/vectorize', request.url);
+        vectorizeUrl.searchParams.set('token', adminToken);
+        
+        await fetch(vectorizeUrl.toString(), {
+          method: 'GET'
+        });
+      }
     } catch (vectorError) {
       console.error("Error triggering vectorization:", vectorError);
       // Continue anyway - vectorization can be done manually
@@ -191,12 +198,19 @@ export async function DELETE(request: NextRequest) {
 
     // Trigger vectorization to update index
     try {
-      const vectorizeUrl = new URL('/api/vectorize', request.url);
-      vectorizeUrl.searchParams.set('token', 'voltique-admin');
-      
-      await fetch(vectorizeUrl.toString(), {
-        method: 'GET'
-      });
+      // Use the same token pattern as vectorize endpoint
+      const adminToken = process.env.ADMIN_VECTORIZE_TOKEN;
+
+      if (!adminToken) {
+        console.warn("ADMIN_VECTORIZE_TOKEN not configured, skipping vectorization");
+      } else {
+        const vectorizeUrl = new URL('/api/admin/vectorize', request.url);
+        vectorizeUrl.searchParams.set('token', adminToken);
+        
+        await fetch(vectorizeUrl.toString(), {
+          method: 'GET'
+        });
+      }
     } catch (vectorError) {
       console.error("Error triggering vectorization:", vectorError);
     }
