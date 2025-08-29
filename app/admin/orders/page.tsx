@@ -1,3 +1,52 @@
+/**
+ * === Admin Orders Management Page ===
+ *
+ * Comprehensive order management interface for administrators to view, edit,
+ * and process customer orders. Features advanced search, filtering, status
+ * updates, and detailed order information with inline editing capabilities.
+ *
+ * === Features ===
+ * - **Order Listing**: Complete order history with expandable details
+ * - **Search & Filter**: Find orders by ID, customer, or status
+ * - **Status Management**: Update order status with tracking information
+ * - **Inline Editing**: Edit tracking numbers, notes, and order details
+ * - **Customer Information**: View customer details and shipping addresses
+ * - **Order Statistics**: Revenue metrics and order count summaries
+ * - **Returns Management**: Placeholder for future returns processing
+ * - **Responsive Design**: Mobile-optimized interface with collapsible sections
+ *
+ * === Order Management Features ===
+ * - **Status Updates**: Pending → Processing → Shipped → Delivered workflow
+ * - **Tracking Integration**: Add and manage shipping tracking numbers
+ * - **Order Notes**: Internal notes for order processing and customer service
+ * - **Customer Communication**: Direct access to customer contact information
+ * - **Financial Overview**: Order totals, payment status, and revenue tracking
+ * - **Bulk Operations**: Future support for batch order processing
+ *
+ * === Technical Implementation ===
+ * - **Client Component**: Interactive interface with real-time updates
+ * - **API Integration**: Fetches and updates orders via admin API endpoints
+ * - **State Management**: Local state for order data, filters, and UI states
+ * - **Error Handling**: Graceful error handling with user feedback
+ * - **Performance**: Efficient data loading with pagination support
+ * - **Type Safety**: Full TypeScript support with Order interface
+ *
+ * === Order Status Workflow ===
+ * - **Pending**: New orders awaiting processing
+ * - **Processing**: Orders being prepared for shipment
+ * - **Shipped**: Orders in transit with tracking information
+ * - **Delivered**: Successfully completed orders
+ * - **Cancelled**: Cancelled orders with reason tracking
+ * - **Refunded**: Refunded orders with refund information
+ *
+ * === Data Sources ===
+ * - `/api/orders?admin=true` - Order listing and updates
+ * - Authentication temporarily disabled for development
+ * - Real-time order status and customer information
+ *
+ * @returns JSX element with complete order management interface
+ */
+
 "use client";
 
 import { useState, useEffect } from "react";

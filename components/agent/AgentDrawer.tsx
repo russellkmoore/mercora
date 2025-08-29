@@ -333,7 +333,7 @@ export default function AgentDrawer({
                 </div>
                 <div className="bg-white text-gray-800 px-3 py-2 rounded-lg shadow-sm border">
                   <p className="text-gray-500">
-                    <strong>Voltique AI:</strong> Thinking...
+                    <strong>Volt:</strong> Thinking...
                   </p>
                 </div>
               </div>
