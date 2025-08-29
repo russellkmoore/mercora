@@ -2,16 +2,23 @@
  * === Header Client Component ===
  *
  * Client-side header component that provides the main navigation interface with
- * interactive elements including category navigation, user authentication,
+ * interactive elements including hierarchical category navigation, user authentication,
  * shopping cart, and AI assistant access.
  *
  * === Features ===
  * - **Responsive Navigation**: Adapts to different screen sizes
- * - **Category Dropdown**: Dynamic category navigation from server data
+ * - **Hierarchical Categories**: Nested category navigation with proper indentation
+ * - **Expandable Categories**: Mobile menu with expand/collapse functionality
  * - **User Authentication**: Clerk integration for login/logout
  * - **Shopping Cart**: Quick access to cart with item count
  * - **AI Assistant**: Integrated Volt AI chat drawer
  * - **Interactive Elements**: Hover effects and smooth transitions
+ *
+ * === Category Navigation ===
+ * - **Desktop Dropdown**: Hierarchical menu with visual indentation using tree symbols
+ * - **Mobile Menu**: Expandable tree structure with chevron expand/collapse icons
+ * - **Visual Hierarchy**: Different indentation levels and styling for nested categories
+ * - **Parent Category Detection**: Bold styling for categories with children
  *
  * === Components Integrated ===
  * - **AgentDrawer**: AI-powered shopping assistant
@@ -50,7 +57,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Home, Search, LogIn, ChevronDown, ShoppingCart, Menu, X, Grid3X3 } from "lucide-react";
+import { Home, Search, LogIn, ChevronDown, ChevronRight, ShoppingCart, Menu, X, Grid3X3 } from "lucide-react";
 import AgentDrawer from "@/components/agent/AgentDrawer";
 import ClerkLogin from "@/components/login/ClerkLogin";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -67,6 +74,54 @@ interface HeaderClientProps {
 }
 
 /**
+ * Helper function to build hierarchical category structure from flat array
+ * 
+ * @param categories - Flat array of categories
+ * @param parentId - Parent ID to filter by (null for root categories)
+ * @returns Array of categories with the specified parent
+ */
+const buildCategoryTree = (categories: MACHCategory[], parentId: string | null = null): MACHCategory[] => {
+  return categories.filter(cat => {
+    // Handle both null and undefined values for root categories
+    if (parentId === null) {
+      return cat.parent_id === null || cat.parent_id === undefined;
+    }
+    return cat.parent_id === parentId;
+  });
+};
+
+/**
+ * Helper function to check if a category has children
+ * 
+ * @param categoryId - Category ID to check
+ * @param allCategories - All categories to search through
+ * @returns Boolean indicating if category has children
+ */
+const hasChildren = (categoryId: string, allCategories: MACHCategory[]): boolean => {
+  return allCategories.some(cat => cat.parent_id === categoryId);
+};
+
+/**
+ * Helper function to get category display name
+ * 
+ * @param category - Category object
+ * @returns String representation of category name
+ */
+const getCategoryName = (category: MACHCategory): string => {
+  return typeof category.name === 'string' ? category.name : category.name?.en || Object.values(category.name || {})[0] || '';
+};
+
+/**
+ * Helper function to get category slug for URL
+ * 
+ * @param category - Category object
+ * @returns String representation of category slug
+ */
+const getCategorySlug = (category: MACHCategory): string => {
+  return typeof category.slug === 'string' ? category.slug : (category.slug?.en || Object.values(category.slug || {})[0] || category.id);
+};
+
+/**
  * HeaderClient component providing main navigation with interactive elements
  * 
  * @param categories - Array of product categories for navigation dropdown
@@ -76,6 +131,134 @@ export default function HeaderClient({
   categories,
 }: HeaderClientProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+
+  // Toggle category expansion in mobile menu
+  const toggleCategoryExpansion = (categoryId: string) => {
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryId)) {
+        newSet.delete(categoryId);
+      } else {
+        newSet.add(categoryId);
+      }
+      return newSet;
+    });
+  };
+
+  // Get root categories (those without a parent)
+  const rootCategories = buildCategoryTree(categories, null);
+  
+  // Debug logging for development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('HeaderClient Debug:');
+    console.log('  Categories count:', categories.length);
+    console.log('  All categories:', categories.map(cat => ({ 
+      id: cat.id, 
+      name: getCategoryName(cat), 
+      parent_id: cat.parent_id,
+      slug: getCategorySlug(cat) 
+    })));
+    console.log('  Root categories count:', rootCategories.length);
+    console.log('  Root categories:', rootCategories.map(cat => ({ id: cat.id, name: getCategoryName(cat) })));
+  }
+
+  /**
+   * Recursive component to render category tree for desktop dropdown
+   */
+  const CategoryDropdownTree = ({ cats, level = 0 }: { cats: MACHCategory[], level?: number }) => (
+    <>
+      {cats.map((category) => {
+        const children = buildCategoryTree(categories, category.id);
+        const hasChildCategories = children.length > 0;
+        
+        return (
+          <div key={category.id}>
+            <DropdownMenuItem
+              className="hover:text-orange-500 p-0"
+              asChild
+            >
+              <Link 
+                href={`/category/${getCategorySlug(category)}`} 
+                className="w-full flex items-center px-4 py-2"
+                prefetch={true}
+                style={{ paddingLeft: `${level * 8}px` }}
+              >
+                <span className={`flex items-center ${hasChildCategories ? 'font-semibold' : ''}`}>
+                  {level > 0 && <span className="mr-2 text-gray-400">└</span>}
+                  {getCategoryName(category)}
+                </span>
+              </Link>
+            </DropdownMenuItem>
+            {hasChildCategories && (
+              <CategoryDropdownTree cats={children} level={level + 1} />
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+
+  /**
+   * Get indentation class for nested categories based on level
+   */
+  const getIndentationClass = (level: number): string => {
+    const indentationClasses = {
+      0: '',
+      1: 'ml-6 border-l border-neutral-700 pl-4',
+      2: 'ml-12 border-l border-neutral-700 pl-4', 
+      3: 'ml-16 border-l border-neutral-700 pl-4'
+    };
+    return indentationClasses[level as keyof typeof indentationClasses] || 'ml-20 border-l border-neutral-700 pl-4';
+  };
+
+  /**
+   * Recursive component to render category tree for mobile menu
+   */
+  const CategoryMobileTree = ({ cats, level = 0 }: { cats: MACHCategory[], level?: number }) => (
+    <>
+      {cats.map((category) => {
+        const children = buildCategoryTree(categories, category.id);
+        const hasChildCategories = children.length > 0;
+        const isExpanded = expandedCategories.has(category.id);
+        
+        return (
+          <div key={category.id} className={getIndentationClass(level)}>
+            <div className="flex items-center">
+              {hasChildCategories ? (
+                <button
+                  onClick={() => toggleCategoryExpansion(category.id)}
+                  className="mr-2 p-1 text-gray-400 hover:text-white flex-shrink-0"
+                  aria-label={isExpanded ? 'Collapse category' : 'Expand category'}
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                </button>
+              ) : (
+                <div className="w-8 h-6 mr-2 flex-shrink-0" /> // Spacer for alignment
+              )}
+              <Link
+                href={`/category/${getCategorySlug(category)}`}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`block text-white hover:text-orange-500 py-2 px-2 rounded hover:bg-neutral-800 flex-1 ${hasChildCategories ? 'font-semibold' : ''}`}
+                prefetch={true}
+              >
+                {getCategoryName(category)}
+              </Link>
+            </div>
+            {hasChildCategories && isExpanded && (
+              <div className="mt-2">
+                <CategoryMobileTree cats={children} level={level + 1} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
 
   return (
     <div className="flex justify-between items-center px-4 sm:px-6 py-4 bg-black text-white">
@@ -104,22 +287,29 @@ export default function HeaderClient({
               Categories <ChevronDown className="ml-1 h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="bg-white text-black">
-            {categories.map((category) => (
-              <DropdownMenuItem
-                className="hover:text-orange-500 hover:border-l-2 border-orange-500 pl-4"
-                key={category.id}
-                asChild
-              >
-                <Link 
-                  href={`/category/${typeof category.slug === 'string' ? category.slug : (category.slug?.en || Object.values(category.slug || {})[0] || category.id)}`} 
-                  className="w-full"
-                  prefetch={true}
+          <DropdownMenuContent align="start" className="bg-white text-black max-h-96 overflow-y-auto">
+            {rootCategories.length > 0 ? (
+              <CategoryDropdownTree cats={rootCategories} />
+            ) : (
+              // Fallback: show all categories if no root categories found
+              categories.map((category) => (
+                <DropdownMenuItem
+                  key={category.id}
+                  className="hover:text-orange-500 hover:border-l-2 border-orange-500 p-0"
+                  asChild
                 >
-                  {typeof category.name === 'string' ? category.name : category.name.en || Object.values(category.name)[0]}
-                </Link>
-              </DropdownMenuItem>
-            ))}
+                  <Link 
+                    href={`/category/${getCategorySlug(category)}`} 
+                    className="w-full flex items-center px-4 py-2"
+                    prefetch={true}
+                  >
+                    <span className="flex items-center">
+                      {getCategoryName(category)}
+                    </span>
+                  </Link>
+                </DropdownMenuItem>
+              ))
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -165,18 +355,23 @@ export default function HeaderClient({
 
               <div className="px-4 py-2">
                 <h3 className="text-orange-500 font-semibold mb-2">Categories</h3>
-                <div className="space-y-2">
-                  {categories.map((category) => (
-                    <Link
-                      key={category.id}
-                      href={`/category/${typeof category.slug === 'string' ? category.slug : (category.slug?.en || Object.values(category.slug || {})[0] || category.id)}`}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="block text-white hover:text-orange-500 py-2 px-2 rounded hover:bg-neutral-800"
-                      prefetch={true}
-                    >
-                      {typeof category.name === 'string' ? category.name : category.name.en || Object.values(category.name)[0]}
-                    </Link>
-                  ))}
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {rootCategories.length > 0 ? (
+                    <CategoryMobileTree cats={rootCategories} />
+                  ) : (
+                    // Fallback: show all categories if no root categories found
+                    categories.map((category) => (
+                      <Link
+                        key={category.id}
+                        href={`/category/${getCategorySlug(category)}`}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="block text-white hover:text-orange-500 py-2 px-2 rounded hover:bg-neutral-800"
+                        prefetch={true}
+                      >
+                        {getCategoryName(category)}
+                      </Link>
+                    ))
+                  )}
                 </div>
               </div>
 
