@@ -1,3 +1,55 @@
+/**
+ * === Admin Settings Page ===
+ *
+ * Comprehensive settings management interface for configuring store operations,
+ * AI assistant behavior, and system-wide preferences. Features tabbed interface
+ * with real-time updates and vector index management capabilities.
+ *
+ * === Features ===
+ * - **Store Configuration**: Basic store information, currency, and policies
+ * - **AI Assistant Settings**: Volt personality, response style, and features
+ * - **System Configuration**: Debug mode, maintenance, and performance settings
+ * - **Vector Index Management**: Reindex products and knowledge base
+ * - **Real-time Updates**: Live status indicators and save confirmations
+ * - **Tabbed Interface**: Organized settings categories for easy navigation
+ *
+ * === Settings Categories ===
+ * - **Store Settings**: Store name, contact info, currency, tax rates
+ * - **AI Settings**: Volt personality mode, response length, personalization
+ * - **System Settings**: Debug mode, maintenance mode, analytics, notifications
+ *
+ * === AI Configuration Options ===
+ * - **Personality Mode**: Professional, friendly, or cheeky response style
+ * - **Response Length**: Concise, detailed, or adaptive based on context
+ * - **Product Recommendations**: Toggle AI product suggestion features
+ * - **Personalization**: Enable/disable user-specific recommendations
+ * - **Vector Index**: Monitor and refresh knowledge base indexing
+ *
+ * === System Management Features ===
+ * - **Debug Mode**: Enable detailed logging and error reporting
+ * - **Maintenance Mode**: Temporary site lockdown for updates
+ * - **Analytics**: Control data collection and performance monitoring
+ * - **Email Notifications**: Configure transactional email settings
+ * - **Caching**: Performance optimization controls
+ * - **API Rate Limiting**: Request throttling configuration
+ *
+ * === Technical Implementation ===
+ * - **Client Component**: Interactive settings with immediate feedback
+ * - **State Management**: Local state for settings data and UI states
+ * - **API Integration**: Save settings via admin API endpoints
+ * - **Vector Management**: Integration with `/api/admin/vectorize` endpoint
+ * - **Form Validation**: Input validation and error handling
+ * - **Performance**: Optimized re-rendering and state updates
+ *
+ * === Vector Index Management ===
+ * - **Status Monitoring**: Real-time vector index health
+ * - **Reindex Controls**: Manual trigger for content reindexing
+ * - **Progress Tracking**: Visual feedback during reindexing operations
+ * - **Error Handling**: Graceful handling of reindex failures
+ *
+ * @returns JSX element with complete admin settings interface
+ */
+
 "use client";
 
 import { useState, useEffect } from "react";

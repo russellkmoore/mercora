@@ -3,13 +3,8 @@
 
 export {
   authenticateRequest,
-  withAuth,
-  generateApiToken,
-  storeApiToken,
-  revokeApiToken,
   PERMISSIONS,
   type AuthResult,
-  type TokenPermissions,
 } from "./unified-auth";
 
 export {
