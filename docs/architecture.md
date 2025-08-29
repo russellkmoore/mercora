@@ -7,8 +7,9 @@ This document contains comprehensive architecture diagrams for the Mercora AI-po
 ```mermaid
 graph TB
     %% User Interface Layer
-    subgraph "Frontend - Next.js 14"
+    subgraph "Frontend - Next.js 15"
         UI[Web Interface]
+        Admin[Admin Dashboard]
         Chat[AI Chat Drawer]
         Cart[Shopping Cart]
         Checkout[Checkout Flow]

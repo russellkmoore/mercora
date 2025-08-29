@@ -4,15 +4,16 @@ This document provides essential context for Claude AI when working on the Merco
 
 ## Project Overview
 
-Mercora is an AI-powered outdoor gear eCommerce platform featuring **Volt**, an intelligent shopping assistant. Built on Cloudflare's edge infrastructure with MACH Alliance compliant architecture.
+Mercora is an AI-powered outdoor gear eCommerce platform featuring **Volt**, an intelligent shopping assistant. Built on Cloudflare's edge infrastructure with MACH Alliance compliant architecture and comprehensive admin dashboard.
 
 **Key Features:**
-- AI shopping assistant with semantic search
-- Real-time product recommendations
-- Complete eCommerce platform with checkout
-- User authentication via Clerk
-- Order management and history
-- Vector-based product search
+- AI shopping assistant with semantic search and personalization
+- Real-time product recommendations with anti-hallucination safeguards
+- Complete eCommerce platform with checkout and Stripe integration
+- Comprehensive admin dashboard with AI-powered analytics
+- User authentication via Clerk with admin role support
+- Advanced order management and customer insights
+- Vector-based product search with 38-item index (30 products + 8 knowledge articles)
 
 ## Tech Stack
 
@@ -71,21 +72,35 @@ npm run cf-typegen            # Generate Cloudflare types
 ```
 mercora/
 ├── app/                      # Next.js App Router
+│   ├── admin/                # Admin dashboard
+│   │   ├── categories/       # Category management
+│   │   ├── orders/           # Order management
+│   │   ├── products/         # Product management
+│   │   ├── settings/         # Admin settings
+│   │   └── page.tsx          # Admin dashboard home with AI analytics
 │   ├── api/                  # API Routes
+│   │   ├── admin/            # Admin API endpoints
+│   │   │   ├── analytics/    # AI-powered business analytics
+│   │   │   └── vectorize/    # Consolidated AI indexing
 │   │   ├── agent-chat/       # AI chat endpoint
-│   │   ├── products/         # Product API
-│   │   ├── user-orders/      # Order history
-│   │   └── vectorize-*/      # AI indexing endpoints
+│   │   ├── orders/           # Order API with admin support
+│   │   └── products/         # Product API
 │   ├── category/[slug]/      # Category pages
 │   ├── product/[slug]/       # Product pages
 │   ├── checkout/             # Checkout flow
 │   └── orders/               # Order history
 ├── components/               # React components
+│   ├── admin/                # Admin dashboard components
+│   │   ├── AdminSidebar.tsx  # Admin navigation
+│   │   └── AdminLayoutProvider.tsx  # Admin layout context
 │   ├── agent/                # AI chat components
 │   ├── cart/                 # Shopping cart
 │   ├── checkout/             # Complete checkout flow + Stripe payments
 │   └── ui/                   # shadcn/ui components
 ├── lib/                      # Core logic
+│   ├── auth/                 # Authentication & authorization
+│   │   ├── admin-middleware.ts  # Admin auth (currently disabled for dev)
+│   │   └── unified-auth.ts   # Unified auth system (disabled for dev)
 │   ├── db/                   # Database & schema
 │   ├── models/               # Data access layer
 │   │   └── mach/             # MACH Alliance models
@@ -98,6 +113,88 @@ mercora/
 │   └── knowledge_md/         # Support articles (vectorized)
 └── docs/                     # Architecture documentation
 ```
+
+## Admin Dashboard
+
+### Current Status
+The admin dashboard is **fully implemented and functional** with comprehensive features:
+
+#### **Admin Routes**
+- `/admin` - Dashboard home with AI-powered business analytics
+- `/admin/products` - Product catalog management (CRUD operations)  
+- `/admin/categories` - Category management
+- `/admin/orders` - Order management and processing
+- `/admin/settings` - Store configuration and AI settings
+
+#### **Key Components**
+- **AdminSidebar.tsx**: Navigation with collapsible design and active states
+- **AdminLayoutProvider.tsx**: Layout context for responsive admin interface
+- **AI Analytics**: Real-time business intelligence using Llama 3.1 8B
+
+#### **Admin API Endpoints**
+- `/api/admin/analytics` - AI-powered business insights and analytics
+- `/api/admin/vectorize` - Consolidated AI content indexing (products + knowledge)
+
+#### **Authentication Status**
+- **Current State**: Authentication is **temporarily DISABLED** for development
+- **Implementation**: Unified admin authentication system exists but bypassed
+- **Production Ready**: Full authentication system ready to be re-enabled
+
+### Admin Features Implemented
+
+#### **Dashboard Analytics**
+- Real-time AI-powered business intelligence
+- Natural language insights using Llama 3.1 8B
+- Order status distribution and product performance metrics
+- Actionable business recommendations
+
+#### **Product Management**
+- Complete CRUD operations for products
+- Bulk editing capabilities  
+- Category assignment and organization
+- Inventory tracking and management
+
+#### **Order Management**  
+- Order listing with search and filtering
+- Status updates and tracking information
+- Customer communication and notes
+- Returns management (placeholder for future development)
+
+#### **Settings Management**
+- Store configuration options
+- AI assistant settings and tuning
+- Vector index management and reindexing
+- System monitoring and health checks
+
+## Authentication System
+
+### Current Implementation
+The platform has a comprehensive authentication system that is currently disabled for development:
+
+#### **Admin Authentication**
+- **File**: `lib/auth/admin-middleware.ts`
+- **Status**: Disabled - returns `{ success: true, userId: "dev-admin" }`
+- **Original**: Token-based auth using `ADMIN_VECTORIZE_TOKEN` environment variable
+- **Future**: Role-based access with Clerk integration
+
+#### **Unified Authentication** 
+- **File**: `lib/auth/unified-auth.ts`
+- **Status**: Disabled - bypasses all checks and returns admin permissions
+- **Original**: Comprehensive API token system with permissions and rate limiting
+- **Capabilities**: Multi-method authentication (Bearer token, API key, query parameter)
+
+#### **Re-enabling Authentication**
+To re-enable authentication in production:
+1. Uncomment the authentication logic in both middleware files
+2. Configure proper admin roles in Clerk
+3. Set up API tokens for admin endpoints
+4. Remove the bypass logic that returns success without validation
+
+### Important Notes for Developers
+- **Development Mode**: All admin endpoints work without authentication
+- **API Calls**: No tokens required for `/api/admin/*` endpoints during development
+- **Production Ready**: Full authentication system exists and can be enabled quickly
+- **Security**: Never deploy to production with authentication disabled
 
 ## Database Schema (MACH Alliance Compliant)
 

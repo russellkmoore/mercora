@@ -1,31 +1,39 @@
-# Complete Deployment Setup Guide
+# Mercora Production Deployment Guide
 
-This guide covers the complete setup process for deploying Mercora to production, including all third-party services, infrastructure configuration, and security considerations.
+> **Complete step-by-step guide for deploying Mercora to production**
+
+This comprehensive guide covers the complete deployment process for Mercora, including all third-party services, infrastructure configuration, security setup, and admin dashboard deployment.
 
 ## 🏗️ Infrastructure Overview
 
-Mercora runs on Cloudflare's edge infrastructure with integrated third-party services:
+Mercora runs on Cloudflare's edge infrastructure with integrated services:
 
-- **Hosting**: Cloudflare Workers + Next.js
-- **Database**: Cloudflare D1 (SQLite)
-- **Storage**: Cloudflare R2 Object Storage
-- **AI**: Cloudflare AI (Llama 3.1 + BGE embeddings)
-- **Vector DB**: Cloudflare Vectorize
-- **Authentication**: Clerk
-- **Payments**: Stripe (with Stripe Tax)
+- **Hosting**: Cloudflare Workers + Next.js 15 with App Router
+- **Database**: Cloudflare D1 (distributed SQLite with Drizzle ORM)
+- **Storage**: Cloudflare R2 Object Storage for images and content
+- **AI Platform**: Cloudflare AI (Llama 3.1 8B + BGE embeddings)
+- **Vector Database**: Cloudflare Vectorize (38-item index)
+- **Authentication**: Clerk Authentication (with admin role support)
+- **Payments**: Stripe with Stripe Tax for global tax calculation
+- **Admin Dashboard**: Complete admin interface with AI analytics
 
 ## 📋 Prerequisites
 
-### Required Accounts
-1. **Cloudflare Account** (Workers paid plan required)
-2. **Clerk Account** (for authentication)
-3. **Stripe Account** (for payments and tax)
-4. **GitHub Account** (for repository and deployment)
+### Required Service Accounts
+1. **Cloudflare Account** - Workers paid plan required ($5/month minimum)
+2. **Clerk Account** - Authentication service (free tier available)
+3. **Stripe Account** - Payment processing with Stripe Tax enabled
+4. **GitHub Account** - Repository hosting and optional CI/CD
 
-### Local Development Tools
-- Node.js 18+ and npm/yarn/pnpm
-- Git
-- Wrangler CLI: `npm install -g wrangler`
+### Local Development Environment
+- **Node.js 18+** and npm/yarn/pnpm
+- **Git** for version control
+- **Wrangler CLI**: `npm install -g wrangler`
+- **Terminal/Command Line** access
+
+### Domain Requirements (Optional)
+- **Custom Domain** for production deployment
+- **DNS Management** access for custom domains
 
 ---
 
@@ -242,22 +250,36 @@ npx wrangler d1 execute mercora-db --command="SELECT COUNT(*) FROM products;"
 
 ## 5️⃣ AI Content Indexing
 
-### **Step 1: Prepare Content**
-Ensure you have content in:
-- `data/products_md/` - Product descriptions
-- `data/knowledge_md/` - Support articles
+### **Step 1: Content Preparation**
+Ensure your content is properly organized:
+- `data/r2/products_md/` - Product descriptions (30 files)
+- `data/r2/knowledge_md/` - Support articles (8 files)
+- Content should be uploaded to R2 bucket before indexing
 
-### **Step 2: Index Content for AI**
+### **Step 2: Deploy and Index Content**
 ```bash
-# Deploy first, then index
+# Deploy the application first
 npm run deploy
 
 # Index both products and knowledge articles (consolidated endpoint)
-curl -X GET "https://yourdomain.com/api/admin/vectorize?token=voltique-admin"
+# Note: Authentication temporarily disabled for development
+curl -X GET "https://yourdomain.com/api/admin/vectorize"
+
+# For production with admin token:
+curl -X GET "https://yourdomain.com/api/admin/vectorize?token=your-admin-token"
 ```
 
-### **Step 3: Verify AI Setup**
-Test the AI assistant to ensure it can access vectorized content.
+### **Step 3: Verify AI System**
+1. Test the AI assistant via the chat interface
+2. Verify semantic search is working with product queries
+3. Check admin dashboard AI analytics section
+4. Ensure 38 items are indexed (30 products + 8 knowledge articles)
+
+### **Step 4: Admin Dashboard Verification**
+1. Access admin dashboard at `/admin`
+2. Check AI analytics section for indexing status
+3. Verify vector search performance metrics
+4. Test AI-powered business intelligence features
 
 ---
 
@@ -289,11 +311,17 @@ npm run deploy
 ### **Step 3: Deploy Verification**
 1. Check deployment logs for errors
 2. Visit your deployed site
-3. Test key functionality:
+3. Test core functionality:
    - User registration/login
-   - Product browsing
-   - AI chat
-   - Checkout flow (with test cards)
+   - Product browsing and filtering
+   - AI chat with Volt assistant
+   - Shopping cart and checkout flow (with test cards)
+4. Test admin dashboard:
+   - Access admin dashboard at `/admin`
+   - Verify product management interface
+   - Test order management functionality
+   - Check AI analytics dashboard
+   - Ensure settings management works
 
 ---
 

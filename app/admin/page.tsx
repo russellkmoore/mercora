@@ -1,3 +1,48 @@
+/**
+ * === Admin Dashboard Component ===
+ *
+ * The main admin dashboard providing comprehensive business insights and
+ * AI-powered analytics. Features real-time metrics, order statistics,
+ * and actionable business intelligence for platform management.
+ *
+ * === Features ===
+ * - **Real-time Analytics**: Live business metrics and KPIs
+ * - **AI Business Intelligence**: Natural language insights using Llama 3.1 8B
+ * - **Order Management**: Order status distribution and processing metrics
+ * - **Product Analytics**: Stock levels, active products, and inventory alerts
+ * - **Financial Insights**: Revenue tracking and performance indicators
+ * - **Quick Actions**: Direct links to management sections
+ * - **Alert System**: Low stock warnings and business notifications
+ *
+ * === AI Analytics System ===
+ * - **Natural Language Insights**: AI-generated business recommendations
+ * - **Trend Analysis**: Order patterns and performance trends
+ * - **Predictive Alerts**: Inventory and business alerts
+ * - **Timeframe Analysis**: Week, month, quarter business intelligence
+ * - **Actionable Recommendations**: Data-driven business suggestions
+ *
+ * === Technical Implementation ===
+ * - **Client Component**: Interactive dashboard with real-time updates
+ * - **State Management**: React hooks for analytics and dashboard data
+ * - **API Integration**: Fetches data from admin analytics endpoint
+ * - **Error Handling**: Graceful degradation for API failures
+ * - **Performance**: Efficient data fetching with loading states
+ *
+ * === Dashboard Sections ===
+ * - **Analytics Overview**: Revenue, orders, and key metrics
+ * - **AI Insights**: Business intelligence and recommendations
+ * - **Order Statistics**: Status breakdown and processing pipeline
+ * - **Product Management**: Inventory levels and product status
+ * - **Quick Access**: Navigation to admin management pages
+ *
+ * === Data Sources ===
+ * - `/api/admin/analytics` - AI-powered business intelligence
+ * - Database queries for real-time metrics
+ * - Order and product status aggregations
+ *
+ * @returns JSX element with complete admin dashboard interface
+ */
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -185,7 +230,7 @@ export default function AdminDashboard() {
     setAiAnalytics(prev => ({ ...prev, loading: true, error: undefined }));
     
     try {
-      const response = await fetch("/api/admin/analytics?token=voltique-admin-secure-token-1756375065", {
+      const response = await fetch("/api/admin/analytics", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
