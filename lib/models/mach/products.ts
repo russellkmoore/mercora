@@ -73,10 +73,10 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
         price: parseMoneyField(v.price),
         status: v.status || 'active',
         position: v.position || 0,
-        compare_at_price: v.compare_at_price ? parseMoneyField(v.compare_at_price) : null,
-        cost: v.cost ? parseMoneyField(v.cost) : null,
-        weight: v.weight ? (typeof v.weight === 'string' ? JSON.parse(v.weight) : v.weight) : null,
-        dimensions: v.dimensions ? (typeof v.dimensions === 'string' ? JSON.parse(v.dimensions) : v.dimensions) : null,
+        compare_at_price: v.compare_at_price ? parseMoneyField(v.compare_at_price) : undefined,
+        cost: v.cost ? parseMoneyField(v.cost) : undefined,
+        weight: v.weight ? (typeof v.weight === 'string' ? JSON.parse(v.weight) : v.weight) : undefined,
+        dimensions: v.dimensions ? (typeof v.dimensions === 'string' ? JSON.parse(v.dimensions) : v.dimensions) : undefined,
         barcode: v.barcode,
         inventory: parseInventoryField(v.inventory),
         tax_category: v.tax_category,
@@ -154,21 +154,227 @@ export async function createProduct(productData: Product): Promise<Product> {
 }
 
 export async function getProduct(id: string): Promise<Product | null> {
-    const result = await (await getDb()).select().from(products).where(eq(products.id, id));
-  return result[0] ? deserializeProduct(result[0]) : null;
+  const db = await getDb();
+  const result = await db.select().from(products).where(eq(products.id, id));
+  
+  if (!result[0]) return null;
+  
+  const product = deserializeProduct(result[0]);
+  
+  // Load variants for the product (same logic as listProducts and getProductBySlug)
+  const variants = await db.select().from(product_variants).where(eq(product_variants.product_id, product.id));
+  
+  product.variants = variants.map((v: any) => {
+    try {
+      // Helper function to parse price or inventory fields that might be JSON strings or plain numbers
+      const parseMoneyField = (field: any) => {
+        if (!field) return { amount: 0, currency: 'USD' };
+        if (typeof field === 'object') return field;
+        if (typeof field === 'string') {
+          if (field.startsWith('{')) {
+            return JSON.parse(field);
+          }
+          // Handle legacy string number format
+          const amount = parseInt(field, 10);
+          return { amount: isNaN(amount) ? 0 : amount, currency: 'USD' };
+        }
+        if (typeof field === 'number') {
+          return { amount: field, currency: 'USD' };
+        }
+        return { amount: 0, currency: 'USD' };
+      };
+      
+      const parseInventoryField = (field: any) => {
+        if (!field) return { quantity: 0, status: 'out_of_stock' };
+        if (typeof field === 'object') return field;
+        if (typeof field === 'string') {
+          if (field.startsWith('{')) {
+            return JSON.parse(field);
+          }
+          // Handle legacy string number format
+          const quantity = parseInt(field, 10);
+          return { 
+            quantity: isNaN(quantity) ? 0 : quantity, 
+            status: quantity > 0 ? 'in_stock' : 'out_of_stock' 
+          };
+        }
+        if (typeof field === 'number') {
+          return { quantity: field, status: field > 0 ? 'in_stock' : 'out_of_stock' };
+        }
+        return { quantity: 0, status: 'out_of_stock' };
+      };
+      
+      return {
+        id: v.id,
+        product_id: v.product_id,
+        sku: v.sku,
+        option_values: v.option_values ? (typeof v.option_values === 'string' ? JSON.parse(v.option_values) : v.option_values) : [],
+        price: parseMoneyField(v.price),
+        status: v.status || 'active',
+        position: v.position || 0,
+        compare_at_price: v.compare_at_price ? parseMoneyField(v.compare_at_price) : undefined,
+        cost: v.cost ? parseMoneyField(v.cost) : undefined,
+        weight: v.weight ? (typeof v.weight === 'string' ? JSON.parse(v.weight) : v.weight) : undefined,
+        dimensions: v.dimensions ? (typeof v.dimensions === 'string' ? JSON.parse(v.dimensions) : v.dimensions) : undefined,
+        barcode: v.barcode,
+        inventory: parseInventoryField(v.inventory),
+        tax_category: v.tax_category,
+        shipping_required: v.shipping_required !== 0,
+        media: v.media ? (typeof v.media === 'string' ? JSON.parse(v.media) : v.media) : [],
+        attributes: v.attributes ? (typeof v.attributes === 'string' ? JSON.parse(v.attributes) : v.attributes) : {},
+        created_at: v.created_at,
+        updated_at: v.updated_at
+      } as ProductVariant;
+    } catch (error) {
+      console.error('Error parsing variant for product', product.id, ':', error);
+      // Fallback values for failed parsing
+      const fallbackPrice = typeof v.price === 'string' && !v.price.startsWith('{') ? 
+        { amount: parseInt(v.price, 10) || 0, currency: 'USD' } : 
+        { amount: 0, currency: 'USD' };
+      const fallbackInventory = typeof v.inventory === 'string' && !v.inventory.startsWith('{') ?
+        { quantity: parseInt(v.inventory, 10) || 0, status: (parseInt(v.inventory, 10) || 0) > 0 ? 'in_stock' : 'out_of_stock' } :
+        { quantity: 0, status: 'out_of_stock' };
+        
+      return {
+        id: v.id,
+        product_id: v.product_id,
+        sku: v.sku,
+        option_values: [],
+        price: fallbackPrice,
+        status: v.status || 'active',
+        position: v.position || 0,
+        compare_at_price: undefined,
+        cost: undefined,
+        weight: undefined,
+        dimensions: undefined,
+        barcode: v.barcode,
+        inventory: fallbackInventory,
+        tax_category: v.tax_category,
+        shipping_required: false,
+        media: [],
+        attributes: {},
+        created_at: v.created_at,
+        updated_at: v.updated_at
+      } as ProductVariant;
+    }
+  });
+  
+  return product;
 }
 
 export async function updateProduct(id: string, updates: Partial<Product>): Promise<Product | null> {
-    const updateData = {
+  const db = await getDb();
+  
+  // Extract variants from updates if present
+  const { variants, ...productUpdates } = updates;
+  
+  // Update main product data
+  const updateData = {
     ...serializeProduct({
       id: '',
       name: '',
-      ...updates
+      ...productUpdates
     } as Product),
     updated_at: new Date().toISOString()
   };
 
-  await (await getDb()).update(products).set(updateData).where(eq(products.id, id));
+  await db.update(products).set(updateData).where(eq(products.id, id));
+  
+  // Update variants if provided
+  if (variants && Array.isArray(variants)) {
+    for (const variant of variants) {
+      if (variant.id) {
+        // Prepare variant update data
+        const variantUpdateData: any = {
+          updated_at: new Date().toISOString()
+        };
+        
+        // Update inventory if provided
+        if (variant.inventory) {
+          variantUpdateData.inventory = JSON.stringify(variant.inventory);
+        }
+        
+        // Update price if provided
+        if (variant.price) {
+          variantUpdateData.price = JSON.stringify(variant.price);
+        }
+        
+        // Update SKU if provided
+        if (variant.sku) {
+          variantUpdateData.sku = variant.sku;
+        }
+        
+        // Update weight if provided
+        if (variant.weight) {
+          variantUpdateData.weight = JSON.stringify(variant.weight);
+        }
+        
+        // Update dimensions if provided
+        if (variant.dimensions) {
+          variantUpdateData.dimensions = JSON.stringify(variant.dimensions);
+        }
+        
+        // Update barcode if provided
+        if (variant.barcode) {
+          variantUpdateData.barcode = variant.barcode;
+        }
+        
+        // Update status if provided
+        if (variant.status) {
+          variantUpdateData.status = variant.status;
+        }
+        
+        // Update position if provided
+        if (variant.position !== undefined) {
+          variantUpdateData.position = variant.position;
+        }
+        
+        // Update compare_at_price if provided
+        if (variant.compare_at_price) {
+          variantUpdateData.compare_at_price = JSON.stringify(variant.compare_at_price);
+        }
+        
+        // Update cost if provided
+        if (variant.cost) {
+          variantUpdateData.cost = JSON.stringify(variant.cost);
+        }
+        
+        // Update tax_category if provided
+        if (variant.tax_category) {
+          variantUpdateData.tax_category = variant.tax_category;
+        }
+        
+        // Update shipping_required if provided
+        if (variant.shipping_required !== undefined) {
+          variantUpdateData.shipping_required = variant.shipping_required ? 1 : 0;
+        }
+        
+        // Update media if provided
+        if (variant.media) {
+          variantUpdateData.media = JSON.stringify(variant.media);
+        }
+        
+        // Update attributes if provided
+        if (variant.attributes) {
+          variantUpdateData.attributes = JSON.stringify(variant.attributes);
+        }
+        
+        // Update option_values if provided
+        if (variant.option_values) {
+          variantUpdateData.option_values = JSON.stringify(variant.option_values);
+        }
+        
+        // Perform the update only if there are fields to update
+        const fieldsToUpdate = Object.keys(variantUpdateData).filter(key => key !== 'updated_at');
+        if (fieldsToUpdate.length > 0) {
+          await db.update(product_variants)
+            .set(variantUpdateData)
+            .where(eq(product_variants.id, variant.id));
+        }
+      }
+    }
+  }
+  
   return getProduct(id);
 }
 
@@ -184,7 +390,8 @@ export async function listProducts(options: {
   limit?: number;
   offset?: number;
 } = {}): Promise<Product[]> {
-    const results = await (await getDb()).select().from(products);
+  const db = await getDb();
+  const results = await db.select().from(products);
   let filteredResults = results.map(deserializeProduct);
   
   // Apply filters in memory
@@ -208,6 +415,106 @@ export async function listProducts(options: {
   
   if (options.limit) {
     filteredResults = filteredResults.slice(0, options.limit);
+  }
+  
+  // Load variants for each product (reusing same logic as getProductBySlug)
+  for (const product of filteredResults) {
+    const variants = await db.select().from(product_variants).where(eq(product_variants.product_id, product.id));
+    
+    product.variants = variants.map((v: any) => {
+      try {
+        // Helper function to parse price or inventory fields that might be JSON strings or plain numbers
+        const parseMoneyField = (field: any) => {
+          if (!field) return { amount: 0, currency: 'USD' };
+          if (typeof field === 'object') return field;
+          if (typeof field === 'string') {
+            if (field.startsWith('{')) {
+              return JSON.parse(field);
+            }
+            // Handle legacy string number format
+            const amount = parseInt(field, 10);
+            return { amount: isNaN(amount) ? 0 : amount, currency: 'USD' };
+          }
+          if (typeof field === 'number') {
+            return { amount: field, currency: 'USD' };
+          }
+          return { amount: 0, currency: 'USD' };
+        };
+        
+        const parseInventoryField = (field: any) => {
+          if (!field) return { quantity: 0, status: 'out_of_stock' };
+          if (typeof field === 'object') return field;
+          if (typeof field === 'string') {
+            if (field.startsWith('{')) {
+              return JSON.parse(field);
+            }
+            // Handle legacy string number format
+            const quantity = parseInt(field, 10);
+            return { 
+              quantity: isNaN(quantity) ? 0 : quantity, 
+              status: quantity > 0 ? 'in_stock' : 'out_of_stock' 
+            };
+          }
+          if (typeof field === 'number') {
+            return { quantity: field, status: field > 0 ? 'in_stock' : 'out_of_stock' };
+          }
+          return { quantity: 0, status: 'out_of_stock' };
+        };
+        
+        return {
+          id: v.id,
+          product_id: v.product_id,
+          sku: v.sku,
+          option_values: v.option_values ? (typeof v.option_values === 'string' ? JSON.parse(v.option_values) : v.option_values) : [],
+          price: parseMoneyField(v.price),
+          status: v.status || 'active',
+          position: v.position || 0,
+          compare_at_price: v.compare_at_price ? parseMoneyField(v.compare_at_price) : undefined,
+          cost: v.cost ? parseMoneyField(v.cost) : undefined,
+          weight: v.weight ? (typeof v.weight === 'string' ? JSON.parse(v.weight) : v.weight) : undefined,
+          dimensions: v.dimensions ? (typeof v.dimensions === 'string' ? JSON.parse(v.dimensions) : v.dimensions) : undefined,
+          barcode: v.barcode,
+          inventory: parseInventoryField(v.inventory),
+          tax_category: v.tax_category,
+          shipping_required: v.shipping_required !== 0,
+          media: v.media ? (typeof v.media === 'string' ? JSON.parse(v.media) : v.media) : [],
+          attributes: v.attributes ? (typeof v.attributes === 'string' ? JSON.parse(v.attributes) : v.attributes) : {},
+          created_at: v.created_at,
+          updated_at: v.updated_at
+        } as ProductVariant;
+      } catch (error) {
+        console.error('Error parsing variant for product', product.id, ':', error);
+        // Fallback values for failed parsing
+        const fallbackPrice = typeof v.price === 'string' && !v.price.startsWith('{') ? 
+          { amount: parseInt(v.price, 10) || 0, currency: 'USD' } : 
+          { amount: 0, currency: 'USD' };
+        const fallbackInventory = typeof v.inventory === 'string' && !v.inventory.startsWith('{') ?
+          { quantity: parseInt(v.inventory, 10) || 0, status: (parseInt(v.inventory, 10) || 0) > 0 ? 'in_stock' : 'out_of_stock' } :
+          { quantity: 0, status: 'out_of_stock' };
+          
+        return {
+          id: v.id,
+          product_id: v.product_id,
+          sku: v.sku,
+          option_values: [],
+          price: fallbackPrice,
+          status: v.status || 'active',
+          position: v.position || 0,
+          compare_at_price: undefined,
+          cost: undefined,
+          weight: undefined,
+          dimensions: undefined,
+          barcode: v.barcode,
+          inventory: fallbackInventory,
+          tax_category: v.tax_category,
+          shipping_required: false,
+          media: [],
+          attributes: {},
+          created_at: v.created_at,
+          updated_at: v.updated_at
+        } as ProductVariant;
+      }
+    });
   }
   
   return filteredResults;
@@ -352,10 +659,10 @@ export async function getProductsByCategory(categoryIdentifier: string): Promise
           price: parseMoneyField(v.price),
           status: v.status || 'active',
           position: v.position || 0,
-          compare_at_price: v.compare_at_price ? parseMoneyField(v.compare_at_price) : null,
-          cost: v.cost ? parseMoneyField(v.cost) : null,
-          weight: v.weight ? (typeof v.weight === 'string' ? JSON.parse(v.weight) : v.weight) : null,
-          dimensions: v.dimensions ? (typeof v.dimensions === 'string' ? JSON.parse(v.dimensions) : v.dimensions) : null,
+          compare_at_price: v.compare_at_price ? parseMoneyField(v.compare_at_price) : undefined,
+          cost: v.cost ? parseMoneyField(v.cost) : undefined,
+          weight: v.weight ? (typeof v.weight === 'string' ? JSON.parse(v.weight) : v.weight) : undefined,
+          dimensions: v.dimensions ? (typeof v.dimensions === 'string' ? JSON.parse(v.dimensions) : v.dimensions) : undefined,
           barcode: v.barcode,
           inventory: parseInventoryField(v.inventory),
           tax_category: v.tax_category,
