@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listCategories, createCategory, updateCategory } from "@/lib/models";
+import { listCategories, createCategory, updateCategory, listCategoriesWithRealTimeCounts } from "@/lib/models";
 import type { ApiResponse, Category } from "@/lib/types";
 
 /**
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const status = allowedStatuses.includes(statusParam as any) ? (statusParam as typeof allowedStatuses[number]) : null;
     const search = url.searchParams.get('search');
 
-    const categories = await listCategories({
+    const categories = await listCategoriesWithRealTimeCounts({
       status: status ? [status] : undefined,
       include_inactive: includeInactive,
       limit,

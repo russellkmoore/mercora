@@ -368,7 +368,7 @@ export default function ProductManagement() {
           <div className="text-2xl font-bold text-green-400">
             {products.filter(p => p.status === "active").length}
           </div>
-          <div className="text-sm text-gray-400">Active Products (Page)</div>
+          <div className="text-sm text-gray-400">Active Products (This Page)</div>
         </Card>
         <Card className="bg-neutral-800 border-neutral-700 p-4">
           <div className="text-2xl font-bold text-orange-400">
@@ -377,7 +377,7 @@ export default function ProductManagement() {
               return stock > 0 && stock < 10;
             }).length}
           </div>
-          <div className="text-sm text-gray-400">Low Stock (Page)</div>
+          <div className="text-sm text-gray-400">Low Stock (This Page)</div>
         </Card>
         <Card className="bg-neutral-800 border-neutral-700 p-4">
           <div className="text-2xl font-bold text-red-400">
