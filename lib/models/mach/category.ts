@@ -10,6 +10,7 @@
 
 import { getDbAsync } from "@/lib/db";
 import { categories, deserializeCategory, serializeCategory } from "@/lib/db/schema/category";
+import { products } from "@/lib/db/schema/products";
 import { eq, desc, asc, like, or, and, inArray, isNull, isNotNull, sql } from "drizzle-orm";
 
 // Helper function to get database instance (consistent pattern)
@@ -599,6 +600,66 @@ export async function getCategoriesWithProducts(): Promise<Category[]> {
  */
 export async function getEmptyCategories(): Promise<Category[]> {
   return listCategories({ has_products: false });
+}
+
+/**
+ * Calculate real-time product count for a specific category
+ */
+export async function calculateCategoryProductCount(categoryId: string): Promise<number> {
+  const db = await getDb();
+  
+  // Query products where categories field contains the category ID
+  const result = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(products)
+    .where(
+      and(
+        eq(products.status, 'active'),
+        like(products.categories, `%"${categoryId}"%`)
+      )
+    );
+    
+  return result[0]?.count || 0;
+}
+
+/**
+ * Update all category product counts with real-time calculations
+ */
+export async function updateAllCategoryProductCounts(): Promise<void> {
+  const db = await getDb();
+  const allCategories = await listCategories({ include_inactive: true });
+  
+  for (const category of allCategories) {
+    const realCount = await calculateCategoryProductCount(category.id);
+    
+    // Only update if count has changed to avoid unnecessary writes
+    if (category.product_count !== realCount) {
+      await db
+        .update(categories)
+        .set({ 
+          productCount: realCount,
+          updatedAt: new Date().toISOString()
+        })
+        .where(eq(categories.id, category.id));
+    }
+  }
+}
+
+/**
+ * Get categories with real-time product counts
+ */
+export async function listCategoriesWithRealTimeCounts(filters: CategoryFilters = {}): Promise<Category[]> {
+  const db = await getDb();
+  
+  // Get base categories
+  const categoryList = await listCategories(filters);
+  
+  // Calculate real-time product counts for each category
+  for (const category of categoryList) {
+    category.product_count = await calculateCategoryProductCount(category.id);
+  }
+  
+  return categoryList;
 }
 
 /**

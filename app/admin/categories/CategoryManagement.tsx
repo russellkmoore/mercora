@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { 
   Search, Plus, Edit, Trash2, Move, ChevronDown, ChevronRight,
-  Tag, FolderOpen, Package, ArrowUpDown, Eye
+  Tag, FolderOpen, Package, ArrowUpDown, Eye, Upload, X, ImageIcon, RefreshCw
 } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { Category } from "@/lib/types";
 
@@ -71,8 +72,57 @@ function CategoryTree({ categories, allCategories, onEdit, onDelete, onMove, lev
                 <div className="w-4 h-4" /> // Spacer
               )}
               
-              <div className="w-8 h-8 bg-orange-600/20 rounded-md flex items-center justify-center">
-                <FolderOpen className="w-4 h-4 text-orange-400" />
+              <div className="w-8 h-8 bg-orange-600/20 rounded-md overflow-hidden flex items-center justify-center">
+                {(() => {
+                  // Extract primary image URL from category
+                  const getPrimaryImageUrl = () => {
+                    if (!category.primary_image) return null;
+                    
+                    try {
+                      let imageData = category.primary_image;
+                      
+                      // Parse JSON string if needed
+                      if (typeof imageData === "string" && (imageData as string).startsWith("{")) {
+                        try {
+                          imageData = JSON.parse(imageData);
+                        } catch {
+                          return null;
+                        }
+                      }
+                      
+                      // Handle MACH structure (file.url)
+                      if (imageData?.file?.url) {
+                        return imageData.file.url;
+                      }
+                      
+                      // Handle flat structure (url) - for legacy data
+                      if ((imageData as any)?.url) {
+                        return (imageData as any).url;
+                      }
+                      
+                      return null;
+                    } catch {
+                      return null;
+                    }
+                  };
+
+                  const imageUrl = getPrimaryImageUrl();
+                  
+                  if (imageUrl) {
+                    return (
+                      <Image
+                        src={imageUrl.startsWith("/") ? imageUrl : `/${imageUrl}`}
+                        alt={getCategoryName(category)}
+                        width={32}
+                        height={32}
+                        className="object-cover rounded-md"
+                        sizes="32px"
+                      />
+                    );
+                  }
+                  
+                  return <FolderOpen className="w-4 h-4 text-orange-400" />;
+                })()}
               </div>
               
               <div>
@@ -165,6 +215,8 @@ function CategoryEditor({ category, isOpen, onClose, onSave, isNew = false, allC
   const [tags, setTags] = useState("");
   const [position, setPosition] = useState<number>(1);
   const [primaryImageUrl, setPrimaryImageUrl] = useState("");
+  const [primaryImageAlt, setPrimaryImageAlt] = useState("");
+  const [uploadingPrimary, setUploadingPrimary] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -180,7 +232,43 @@ function CategoryEditor({ category, isOpen, onClose, onSave, isNew = false, allC
       setStatus(category.status || "active");
       setTags(category.tags?.join(", ") || "");
       setPosition(category.position || 1);
-      setPrimaryImageUrl(category.primary_image?.file?.url || "");
+      
+      // Load image data with both MACH and flat structure support
+      const loadImageData = (imageField: any) => {
+        if (!imageField) return { url: "", alt: "" };
+        
+        // Parse JSON string if needed
+        let imageData = imageField;
+        if (typeof imageField === "string" && imageField.startsWith("{")) {
+          try {
+            imageData = JSON.parse(imageField);
+          } catch {
+            return { url: "", alt: "" };
+          }
+        }
+        
+        // Handle MACH structure (file.url, accessibility.alt_text)
+        if (imageData?.file?.url) {
+          return {
+            url: imageData.file.url,
+            alt: imageData.accessibility?.alt_text || ""
+          };
+        }
+        
+        // Handle flat structure (url, alt_text)
+        if (imageData?.url) {
+          return {
+            url: imageData.url,
+            alt: imageData.alt_text || imageData.alt || ""
+          };
+        }
+        
+        return { url: "", alt: "" };
+      };
+      
+      const primaryImage = loadImageData(category.primary_image);
+      setPrimaryImageUrl(primaryImage.url);
+      setPrimaryImageAlt(primaryImage.alt);
     } else if (isNew) {
       setName("");
       setDescription("");
@@ -190,6 +278,7 @@ function CategoryEditor({ category, isOpen, onClose, onSave, isNew = false, allC
       setTags("");
       setPosition(1);
       setPrimaryImageUrl("");
+      setPrimaryImageAlt("");
     }
   }, [category, isNew]);
 
@@ -206,13 +295,13 @@ function CategoryEditor({ category, isOpen, onClose, onSave, isNew = false, allC
         position,
         primary_image: primaryImageUrl.trim() ? {
           id: `img_${Date.now()}`,
-          type: "image",
+          type: "image" as const,
           file: {
             url: primaryImageUrl.trim(),
             format: primaryImageUrl.trim().split('.').pop()?.toLowerCase() || "jpg"
           },
           accessibility: {
-            alt_text: name.trim()
+            alt_text: primaryImageAlt.trim() || name.trim()
           }
         } : undefined,
       };
@@ -238,6 +327,57 @@ function CategoryEditor({ category, isOpen, onClose, onSave, isNew = false, allC
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '');
       setSlug(generatedSlug);
+    }
+  };
+
+  // Image upload functions
+  const uploadImage = async (file: File, folder: 'products' | 'categories', filename: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', folder);
+    formData.append('filename', filename);
+
+    const response = await fetch('/api/admin/upload-image', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error((error as any).error || 'Upload failed');
+    }
+
+    return await response.json();
+  };
+
+  const generateR2Filename = (baseName: string, suffix: string) => {
+    const cleanName = baseName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    const timestamp = Date.now();
+    return `${cleanName}-${suffix}-${timestamp}`;
+  };
+
+  const handlePrimaryImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadingPrimary(true);
+    try {
+      // Generate filename from category name
+      const filename = generateR2Filename(name || 'category', 'primary');
+      
+      const result = await uploadImage(file, 'categories', filename);
+      setPrimaryImageUrl((result as any).path); // Store the database path format (/categories/filename.jpg)
+      
+      // Reset the input
+      event.target.value = '';
+    } catch (error) {
+      console.error('Upload failed:', error);
+      alert(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setUploadingPrimary(false);
     }
   };
 
@@ -307,28 +447,88 @@ function CategoryEditor({ category, isOpen, onClose, onSave, isNew = false, allC
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Primary Image URL
-            </label>
-            <Input
-              value={primaryImageUrl}
-              onChange={(e) => setPrimaryImageUrl(e.target.value)}
-              placeholder="https://example.com/category-image.jpg"
-              className="bg-neutral-700 border-neutral-600"
-            />
-            {primaryImageUrl && (
-              <div className="mt-2">
-                <img 
-                  src={primaryImageUrl} 
-                  alt="Primary image preview" 
-                  className="w-20 h-20 object-cover rounded border border-neutral-600"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
+          {/* Primary Image Section */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-white flex items-center">
+              <ImageIcon className="w-4 h-4 mr-2" />
+              Category Image
+            </h3>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Primary Image
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Input
+                    value={primaryImageUrl}
+                    onChange={(e) => setPrimaryImageUrl(e.target.value)}
+                    placeholder="/categories/category-name.jpg or full URL"
+                    className="bg-neutral-700 border-neutral-600"
+                  />
+                  <div className="text-xs text-gray-400 mt-1">
+                    Path or URL for the main category image
+                  </div>
+                </div>
+                <div>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                      onChange={handlePrimaryImageUpload}
+                      className="hidden"
+                      id="primary-image-upload"
+                      disabled={uploadingPrimary}
+                    />
+                    <label
+                      htmlFor="primary-image-upload"
+                      className={`flex items-center justify-center px-4 py-2 border border-orange-500 rounded-md cursor-pointer transition-colors ${
+                        uploadingPrimary
+                          ? 'bg-orange-600/20 text-orange-300 cursor-not-allowed'
+                          : 'text-orange-500 hover:bg-orange-500 hover:text-black'
+                      }`}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      {uploadingPrimary ? 'Uploading...' : 'Upload Image'}
+                    </label>
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    Upload to R2 bucket (JPEG, PNG, WebP, max 10MB)
+                  </div>
+                </div>
               </div>
-            )}
+              {primaryImageUrl && (
+                <div className="mt-3">
+                  <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-neutral-600">
+                    <Image
+                      src={primaryImageUrl.startsWith("/") ? primaryImageUrl : `/${primaryImageUrl}`}
+                      alt={primaryImageAlt || "Primary image preview"}
+                      fill
+                      className="object-cover"
+                      sizes="128px"
+                    />
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Preview: {primaryImageUrl}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Image Alt Text
+              </label>
+              <Input
+                value={primaryImageAlt}
+                onChange={(e) => setPrimaryImageAlt(e.target.value)}
+                placeholder="Descriptive text for accessibility and SEO"
+                className="bg-neutral-700 border-neutral-600"
+              />
+              <div className="text-xs text-gray-400 mt-1">
+                Describe the image for screen readers and search engines
+              </div>
+            </div>
           </div>
           
           <div className="grid grid-cols-2 gap-4">
@@ -450,6 +650,7 @@ export default function CategoryManagement() {
   const [showEditor, setShowEditor] = useState(false);
   const [isNewCategory, setIsNewCategory] = useState(false);
   const [viewMode, setViewMode] = useState<"tree" | "list">("tree");
+  const [refreshingCounts, setRefreshingCounts] = useState(false);
 
   const fetchCategories = async () => {
     try {
@@ -538,6 +739,28 @@ export default function CategoryManagement() {
     setIsNewCategory(false);
   };
 
+  const refreshCategoryCounts = async () => {
+    setRefreshingCounts(true);
+    try {
+      const response = await fetch("/api/admin/categories/refresh-counts", {
+        method: "POST",
+      });
+      
+      if (response.ok) {
+        console.log("Category counts refreshed successfully");
+        await fetchCategories(); // Reload categories with updated counts
+      } else {
+        console.error("Failed to refresh category counts");
+        alert("Failed to refresh category counts");
+      }
+    } catch (error) {
+      console.error("Error refreshing category counts:", error);
+      alert("Failed to refresh category counts");
+    } finally {
+      setRefreshingCounts(false);
+    }
+  };
+
   useEffect(() => {
     fetchCategories();
   }, []);
@@ -608,6 +831,20 @@ export default function CategoryManagement() {
               List View
             </Button>
           </div>
+          
+          <Button
+            onClick={refreshCategoryCounts}
+            disabled={refreshingCounts}
+            variant="outline"
+            className="border-green-500 text-green-500 hover:bg-green-500 hover:text-black"
+          >
+            {refreshingCounts ? (
+              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            {refreshingCounts ? "Refreshing..." : "Refresh Counts"}
+          </Button>
         </div>
         
         <Button 
@@ -631,7 +868,7 @@ export default function CategoryManagement() {
         </Card>
         <Card className="bg-neutral-800 border-neutral-700 p-4">
           <div className="text-2xl font-bold text-orange-400">{totalProducts}</div>
-          <div className="text-sm text-gray-400">Total Products</div>
+          <div className="text-sm text-gray-400">Total Product Mappings</div>
         </Card>
         <Card className="bg-neutral-800 border-neutral-700 p-4">
           <div className="text-2xl font-bold text-blue-400">{rootCategories.length}</div>
@@ -664,8 +901,58 @@ export default function CategoryManagement() {
             return (
               <Card key={category.id} className="bg-neutral-800 border-neutral-700 p-4">
                 <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 bg-orange-600/20 rounded-lg flex items-center justify-center">
-                    <FolderOpen className="w-5 h-5 text-orange-400" />
+                  <div className="w-10 h-10 bg-orange-600/20 rounded-lg overflow-hidden flex items-center justify-center">
+                    {(() => {
+                      // Extract primary image URL from category
+                      const getPrimaryImageUrl = () => {
+                        if (!category.primary_image) return null;
+                        
+                        try {
+                          let imageData = category.primary_image;
+                          
+                          // Parse JSON string if needed
+                          if (typeof imageData === "string" && (imageData as string).startsWith("{")) {
+                            try {
+                              imageData = JSON.parse(imageData);
+                            } catch {
+                              return null;
+                            }
+                          }
+                          
+                          // Handle MACH structure (file.url)
+                          if (imageData?.file?.url) {
+                            return imageData.file.url;
+                          }
+                          
+                          // Handle flat structure (url) - for legacy data
+                          if ((imageData as any)?.url) {
+                            return (imageData as any).url;
+                          }
+                          
+                          return null;
+                        } catch {
+                          return null;
+                        }
+                      };
+
+                      const imageUrl = getPrimaryImageUrl();
+                      const name = typeof category.name === 'string' ? category.name : Object.values(category.name)[0] || '';
+                      
+                      if (imageUrl) {
+                        return (
+                          <Image
+                            src={imageUrl.startsWith("/") ? imageUrl : `/${imageUrl}`}
+                            alt={name}
+                            width={40}
+                            height={40}
+                            className="object-cover rounded-lg"
+                            sizes="40px"
+                          />
+                        );
+                      }
+                      
+                      return <FolderOpen className="w-5 h-5 text-orange-400" />;
+                    })()}
                   </div>
                   <div className="flex items-center space-x-2">
                     <Badge variant={category.status === 'active' ? 'default' : 'secondary'}>
