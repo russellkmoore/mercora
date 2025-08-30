@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Search, Plus, Edit, Trash2, Bot, RefreshCw, Tag } from "lucide-react";
+import Image from "next/image";
 import ProductEditor from "@/components/admin/ProductEditor";
 import type { Product } from "@/lib/types/";
 
@@ -40,8 +41,57 @@ function ProductTable({ products, onEdit, onDelete }: ProductTableProps) {
               <tr key={product.id} className="border-t border-neutral-700">
                 <td className="p-4">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-neutral-600 rounded-md flex items-center justify-center">
-                      📦
+                    <div className="w-10 h-10 bg-neutral-600 rounded-md overflow-hidden flex items-center justify-center">
+                      {(() => {
+                        // Extract primary image URL from product
+                        const getPrimaryImageUrl = () => {
+                          if (!product.primary_image) return null;
+                          
+                          try {
+                            let imageData = product.primary_image;
+                            
+                            // Parse JSON string if needed
+                            if (typeof imageData === "string" && (imageData as string).startsWith("{")) {
+                              try {
+                                imageData = JSON.parse(imageData);
+                              } catch {
+                                return null;
+                              }
+                            }
+                            
+                            // Handle MACH structure (file.url)
+                            if (imageData?.file?.url) {
+                              return imageData.file.url;
+                            }
+                            
+                            // Handle flat structure (url) - this would be for non-MACH data
+                            if ((imageData as any)?.url) {
+                              return (imageData as any).url;
+                            }
+                            
+                            return null;
+                          } catch {
+                            return null;
+                          }
+                        };
+
+                        const imageUrl = getPrimaryImageUrl();
+                        
+                        if (imageUrl) {
+                          return (
+                            <Image
+                              src={imageUrl.startsWith("/") ? imageUrl : `/${imageUrl}`}
+                              alt={name}
+                              width={40}
+                              height={40}
+                              className="object-cover rounded-md"
+                              sizes="40px"
+                            />
+                          );
+                        }
+                        
+                        return <span className="text-lg">📦</span>;
+                      })()}
                     </div>
                     <div>
                       <div className="font-medium text-white">{name}</div>
