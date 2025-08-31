@@ -111,7 +111,7 @@ interface VectorIndexStatus {
 }
 
 export default function AdminSettingsPage() {
-  const [activeTab, setActiveTab] = useState<"system" | "store" | "shipping" | "refunds" | "promotions">("system");
+  const [activeTab, setActiveTab] = useState<"system" | "store" | "shipping" | "refunds" | "promotions" | "admins">("system");
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
@@ -158,10 +158,16 @@ export default function AdminSettingsPage() {
     vectorIndexStatus: "healthy",
     lastIndexed: new Date().toLocaleDateString()
   });
+  
+  // Admin users state
+  const [adminUsers, setAdminUsers] = useState<string[]>([]);
+  const [newUserId, setNewUserId] = useState<string>('');
+  const [adminUsersLoading, setAdminUsersLoading] = useState(false);
 
   // Load settings from API on component mount
   useEffect(() => {
     loadSettings();
+    loadAdminUsers();
   }, []);
 
   const loadSettings = async () => {
@@ -207,6 +213,46 @@ export default function AdminSettingsPage() {
       setLoading(false);
       setInitialLoad(false);
     }
+  };
+
+  // Load admin users from API
+  const loadAdminUsers = async () => {
+    try {
+      setAdminUsersLoading(true);
+      const response = await fetch('/api/admin/users?admin=true');
+      if (response.ok) {
+        const { adminUsers } = await response.json() as { adminUsers: string[] };
+        setAdminUsers(adminUsers);
+      }
+    } catch (error) {
+      console.error('Error loading admin users:', error);
+    } finally {
+      setAdminUsersLoading(false);
+    }
+  };
+
+  // Add new admin user
+  const addAdminUser = () => {
+    if (!newUserId.trim()) return;
+    if (!newUserId.match(/^user_[a-zA-Z0-9]+$/)) {
+      alert('User ID must start with "user_" and contain only letters and numbers');
+      return;
+    }
+    if (adminUsers.includes(newUserId.trim())) {
+      alert('This user is already an admin');
+      return;
+    }
+    setAdminUsers([...adminUsers, newUserId.trim()]);
+    setNewUserId('');
+  };
+
+  // Remove admin user
+  const removeAdminUser = (userId: string) => {
+    if (adminUsers.length <= 1) {
+      alert('Cannot remove the last admin user');
+      return;
+    }
+    setAdminUsers(adminUsers.filter(id => id !== userId));
   };
 
   const handleSave = async () => {
@@ -299,7 +345,8 @@ export default function AdminSettingsPage() {
     { id: "store" as const, label: "Store", icon: Store, description: "Operations & policies" },
     { id: "shipping" as const, label: "Shipping", icon: Zap, description: "Methods & pricing" },
     { id: "refunds" as const, label: "Refunds", icon: RefreshCw, description: "Return policies" },
-    { id: "promotions" as const, label: "Promotions", icon: DollarSign, description: "Sales & banners" }
+    { id: "promotions" as const, label: "Promotions", icon: DollarSign, description: "Sales & banners" },
+    { id: "admins" as const, label: "Admin Users", icon: Shield, description: "Access management" }
   ];
 
   return (
@@ -780,6 +827,122 @@ export default function AdminSettingsPage() {
                 </>
               )}
             </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Admin Users Management */}
+      {activeTab === "admins" && (
+        <div className="grid grid-cols-1 gap-6">
+          <Card className="bg-neutral-800 border-neutral-700 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-3">
+                <Shield className="w-5 h-5 text-blue-400" />
+                <h3 className="text-lg font-semibold text-white">Admin Users</h3>
+              </div>
+              <Badge variant="secondary">
+                {adminUsers.length} {adminUsers.length === 1 ? 'Admin' : 'Admins'}
+              </Badge>
+            </div>
+            
+            <p className="text-gray-400 mb-6">
+              Manage users who have access to the admin panel. Admin users can view and modify all store data.
+            </p>
+
+            {/* Current Admin Users */}
+            <div className="space-y-4 mb-6">
+              <h4 className="text-md font-semibold text-white">Current Admin Users</h4>
+              {adminUsersLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw className="w-5 h-5 animate-spin text-gray-400" />
+                  <span className="ml-2 text-gray-400">Loading admin users...</span>
+                </div>
+              ) : adminUsers.length === 0 ? (
+                <div className="text-gray-400 py-4 text-center">
+                  No admin users found. This shouldn't happen - there should always be at least one admin.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {adminUsers.map((userId, index) => (
+                    <div key={userId} className="flex items-center justify-between bg-neutral-700 p-3 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <Shield className="w-4 h-4 text-blue-400" />
+                        <code className="text-sm font-mono text-white">{userId}</code>
+                        {index === 0 && (
+                          <Badge variant="outline" className="text-xs">
+                            Primary
+                          </Badge>
+                        )}
+                      </div>
+                      {adminUsers.length > 1 && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => removeAdminUser(userId)}
+                          className="h-7"
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Add New Admin User */}
+            <div className="border-t border-neutral-600 pt-6">
+              <h4 className="text-md font-semibold text-white mb-4">Add New Admin User</h4>
+              <div className="flex space-x-3">
+                <div className="flex-1">
+                  <Input
+                    value={newUserId}
+                    onChange={(e) => setNewUserId(e.target.value)}
+                    placeholder="user_xxxxxxxxxxxxxxxxx"
+                    className="bg-neutral-700 border-neutral-600 text-white font-mono text-sm"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Enter the Clerk User ID (starts with "user_")
+                  </p>
+                </div>
+                <Button
+                  onClick={addAdminUser}
+                  disabled={!newUserId.trim()}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Add Admin
+                </Button>
+              </div>
+            </div>
+
+            {/* Instructions */}
+            <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-4 mt-6">
+              <div className="flex items-start space-x-3">
+                <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5" />
+                <div>
+                  <h5 className="text-yellow-300 font-medium mb-2">Important Notes:</h5>
+                  <ul className="text-yellow-200 text-sm space-y-1 list-disc list-inside">
+                    <li>Changes here only update the local list - you'll see a command to run</li>
+                    <li>User IDs can be found in the Clerk Dashboard under Users</li>
+                    <li>There must always be at least one admin user</li>
+                    <li>Admin users have full access to all store data and settings</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Command to run (when changes are made) */}
+            {adminUsers.length > 0 && (
+              <div className="bg-neutral-900 border border-neutral-600 rounded-lg p-4 mt-4">
+                <h5 className="text-white font-medium mb-2">To apply changes, run:</h5>
+                <div className="bg-black rounded p-3 font-mono text-sm text-green-400">
+                  echo "{adminUsers.join(',')}" | npx wrangler secret put ADMIN_USER_IDS
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Run this command in your terminal to update the admin users list
+                </p>
+              </div>
+            )}
           </Card>
         </div>
       )}
