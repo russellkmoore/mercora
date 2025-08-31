@@ -164,7 +164,8 @@ export async function POST(req: NextRequest) {
         try {
           const inventory = variant.inventory ? 
             (typeof variant.inventory === 'string' ? JSON.parse(variant.inventory) : variant.inventory) : {};
-          return inventory.track_inventory && (inventory.quantity || 0) < 10;
+          const quantity = inventory.quantity || 0;
+          return quantity > 0 && quantity < 10; // In stock but low
         } catch {
           return false;
         }

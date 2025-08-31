@@ -494,3 +494,19 @@ CREATE INDEX idx_order_webhooks_type ON order_webhooks(webhook_type);
 CREATE INDEX idx_order_webhooks_status ON order_webhooks(status);
 CREATE INDEX idx_order_webhooks_created_at ON order_webhooks(created_at);
 CREATE INDEX idx_order_webhooks_next_retry ON order_webhooks(next_retry_at) WHERE next_retry_at IS NOT NULL;
+
+-- Admin Settings Table - For system configuration management
+CREATE TABLE admin_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL, -- JSON value
+    category TEXT NOT NULL, -- store, ai, system, refund
+    description TEXT, -- Human-readable description
+    data_type TEXT NOT NULL, -- string, number, boolean, object
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_admin_settings_category ON admin_settings(category);
+CREATE INDEX idx_admin_settings_data_type ON admin_settings(data_type);
+CREATE INDEX idx_admin_settings_created_at ON admin_settings(created_at);
+CREATE INDEX idx_admin_settings_updated_at ON admin_settings(updated_at);

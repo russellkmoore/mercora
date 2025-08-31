@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import CategoryPicker from "./CategoryPicker";
-import { X, Save, Package, Tag, DollarSign, Plus, Trash2, Search, ImageIcon, Star, Link, ExternalLink, Upload, Clock, FileText, Settings } from "lucide-react";
+import { X, Save, Package, Tag, DollarSign, Plus, Trash2, Search, ImageIcon, Star, Link, ExternalLink, Upload, Clock, FileText, Settings, Sparkles, Wand2, RefreshCw } from "lucide-react";
 import Image from "next/image";
 import type { Product } from "@/lib/types";
 import { getImageDisplayPath, generateR2Filename } from "@/lib/utils/r2";
@@ -72,6 +72,11 @@ export default function ProductEditor({
   const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
   const [variants, setVariants] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
+  
+  // AI Assistant state
+  const [showAiAssistant, setShowAiAssistant] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [generatingDescription, setGeneratingDescription] = useState(false);
   
   // Current variant fields (based on selected variant)
   const [price, setPrice] = useState("");
@@ -464,6 +469,45 @@ export default function ProductEditor({
     }
   };
 
+  const generateAiDescription = async () => {
+    if (!aiPrompt.trim() || !name.trim()) {
+      alert('Please provide both a product name and details about the product.');
+      return;
+    }
+
+    setGeneratingDescription(true);
+    try {
+      const response = await fetch('/api/admin/generate-product-description', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          productName: name.trim(),
+          prompt: aiPrompt.trim(),
+          brand: brand.trim(),
+          category: categories[0] || '',
+          price: price ? `$${price}` : '',
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json() as any;
+        setDescription(result?.description || result?.content || '');
+        setShowAiAssistant(false);
+        setAiPrompt('');
+      } else {
+        const error = await response.json() as any;
+        alert(`Failed to generate description: ${error?.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error generating AI description:', error);
+      alert('Failed to generate description. Please try again.');
+    } finally {
+      setGeneratingDescription(false);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -692,16 +736,112 @@ export default function ProductEditor({
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Description
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-300">
+                  Description
+                </label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAiAssistant(true)}
+                  className="border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white"
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Volt AI Assist
+                </Button>
+              </div>
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Product description..."
+                placeholder="Product description...\n\nOr click 'Volt AI Assist' above for AI-powered description generation!"
                 rows={4}
                 className="bg-neutral-700 border-neutral-600"
               />
+              
+              {/* AI Assistant Dialog */}
+              {showAiAssistant && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[60]">
+                  <Card className="bg-neutral-900 border-purple-500/30 w-full max-w-lg">
+                    <div className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-orange-500 rounded-lg flex items-center justify-center">
+                            <Image
+                              src="/volt.svg"
+                              alt="Volt AI"
+                              width={24}
+                              height={24}
+                            />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-semibold text-white">Volt AI Assistant</h3>
+                            <p className="text-sm text-gray-400">Product description generation</p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowAiAssistant(false)}
+                          className="text-gray-400 hover:text-white"
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-sm text-gray-300 mb-3">
+                            Tell me about this product and I'll create a compelling description that highlights its key features and benefits!
+                          </p>
+                          <Textarea
+                            value={aiPrompt}
+                            onChange={(e) => setAiPrompt(e.target.value)}
+                            placeholder="Describe the product details...\n\nFor example:\n- Key features and specifications\n- Target audience or use cases\n- Unique selling points\n- Materials or technology\n- Size, weight, or capacity details"
+                            rows={6}
+                            className="bg-neutral-800 border-neutral-600 text-white"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-gray-500">
+                            Product: <strong className="text-gray-300">{name || 'Please add a product name first'}</strong>
+                          </p>
+                          <div className="flex space-x-3">
+                            <Button
+                              variant="ghost"
+                              onClick={() => {
+                                setShowAiAssistant(false);
+                                setAiPrompt('');
+                              }}
+                              disabled={generatingDescription}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={generateAiDescription}
+                              disabled={generatingDescription || !aiPrompt.trim() || !name.trim()}
+                              className="bg-gradient-to-r from-purple-600 to-orange-600 hover:from-purple-700 hover:to-orange-700"
+                            >
+                              {generatingDescription ? (
+                                <>
+                                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                  Generating...
+                                </>
+                              ) : (
+                                <>
+                                  <Wand2 className="w-4 h-4 mr-2" />
+                                  Generate Description
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              )}
             </div>
             
             <div>

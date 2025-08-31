@@ -2,12 +2,13 @@
 
 import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
-import { LogIn } from "lucide-react";
-import { Package } from "lucide-react";
+import { LogIn, Package, Shield } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useAdminAccess } from "@/components/admin/AdminGuard";
 
 export default function ClerkLogin() {
   const [hasMounted, setHasMounted] = useState(false);
+  const { isAdmin, isLoading: adminLoading } = useAdminAccess();
 
   useEffect(() => {
     // Small delay to ensure Clerk is fully initialized
@@ -17,6 +18,7 @@ export default function ClerkLogin() {
     
     return () => clearTimeout(timer);
   }, []);
+
 
   // Don't render anything until client has mounted
   if (!hasMounted) {
@@ -48,10 +50,17 @@ export default function ClerkLogin() {
         <UserButton appearance={{ elements: { avatarBox: "w-8 h-8" } }}>
           <UserButton.MenuItems>
             <UserButton.Link
-              label="View Voltique Order History"
+              label="View Order History"
               labelIcon={<Package />}
               href="/orders"
             />
+            {!adminLoading && isAdmin && (
+              <UserButton.Link
+                label="Admin Dashboard"
+                labelIcon={<Shield />}
+                href="/admin"
+              />
+            )}
           </UserButton.MenuItems>
         </UserButton>
       </SignedIn>

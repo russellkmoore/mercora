@@ -47,6 +47,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import PromotionalBanner from "@/components/PromotionalBanner";
 import { Toaster } from "sonner";
 import { dark } from "@clerk/themes";
 import { Suspense } from "react";
@@ -116,6 +117,11 @@ export default function RootLayout({
           className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white flex flex-col min-h-screen`}
           suppressHydrationWarning
         >
+          {/* Promotional banner - shown above header when enabled */}
+          <Suspense fallback={null}>
+            <PromotionalBanner />
+          </Suspense>
+
           {/* Global navigation header with suspense boundary */}
           <Suspense fallback={<div className="h-16 bg-neutral-900" />}>
             <Header />

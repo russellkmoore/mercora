@@ -31,6 +31,7 @@ Mercora is a sophisticated, AI-enhanced eCommerce platform specializing in outdo
 - **AI Analytics**: Real-time business intelligence with natural language insights
 - **Customer Management**: VIP identification, order history, personalization
 - **Settings Management**: Store configuration, AI tuning, system monitoring
+- **🔐 Secure Authentication**: Multi-layered admin access control with Clerk integration
 
 ### ⚡ Edge-Optimized Performance
 - **Cloudflare Workers**: Global edge deployment for sub-100ms response times
@@ -122,6 +123,7 @@ User Query → AI Embeddings → Vector Search → Context Retrieval → LLM Res
 
 ### **💼 Business & Admin Features**
 - **[👨‍💼 Admin Dashboard](docs/admin-dashboard-specification.md)** - Complete admin interface specification
+- **[🔐 Admin Authentication](docs/admin-authentication.md)** - Comprehensive admin security and access control
 - **[💳 Stripe Integration](docs/STRIPE_INTEGRATION.md)** - Payment processing and tax calculation
 - **[🌟 MCP Server Integration](docs/mcp-server-specification.md)** - Revolutionary shopping through developer tools
 
@@ -226,8 +228,10 @@ Test the promotional system with these codes:
 
 ### **Security Features**
 - **Multi-layered Authentication**: Clerk integration with secure session management
+- **Admin Access Control**: Role-based admin authentication with dev/production modes
+- **API Protection**: Comprehensive admin API security with token authentication
 - **Payment Security**: PCI-compliant Stripe integration with webhook verification
-- **API Security**: Rate limiting, input validation, and SQL injection protection
+- **Route Protection**: Client-side and server-side admin route protection
 - **Content Security**: CSP headers and XSS prevention
 
 ### **Data Protection**
@@ -249,7 +253,7 @@ Test the promotional system with these codes:
 - ✅ **Admin Dashboard**: Complete admin interface with AI-powered analytics
 - ✅ **Order Management**: Full order processing workflow with status tracking
 - ✅ **AI Analytics**: Real-time business intelligence with natural language insights
-- ✅ **Authentication System**: Unified admin authentication (currently disabled for development)
+- ✅ **Authentication System**: Comprehensive admin authentication with role-based access control
 - ✅ **Customer Management**: VIP identification and personalized experiences
 
 ### **🔮 Next Phase**

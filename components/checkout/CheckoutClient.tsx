@@ -242,6 +242,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
           billing_address: shippingAddress, // Use same as shipping for now
           shipping_method: shippingOption?.label || 'standard',
           payment_method: 'stripe',
+          payment_status: 'paid', // Payment succeeded since we reached this point
           extensions: {
             payment_intent_id: paymentIntentId,
             shipping_cost: shippingOption?.cost || 0,
@@ -256,10 +257,17 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
         throw new Error(err.error || 'Failed to create order');
       }
 
-      // Show confirmation first, then clear cart
+      const orderResponse = await res.json();
+      console.log('Order created successfully:', orderResponse);
+
+      // Clear cart immediately after successful order creation
+      clearCart();
+      
+      // Show confirmation
       setCurrentStep('confirmation');
 
     } catch (err: unknown) {
+      // Don't clear cart on error - preserve user's items for retry
       setError(err instanceof Error ? err.message : 'Order creation failed');
     }
   };
@@ -372,8 +380,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
             <OrderConfirmationModal
               isOpen={true}
               onClose={() => {
-                clearCart();
-                // Optional: redirect to home page or orders page
+                // Cart already cleared, just handle navigation
                 window.location.href = '/';
               }}
               orderId={orderId}
