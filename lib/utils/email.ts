@@ -277,6 +277,19 @@ function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string
       `;
       break;
 
+    case 'refunded':
+      statusMessage = "Your order has been refunded";
+      statusColor = "#f97316";
+      statusContent = `
+        <p style="color: #64748b; font-size: 16px; line-height: 24px; margin: 0 0 16px;">Your order has been refunded and the payment has been processed back to your original payment method.</p>
+        <div style="background-color: #fef3f2; border-left: 4px solid #f97316; padding: 12px 16px; margin: 16px 0;">
+          <p style="color: #ea580c; font-size: 14px; margin: 0 0 4px;"><strong>Refund Processing:</strong></p>
+          <p style="color: #7c2d12; font-size: 14px; margin: 0;">Please allow 5-10 business days for the refund to appear on your statement.</p>
+        </div>
+        <p style="color: #64748b; font-size: 14px; line-height: 20px; margin: 0 0 16px;">If you have any questions about this refund, please contact our support team.</p>
+      `;
+      break;
+
     default:
       statusMessage = "Order status updated";
       statusContent = `<p style="color: #64748b; font-size: 16px; line-height: 24px; margin: 0 0 16px;">Your order status has been updated.</p>`;
@@ -390,6 +403,9 @@ export async function sendOrderStatusUpdateEmail(orderData: OrderStatusUpdateDat
         break;
       case 'processing':
         subject = `Order Processing #${orderData.orderNumber}`;
+        break;
+      case 'refunded':
+        subject = `Order Refunded #${orderData.orderNumber}`;
         break;
     }
     

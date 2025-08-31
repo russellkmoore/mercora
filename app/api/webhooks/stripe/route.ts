@@ -125,6 +125,7 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
         body: JSON.stringify({
           orderId,
           status: 'processing', // Move to processing after successful payment
+          payment_status: 'paid', // Ensure payment status is updated
           notes: `Payment completed via Stripe - Payment Intent: ${paymentIntent.id}`,
         }),
       });

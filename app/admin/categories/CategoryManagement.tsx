@@ -19,7 +19,7 @@ interface CategoryTreeProps {
   allCategories: Category[];
   onEdit: (category: Category) => void;
   onDelete: (id: string) => void;
-  onMove: (categoryId: string, newParentId: string | null) => void;
+  onMove: (categoryId: string, direction: 'up' | 'down') => void;
   level?: number;
 }
 
@@ -162,14 +162,26 @@ function CategoryTree({ categories, allCategories, onEdit, onDelete, onMove, lev
               >
                 <Edit className="w-4 h-4" />
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-gray-500 hover:text-gray-400"
-                title="Move category (coming soon)"
-              >
-                <Move className="w-4 h-4" />
-              </Button>
+              <div className="flex items-center space-x-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onMove(category.id, 'up')}
+                  className="text-gray-500 hover:text-gray-400 p-1"
+                  title="Move category up"
+                >
+                  <ArrowUpDown className="w-3 h-3 rotate-180" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onMove(category.id, 'down')}
+                  className="text-gray-500 hover:text-gray-400 p-1"
+                  title="Move category down"
+                >
+                  <ArrowUpDown className="w-3 h-3" />
+                </Button>
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
@@ -689,13 +701,22 @@ export default function CategoryManagement() {
         const result = await response.json();
         console.log("Category saved successfully:", result);
         await fetchCategories();
+        // Show success notification
+        alert(`Category "${categoryData.name}" ${isNewCategory ? 'created' : 'updated'} successfully!`);
       } else {
-        const error: any = await response.json();
-        console.error("Failed to save category:", error);
-        throw new Error(error.error || "Failed to save category");
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" })) as any;
+        console.error("Failed to save category:", errorData);
+        const errorMessage = errorData?.error || errorData?.message || "Failed to save category";
+        alert(`Error saving category: ${errorMessage}`);
+        throw new Error(errorMessage);
       }
     } catch (error) {
       console.error("Error saving category:", error);
+      if (error instanceof Error) {
+        alert(`Error saving category: ${error.message}`);
+      } else {
+        alert("Error saving category: Unknown error occurred");
+      }
       throw error;
     }
   };
@@ -722,9 +743,47 @@ export default function CategoryManagement() {
     }
   };
 
-  const handleMoveCategory = async (categoryId: string, newParentId: string | null) => {
-    // TODO: Implement move functionality
-    console.log("Move category", categoryId, "to parent", newParentId);
+  const handleMoveCategory = async (categoryId: string, direction: 'up' | 'down') => {
+    const category = categories.find(cat => cat.id === categoryId);
+    if (!category) return;
+    
+    // Get categories with the same parent
+    const siblings = categories.filter(cat => cat.parent_id === category.parent_id)
+                               .sort((a, b) => (a.position || 0) - (b.position || 0));
+    
+    const currentIndex = siblings.findIndex(cat => cat.id === categoryId);
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    
+    if (targetIndex < 0 || targetIndex >= siblings.length) {
+      alert(`Cannot move category ${direction} - already at the ${direction === 'up' ? 'top' : 'bottom'}`);
+      return;
+    }
+    
+    const targetCategory = siblings[targetIndex];
+    const currentPosition = category.position || 0;
+    const targetPosition = targetCategory.position || 0;
+    
+    try {
+      // Swap positions
+      await Promise.all([
+        fetch(`/api/categories/${category.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ position: targetPosition })
+        }),
+        fetch(`/api/categories/${targetCategory.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ position: currentPosition })
+        })
+      ]);
+      
+      console.log(`Moved category ${category.name} ${direction}`);
+      await fetchCategories(); // Refresh the list
+    } catch (error) {
+      console.error('Error moving category:', error);
+      alert('Failed to move category');
+    }
   };
 
   const openEditor = (category: Category | null = null, isNew = false) => {

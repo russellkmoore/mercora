@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(url.searchParams.get('offset') || '0');
     const status = url.searchParams.get('status');
     const requestedUserId = url.searchParams.get('userId');
+    const orderId = url.searchParams.get('orderId');
     const isAdminRequest = url.searchParams.has('admin');
 
     const db = await getDbAsync();
@@ -75,6 +76,9 @@ export async function GET(request: NextRequest) {
     // Apply filters based on MACH schema
     if (!isAdminRequest && requestedUserId) {
       filteredOrders = filteredOrders.filter(order => order.customer_id === requestedUserId);
+    }
+    if (orderId) {
+      filteredOrders = filteredOrders.filter(order => order.id === orderId);
     }
     if (status) {
       filteredOrders = filteredOrders.filter(order => order.status === status);
@@ -354,7 +358,7 @@ export async function PUT(request: NextRequest) {
       .returning();
 
     // Send email notification for status changes
-    const emailStatuses = ['processing', 'shipped', 'delivered', 'cancelled'];
+    const emailStatuses = ['processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
     if (emailStatuses.includes(status) && currentOrder.status !== status) {
       try {
         const orderData = transformOrderForEmail(updatedOrder);

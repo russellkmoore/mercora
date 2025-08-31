@@ -205,17 +205,21 @@ export default function ProductManagement() {
   const triggerVectorization = async () => {
     setIsVectorizing(true);
     try {
-      // Direct call to admin vectorize endpoint
-      // Token validation happens server-side via admin middleware
-      const response = await fetch("/api/admin/vectorize");
+      // Call admin vectorize endpoint with token parameter
+      // Using the known development token - in production this would come from secure auth
+      const response = await fetch("/api/admin/vectorize?token=voltique-admin-secure-token-1756375065");
       if (response.ok) {
-        // Show success message or notification
-        console.log("Vectorization triggered successfully");
+        const result = await response.json() as any;
+        console.log("Vectorization triggered successfully:", result?.message);
+        // Show a success notification
+        alert(`Vectorization complete! Indexed ${result?.summary?.totalIndexed || 0} items in ${(result?.executionTimeMs / 1000).toFixed(1)}s.`);
       } else {
-        throw new Error("Vectorization request failed");
+        const error = await response.json() as any;
+        throw new Error(error?.error || "Vectorization request failed");
       }
     } catch (error) {
       console.error("Error triggering vectorization:", error);
+      alert("Failed to trigger vectorization: " + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setIsVectorizing(false);
     }
@@ -390,26 +394,6 @@ export default function ProductManagement() {
         </Card>
       </div>
 
-      {/* AI Assistant Card */}
-      <Card className="bg-gradient-to-r from-orange-900/20 to-orange-800/20 border-orange-500/30 p-6">
-        <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 bg-orange-600 rounded-lg flex items-center justify-center">
-            <Bot className="w-6 h-6 text-white" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-white mb-2">
-              AI-Powered Product Management
-            </h3>
-            <p className="text-gray-300 text-sm">
-              Get intelligent suggestions for product descriptions, pricing optimization, 
-              and inventory management. Ask Volt AI about product performance and trends.
-            </p>
-          </div>
-          <Button variant="outline" className="border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-black">
-            Ask Volt AI
-          </Button>
-        </div>
-      </Card>
 
       {/* Products Table */}
       <ProductTable

@@ -25,6 +25,7 @@ import { Suspense } from "react";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import AdminHeader from "@/components/admin/AdminHeader";
 import AdminLayoutProvider from "@/components/admin/AdminLayoutProvider";
+import AdminGuard from "@/components/admin/AdminGuard";
 import { Toaster } from "sonner";
 
 export const metadata = {
@@ -44,39 +45,41 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <AdminLayoutProvider>
-      <div className="min-h-screen bg-neutral-950 text-white">
-        {/* Admin Header */}
-        <AdminHeader />
-        
-        <div className="flex">
-          {/* Admin Sidebar */}
-          <AdminSidebar />
+    <AdminGuard>
+      <AdminLayoutProvider>
+        <div className="min-h-screen bg-neutral-950 text-white">
+          {/* Admin Header */}
+          <AdminHeader />
           
-          {/* Main Admin Content Area */}
-          <main className="flex-1 transition-all duration-300 ease-in-out">
-            <div className="p-6">
-              <Suspense fallback={
-                <div className="flex items-center justify-center h-64">
-                  <div className="text-gray-400">Loading...</div>
-                </div>
-              }>
-                {children}
-              </Suspense>
-            </div>
-          </main>
-        </div>
+          <div className="flex">
+            {/* Admin Sidebar */}
+            <AdminSidebar />
+            
+            {/* Main Admin Content Area */}
+            <main className="flex-1 transition-all duration-300 ease-in-out">
+              <div className="p-6">
+                <Suspense fallback={
+                  <div className="flex items-center justify-center h-64">
+                    <div className="text-gray-400">Loading...</div>
+                  </div>
+                }>
+                  {children}
+                </Suspense>
+              </div>
+            </main>
+          </div>
 
-        {/* Admin-specific toast notifications */}
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            className:
-              "bg-neutral-800 text-white border border-neutral-700 shadow-lg",
-            duration: 4000,
-          }}
-        />
-      </div>
-    </AdminLayoutProvider>
+          {/* Admin-specific toast notifications */}
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              className:
+                "bg-neutral-800 text-white border border-neutral-700 shadow-lg",
+              duration: 4000,
+            }}
+          />
+        </div>
+      </AdminLayoutProvider>
+    </AdminGuard>
   );
 }

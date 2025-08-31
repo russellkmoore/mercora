@@ -9,15 +9,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { 
   Search, Plus, Edit, Trash2, Percent, Calendar, 
-  Users, ShoppingCart, Copy, Eye, BarChart3 
+  Users, ShoppingCart, Copy, Eye, Tag, Settings 
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Promotion {
   id: string;
   code: string;
   name: string;
   description: string;
-  type: "percentage" | "fixed_amount" | "free_shipping";
+  type: "percentage" | "fixed_amount" | "free_shipping" | "bogo" | "tiered";
   value: number;
   minimumAmount?: number;
   maxUses?: number;
@@ -27,6 +28,25 @@ interface Promotion {
   status: "active" | "inactive" | "expired";
   categories?: string[];
   products?: string[];
+  // Enhanced fields
+  conditions?: {
+    productCategories?: string[];
+    productSkus?: string[];
+    customerSegments?: string[];
+    customerTypes?: string[];
+    firstPurchaseOnly?: boolean;
+    minimumQuantity?: number;
+    maximumQuantity?: number;
+  };
+  eligibility?: {
+    customerSegments?: string[];
+    channels?: string[];
+    regions?: string[];
+    requiresAccount?: boolean;
+    perCustomerLimit?: number;
+  };
+  stackable?: boolean;
+  priority?: number;
 }
 
 interface PromotionEditorProps {
@@ -48,7 +68,11 @@ function PromotionEditor({ promotion, isOpen, onClose, onSave, isNew = false }: 
     maxUses: undefined,
     validFrom: new Date().toISOString().split('T')[0],
     validTo: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    status: "active"
+    status: "active",
+    conditions: {},
+    eligibility: {},
+    stackable: true,
+    priority: 100
   });
   const [saving, setSaving] = useState(false);
 
@@ -70,7 +94,11 @@ function PromotionEditor({ promotion, isOpen, onClose, onSave, isNew = false }: 
         maxUses: undefined,
         validFrom: new Date().toISOString().split('T')[0],
         validTo: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        status: "active"
+        status: "active",
+        conditions: {},
+        eligibility: {},
+        stackable: true,
+        priority: 100
       });
     }
   }, [promotion, isNew]);
@@ -101,7 +129,7 @@ function PromotionEditor({ promotion, isOpen, onClose, onSave, isNew = false }: 
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <Card className="bg-neutral-800 border-neutral-700 w-full max-w-2xl max-h-[90vh] overflow-hidden">
+      <Card className="bg-neutral-800 border-neutral-700 w-full max-w-4xl max-h-[90vh] overflow-hidden">
         <div className="p-6 border-b border-neutral-700">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-white">
@@ -113,7 +141,7 @@ function PromotionEditor({ promotion, isOpen, onClose, onSave, isNew = false }: 
           </div>
         </div>
         
-        <div className="p-6 overflow-y-auto max-h-[70vh]">
+        <div className="p-6 overflow-y-auto max-h-[75vh]">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-4">
               <div>
@@ -165,11 +193,13 @@ function PromotionEditor({ promotion, isOpen, onClose, onSave, isNew = false }: 
                     <SelectItem value="percentage">Percentage Off</SelectItem>
                     <SelectItem value="fixed_amount">Fixed Amount Off</SelectItem>
                     <SelectItem value="free_shipping">Free Shipping</SelectItem>
+                    <SelectItem value="bogo">Buy One Get One</SelectItem>
+                    <SelectItem value="tiered">Tiered Discount</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              {formData.type !== "free_shipping" && (
+              {formData.type !== "free_shipping" && formData.type !== "bogo" && (
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     {formData.type === "percentage" ? "Percentage" : "Amount"} ({formData.type === "percentage" ? "%" : "$"})
@@ -250,6 +280,223 @@ function PromotionEditor({ promotion, isOpen, onClose, onSave, isNew = false }: 
               className="bg-neutral-700 border-neutral-600"
             />
           </div>
+
+          {/* Advanced Configuration Sections */}
+          <div className="mt-6 space-y-6">
+            {/* Product & Category Conditions */}
+            <div className="border-t border-neutral-600 pt-6">
+              <h4 className="text-sm font-medium text-white mb-4 flex items-center">
+                <Tag className="w-4 h-4 mr-2" />
+                Product & Category Requirements
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Required Categories (comma-separated)
+                  </label>
+                  <Input
+                    value={formData.conditions?.productCategories?.join(", ") || ""}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      conditions: {
+                        ...formData.conditions,
+                        productCategories: e.target.value.split(",").map(s => s.trim()).filter(Boolean)
+                      }
+                    })}
+                    placeholder="electronics, clothing, books"
+                    className="bg-neutral-700 border-neutral-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Specific Product SKUs (comma-separated)
+                  </label>
+                  <Input
+                    value={formData.conditions?.productSkus?.join(", ") || ""}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      conditions: {
+                        ...formData.conditions,
+                        productSkus: e.target.value.split(",").map(s => s.trim()).filter(Boolean)
+                      }
+                    })}
+                    placeholder="PROD-001, PROD-002"
+                    className="bg-neutral-700 border-neutral-600"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Minimum Quantity
+                  </label>
+                  <Input
+                    type="number"
+                    value={formData.conditions?.minimumQuantity || ""}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      conditions: {
+                        ...formData.conditions,
+                        minimumQuantity: e.target.value ? Number(e.target.value) : undefined
+                      }
+                    })}
+                    placeholder="1"
+                    className="bg-neutral-700 border-neutral-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Maximum Quantity
+                  </label>
+                  <Input
+                    type="number"
+                    value={formData.conditions?.maximumQuantity || ""}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      conditions: {
+                        ...formData.conditions,
+                        maximumQuantity: e.target.value ? Number(e.target.value) : undefined
+                      }
+                    })}
+                    placeholder="10"
+                    className="bg-neutral-700 border-neutral-600"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Customer Targeting */}
+            <div className="border-t border-neutral-600 pt-6">
+              <h4 className="text-sm font-medium text-white mb-4 flex items-center">
+                <Users className="w-4 h-4 mr-2" />
+                Customer Targeting
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Customer Segments (comma-separated)
+                  </label>
+                  <Input
+                    value={formData.conditions?.customerSegments?.join(", ") || ""}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      conditions: {
+                        ...formData.conditions,
+                        customerSegments: e.target.value.split(",").map(s => s.trim()).filter(Boolean)
+                      }
+                    })}
+                    placeholder="vip, new-customer, loyalty"
+                    className="bg-neutral-700 border-neutral-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Customer Types (comma-separated)
+                  </label>
+                  <Input
+                    value={formData.conditions?.customerTypes?.join(", ") || ""}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      conditions: {
+                        ...formData.conditions,
+                        customerTypes: e.target.value.split(",").map(s => s.trim()).filter(Boolean)
+                      }
+                    })}
+                    placeholder="guest, registered, business"
+                    className="bg-neutral-700 border-neutral-600"
+                  />
+                </div>
+              </div>
+              <div className="mt-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="firstPurchaseOnly"
+                    checked={formData.conditions?.firstPurchaseOnly || false}
+                    onCheckedChange={(checked) => setFormData({
+                      ...formData,
+                      conditions: {
+                        ...formData.conditions,
+                        firstPurchaseOnly: !!checked
+                      }
+                    })}
+                  />
+                  <label htmlFor="firstPurchaseOnly" className="text-sm text-gray-300">
+                    First purchase only
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Advanced Settings */}
+            <div className="border-t border-neutral-600 pt-6">
+              <h4 className="text-sm font-medium text-white mb-4 flex items-center">
+                <Settings className="w-4 h-4 mr-2" />
+                Advanced Settings
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Priority (higher = applied first)
+                  </label>
+                  <Input
+                    type="number"
+                    value={formData.priority || 100}
+                    onChange={(e) => setFormData({ ...formData, priority: Number(e.target.value) })}
+                    placeholder="100"
+                    className="bg-neutral-700 border-neutral-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Per-Customer Limit
+                  </label>
+                  <Input
+                    type="number"
+                    value={formData.eligibility?.perCustomerLimit || ""}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      eligibility: {
+                        ...formData.eligibility,
+                        perCustomerLimit: e.target.value ? Number(e.target.value) : undefined
+                      }
+                    })}
+                    placeholder="1"
+                    className="bg-neutral-700 border-neutral-600"
+                  />
+                </div>
+                <div className="flex flex-col justify-end">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="stackable"
+                        checked={formData.stackable || false}
+                        onCheckedChange={(checked) => setFormData({ ...formData, stackable: !!checked })}
+                      />
+                      <label htmlFor="stackable" className="text-sm text-gray-300">
+                        Stackable
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="requiresAccount"
+                        checked={formData.eligibility?.requiresAccount || false}
+                        onCheckedChange={(checked) => setFormData({
+                          ...formData,
+                          eligibility: {
+                            ...formData.eligibility,
+                            requiresAccount: !!checked
+                          }
+                        })}
+                      />
+                      <label htmlFor="requiresAccount" className="text-sm text-gray-300">
+                        Account Required
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         
         <div className="p-6 border-t border-neutral-700 flex items-center justify-end space-x-3">
@@ -280,99 +527,153 @@ export default function PromotionManagement() {
 
   const fetchPromotions = async () => {
     try {
-      // Mock data - replace with actual API call
-      const mockPromotions: Promotion[] = [
-        {
-          id: "1",
-          code: "SUMMER20",
-          name: "Summer Sale 2024",
-          description: "20% off all outdoor gear",
-          type: "percentage",
-          value: 20,
-          minimumAmount: 100,
-          maxUses: 1000,
-          currentUses: 245,
-          validFrom: "2024-06-01T00:00:00Z",
-          validTo: "2024-08-31T23:59:59Z",
-          status: "active"
-        },
-        {
-          id: "2",
-          code: "FREESHIP",
-          name: "Free Shipping",
-          description: "Free shipping on orders over $75",
-          type: "free_shipping",
-          value: 0,
-          minimumAmount: 75,
-          maxUses: undefined,
-          currentUses: 892,
-          validFrom: "2024-01-01T00:00:00Z",
-          validTo: "2024-12-31T23:59:59Z",
-          status: "active"
-        },
-        {
-          id: "3",
-          code: "WELCOME25",
-          name: "New Customer Welcome",
-          description: "$25 off first order",
-          type: "fixed_amount",
-          value: 25,
-          minimumAmount: 100,
-          maxUses: 500,
-          currentUses: 156,
-          validFrom: "2024-01-01T00:00:00Z",
-          validTo: "2024-12-31T23:59:59Z",
-          status: "active"
-        }
-      ];
+      const response = await fetch('/api/promotions');
+      if (!response.ok) {
+        throw new Error('Failed to fetch promotions');
+      }
       
-      setPromotions(mockPromotions);
-      setFilteredPromotions(mockPromotions);
+      const promotionsData: Promotion[] = await response.json();
+      setPromotions(promotionsData);
+      setFilteredPromotions(promotionsData);
     } catch (error) {
       console.error("Error fetching promotions:", error);
+      // Show error message to user
+      alert("Failed to load promotions. Please refresh the page.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleSavePromotion = async (promotionData: Partial<Promotion>) => {
-    // TODO: Implement API call
-    console.log("Saving promotion:", promotionData);
-    
-    // Mock implementation
-    if (isNewPromotion) {
-      const newPromotion: Promotion = {
-        ...promotionData as Promotion,
-        id: Date.now().toString(),
-        currentUses: 0
-      };
-      setPromotions([...promotions, newPromotion]);
-    } else if (selectedPromotion) {
-      const updatedPromotions = promotions.map(p => 
-        p.id === selectedPromotion.id 
-          ? { ...p, ...promotionData }
-          : p
-      );
-      setPromotions(updatedPromotions);
+    try {
+      let response: Response;
+      
+      if (isNewPromotion) {
+        response = await fetch('/api/promotions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(promotionData),
+        });
+      } else if (selectedPromotion) {
+        response = await fetch('/api/promotions', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ ...promotionData, id: selectedPromotion.id }),
+        });
+      } else {
+        throw new Error('No promotion selected for update');
+      }
+      
+      if (!response.ok) {
+        const error: { error?: string } = await response.json();
+        throw new Error(error.error || 'Failed to save promotion');
+      }
+      
+      const savedPromotion: Promotion = await response.json();
+      
+      // Update local state
+      if (isNewPromotion) {
+        setPromotions([...promotions, savedPromotion]);
+        setFilteredPromotions([...filteredPromotions, savedPromotion]);
+      } else {
+        const updatedPromotions = promotions.map(p => 
+          p.id === savedPromotion.id ? savedPromotion : p
+        );
+        setPromotions(updatedPromotions);
+        setFilteredPromotions(updatedPromotions.filter((promotion) =>
+          !searchQuery.trim() ||
+          promotion.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          promotion.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          promotion.description.toLowerCase().includes(searchQuery.toLowerCase())
+        ));
+      }
+      
+    } catch (error) {
+      console.error("Error saving promotion:", error);
+      alert(`Failed to save promotion: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw error; // Re-throw to prevent modal from closing
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this promotion?")) return;
-    setPromotions(promotions.filter(p => p.id !== id));
+    
+    try {
+      const response = await fetch(`/api/promotions?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const error: { error?: string } = await response.json();
+        throw new Error(error.error || 'Failed to delete promotion');
+      }
+      
+      // Update local state
+      const updatedPromotions = promotions.filter(p => p.id !== id);
+      setPromotions(updatedPromotions);
+      setFilteredPromotions(updatedPromotions.filter((promotion) =>
+        !searchQuery.trim() ||
+        promotion.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        promotion.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        promotion.description.toLowerCase().includes(searchQuery.toLowerCase())
+      ));
+      
+    } catch (error) {
+      console.error("Error deleting promotion:", error);
+      alert(`Failed to delete promotion: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   const copyCode = (code: string) => {
     navigator.clipboard.writeText(code);
   };
 
-  const toggleStatus = (id: string) => {
-    const updatedPromotions = promotions.map(p => 
-      p.id === id 
-        ? { ...p, status: (p.status === "active" ? "inactive" : "active") as "active" | "inactive" | "expired" }
-        : p
-    );
-    setPromotions(updatedPromotions);
+  const toggleStatus = async (id: string) => {
+    const promotion = promotions.find(p => p.id === id);
+    if (!promotion) return;
+    
+    const newStatus = promotion.status === "active" ? "inactive" : "active";
+    
+    try {
+      const response = await fetch('/api/promotions', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...promotion,
+          id: promotion.id,
+          status: newStatus
+        }),
+      });
+      
+      if (!response.ok) {
+        const error: { error?: string } = await response.json();
+        throw new Error(error.error || 'Failed to update promotion status');
+      }
+      
+      const updatedPromotion: Promotion = await response.json();
+      
+      // Update local state
+      const updatedPromotions = promotions.map(p => 
+        p.id === id ? updatedPromotion : p
+      );
+      setPromotions(updatedPromotions);
+      setFilteredPromotions(updatedPromotions.filter((promotion) =>
+        !searchQuery.trim() ||
+        promotion.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        promotion.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        promotion.description.toLowerCase().includes(searchQuery.toLowerCase())
+      ));
+      
+    } catch (error) {
+      console.error("Error updating promotion status:", error);
+      alert(`Failed to update promotion status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   const openEditor = (promotion: Promotion | null = null, isNew = false) => {
@@ -434,7 +735,7 @@ export default function PromotionManagement() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="bg-neutral-800 border-neutral-700 p-4">
           <div className="text-2xl font-bold text-white">{promotions.length}</div>
           <div className="text-sm text-gray-400">Total Promotions</div>
@@ -444,18 +745,6 @@ export default function PromotionManagement() {
             {promotions.filter(p => p.status === "active").length}
           </div>
           <div className="text-sm text-gray-400">Active Promotions</div>
-        </Card>
-        <Card className="bg-neutral-800 border-neutral-700 p-4">
-          <div className="text-2xl font-bold text-orange-400">
-            {promotions.reduce((acc, p) => acc + p.currentUses, 0)}
-          </div>
-          <div className="text-sm text-gray-400">Total Uses</div>
-        </Card>
-        <Card className="bg-neutral-800 border-neutral-700 p-4">
-          <div className="text-2xl font-bold text-blue-400">
-            {Math.round(promotions.reduce((acc, p) => acc + (p.currentUses / (p.maxUses || 1)), 0) / promotions.length * 100) || 0}%
-          </div>
-          <div className="text-sm text-gray-400">Avg Usage Rate</div>
         </Card>
       </div>
 
@@ -492,10 +781,6 @@ export default function PromotionManagement() {
             
             <div className="space-y-2 text-xs text-gray-500 mb-4">
               <div className="flex justify-between">
-                <span>Usage:</span>
-                <span>{promotion.currentUses}{promotion.maxUses ? `/${promotion.maxUses}` : ""}</span>
-              </div>
-              <div className="flex justify-between">
                 <span>Valid until:</span>
                 <span>{new Date(promotion.validTo).toLocaleDateString()}</span>
               </div>
@@ -516,13 +801,6 @@ export default function PromotionManagement() {
                   className="text-orange-500 hover:text-orange-400"
                 >
                   <Edit className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-blue-500 hover:text-blue-400"
-                >
-                  <BarChart3 className="w-4 h-4" />
                 </Button>
                 <Button
                   variant="ghost"

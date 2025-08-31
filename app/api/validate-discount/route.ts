@@ -123,7 +123,9 @@ function validatePromotionConditions(
     switch (condition.type) {
       case 'cart_subtotal':
         if (condition.operator === 'gte') {
-          const minAmount = condition.value?.amount || 0;
+          const minAmount = typeof condition.value === 'object' && condition.value?.amount 
+            ? condition.value.amount 
+            : (condition.value as number) || 0;
           if (cartSubtotal < minAmount) {
             return {
               valid: false,
@@ -200,6 +202,41 @@ function calculateDiscountAmount(
         amount: shippingFixed,
         type: 'fixed',
         value: shippingFixed
+      };
+
+    case 'item_percentage_discount':
+      const itemPercentageValue = action.value as number;
+      // Calculate discount on qualifying items only
+      let itemDiscountAmount = 0;
+      
+      // For item-level discounts, we need to check which items qualify
+      // This is a simplified approach - in practice you'd want more sophisticated rules
+      for (const item of cartItems) {
+        // Check if item qualifies based on promotion conditions
+        let itemQualifies = true;
+        
+        // Check category conditions if they exist
+        if (promotion.rules.conditions) {
+          for (const condition of promotion.rules.conditions) {
+            if (condition.type === 'product_category' && condition.operator === 'in') {
+              const requiredCategories = Array.isArray(condition.value) ? condition.value : [condition.value];
+              if (!item.categories.some(cat => requiredCategories.includes(cat))) {
+                itemQualifies = false;
+                break;
+              }
+            }
+          }
+        }
+        
+        if (itemQualifies) {
+          itemDiscountAmount += Math.round((item.price * item.quantity) * (itemPercentageValue / 100));
+        }
+      }
+      
+      return {
+        amount: itemDiscountAmount,
+        type: 'percentage',
+        value: itemPercentageValue
       };
 
     default:
