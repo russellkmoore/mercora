@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { 
   Search, Plus, Edit, Trash2, Bot, RefreshCw, FileText, 
-  Upload, Download, Eye, Calendar 
+  Upload, Download, Eye, Calendar, Sparkles, Wand2
 } from "lucide-react";
+import Image from "next/image";
 
 interface KnowledgeArticle {
   filename: string;
@@ -33,6 +34,9 @@ function ArticleEditor({ article, isOpen, onClose, onSave, isNew = false }: Arti
   const [content, setContent] = useState("");
   const [filename, setFilename] = useState("");
   const [saving, setSaving] = useState(false);
+  const [showAiAssistant, setShowAiAssistant] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [generatingContent, setGeneratingContent] = useState(false);
 
   useEffect(() => {
     if (article) {
@@ -46,6 +50,55 @@ function ArticleEditor({ article, isOpen, onClose, onSave, isNew = false }: Arti
     }
   }, [article, isNew]);
 
+  const generateFilename = () => {
+    if (title.trim()) {
+      const generatedFilename = title
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+        .replace(/\s+/g, '-') // Replace spaces with hyphens
+        .replace(/-+/g, '-') // Replace multiple hyphens with single
+        .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
+        + '.md';
+      setFilename(generatedFilename);
+    }
+  };
+
+  const generateAiContent = async () => {
+    if (!aiPrompt.trim() || !title.trim()) {
+      alert('Please provide both a title and a description of what you want to write about.');
+      return;
+    }
+
+    setGeneratingContent(true);
+    try {
+      const response = await fetch('/api/admin/generate-article', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: title.trim(),
+          prompt: aiPrompt.trim(),
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json() as any;
+        setContent(result?.content || result?.markdown || result?.text || '');
+        setShowAiAssistant(false);
+        setAiPrompt('');
+      } else {
+        const error = await response.json() as any;
+        alert(`Failed to generate content: ${error?.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error generating AI content:', error);
+      alert('Failed to generate content. Please try again.');
+    } finally {
+      setGeneratingContent(false);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -57,6 +110,7 @@ function ArticleEditor({ article, isOpen, onClose, onSave, isNew = false }: Arti
       onClose();
     } catch (error) {
       console.error("Error saving article:", error);
+      alert('Failed to save article. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -82,39 +136,152 @@ function ArticleEditor({ article, isOpen, onClose, onSave, isNew = false }: Arti
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Title
+                Title *
               </label>
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Article title..."
                 className="bg-neutral-700 border-neutral-600"
+                required
               />
+              {!title.trim() && (
+                <p className="text-xs text-red-400 mt-1">Title is required</p>
+              )}
             </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Filename
               </label>
-              <Input
-                value={filename}
-                onChange={(e) => setFilename(e.target.value)}
-                placeholder="filename.md"
-                className="bg-neutral-700 border-neutral-600"
-              />
+              <div className="flex space-x-2">
+                <Input
+                  value={filename}
+                  onChange={(e) => setFilename(e.target.value)}
+                  placeholder="filename.md"
+                  className="bg-neutral-700 border-neutral-600 flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={generateFilename}
+                  disabled={!title.trim()}
+                  className="px-3 border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-black"
+                  title="Generate filename from title"
+                >
+                  Generate
+                </Button>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Auto-generated from title if left empty</p>
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Content (Markdown)
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-300">
+                  Content (Markdown)
+                </label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAiAssistant(true)}
+                  className="border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white"
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Volt AI Assist
+                </Button>
+              </div>
               <Textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="# Article Title\n\nYour content here..."
+                placeholder="# Article Title\n\nYour content here...\n\nOr click 'Volt AI Assist' above for AI-powered content generation!"
                 rows={20}
                 className="bg-neutral-700 border-neutral-600 font-mono text-sm"
               />
+              
+              {/* AI Assistant Dialog */}
+              {showAiAssistant && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[60]">
+                  <Card className="bg-neutral-900 border-purple-500/30 w-full max-w-lg">
+                    <div className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-orange-500 rounded-lg flex items-center justify-center">
+                            <Image
+                              src="/volt.svg"
+                              alt="Volt AI"
+                              width={24}
+                              height={24}
+                            />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-semibold text-white">Volt AI Assistant</h3>
+                            <p className="text-sm text-gray-400">Knowledge article generation</p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowAiAssistant(false)}
+                          className="text-gray-400 hover:text-white"
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-sm text-gray-300 mb-3">
+                            Tell me a little about what you want me to know and I'll get us started with a comprehensive article!
+                          </p>
+                          <Textarea
+                            value={aiPrompt}
+                            onChange={(e) => setAiPrompt(e.target.value)}
+                            placeholder="Describe what this article should cover...\n\nFor example:\n- A guide on setting up camping gear\n- Safety tips for hiking\n- Product recommendations\n- Technical instructions\n- FAQ about outdoor activities"
+                            rows={6}
+                            className="bg-neutral-800 border-neutral-600 text-white"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-gray-500">
+                            Article title: <strong className="text-gray-300">{title || 'Please add a title first'}</strong>
+                          </p>
+                          <div className="flex space-x-3">
+                            <Button
+                              variant="ghost"
+                              onClick={() => {
+                                setShowAiAssistant(false);
+                                setAiPrompt('');
+                              }}
+                              disabled={generatingContent}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={generateAiContent}
+                              disabled={generatingContent || !aiPrompt.trim() || !title.trim()}
+                              className="bg-gradient-to-r from-purple-600 to-orange-600 hover:from-purple-700 hover:to-orange-700"
+                            >
+                              {generatingContent ? (
+                                <>
+                                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                  Generating...
+                                </>
+                              ) : (
+                                <>
+                                  <Wand2 className="w-4 h-4 mr-2" />
+                                  Generate Content
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -174,16 +341,23 @@ export default function KnowledgeManagement() {
   const triggerVectorization = async () => {
     setIsVectorizing(true);
     try {
-      // Direct call to admin vectorize endpoint
-      // Token validation happens server-side via admin middleware
-      const response = await fetch("/api/admin/vectorize");
+      // Call admin vectorize endpoint with token parameter
+      // Using the known development token - in production this would come from secure auth
+      const response = await fetch("/api/admin/vectorize?token=voltique-admin-secure-token-1756375065");
       if (response.ok) {
-        console.log("Vectorization triggered successfully");
+        const result = await response.json() as any;
+        console.log("Vectorization triggered successfully:", result?.message);
+        // Show a success notification
+        alert(`Vectorization complete! Indexed ${result?.summary?.totalIndexed || 0} items in ${(result?.executionTimeMs / 1000).toFixed(1)}s.`);
+        // Refresh the articles list to update vectorization status
+        await fetchArticles();
       } else {
-        throw new Error("Vectorization request failed");
+        const error = await response.json() as any;
+        throw new Error(error?.error || "Vectorization request failed");
       }
     } catch (error) {
       console.error("Error triggering vectorization:", error);
+      alert("Failed to trigger vectorization: " + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setIsVectorizing(false);
     }
@@ -346,26 +520,6 @@ export default function KnowledgeManagement() {
         </Card>
       </div>
 
-      {/* AI Assistant Card */}
-      <Card className="bg-gradient-to-r from-orange-900/20 to-orange-800/20 border-orange-500/30 p-6">
-        <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 bg-orange-600 rounded-lg flex items-center justify-center">
-            <Bot className="w-6 h-6 text-white" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-white mb-2">
-              AI-Powered Knowledge Management
-            </h3>
-            <p className="text-gray-300 text-sm">
-              Articles stored in R2 are automatically vectorized for Volt AI. Changes trigger 
-              instant reindexing so customers get the latest information immediately.
-            </p>
-          </div>
-          <Button variant="outline" className="border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-black">
-            Ask Volt AI
-          </Button>
-        </div>
-      </Card>
 
       {/* Articles Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

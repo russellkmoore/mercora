@@ -112,6 +112,7 @@ export default function AdminDashboard() {
     lowStockAlerts: 0
   });
   const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
   
   const [aiAnalytics, setAiAnalytics] = useState<AIAnalytics>({
     insights: "",
@@ -137,6 +138,11 @@ export default function AdminDashboard() {
 
   const fetchDashboardStats = async () => {
     try {
+      // Calculate time range filter
+      const now = new Date();
+      const daysBack = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
+      const startDate = new Date(now.getTime() - (daysBack * 24 * 60 * 60 * 1000));
+      
       // Fetch products data
       const productsResponse = await fetch("/api/products?limit=1000");
       let totalProducts = 0;
@@ -153,15 +159,20 @@ export default function AdminDashboard() {
         inactiveProducts = products.filter((p: any) => p.status === 'inactive').length;
         draftProducts = products.filter((p: any) => p.status === 'draft').length;
         
-        // Count products with low stock (quantity < 10)
-        lowStockAlerts = products.filter((p: any) => {
-          const inventory = p.inventory;
-          return inventory && inventory.track_inventory && (inventory.quantity || 0) < 10;
-        }).length;
+        // Count products with low stock (quantity < 10) - check variants
+        lowStockAlerts = products.reduce((count: number, p: any) => {
+          const variants = p.variants || [];
+          const lowStockVariants = variants.filter((v: any) => {
+            const inventory = v.inventory;
+            const quantity = inventory?.quantity || 0;
+            return quantity > 0 && quantity < 10; // In stock but low
+          });
+          return count + lowStockVariants.length;
+        }, 0);
       }
 
       // Fetch orders data
-      const ordersResponse = await fetch("/api/orders?limit=1000");
+      const ordersResponse = await fetch("/api/orders?admin=true&limit=1000");
       let totalOrders = 0;
       let pendingOrders = 0;
       let processingOrders = 0;
@@ -172,16 +183,23 @@ export default function AdminDashboard() {
       
       if (ordersResponse.ok) {
         const ordersResult: any = await ordersResponse.json();
-        const orders = ordersResult.data || [];
-        totalOrders = ordersResult.meta?.total || orders.length;
-        pendingOrders = orders.filter((o: any) => o.status === 'pending').length;
-        processingOrders = orders.filter((o: any) => o.status === 'processing').length;
-        shippedOrders = orders.filter((o: any) => o.status === 'shipped').length;
-        deliveredOrders = orders.filter((o: any) => o.status === 'delivered').length;
-        cancelledOrders = orders.filter((o: any) => o.status === 'cancelled').length;
+        const allOrders = ordersResult.data || [];
         
-        // Calculate total revenue from delivered orders
-        totalRevenue = orders
+        // Filter orders by time range
+        const filteredOrders = allOrders.filter((o: any) => {
+          const orderDate = new Date(o.created_at);
+          return orderDate >= startDate;
+        });
+        
+        totalOrders = filteredOrders.length;
+        pendingOrders = filteredOrders.filter((o: any) => o.status === 'pending').length;
+        processingOrders = filteredOrders.filter((o: any) => o.status === 'processing').length;
+        shippedOrders = filteredOrders.filter((o: any) => o.status === 'shipped').length;
+        deliveredOrders = filteredOrders.filter((o: any) => o.status === 'delivered').length;
+        cancelledOrders = filteredOrders.filter((o: any) => o.status === 'cancelled').length;
+        
+        // Calculate total revenue from delivered orders in time range
+        totalRevenue = filteredOrders
           .filter((o: any) => o.status === 'delivered')
           .reduce((sum: number, order: any) => {
             const amount = order.total_amount?.amount || 0;
@@ -286,7 +304,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchDashboardStats();
     fetchAIAnalytics();
-  }, []);
+  }, [timeRange]);
 
 
   if (loading) {
@@ -300,11 +318,33 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-8 px-4">
       {/* Welcome Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-white">Welcome to Voltique Admin</h1>
-        <p className="text-gray-400 mt-2">
-          Manage your outdoor gear store with AI-powered insights and automation
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Welcome to Voltique Admin</h1>
+          <p className="text-gray-400 mt-2">
+            Manage your outdoor gear store with AI-powered insights and automation
+          </p>
+        </div>
+        <div className="mt-4 sm:mt-0">
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-400">Time Range:</span>
+            <div className="flex rounded-lg bg-neutral-800 p-1">
+              {(['7d', '30d', '90d'] as const).map((range) => (
+                <button
+                  key={range}
+                  onClick={() => setTimeRange(range)}
+                  className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                    timeRange === range
+                      ? 'bg-orange-600 text-white'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  {range === '7d' ? '7 Days' : range === '30d' ? '30 Days' : '90 Days'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Key Metrics */}
@@ -312,7 +352,7 @@ export default function AdminDashboard() {
         <Card className="bg-neutral-800 border-neutral-700 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-400">Total Revenue</p>
+              <p className="text-sm text-gray-400">Total Revenue ({timeRange})</p>
               <p className="text-2xl font-bold text-green-400">
                 ${(stats.totalRevenue / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
@@ -327,7 +367,7 @@ export default function AdminDashboard() {
         <Card className="bg-neutral-800 border-neutral-700 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-400">Total Orders</p>
+              <p className="text-sm text-gray-400">Total Orders ({timeRange})</p>
               <p className="text-2xl font-bold text-blue-400">{stats.totalOrders}</p>
               <p className="text-xs text-gray-500 mt-1">{stats.pendingOrders} pending, {stats.processingOrders} processing</p>
             </div>
@@ -549,76 +589,68 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      {/* Status Overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* System Status */}
-        <Card className="bg-neutral-800 border-neutral-700 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white">System Status</h3>
-            <Badge variant="default" className="bg-green-600 text-white">
-              All Systems Operational
-            </Badge>
+      {/* Revenue & Performance Trends */}
+      <Card className="bg-neutral-800 border-neutral-700 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-white">Financial Overview ({timeRange})</h3>
+          <div className="flex items-center space-x-2">
+            <BarChart3 className="w-5 h-5 text-orange-400" />
           </div>
-          <div className="space-y-3">
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-gray-300 text-sm">Website Performance</span>
-              <Badge variant="default" className="bg-green-600 text-white text-xs">Excellent</Badge>
+              <span className="text-gray-400 text-sm">Total Revenue</span>
+              <span className="text-white font-semibold">
+                ${(stats.totalRevenue / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-gray-300 text-sm">Search & Recommendations</span>
-              <Badge variant="default" className="bg-green-600 text-white text-xs">Active</Badge>
+            <div className="w-full bg-neutral-700 rounded-full h-2">
+              <div 
+                className="bg-green-500 h-2 rounded-full" 
+                style={{ width: `${Math.min(100, (stats.totalRevenue / 10000))}%` }}
+              ></div>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-gray-300 text-sm">Payment Processing</span>
-              <Badge variant="default" className="bg-green-600 text-white text-xs">Active</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-gray-300 text-sm">Vector Database</span>
-              <Badge variant="default" className="bg-green-600 text-white text-xs">Synced</Badge>
-            </div>
+            <p className="text-xs text-gray-500">Target: $100.00</p>
           </div>
-        </Card>
-
-        {/* Recent Activity */}
-        <Card className="bg-neutral-800 border-neutral-700 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white">Recent Activity</h3>
-            <Button variant="ghost" size="sm" className="text-orange-500">
-              View All
-            </Button>
+          
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-gray-400 text-sm">Average Order Value</span>
+              <span className="text-white font-semibold">
+                ${stats.totalOrders > 0 ? ((stats.totalRevenue / stats.totalOrders) / 100).toFixed(2) : '0.00'}
+              </span>
+            </div>
+            <div className="w-full bg-neutral-700 rounded-full h-2">
+              <div 
+                className="bg-blue-500 h-2 rounded-full" 
+                style={{ 
+                  width: `${Math.min(100, stats.totalOrders > 0 ? ((stats.totalRevenue / stats.totalOrders) / 100) * 2 : 0)}%` 
+                }}
+              ></div>
+            </div>
+            <p className="text-xs text-gray-500">Target: $50.00</p>
           </div>
-          <div className="space-y-3">
-            <div className="flex items-start space-x-3">
-              <div className="w-2 h-2 bg-green-400 rounded-full mt-2"></div>
-              <div className="flex-1">
-                <p className="text-gray-300 text-sm">New order #1847 received</p>
-                <p className="text-gray-500 text-xs">2 minutes ago</p>
-              </div>
+          
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-gray-400 text-sm">Completion Rate</span>
+              <span className="text-white font-semibold">
+                {stats.totalOrders > 0 ? Math.round((stats.deliveredOrders / stats.totalOrders) * 100) : 0}%
+              </span>
             </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-2 h-2 bg-blue-400 rounded-full mt-2"></div>
-              <div className="flex-1">
-                <p className="text-gray-300 text-sm">Product "Solar Panel Kit" updated</p>
-                <p className="text-gray-500 text-xs">15 minutes ago</p>
-              </div>
+            <div className="w-full bg-neutral-700 rounded-full h-2">
+              <div 
+                className="bg-orange-500 h-2 rounded-full" 
+                style={{ 
+                  width: `${stats.totalOrders > 0 ? Math.round((stats.deliveredOrders / stats.totalOrders) * 100) : 0}%` 
+                }}
+              ></div>
             </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-2 h-2 bg-orange-400 rounded-full mt-2"></div>
-              <div className="flex-1">
-                <p className="text-gray-300 text-sm">Search index updated</p>
-                <p className="text-gray-500 text-xs">1 hour ago</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-2 h-2 bg-purple-400 rounded-full mt-2"></div>
-              <div className="flex-1">
-                <p className="text-gray-300 text-sm">Promotion "SUMMER20" created</p>
-                <p className="text-gray-500 text-xs">3 hours ago</p>
-              </div>
-            </div>
+            <p className="text-xs text-gray-500">Target: 95%</p>
           </div>
-        </Card>
-      </div>
+        </div>
+      </Card>
 
       {/* Alerts & Notifications */}
       {stats.lowStockAlerts > 0 && (
