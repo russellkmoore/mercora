@@ -9,6 +9,11 @@ import { useAdminAccess } from "@/components/admin/AdminGuard";
 export default function ClerkLogin() {
   const [hasMounted, setHasMounted] = useState(false);
   const { isAdmin, isLoading: adminLoading } = useAdminAccess();
+  
+  // Debug logging
+  useEffect(() => {
+    console.log("🔍 ClerkLogin Debug:", { isAdmin, adminLoading, hasMounted });
+  }, [isAdmin, adminLoading, hasMounted]);
 
   useEffect(() => {
     // Small delay to ensure Clerk is fully initialized

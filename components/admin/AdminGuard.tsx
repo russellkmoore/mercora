@@ -193,27 +193,49 @@ export function useAdminAccess() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!userLoaded || !authLoaded) return;
+    async function checkAdminAccess() {
+      if (!userLoaded || !authLoaded) return;
 
-    if (!isSignedIn || !user) {
-      setIsAdmin(false);
+      if (!isSignedIn || !user) {
+        setIsAdmin(false);
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        // Development mode - allow any authenticated user
+        if (process.env.NODE_ENV === "development") {
+          setIsAdmin(true);
+          setIsLoading(false);
+          return;
+        }
+
+        // Production mode - check admin role via server-side API call
+        console.log("🔍 useAdminAccess: Making API call to /api/admin/auth-check");
+        const response = await fetch('/api/admin/auth-check', {
+          method: 'GET',
+          credentials: 'include'
+        });
+
+        console.log("🔍 useAdminAccess: API response status:", response.status);
+        if (response.ok) {
+          const result = await response.json() as { success: boolean; error?: string };
+          console.log("🔍 useAdminAccess: API result:", result);
+          console.log("🔍 useAdminAccess: Setting isAdmin to:", result.success);
+          setIsAdmin(result.success);
+        } else {
+          console.log("🔍 useAdminAccess: API call failed");
+          setIsAdmin(false);
+        }
+      } catch (error) {
+        console.error("Admin auth check failed:", error);
+        setIsAdmin(false);
+      }
+      
       setIsLoading(false);
-      return;
     }
 
-    // Development mode - allow any authenticated user
-    if (process.env.NODE_ENV === "development") {
-      setIsAdmin(true);
-      setIsLoading(false);
-      return;
-    }
-
-    // Production mode - check admin role
-    const userRole = user.publicMetadata?.role;
-    const adminUsers = process.env.NEXT_PUBLIC_ADMIN_USER_IDS?.split(",") || [];
-    
-    setIsAdmin(userRole === "admin" || adminUsers.includes(user.id));
-    setIsLoading(false);
+    checkAdminAccess();
   }, [userLoaded, authLoaded, isSignedIn, user]);
 
   return { isAdmin, isLoading };
