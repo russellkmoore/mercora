@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { isUserAdmin, updateAdminLastLogin } from "../models/admin";
 
 export interface AdminAuthResult {
   success: boolean;
@@ -47,11 +48,18 @@ export async function checkAdminPermissions(request: NextRequest): Promise<Admin
         return { success: true, userId };
       }
 
-      // Production admin check - check for admin role in metadata
-      const userRole = (sessionClaims as any)?.metadata?.role;
-      const adminUsers = process.env.ADMIN_USER_IDS?.split(",") || [];
+      // Check admin status in database
+      const isAdmin = await isUserAdmin(userId);
       
-      if (userRole === "admin" || adminUsers.includes(userId)) {
+      if (isAdmin) {
+        // Update last login timestamp
+        updateAdminLastLogin(userId).catch(console.error);
+        return { success: true, userId };
+      }
+
+      // Fallback: Check for admin role in Clerk metadata (for backward compatibility)
+      const userRole = (sessionClaims as any)?.metadata?.role;
+      if (userRole === "admin") {
         return { success: true, userId };
       }
 
