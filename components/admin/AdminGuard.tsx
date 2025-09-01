@@ -211,20 +211,15 @@ export function useAdminAccess() {
         }
 
         // Production mode - check admin role via server-side API call
-        console.log("🔍 useAdminAccess: Making API call to /api/admin/auth-check");
         const response = await fetch('/api/admin/auth-check', {
           method: 'GET',
           credentials: 'include'
         });
 
-        console.log("🔍 useAdminAccess: API response status:", response.status);
         if (response.ok) {
           const result = await response.json() as { success: boolean; error?: string };
-          console.log("🔍 useAdminAccess: API result:", result);
-          console.log("🔍 useAdminAccess: Setting isAdmin to:", result.success);
           setIsAdmin(result.success);
         } else {
-          console.log("🔍 useAdminAccess: API call failed");
           setIsAdmin(false);
         }
       } catch (error) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdminPermissions } from '@/lib/auth/admin-middleware';
+import { getAllAdminUsers, addAdminUser, removeAdminUser, getAdminUser } from '@/lib/models/admin';
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,11 +9,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: authResult.error }, { status: 401 });
     }
 
-    // Get current admin users from environment
-    const adminUsers = process.env.ADMIN_USER_IDS?.split(',').filter(id => id.trim()) || [];
+    // Get admin users from database
+    const adminUsers = await getAllAdminUsers();
     
     return NextResponse.json({
-      adminUsers,
+      adminUsers: adminUsers.map(user => user.userId),
+      adminUserDetails: adminUsers,
       count: adminUsers.length
     });
   } catch (error) {
@@ -31,29 +33,68 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: authResult.error }, { status: 401 });
     }
 
-    const { adminUsers } = await request.json() as { adminUsers: string[] };
-    
-    if (!Array.isArray(adminUsers)) {
-      return NextResponse.json({ error: 'adminUsers must be an array' }, { status: 400 });
-    }
+    const { action, userId, email, displayName } = await request.json() as { 
+      action: 'add' | 'remove'; 
+      userId: string; 
+      email?: string; 
+      displayName?: string; 
+    };
 
-    // Validate user IDs format (should start with user_)
-    const invalidUsers = adminUsers.filter(id => !id.match(/^user_[a-zA-Z0-9]+$/));
-    if (invalidUsers.length > 0) {
+    if (action === 'add') {
+      // Validate user ID format
+      if (!userId.match(/^user_[a-zA-Z0-9]+$/)) {
+        return NextResponse.json({ 
+          error: `Invalid user ID format: ${userId}. User IDs should start with 'user_'` 
+        }, { status: 400 });
+      }
+
+      // Check if user already exists
+      const existingUser = await getAdminUser(userId);
+      if (existingUser) {
+        return NextResponse.json({ 
+          error: 'User is already an admin' 
+        }, { status: 400 });
+      }
+
+      // Add new admin user
+      const newAdmin = await addAdminUser({
+        userId,
+        email,
+        displayName,
+        createdBy: authResult.userId,
+        role: 'admin'
+      });
+
+      if (!newAdmin) {
+        return NextResponse.json({ 
+          error: 'Failed to add admin user' 
+        }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        message: 'Admin user added successfully',
+        user: newAdmin
+      });
+
+    } else if (action === 'remove') {
+      const success = await removeAdminUser(userId);
+      
+      if (!success) {
+        return NextResponse.json({ 
+          error: 'Failed to remove admin user. Cannot remove the last admin.' 
+        }, { status: 400 });
+      }
+
+      return NextResponse.json({
+        message: 'Admin user removed successfully'
+      });
+
+    } else {
       return NextResponse.json({ 
-        error: `Invalid user ID format: ${invalidUsers.join(', ')}. User IDs should start with 'user_'` 
+        error: 'Invalid action. Must be "add" or "remove"' 
       }, { status: 400 });
     }
 
-    // Note: This endpoint can show current admin users and validate format,
-    // but updating ADMIN_USER_IDS requires manual secret management via Wrangler
-    // since we can't programmatically update Cloudflare Workers secrets
-    
-    return NextResponse.json({
-      message: 'Admin users validated successfully. To update, use: wrangler secret put ADMIN_USER_IDS',
-      command: `echo "${adminUsers.join(',')}" | npx wrangler secret put ADMIN_USER_IDS`,
-      currentUsers: process.env.ADMIN_USER_IDS?.split(',').filter(id => id.trim()) || []
-    });
   } catch (error) {
     console.error('Error processing admin users:', error);
     return NextResponse.json(
