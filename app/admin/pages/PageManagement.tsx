@@ -64,7 +64,9 @@ import {
   User,
   Globe,
   Lock,
-  BarChart3
+  BarChart3,
+  Bot,
+  Loader2
 } from "lucide-react";
 
 interface PageData {
@@ -129,6 +131,7 @@ export default function PageManagement() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingPage, setEditingPage] = useState<PageData | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState<Partial<PageData>>({
@@ -368,6 +371,100 @@ export default function PageManagement() {
     }
   };
 
+  // Generate content with AI
+  const handleGenerateContent = async () => {
+    if (!formData.title) {
+      alert("Please enter a page title first");
+      return;
+    }
+
+    setIsGeneratingContent(true);
+    
+    try {
+      const template = getTemplate(formData.template || 'default');
+      const templateDescription = template?.description || 'general content page';
+      
+      const prompt = `CRITICAL: Generate complete, untruncated HTML content. Do NOT stop mid-sentence or mid-tag.
+
+You are generating HTML content for a page titled "${formData.title}" (${templateDescription}) for Mercora outdoor gear eCommerce.
+
+STRICT REQUIREMENTS:
+- Generate ONLY inner HTML content (NO DOCTYPE, html, head, body tags)
+- Start with: <h1>${formData.title}</h1>  
+- Use semantic elements: h2, h3, p, ul, ol, section, div
+- Be professional, NO personality, jokes, or conversational tone
+- Generate 3-5 comprehensive sections with detailed content
+- MUST be complete - no cut-off content or incomplete sentences
+- Target 2000-3000 characters for comprehensive coverage
+
+MUST INCLUDE (for completeness):
+- Multiple detailed sections with subsections
+- Lists with 5-8 items each where appropriate
+- Detailed paragraphs explaining policies/procedures
+- Contact information or next steps where relevant
+
+Generate complete content now:`;
+
+      const response = await fetch('/api/agent-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          question: prompt,
+          userName: 'Admin',
+          userContext: 'content-generation'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate content');
+      }
+
+      const result = await response.json() as { answer?: string; error?: string };
+      
+      // Debug logging
+      console.log('API Response length:', result.answer?.length || 0);
+      console.log('Raw response preview:', result.answer?.substring(0, 200) + '...');
+      
+      if (result.answer) {
+        // Clean the response to ensure it's just inner HTML content
+        let cleanedContent = result.answer
+          .replace(/```html/gi, '')
+          .replace(/```/g, '')
+          .replace(/<!DOCTYPE[^>]*>/gi, '')
+          .replace(/<html[^>]*>/gi, '')
+          .replace(/<\/html>/gi, '')
+          .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '')
+          .replace(/<body[^>]*>/gi, '')
+          .replace(/<\/body>/gi, '')
+          .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
+          .replace(/Camping rule #\d+:.*?-- Volt/gi, '') // Remove Volt's personality additions
+          .replace(/\n\s*They're.*?\.\s*/gi, '') // Remove personality continuations
+          .replace(/-- Volt.*$/gim, '') // Remove any Volt signatures
+          .replace(/\*winks\*/gi, '') // Remove personality actions
+          .replace(/\*.*?\*/gi, '') // Remove any action text in asterisks
+          .trim();
+        
+        // Debug cleaned content
+        console.log('Cleaned content length:', cleanedContent.length);
+        console.log('Cleaned content preview:', cleanedContent.substring(0, 200) + '...');
+        console.log('Cleaned content ends with:', cleanedContent.slice(-100));
+        
+        // Update form data with generated content
+        setFormData(prev => ({
+          ...prev,
+          content: cleanedContent
+        }));
+      } else {
+        throw new Error(result.error || 'No content generated');
+      }
+    } catch (error) {
+      console.error('Error generating content:', error);
+      alert('Failed to generate content. Please try again.');
+    } finally {
+      setIsGeneratingContent(false);
+    }
+  };
+
   // Get template by name
   const getTemplate = (templateName: string) => {
     return templates.find(t => t.name === templateName);
@@ -409,6 +506,8 @@ export default function PageManagement() {
               onChange={handleInputChange}
               onSubmit={handleCreatePage}
               onCancel={() => setIsCreateDialogOpen(false)}
+              onGenerateContent={handleGenerateContent}
+              isGeneratingContent={isGeneratingContent}
               isEdit={false}
             />
           </DialogContent>
@@ -640,6 +739,8 @@ export default function PageManagement() {
             onChange={handleInputChange}
             onSubmit={handleUpdatePage}
             onCancel={() => setIsEditDialogOpen(false)}
+            onGenerateContent={handleGenerateContent}
+            isGeneratingContent={isGeneratingContent}
             isEdit={true}
           />
         </DialogContent>
@@ -655,6 +756,8 @@ function CreateEditPageForm({
   onChange,
   onSubmit,
   onCancel,
+  onGenerateContent,
+  isGeneratingContent,
   isEdit
 }: {
   formData: Partial<PageData>;
@@ -662,6 +765,8 @@ function CreateEditPageForm({
   onChange: (field: keyof PageData, value: any) => void;
   onSubmit: () => void;
   onCancel: () => void;
+  onGenerateContent: () => void;
+  isGeneratingContent: boolean;
   isEdit: boolean;
 }) {
   const handleTemplateChange = (templateName: string) => {
@@ -733,13 +838,35 @@ function CreateEditPageForm({
 
       {/* Content */}
       <div className="space-y-2">
-        <Label htmlFor="content" className="text-white">Content *</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="content" className="text-white">Content *</Label>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onGenerateContent}
+            disabled={isGeneratingContent || !formData.title?.trim()}
+            className="border-orange-600 text-orange-400 hover:bg-orange-600 hover:text-white"
+          >
+            {isGeneratingContent ? (
+              <>
+                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Bot className="w-3 h-3 mr-1" />
+                Generate with Volt AI
+              </>
+            )}
+          </Button>
+        </div>
         <Textarea
           id="content"
           value={formData.content || ""}
           onChange={(e) => onChange('content', e.target.value)}
           className="bg-neutral-700 border-neutral-600 text-white min-h-[200px]"
-          placeholder="Enter page content (HTML supported)"
+          placeholder="Enter page content (HTML supported) or use Volt AI to generate content"
         />
       </div>
 

@@ -83,18 +83,13 @@ export default function PageRenderer({ page }: PageRendererProps) {
   const templateClasses = getTemplateClasses(page.template || 'default');
 
   return (
-    <div className="min-h-screen bg-black">
-      {/* Background Pattern */}
-      <div className="fixed inset-0 bg-[radial-gradient(circle_at_30%_80%,rgba(255,165,0,0.1),transparent_50%),radial-gradient(circle_at_80%_20%,rgba(255,165,0,0.05),transparent_50%)]" />
-      <div className="fixed inset-0 bg-[linear-gradient(to_bottom,transparent_0%,rgba(0,0,0,0.8)_100%)]" />
+    <>
+      {/* Background Pattern - only for this page content area */}
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_30%_80%,rgba(255,165,0,0.1),transparent_50%),radial-gradient(circle_at_80%_20%,rgba(255,165,0,0.05),transparent_50%)] pointer-events-none -z-10" />
+      <div className="fixed inset-0 bg-[linear-gradient(to_bottom,transparent_0%,rgba(0,0,0,0.8)_100%)] pointer-events-none -z-10" />
       
-      {/* Content */}
-      <div className="relative z-10">
-        {/* Navigation Spacer */}
-        <div className="h-20" />
-
-        {/* Page Content */}
-        <div className="container mx-auto px-4 py-12">
+      {/* Page Content */}
+      <div className="container mx-auto px-4 py-12 relative">
           <div className={`mx-auto ${templateClasses.container}`}>
             {/* Page Header */}
             <div className={templateClasses.header}>
@@ -170,7 +165,7 @@ export default function PageRenderer({ page }: PageRendererProps) {
 
         {/* Related Pages or CTA Section (for about page) */}
         {(page.template || 'default') === 'about' && (
-          <div className="bg-gradient-to-r from-orange-900/20 to-orange-800/20 py-16">
+          <div className="bg-gradient-to-r from-orange-900/20 to-orange-800/20 py-16 mt-16">
             <div className="container mx-auto px-4">
               <div className="max-w-4xl mx-auto text-center">
                 <h2 className="text-3xl font-bold text-white mb-6">
@@ -197,7 +192,6 @@ export default function PageRenderer({ page }: PageRendererProps) {
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </>
   );
 }
