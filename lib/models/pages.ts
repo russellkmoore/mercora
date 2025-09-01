@@ -164,7 +164,7 @@ export async function createPage(data: Omit<PageInsert, 'id' | 'created_at' | 'u
   }
   
   // Set timestamps
-  const now = new Date();
+  const now = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
   const pageData: PageInsert = {
     ...data,
     created_at: now,
@@ -203,47 +203,87 @@ export async function updatePage(
   userId?: string,
   changeSummary?: string
 ): Promise<PageSelect | null> {
-  const db = await getDbAsync();
+  try {
+    console.log(`Updating page ${id} with data:`, data);
+    
+    // Convert any Date objects in the incoming data to timestamps
+    const cleanData = { ...data };
+    Object.keys(cleanData).forEach(key => {
+      const value = (cleanData as any)[key];
+      if (value && Object.prototype.toString.call(value) === '[object Date]') {
+        console.log(`Converting Date object for field ${key}:`, value);
+        (cleanData as any)[key] = Math.floor(value.getTime() / 1000);
+      }
+    });
+    console.log('Cleaned data:', cleanData);
+    
+    const db = await getDbAsync();
+    
+    // Get current page
+    const currentPage = await getPageById(id);
+    if (!currentPage) {
+      throw new Error("Page not found");
+    }
+    console.log('Current page found:', currentPage.title);
+    
+    // Validate data
+    const validation = validatePageData(cleanData);
+    if (!validation.valid) {
+      console.error('Validation failed:', validation.errors);
+      throw new Error(`Invalid page data: ${validation.errors.join(', ')}`);
+    }
+    console.log('Data validation passed');
+    
+    // Generate new slug if title changed
+    if (cleanData.title && cleanData.title !== currentPage.title && !cleanData.slug) {
+      console.log('Generating new slug for title:', cleanData.title);
+      const existingSlugs = await getExistingSlugs();
+      cleanData.slug = generatePageSlug(cleanData.title, existingSlugs);
+      console.log('Generated slug:', cleanData.slug);
+    }
+    
+    // Increment version if content changed
+    const contentChanged = cleanData.content && cleanData.content !== currentPage.content;
+    const newVersion = contentChanged ? currentPage.version + 1 : currentPage.version;
+    console.log('Version handling - contentChanged:', contentChanged, 'newVersion:', newVersion);
+    console.log('Current page data types:', Object.entries(currentPage).map(([k, v]) => `${k}: ${typeof v}`).join(', '));
+    
+    // Update page
+    const now = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
+    const updateData: Partial<PageInsert> = {
+      ...cleanData,
+      updated_at: now,
+      updated_by: userId,
+      version: newVersion
+    };
+    
+    console.log('About to update with data:', updateData);
+    
+    // Deep inspection of updateData for any Date objects
+    Object.entries(updateData).forEach(([key, value]) => {
+      console.log(`Field ${key}:`, typeof value, value);
+      if (value && Object.prototype.toString.call(value) === '[object Date]') {
+        console.error(`FOUND DATE OBJECT in field ${key}:`, value);
+      }
+    });
+    
+    let result;
+    try {
+      result = await db.update(pages)
+        .set(updateData)
+        .where(eq(pages.id, id))
+        .returning();
+      console.log('Database update completed, rows affected:', result.length);
+    } catch (dbError) {
+      console.error('Database update failed:', dbError);
+      throw dbError;
+    }
   
-  // Get current page
-  const currentPage = await getPageById(id);
-  if (!currentPage) {
-    throw new Error("Page not found");
-  }
-  
-  // Validate data
-  const validation = validatePageData(data);
-  if (!validation.valid) {
-    throw new Error(`Invalid page data: ${validation.errors.join(', ')}`);
-  }
-  
-  // Generate new slug if title changed
-  if (data.title && data.title !== currentPage.title && !data.slug) {
-    const existingSlugs = await getExistingSlugs();
-    data.slug = generatePageSlug(data.title, existingSlugs);
-  }
-  
-  // Increment version if content changed
-  const contentChanged = data.content && data.content !== currentPage.content;
-  const newVersion = contentChanged ? currentPage.version + 1 : currentPage.version;
-  
-  // Update page
-  const updateData: Partial<PageInsert> = {
-    ...data,
-    updated_at: new Date(),
-    updated_by: userId,
-    version: newVersion
-  };
-  
-  const result = await db.update(pages)
-    .set(updateData)
-    .where(eq(pages.id, id))
-    .returning();
-  
-  const updatedPage = result[0];
+    const updatedPage = result[0];
   
   // Create new version if content changed
   if (contentChanged && updatedPage) {
+    console.log('Creating page version with data types:', Object.entries(updatedPage).map(([k, v]) => `${k}: ${typeof v}`).join(', '));
     await createPageVersion(id, {
       title: updatedPage.title,
       content: updatedPage.content,
@@ -257,7 +297,12 @@ export async function updatePage(
     });
   }
   
-  return updatedPage;
+    console.log('Page updated successfully');
+    return updatedPage;
+  } catch (error) {
+    console.error('Error in updatePage:', error);
+    throw error;
+  }
 }
 
 /**
@@ -289,10 +334,11 @@ export async function createPageVersion(
 ): Promise<PageVersionSelect> {
   const db = await getDbAsync();
   
+  const now = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
   const versionData: PageVersionInsert = {
     ...data,
     page_id: pageId,
-    created_at: new Date()
+    created_at: now
   };
   
   const result = await db.insert(page_versions).values(versionData).returning();
@@ -460,9 +506,10 @@ export async function searchPages(
  * Publish a page
  */
 export async function publishPage(id: number, userId?: string): Promise<PageSelect | null> {
+  const now = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
   return updatePage(id, {
     status: PAGE_STATUS.PUBLISHED,
-    published_at: new Date()
+    published_at: now
   }, userId, "Page published");
 }
 

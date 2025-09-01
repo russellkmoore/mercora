@@ -174,8 +174,14 @@ export async function PUT(
       );
     }
 
+    // Return more detailed error information
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    const errorStack = error instanceof Error ? error.stack : "No stack trace available";
+    
+    console.error("Detailed error:", { message: errorMessage, stack: errorStack });
+
     return NextResponse.json(
-      { success: false, error: "Failed to update page" },
+      { success: false, error: `Failed to update page: ${errorMessage}` },
       { status: 500 }
     );
   }
