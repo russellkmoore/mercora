@@ -92,6 +92,23 @@ export async function getAISettings() {
   };
 }
 
+/**
+ * Get social media settings specifically
+ * @returns Promise<SocialMediaSettings> - Social media links configuration
+ */
+export async function getSocialMediaSettings() {
+  const socialSettings = await getSettings('social');
+  
+  return {
+    instagram: socialSettings['social.instagram'] || '',
+    youtube: socialSettings['social.youtube'] || '',
+    linkedin: socialSettings['social.linkedin'] || '',
+    twitter: socialSettings['social.twitter'] || '',
+    facebook: socialSettings['social.facebook'] || '',
+    tiktok: socialSettings['social.tiktok'] || '',
+  };
+}
+
 export interface RefundPolicy {
   refundShipping: boolean;
   refundShippingOnFullReturn: boolean;

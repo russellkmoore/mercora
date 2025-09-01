@@ -30,7 +30,6 @@
  */
 
 import { listCategories } from "@/lib/models";
-import { getNavigationPages } from "@/lib/models/pages";
 import HeaderClient from "./HeaderClient";
 import { unstable_cache } from "next/cache";
 
@@ -41,25 +40,15 @@ const getCachedCategories = unstable_cache(
   { revalidate: 3600 } // Cache for 1 hour
 );
 
-// Cache navigation pages for better performance
-const getCachedNavigationPages = unstable_cache(
-  async () => getNavigationPages(),
-  ['header-navigation-pages'],
-  { revalidate: 3600 } // Cache for 1 hour
-);
-
 /**
- * Server-side Header component that fetches categories and navigation pages and renders HeaderClient
+ * Server-side Header component that fetches categories and renders HeaderClient
  * 
- * @returns Promise<JSX.Element> Server-rendered header with category and page data
+ * @returns Promise<JSX.Element> Server-rendered header with category data
  */
 export default async function Header() {
-  // Fetch both categories and navigation pages on the server for optimal performance with caching
-  const [categories, navigationPages] = await Promise.all([
-    getCachedCategories(),
-    getCachedNavigationPages()
-  ]);
+  // Fetch categories on the server for optimal performance with caching
+  const categories = await getCachedCategories();
   
   // Pass data to client component for interactive functionality
-  return <HeaderClient categories={categories} navigationPages={navigationPages} />;
+  return <HeaderClient categories={categories} />;
 }
