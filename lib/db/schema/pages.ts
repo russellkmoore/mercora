@@ -31,7 +31,7 @@ export const pages = sqliteTable("pages", {
   
   // Publishing
   status: text("status").notNull().default("draft"), // draft, published, archived
-  published_at: integer("published_at", { mode: "timestamp" }),
+  published_at: integer("published_at"),
   
   // Content organization
   template: text("template").default("default"), // page template type
@@ -39,8 +39,8 @@ export const pages = sqliteTable("pages", {
   sort_order: integer("sort_order").default(0), // Display order
   
   // System fields
-  created_at: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
-  updated_at: integer("updated_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  created_at: integer("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updated_at: integer("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   created_by: text("created_by"), // User ID who created the page
   updated_by: text("updated_by"), // User ID who last updated the page
   
@@ -88,7 +88,7 @@ export const page_versions = sqliteTable("page_versions", {
   change_summary: text("change_summary"), // Description of changes
   
   // System fields
-  created_at: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  created_at: integer("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   created_by: text("created_by").notNull(),
   
 }, (table) => ({
@@ -111,7 +111,7 @@ export const page_templates = sqliteTable("page_templates", {
   default_content: text("default_content"), // Default content for new pages
   
   // System fields
-  created_at: integer("created_at", { mode: "timestamp" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  created_at: integer("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   is_active: integer("is_active", { mode: "boolean" }).default(true),
   
 }, (table) => ({
@@ -254,8 +254,9 @@ export function validatePageData(data: Partial<PageInsert>): { valid: boolean; e
  * Check if page is published and visible
  */
 export function isPagePublished(page: PageSelect): boolean {
+  const now = Math.floor(Date.now() / 1000); // Current Unix timestamp
   return page.status === PAGE_STATUS.PUBLISHED && 
-         (page.published_at === null || page.published_at <= new Date());
+         (page.published_at === null || page.published_at <= now);
 }
 
 /**

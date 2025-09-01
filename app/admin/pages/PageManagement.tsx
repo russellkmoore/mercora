@@ -80,9 +80,9 @@ interface PageData {
   meta_keywords?: string;
   status: 'draft' | 'published' | 'archived';
   template: string;
-  published_at?: string;
-  created_at: string;
-  updated_at: string;
+  published_at?: number;
+  created_at: number;
+  updated_at: number;
   created_by?: string;
   updated_by?: string;
   version: number;
@@ -470,9 +470,19 @@ Generate complete content now:`;
     return templates.find(t => t.name === templateName);
   };
 
-  // Format date
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+  // Format date - handles both Unix timestamps (numbers) and date strings
+  const formatDate = (dateValue: string | number) => {
+    let date: Date;
+    
+    if (typeof dateValue === 'number') {
+      // Unix timestamp in seconds, convert to milliseconds
+      date = new Date(dateValue * 1000);
+    } else {
+      // Date string
+      date = new Date(dateValue);
+    }
+    
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
