@@ -151,12 +151,20 @@ export async function getPageBySlug(slug: string, includeUnpublished = false): P
 export async function createPage(data: Omit<PageInsert, 'id' | 'created_at' | 'updated_at'>): Promise<PageSelect> {
   const db = await getDbAsync();
   
+  // Validate required fields for creation
+  if (!data.title || data.title.trim().length === 0) {
+    throw new Error("Title is required");
+  }
+  if (!data.content || data.content.trim().length === 0) {
+    throw new Error("Content is required");
+  }
+  
   // Validate data
   const validation = validatePageData(data);
   if (!validation.valid) {
     throw new Error(`Invalid page data: ${validation.errors.join(', ')}`);
   }
-  
+
   // Generate slug if not provided
   if (!data.slug && data.title) {
     const existingSlugs = await getExistingSlugs();
