@@ -3,10 +3,10 @@ export default function Footer() {
     <footer className="bg-neutral-950 text-white mt-16 relative z-10">
       <div className="ml-0 sm:ml-[100px] lg:ml-[200px] px-4 sm:px-6 py-12 sm:py-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 sm:gap-8 text-sm text-gray-400 z-10 relative">
         <div className="space-y-2">
+          <a href="/about" className="block hover:text-white">About Us</a>
           <a href="#" className="block hover:text-white">Contact us</a>
           <a href="#" className="block hover:text-white">Keep in touch</a>
           <a href="#" className="block hover:text-white">Careers</a>
-          <a href="#" className="block hover:text-white">About Voltique</a>
         </div>
         <div className="space-y-2">
           <a href="#" className="block hover:text-white">News & media</a>
@@ -15,8 +15,8 @@ export default function Footer() {
           <a href="#" className="block hover:text-white">Specs</a>
         </div>
         <div className="space-y-2">
-          <a href="#" className="block hover:text-white">Privacy policy</a>
-          <a href="#" className="block hover:text-white">Terms of use</a>
+          <a href="/privacy-policy" className="block hover:text-white">Privacy policy</a>
+          <a href="/terms-of-service" className="block hover:text-white">Terms of service</a>
           <a href="#" className="block hover:text-white">Fleet</a>
           <a href="#" className="block hover:text-white">FAQ</a>
         </div>
