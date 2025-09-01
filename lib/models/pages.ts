@@ -20,7 +20,6 @@ import {
   PAGE_STATUS,
   PageStatus,
   generatePageSlug,
-  validatePageData,
   isPagePublished,
   getPageUrl
 } from "@/lib/db/schema/pages";
@@ -389,6 +388,47 @@ export async function getPageStats(): Promise<{
 }
 
 /**
+ * Validate page data
+ */
+export function validatePageData(data: Partial<PageInsert>): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  // Title validation
+  if (data.title !== undefined) {
+    if (!data.title || data.title.trim().length === 0) {
+      errors.push("Title is required");
+    } else if (data.title.length > 500) {
+      errors.push("Title must be less than 500 characters");
+    }
+  }
+  
+  // Slug validation
+  if (data.slug !== undefined) {
+    if (!data.slug || data.slug.trim().length === 0) {
+      errors.push("Slug is required");
+    } else if (!/^[a-z0-9-]+$/.test(data.slug)) {
+      errors.push("Slug can only contain lowercase letters, numbers, and hyphens");
+    }
+  }
+  
+  // Content validation
+  if (data.content !== undefined && data.content && data.content.length > 100000) {
+    errors.push("Content must be less than 100,000 characters");
+  }
+  
+  // Status validation
+  if (data.status && !Object.values(PAGE_STATUS).includes(data.status as PageStatus)) {
+    errors.push("Invalid status");
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
+
+
+/**
  * Get existing slugs for uniqueness checking
  */
 export async function getExistingSlugs(): Promise<string[]> {
@@ -450,7 +490,6 @@ export async function archivePage(id: number, userId?: string): Promise<PageSele
  */
 export { 
   generatePageSlug,
-  validatePageData,
   isPagePublished,
   getPageUrl,
   PAGE_STATUS
