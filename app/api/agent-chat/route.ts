@@ -235,12 +235,15 @@ If no products are truly relevant to their question, provide general advice abou
 
 Your expertise is in curation, not catalog dumping. Choose wisely.`;
 
-    // Check for unicorn mode and greeting mode
+    // Check for unicorn mode, greeting mode, and content generation mode
     const unicornMode = /unicorn/i.test(question);
     const isGreeting =
       /^(hi|hello|hey|what's up|good morning|good afternoon|good evening)[\s\.,!?]*$/i.test(
         question.trim()
       );
+    const isContentGeneration = userContext === 'content-generation' || 
+                               question.includes('Generate ONLY the inner HTML') ||
+                               question.includes('CRITICAL: Generate complete');
 
     let assistantReply = "";
     let isAIResponse = false; // Track if we got a real AI response
@@ -267,11 +270,24 @@ ${
 
 Respond to this greeting warmly and ask what outdoor adventure they're planning. Keep it under 50 words.`;
 
+        // Content generation system prompt
+        const contentGenerationPrompt = `You are a professional content writer creating HTML content for an outdoor gear eCommerce platform. Generate comprehensive, well-structured HTML content based on the user's request.
+
+CRITICAL REQUIREMENTS:
+- Generate ONLY inner HTML content (no DOCTYPE, html, head, body tags)
+- Use semantic HTML elements (h1, h2, h3, p, ul, ol, section, div)
+- Be professional and informative - NO personality, jokes, or conversational tone
+- Create comprehensive content with multiple sections
+- Ensure content is complete and not truncated
+- Target detailed, informative content appropriate for business use
+
+Generate complete content based on the user's specifications.`;
+
         // Prepare messages for AI
         const messages = [
           {
             role: "system",
-            content: isGreeting ? greetingPrompt : systemPrompt,
+            content: isContentGeneration ? contentGenerationPrompt : (isGreeting ? greetingPrompt : systemPrompt),
           },
           ...recentMessages, // Include conversation history
           { role: "user", content: question },
@@ -285,8 +301,8 @@ Respond to this greeting warmly and ask what outdoor adventure they're planning.
           // Generate AI response
           const response = await ai.run("@cf/meta/llama-3.1-8b-instruct", {
             messages: messages,
-            max_tokens: isGreeting ? 128 : 256,
-            temperature: 0.1, // Lower temperature for more consistent, less creative responses
+            max_tokens: isContentGeneration ? 2048 : (isGreeting ? 128 : 256),
+            temperature: isContentGeneration ? 0.3 : 0.1, // Slightly higher temp for more varied content generation
           });
 
           console.log("AI response:", response.response);

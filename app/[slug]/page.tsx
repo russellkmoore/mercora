@@ -6,9 +6,10 @@
  */
 
 import { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getPageBySlug } from "@/lib/models/pages";
 import PageRenderer from "./PageRenderer";
+import { auth } from "@clerk/nextjs/server";
 
 interface PageProps {
   params: Promise<{
@@ -79,6 +80,16 @@ export default async function PublicPage({ params }: PageProps) {
     
     if (!page) {
       notFound();
+    }
+
+    // Check if page is protected and requires authentication
+    if (page.is_protected) {
+      const { userId } = await auth();
+      
+      if (!userId) {
+        // Redirect to sign-in with return URL
+        redirect(`/sign-in?redirect_url=/${slug}`);
+      }
     }
 
     return <PageRenderer page={page} />;
