@@ -65,14 +65,12 @@ import CartDrawer from "@/components/cart/CartDrawer";
 import { CartHydrationGuard } from "@/components/cart/CartHydrationGuard";
 import ClientOnly from "@/components/ClientOnly";
 import type { MACHCategory } from '@/lib/types/mach';
-import type { PageSelect } from '@/lib/db/schema/pages';
 
 /**
  * Props interface for HeaderClient component
  */
 interface HeaderClientProps {
   categories: MACHCategory[];
-  navigationPages: PageSelect[];
 }
 
 /**
@@ -131,7 +129,6 @@ const getCategorySlug = (category: MACHCategory): string => {
  */
 export default function HeaderClient({
   categories,
-  navigationPages,
 }: HeaderClientProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -316,6 +313,7 @@ export default function HeaderClient({
           </DropdownMenuContent>
         </DropdownMenu>
 
+
         <ClientOnly>
           <AgentDrawer />
         </ClientOnly>
@@ -377,6 +375,7 @@ export default function HeaderClient({
                   )}
                 </div>
               </div>
+
 
               <div className="px-4 border-t border-neutral-700 pt-4 space-y-3">
                 <button 

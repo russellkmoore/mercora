@@ -62,7 +62,8 @@ import { Switch } from "@/components/ui/switch";
 import { 
   Settings, Store, Bot, Mail, Database, 
   RefreshCw, Save, Globe, DollarSign,
-  Shield, Zap, AlertCircle, CheckCircle
+  Shield, Zap, AlertCircle, CheckCircle,
+  Share2
 } from "lucide-react";
 
 interface SystemSettings {
@@ -104,6 +105,15 @@ interface PromotionSettings {
   new_customer_discount: number;
 }
 
+interface SocialMediaSettings {
+  instagram: string;
+  youtube: string;
+  linkedin: string;
+  twitter: string;
+  facebook: string;
+  tiktok: string;
+}
+
 interface VectorIndexStatus {
   knowledgeBaseSize: number;
   vectorIndexStatus: string;
@@ -111,7 +121,7 @@ interface VectorIndexStatus {
 }
 
 export default function AdminSettingsPage() {
-  const [activeTab, setActiveTab] = useState<"system" | "store" | "shipping" | "refunds" | "promotions" | "admins">("system");
+  const [activeTab, setActiveTab] = useState<"system" | "store" | "shipping" | "refunds" | "promotions" | "social" | "admins">("system");
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
@@ -151,6 +161,15 @@ export default function AdminSettingsPage() {
     banner_text: '🎉 Free shipping on orders over $75!',
     banner_type: 'info',
     new_customer_discount: 0
+  });
+
+  const [socialMediaSettings, setSocialMediaSettings] = useState<SocialMediaSettings>({
+    instagram: '',
+    youtube: '',
+    linkedin: '',
+    twitter: '',
+    facebook: '',
+    tiktok: ''
   });
 
   const [vectorStatus, setVectorStatus] = useState<VectorIndexStatus>({
@@ -204,6 +223,13 @@ export default function AdminSettingsPage() {
             if (setting.key === 'promotions.banner_text') setPromotionSettings(prev => ({ ...prev, banner_text: value }));
             if (setting.key === 'promotions.banner_type') setPromotionSettings(prev => ({ ...prev, banner_type: value }));
             if (setting.key === 'promotions.new_customer_discount') setPromotionSettings(prev => ({ ...prev, new_customer_discount: value }));
+          } else if (setting.category === 'social') {
+            if (setting.key === 'social.instagram') setSocialMediaSettings(prev => ({ ...prev, instagram: value }));
+            if (setting.key === 'social.youtube') setSocialMediaSettings(prev => ({ ...prev, youtube: value }));
+            if (setting.key === 'social.linkedin') setSocialMediaSettings(prev => ({ ...prev, linkedin: value }));
+            if (setting.key === 'social.twitter') setSocialMediaSettings(prev => ({ ...prev, twitter: value }));
+            if (setting.key === 'social.facebook') setSocialMediaSettings(prev => ({ ...prev, facebook: value }));
+            if (setting.key === 'social.tiktok') setSocialMediaSettings(prev => ({ ...prev, tiktok: value }));
           }
         });
       }
@@ -339,6 +365,14 @@ export default function AdminSettingsPage() {
         { key: 'promotions.banner_text', value: promotionSettings.banner_text, category: 'promotions' },
         { key: 'promotions.banner_type', value: promotionSettings.banner_type, category: 'promotions' },
         { key: 'promotions.new_customer_discount', value: promotionSettings.new_customer_discount, category: 'promotions' },
+        
+        // Social media settings
+        { key: 'social.instagram', value: socialMediaSettings.instagram, category: 'social' },
+        { key: 'social.youtube', value: socialMediaSettings.youtube, category: 'social' },
+        { key: 'social.linkedin', value: socialMediaSettings.linkedin, category: 'social' },
+        { key: 'social.twitter', value: socialMediaSettings.twitter, category: 'social' },
+        { key: 'social.facebook', value: socialMediaSettings.facebook, category: 'social' },
+        { key: 'social.tiktok', value: socialMediaSettings.tiktok, category: 'social' },
       ];
       
       const response = await fetch('/api/admin/settings', {
@@ -396,6 +430,7 @@ export default function AdminSettingsPage() {
     { id: "shipping" as const, label: "Shipping", icon: Zap, description: "Methods & pricing" },
     { id: "refunds" as const, label: "Refunds", icon: RefreshCw, description: "Return policies" },
     { id: "promotions" as const, label: "Promotions", icon: DollarSign, description: "Sales & banners" },
+    { id: "social" as const, label: "Social Media", icon: Share2, description: "Social links" },
     { id: "admins" as const, label: "Admin Users", icon: Shield, description: "Access management" }
   ];
 
@@ -876,6 +911,114 @@ export default function AdminSettingsPage() {
                   </div>
                 </>
               )}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Social Media Settings */}
+      {activeTab === "social" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="bg-neutral-800 border-neutral-700 p-6">
+            <div className="flex items-center space-x-3 mb-4">
+              <Share2 className="w-5 h-5 text-blue-400" />
+              <h3 className="text-lg font-semibold text-white">Social Media Links</h3>
+            </div>
+            
+            <p className="text-gray-400 mb-6">
+              Manage social media links displayed in your site footer. Leave empty to hide specific platforms.
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Instagram</label>
+                <Input
+                  type="url"
+                  value={socialMediaSettings.instagram}
+                  onChange={(e) => setSocialMediaSettings(prev => ({ ...prev, instagram: e.target.value }))}
+                  className="bg-neutral-700 border-neutral-600 text-white"
+                  placeholder="https://instagram.com/yourusername"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">YouTube</label>
+                <Input
+                  type="url"
+                  value={socialMediaSettings.youtube}
+                  onChange={(e) => setSocialMediaSettings(prev => ({ ...prev, youtube: e.target.value }))}
+                  className="bg-neutral-700 border-neutral-600 text-white"
+                  placeholder="https://youtube.com/@yourchannel"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">LinkedIn</label>
+                <Input
+                  type="url"
+                  value={socialMediaSettings.linkedin}
+                  onChange={(e) => setSocialMediaSettings(prev => ({ ...prev, linkedin: e.target.value }))}
+                  className="bg-neutral-700 border-neutral-600 text-white"
+                  placeholder="https://linkedin.com/company/yourcompany"
+                />
+              </div>
+            </div>
+          </Card>
+
+          <Card className="bg-neutral-800 border-neutral-700 p-6">
+            <div className="flex items-center space-x-3 mb-4">
+              <Globe className="w-5 h-5 text-green-400" />
+              <h3 className="text-lg font-semibold text-white">Additional Platforms</h3>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Twitter (X)</label>
+                <Input
+                  type="url"
+                  value={socialMediaSettings.twitter}
+                  onChange={(e) => setSocialMediaSettings(prev => ({ ...prev, twitter: e.target.value }))}
+                  className="bg-neutral-700 border-neutral-600 text-white"
+                  placeholder="https://twitter.com/yourusername"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Facebook</label>
+                <Input
+                  type="url"
+                  value={socialMediaSettings.facebook}
+                  onChange={(e) => setSocialMediaSettings(prev => ({ ...prev, facebook: e.target.value }))}
+                  className="bg-neutral-700 border-neutral-600 text-white"
+                  placeholder="https://facebook.com/yourpage"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">TikTok</label>
+                <Input
+                  type="url"
+                  value={socialMediaSettings.tiktok}
+                  onChange={(e) => setSocialMediaSettings(prev => ({ ...prev, tiktok: e.target.value }))}
+                  className="bg-neutral-700 border-neutral-600 text-white"
+                  placeholder="https://tiktok.com/@yourusername"
+                />
+              </div>
+            </div>
+
+            <div className="bg-blue-900/20 border border-blue-600/30 rounded-lg p-4 mt-6">
+              <div className="flex items-start space-x-3">
+                <CheckCircle className="w-5 h-5 text-blue-400 mt-0.5" />
+                <div>
+                  <h5 className="text-blue-300 font-medium mb-2">Footer Integration:</h5>
+                  <ul className="text-blue-200 text-sm space-y-1 list-disc list-inside">
+                    <li>Links appear automatically in the footer when provided</li>
+                    <li>Empty links are hidden from display</li>
+                    <li>All links open in new tabs for better user experience</li>
+                    <li>Changes are applied immediately after saving</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </Card>
         </div>
