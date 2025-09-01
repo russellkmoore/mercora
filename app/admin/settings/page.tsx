@@ -232,27 +232,77 @@ export default function AdminSettingsPage() {
   };
 
   // Add new admin user
-  const addAdminUser = () => {
+  const addAdminUser = async () => {
     if (!newUserId.trim()) return;
     if (!newUserId.match(/^user_[a-zA-Z0-9]+$/)) {
       alert('User ID must start with "user_" and contain only letters and numbers');
       return;
     }
-    if (adminUsers.includes(newUserId.trim())) {
-      alert('This user is already an admin');
-      return;
+
+    try {
+      setAdminUsersLoading(true);
+      const response = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'add',
+          userId: newUserId.trim()
+        })
+      });
+
+      const result = await response.json() as { message?: string; error?: string };
+      
+      if (response.ok) {
+        setNewUserId('');
+        loadAdminUsers(); // Reload the list
+        alert('Admin user added successfully!');
+      } else {
+        alert(`Error: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error adding admin user:', error);
+      alert('Failed to add admin user');
+    } finally {
+      setAdminUsersLoading(false);
     }
-    setAdminUsers([...adminUsers, newUserId.trim()]);
-    setNewUserId('');
   };
 
   // Remove admin user
-  const removeAdminUser = (userId: string) => {
+  const removeAdminUser = async (userId: string) => {
     if (adminUsers.length <= 1) {
       alert('Cannot remove the last admin user');
       return;
     }
-    setAdminUsers(adminUsers.filter(id => id !== userId));
+
+    if (!confirm(`Are you sure you want to remove admin access for ${userId}?`)) {
+      return;
+    }
+
+    try {
+      setAdminUsersLoading(true);
+      const response = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'remove',
+          userId
+        })
+      });
+
+      const result = await response.json() as { message?: string; error?: string };
+      
+      if (response.ok) {
+        loadAdminUsers(); // Reload the list
+        alert('Admin user removed successfully!');
+      } else {
+        alert(`Error: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error removing admin user:', error);
+      alert('Failed to remove admin user');
+    } finally {
+      setAdminUsersLoading(false);
+    }
   };
 
   const handleSave = async () => {
@@ -916,13 +966,13 @@ export default function AdminSettingsPage() {
             </div>
 
             {/* Instructions */}
-            <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-4 mt-6">
+            <div className="bg-blue-900/20 border border-blue-600/30 rounded-lg p-4 mt-6">
               <div className="flex items-start space-x-3">
-                <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5" />
+                <CheckCircle className="w-5 h-5 text-blue-400 mt-0.5" />
                 <div>
-                  <h5 className="text-yellow-300 font-medium mb-2">Important Notes:</h5>
-                  <ul className="text-yellow-200 text-sm space-y-1 list-disc list-inside">
-                    <li>Changes here only update the local list - you'll see a command to run</li>
+                  <h5 className="text-blue-300 font-medium mb-2">Database-Based Management:</h5>
+                  <ul className="text-blue-200 text-sm space-y-1 list-disc list-inside">
+                    <li>Changes are applied immediately to the database</li>
                     <li>User IDs can be found in the Clerk Dashboard under Users</li>
                     <li>There must always be at least one admin user</li>
                     <li>Admin users have full access to all store data and settings</li>
@@ -930,19 +980,6 @@ export default function AdminSettingsPage() {
                 </div>
               </div>
             </div>
-
-            {/* Command to run (when changes are made) */}
-            {adminUsers.length > 0 && (
-              <div className="bg-neutral-900 border border-neutral-600 rounded-lg p-4 mt-4">
-                <h5 className="text-white font-medium mb-2">To apply changes, run:</h5>
-                <div className="bg-black rounded p-3 font-mono text-sm text-green-400">
-                  echo "{adminUsers.join(',')}" | npx wrangler secret put ADMIN_USER_IDS
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Run this command in your terminal to update the admin users list
-                </p>
-              </div>
-            )}
           </Card>
         </div>
       )}
