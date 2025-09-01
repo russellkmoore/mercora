@@ -100,3 +100,6 @@ export * from "./settings";
 
 // Admin Users schema (application-specific)
 export * from "./admin_users";
+
+// Pages/CMS schema (application-specific)
+export * from "./pages";
