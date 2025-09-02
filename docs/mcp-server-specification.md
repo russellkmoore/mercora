@@ -410,4 +410,217 @@ interface SafetyConfig {
 
 ---
 
+## 🤖 Multi-Agent Commerce Architecture
+
+### **Agent Context & User Identity**
+
+**Design Philosophy**: Users don't need authentication, but agents provide rich user context for personalized commerce.
+
+```typescript
+interface AgentContext {
+  agentId: string;           // Unique agent identifier
+  userId?: string;           // User's identifier (optional)
+  userPreferences?: {        // User context from agent
+    budget?: number;
+    brands?: string[];
+    activities?: string[];
+    location?: string;
+    experience_level?: string;
+  };
+  session_context?: string;  // Agent's understanding of user needs
+}
+```
+
+### **Multi-Site Order Coordination**
+
+**Vision**: Personal shopping agents coordinate orders across specialized retailers (Voltique for camping gear, others for rations/skis).
+
+```typescript
+// Cross-site coordination tools
+voltique_get_capabilities(): Promise<{
+  categories: string[];
+  price_ranges: Record<string, {min: number, max: number}>;
+  shipping_regions: string[];
+  specialties: string[];
+}>;
+
+voltique_assess_request(requirements: {
+  items: string[];
+  budget: number;
+  timeline: string;
+  location: string;
+}): Promise<{
+  can_fulfill: string[];         // Items Voltique can provide
+  cannot_fulfill: string[];      // Items to source elsewhere
+  recommendations: Product[];    // What we recommend
+  estimated_cost: number;
+  estimated_delivery: string;
+}>;
+```
+
+### **Enhanced Tool Response Format**
+
+```typescript
+interface MCPToolResponse<T> {
+  success: boolean;
+  data: T;
+  context: {
+    session_id: string;
+    agent_id: string;
+    processing_time_ms: number;
+  };
+  recommendations?: {
+    alternative_sites?: string[];    // Suggest other sites for unfulfilled needs
+    bundling_opportunities?: string[];
+    cost_optimization?: string[];
+  };
+  metadata: {
+    can_fulfill_percentage: number;  // How much of request we can handle
+    estimated_satisfaction: number;  // How well we match user needs
+    next_actions?: string[];         // Suggested next steps
+  };
+}
+```
+
+## 🏗️ Implementation Architecture
+
+### **Code Structure**
+
+```
+app/api/mcp/                    # MCP Server endpoints
+├── route.ts                    # Main MCP server discovery/capabilities
+├── tools/
+│   ├── search/route.ts         # Product search with agent context
+│   ├── assess/route.ts         # Fulfillment assessment
+│   ├── recommend/route.ts      # AI recommendations
+│   ├── cart/
+│   │   ├── add/route.ts        # Add to agent cart
+│   │   ├── update/route.ts     # Update cart quantities
+│   │   ├── remove/route.ts     # Remove from cart
+│   │   └── estimate/route.ts   # Get totals/shipping
+│   └── order/
+│       ├── place/route.ts      # Place order with agent context
+│       ├── status/route.ts     # Order status lookup
+│       └── track/route.ts      # Shipment tracking
+└── sessions/
+    ├── route.ts                # Create/list sessions
+    └── [sessionId]/route.ts    # Get/update/delete session
+
+lib/mcp/                        # MCP-specific logic
+├── types.ts                    # MCP request/response types
+├── auth.ts                     # Agent authentication
+├── context.ts                  # Agent context parsing
+├── session.ts                  # Session management
+├── tools/                      # Tool implementations
+│   ├── search.ts              
+│   ├── assess.ts              
+│   ├── recommend.ts           
+│   ├── cart.ts                
+│   └── order.ts               
+└── server.ts                   # Core MCP server logic
+
+lib/db/schema/
+└── mcp.ts                      # MCP session/agent tables
+```
+
+### **Cloudflare Workers Adaptations**
+
+**Transport Layer**: HTTP REST instead of WebSocket
+```typescript
+// HTTP-based MCP server for Cloudflare Workers
+app.post('/api/mcp/tools/:toolName', async (request) => {
+  const context = parseAgentContext(request.headers);
+  const result = await executeTool(toolName, request.body, context);
+  return Response.json(result);
+});
+```
+
+**Response Chunking** for 128KB limit:
+```typescript
+interface ChunkedResponse {
+  chunk: number;
+  total_chunks: number;
+  data: any[];
+  next_token?: string;
+}
+```
+
+**Session State** via Cloudflare D1:
+```typescript
+interface AgentSession {
+  sessionId: string;
+  agentId: string;
+  userContext: AgentContext;
+  cart: CartItem[];
+  created_at: string;
+  expires_at: string;
+}
+```
+
+### **Authentication Architecture**
+
+**Hybrid Approach**: No user auth required, agent API keys for rate limiting
+
+```typescript
+interface MCPAuthConfig {
+  require_user_auth: false;
+  
+  agent_auth: {
+    method: 'api_key';
+    header: 'X-Agent-API-Key';
+    rate_limits: {
+      requests_per_minute: 100;
+      orders_per_hour: 10;
+    };
+  };
+  
+  user_context_validation: {
+    required_fields: [];
+    optional_fields: ['budget', 'preferences', 'location'];
+    max_context_size: 1024; // bytes
+  };
+}
+```
+
+## 🎯 Implementation Decisions (Recommendations)
+
+### **✅ Recommended Decisions**
+
+1. **Transport**: HTTP REST API (Option B) - Simpler than JSON-RPC, Cloudflare Workers compatible
+2. **Authentication**: API Keys - Required for rate limiting and agent identification  
+3. **Context**: Rich Context - Enables personalized multi-site coordination
+4. **State**: Cloudflare D1 - Leverages existing infrastructure, persistent sessions
+5. **Caching**: Product + Agent-specific - Best performance for repeated queries
+6. **Error Handling**: Graceful degradation with fallbacks - Maintains agent workflow reliability
+
+### **🚀 Implementation Priority Roadmap**
+
+#### **Phase 1: MCP Foundation (Week 1)**
+1. **HTTP-based MCP server** - Cloudflare Workers adaptation
+2. **Agent context parsing** - Handle agent-provided user context
+3. **Session management** - D1-based agent session storage
+4. **Basic tools**: `search`, `get_capabilities`, `assess_request`
+
+#### **Phase 2: Commerce Core (Week 2)**  
+1. **Cart management** - Agent session-based carts
+2. **Order placement** - With agent context integration
+3. **Enhanced recommendations** - Multi-site awareness
+4. **Response chunking** - Handle large datasets
+
+#### **Phase 3: Multi-Agent Features (Week 3)**
+1. **Cross-site coordination** - Assessment and routing tools
+2. **Agent rate limiting** - Per-agent usage controls  
+3. **Context validation** - User preference processing
+4. **Order tracking** - Agent-accessible status updates
+
+#### **Phase 4: Production Readiness (Week 4)**
+1. **Error handling** - Graceful degradation
+2. **Monitoring** - Agent usage analytics
+3. **Documentation** - MCP client integration guides
+4. **Testing** - Multi-agent scenarios
+
+---
+
 **This MCP server represents a paradigm shift in eCommerce - from destination shopping to embedded, conversational commerce. By integrating shopping directly into users' daily workflows, we transform Voltique from a website into an essential tool.**
+
+**Updated**: Enhanced with multi-agent commerce architecture and Cloudflare Workers implementation planning.
