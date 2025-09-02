@@ -148,20 +148,6 @@ export default function HeaderClient({
 
   // Get root categories (those without a parent)
   const rootCategories = buildCategoryTree(categories, null);
-  
-  // Debug logging for development
-  if (process.env.NODE_ENV === 'development') {
-    console.log('HeaderClient Debug:');
-    console.log('  Categories count:', categories.length);
-    console.log('  All categories:', categories.map(cat => ({ 
-      id: cat.id, 
-      name: getCategoryName(cat), 
-      parent_id: cat.parent_id,
-      slug: getCategorySlug(cat) 
-    })));
-    console.log('  Root categories count:', rootCategories.length);
-    console.log('  Root categories:', rootCategories.map(cat => ({ id: cat.id, name: getCategoryName(cat) })));
-  }
 
   /**
    * Recursive component to render category tree for desktop dropdown

@@ -144,8 +144,39 @@ graph TB
 ```
 ├── /api/agent-chat          # AI assistant
 │   └── POST   - Chat with Volt AI assistant
-├── /api/admin/vectorize           # Consolidated content indexing
+├── /api/admin/vectorize     # Consolidated content indexing
 │   └── GET    - Index products + knowledge articles (atomic operation)
+├── /api/admin/analytics     # AI business intelligence
+│   └── POST   - Generate business insights and recommendations
+├── /api/admin/generate-article # AI content generation
+│   └── POST   - Generate articles and blog content
+├── /api/admin/generate-product-description # AI product descriptions
+│   └── POST   - Generate enhanced product descriptions
+```
+
+### **Admin Management**
+```
+├── /api/admin/users         # Admin user management
+│   ├── GET    - List admin users
+│   ├── POST   - Create admin user
+│   └── PUT    - Update admin user
+├── /api/admin/pages         # CMS page management
+│   ├── GET    - List CMS pages
+│   ├── POST   - Create CMS page
+│   └── PUT    - Update CMS page
+├── /api/admin/knowledge     # Knowledge base management
+│   ├── GET    - List knowledge articles
+│   ├── POST   - Create knowledge article
+│   └── PUT    - Update knowledge article
+├── /api/admin/settings      # System settings
+│   ├── GET    - Get system settings
+│   └── PUT    - Update system settings
+├── /api/admin/auth-check    # Authentication verification
+│   └── GET    - Verify admin authentication
+├── /api/admin/generate-token # Admin token generation
+│   └── POST   - Generate admin access tokens
+├── /api/admin/upload-image  # Image upload management
+│   └── POST   - Upload and manage product images
 ```
 
 ## 🎯 Checkout Flow
