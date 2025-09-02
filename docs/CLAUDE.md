@@ -14,6 +14,7 @@ Mercora is an AI-powered outdoor gear eCommerce platform featuring **Volt**, an 
 - User authentication via Clerk with admin role support
 - Advanced order management and customer insights
 - Vector-based product search with 38-item index (30 products + 8 knowledge articles)
+- **MCP (Model Context Protocol) Server** - Multi-agent commerce capabilities for AI coordination
 
 ## Tech Stack
 
@@ -83,6 +84,9 @@ mercora/
 │   │   │   ├── analytics/    # AI-powered business analytics
 │   │   │   └── vectorize/    # Consolidated AI indexing
 │   │   ├── agent-chat/       # AI chat endpoint
+│   │   ├── mcp/              # MCP (Model Context Protocol) Server
+│   │   │   ├── schema/       # MCP server documentation
+│   │   │   └── tools/        # MCP tool endpoints (cart, orders, shipping, etc.)
 │   │   ├── orders/           # Order API with admin support
 │   │   └── products/         # Product API
 │   ├── category/[slug]/      # Category pages
@@ -102,6 +106,23 @@ mercora/
 │   │   ├── admin-middleware.ts  # Admin auth (currently disabled for dev)
 │   │   └── unified-auth.ts   # Unified auth system (disabled for dev)
 │   ├── db/                   # Database & schema
+│   │   └── schema/           # Database schemas
+│   │       └── mcp.ts        # MCP-specific tables (agents, sessions, rate limits)
+│   ├── mcp/                  # MCP Server Implementation
+│   │   ├── auth.ts           # Agent authentication system
+│   │   ├── context.ts        # Agent context parsing
+│   │   ├── error-handler.ts  # Comprehensive error handling
+│   │   ├── session.ts        # Session management
+│   │   ├── types.ts          # MCP type definitions
+│   │   └── tools/            # MCP tool implementations
+│   │       ├── agent.ts      # Agent management
+│   │       ├── assess.ts     # Fulfillment assessment
+│   │       ├── cart.ts       # Cart operations
+│   │       ├── order.ts      # Order processing
+│   │       ├── payment.ts    # Payment validation
+│   │       ├── recommend.ts  # Recommendations
+│   │       ├── search.ts     # Product search
+│   │       └── shipping.ts   # Shipping calculations
 │   ├── models/               # Data access layer
 │   │   └── mach/             # MACH Alliance models
 │   ├── stores/               # Zustand state
@@ -198,12 +219,18 @@ To re-enable authentication in production:
 
 ## Database Schema (MACH Alliance Compliant)
 
-Key tables:
+### Core Commerce Tables
 - `products` - Product catalog with pricing and inventory
 - `categories` - Product categorization
 - `orders` - Order tracking and management
 - `addresses` - MACH Alliance address specification
 - `customers` - User profiles linked to Clerk
+
+### MCP Server Tables
+- `mcpAgents` - MCP agent registration and API keys
+- `mcpSessions` - Agent session management with cart persistence
+- `mcpRateLimits` - Rate limiting and usage tracking
+- `mcpUsage` - Agent usage analytics and monitoring
 
 **Migration Commands:**
 ```bash
@@ -213,7 +240,7 @@ npx wrangler d1 migrations apply mercora-db          # Production
 
 ## API Architecture
 
-### Key Endpoints
+### Core eCommerce Endpoints
 - `POST /api/agent-chat` - AI chat with context
 - `GET /api/products` - Product listing with filters
 - `GET /api/orders` - Unified order management (list/create/update)
@@ -223,6 +250,69 @@ npx wrangler d1 migrations apply mercora-db          # Production
 - `POST /api/webhooks/stripe` - Handle Stripe webhook events
 - `POST /api/tax` - Calculate tax with Stripe Tax
 - `POST /api/validate-discount` - Validate discount codes
+
+### MCP (Model Context Protocol) Server Endpoints
+#### **Main MCP Server**
+- `GET /api/mcp` - Server capabilities and discovery
+- `POST /api/mcp` - Tool execution endpoint
+- `GET /api/mcp/schema` - Complete API documentation
+
+#### **MCP Tools (17 total)**
+**Commerce Tools:**
+- `search_products` - Product search with agent context
+- `assess_request` - Multi-site fulfillment assessment
+- `get_recommendations` - AI-powered product recommendations
+
+**Cart Management:**
+- `add_to_cart` - Add single items to cart
+- `bulk_add_to_cart` - Efficient multi-item addition
+- `update_cart` - Modify quantities
+- `remove_from_cart` - Remove items
+- `clear_cart` - Reset cart
+- `get_cart` - View cart with totals
+
+**Order Processing:**
+- `get_shipping_options` - Calculate shipping costs and methods
+- `validate_payment` - Payment method validation and fees
+- `place_order` - Complete order placement
+- `get_order_status` - Track orders and delivery
+
+**Agent Administration:**
+- `create_agent` - Create new MCP agents
+- `list_agents` - View all agents with stats
+- `get_agent_details` - Agent analytics and performance
+- `update_agent_status` - Enable/disable agents
+
+#### **Individual Tool Endpoints** (also accessible via REST)
+- `POST /api/mcp/tools/cart/bulk-add` - Bulk cart operations
+- `POST /api/mcp/tools/cart/clear` - Clear cart
+- `POST /api/mcp/tools/shipping` - Shipping calculations
+- `POST /api/mcp/tools/payment/validate` - Payment validation
+- `POST /api/mcp/tools/agents/create` - Create agents
+- `GET /api/mcp/tools/agents/list` - List agents
+- `GET /api/mcp/tools/agents/[agentId]` - Agent details
+- `PATCH /api/mcp/tools/agents/[agentId]` - Update agent status
+
+### MCP Server Discovery & Authentication
+#### **Discovery Mechanisms**
+- **HTML Meta Tags**: `<meta name="mcp-server" content="/api/mcp" />`
+- **robots.txt**: MCP endpoints explicitly allowed for agent crawlers
+- **sitemap.xml**: MCP endpoints included for systematic indexing
+- **Schema Endpoint**: `/api/mcp/schema` provides complete API documentation
+
+#### **MCP Authentication**  
+- **Agent API Keys**: Secure API key authentication for MCP agents
+- **Rate Limiting**: Per-agent rate limits (100 RPM, 10 OPH default)
+- **Session Management**: Persistent agent sessions with cart state
+- **Authorization**: Role-based permissions and access control
+
+#### **Multi-Agent Commerce Architecture**
+The MCP server enables multi-agent commerce scenarios where personal shopping agents coordinate purchases across multiple retailers. Agents can:
+- Search and assess product fulfillment capabilities
+- Manage shopping carts with bulk operations
+- Calculate shipping and validate payment methods  
+- Place orders with budget validation and tracking
+- Coordinate with other agents for multi-site purchases
 
 ### Vectorization
 Use `GET /api/admin/vectorize?token=<ADMIN_VECTORIZE_TOKEN>` for complete atomic rebuild of both products and knowledge articles. The admin token is securely managed via Cloudflare secrets in production and environment variables in development.
@@ -440,6 +530,47 @@ npx wrangler deploy               # Deploy to Cloudflare Workers
 **Status**: Clean working directory
 **Recent work**: Product variant loading and cart functionality fixes
 
+## MCP Server Implementation Details
+
+### **Production-Ready Features**
+✅ **Complete Tool Set**: 17 MCP tools covering all commerce operations  
+✅ **Agent Management**: Create, list, monitor, and manage MCP agents  
+✅ **Session Persistence**: Cart state maintained across agent sessions  
+✅ **Rate Limiting**: Configurable per-agent limits with monitoring  
+✅ **Error Handling**: Comprehensive error system with retry guidance  
+✅ **Discovery**: HTML meta tags, robots.txt, and sitemap integration  
+✅ **Documentation**: Auto-generated schema at `/api/mcp/schema`  
+✅ **Multi-Agent Support**: Coordinate purchases across multiple sites  
+
+### **MCP Usage Example**
+```typescript
+// Agent connecting to MCP server
+const response = await fetch('/api/mcp', {
+  method: 'POST',
+  headers: {
+    'X-Agent-API-Key': 'mcp_1234567890_abcdefgh',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    tool: 'search_products',
+    params: {
+      query: 'ultralight tent',
+      options: { category: 'camping', priceMax: 300 }
+    },
+    session_id: 'agent_session_123'
+  })
+});
+```
+
+### **Multi-Agent Commerce Workflow**
+1. **assess_request** - Determine what items Voltique can fulfill
+2. **bulk_add_to_cart** - Add all available items efficiently  
+3. **get_cart** - Validate totals against agent budget
+4. **get_shipping_options** - Compare shipping methods and costs
+5. **validate_payment** - Verify payment method and calculate fees
+6. **place_order** - Complete purchase with user address
+7. **get_order_status** - Monitor delivery progress
+
 ## Important Files to Reference
 
 - `README.md` - Complete project documentation
@@ -447,7 +578,9 @@ npx wrangler deploy               # Deploy to Cloudflare Workers
 - `docs/ai-pipeline.md` - AI implementation details
 - `docs/STRIPE_INTEGRATION.md` - Stripe payment setup guide
 - `docs/API_STRUCTURE.md` - **NEW**: Clean API architecture (eliminates redundancy)
+- `docs/mcp-server-specification.md` - **MCP Server documentation and planning**
 - `lib/types/mach/` - MACH Alliance type definitions
+- `lib/mcp/` - **Complete MCP server implementation**
 - `lib/stripe.ts` - Stripe configuration and utilities
 - `wrangler.jsonc` - Cloudflare configuration
 
