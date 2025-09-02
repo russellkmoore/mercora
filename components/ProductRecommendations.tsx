@@ -110,29 +110,15 @@ export default function ProductRecommendations({
   
   // Fetch AI-powered recommendations with enhanced user context
   useEffect(() => {
-    console.log('ProductRecommendations useEffect:', { 
-      productId: product?.id, 
-      productName: product?.name,
-      isLoading: stableUserContext.isLoading,
-      hasProduct: !!product 
-    });
-    
     if (!product) {
-      console.log('Early return: no product');
       return;
     }
-    
-    // Don't wait for user context - proceed with generic recommendations if user data isn't ready
-    console.log('User context loading, but proceeding with recommendations anyway');
-    
-    console.log('Starting AI recommendations fetch for:', product.name);
     
     // Debounce to prevent rapid consecutive calls
     const timeoutId = setTimeout(async () => {
       setIsLoading(true);
       try {
         const aiRecommendations = await fetchAIRecommendations(product, stableUserContext);
-        console.log('AI recommendations received:', aiRecommendations.length, 'products');
         setRecommendedProducts(aiRecommendations.slice(0, maxRecommendations));
       } catch (error) {
         console.error("Error fetching AI recommendations:", error);
@@ -174,10 +160,6 @@ export default function ProductRecommendations({
       recommendationQuery += " Can you recommend 3 similar or complementary products that would work well with what I'm interested in?";
       recommendationQuery += " The answer should be short and concise with a little wit.";
 
-      console.log('Making AI recommendation request:', { 
-        query: recommendationQuery.substring(0, 100) + '...',
-        userName: userContext.firstName || "Guest" 
-      });
       
       const res = await fetch("/api/agent-chat", {
         method: "POST",
@@ -198,7 +180,6 @@ export default function ProductRecommendations({
       });
 
       if (!res.ok) {
-        console.warn("AI recommendation request failed:", res.status, res.statusText);
         return [];
       }
       
@@ -222,16 +203,7 @@ export default function ProductRecommendations({
   const hasAgentAnswer = agentAnswer && agentAnswer.trim().length > 0;
   const shouldShowSection = isLoading || hasRecommendations;
 
-  console.log('ProductRecommendations render:', { 
-    isLoading, 
-    hasRecommendations, 
-    hasAgentAnswer, 
-    shouldShowSection,
-    recommendedProductsCount: recommendedProducts.length 
-  });
-
   if (!shouldShowSection) {
-    console.log('Not showing recommendations section');
     return null;
   }
 

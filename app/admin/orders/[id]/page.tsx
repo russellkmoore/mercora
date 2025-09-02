@@ -318,21 +318,6 @@ export default function OrderDetailPage() {
     // Calculate proportional amounts
     const subtotalRatio = actualOrderSubtotal > 0 ? returnItemsSubtotal / actualOrderSubtotal : 0;
     
-    // Debug logging
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Return calculation debug:', {
-        selectedItemIds,
-        extensionsSubtotal: orderSubtotal / 100,
-        calculatedSubtotal: calculatedOrderSubtotal / 100,
-        actualSubtotal: actualOrderSubtotal / 100,
-        returnItemsSubtotal: returnItemsSubtotal / 100,
-        subtotalRatio: subtotalRatio.toFixed(3),
-        orderTax: orderTax / 100,
-        calculatedTaxPortion: (orderTax * subtotalRatio) / 100,
-        orderDiscount: orderDiscount / 100,
-        calculatedDiscountPortion: (orderDiscount * subtotalRatio) / 100
-      });
-    }
     
     
     const returnTax = Math.round(orderTax * subtotalRatio);
