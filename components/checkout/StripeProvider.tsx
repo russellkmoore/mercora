@@ -68,16 +68,45 @@ export default function StripeProvider({
           border: '1px solid #d1d5db',
           borderRadius: '8px',
           padding: '12px',
-          fontSize: '16px',
+          fontSize: '16px', // 16px prevents zoom on iOS
+          minHeight: '44px', // Touch-friendly minimum height
+          transition: 'border-color 0.15s ease-in-out',
         },
         '.Input:focus': {
           borderColor: '#f97316',
           boxShadow: '0 0 0 2px rgba(249, 115, 22, 0.2)',
+          outline: 'none',
+        },
+        '.Input--invalid': {
+          borderColor: '#ef4444',
         },
         '.Label': {
           fontSize: '14px',
           fontWeight: '500',
-          marginBottom: '4px',
+          marginBottom: '8px',
+          color: '#374151',
+        },
+        '.Tab': {
+          minHeight: '44px',
+          padding: '12px 16px',
+          fontSize: '16px',
+        },
+        '.Tab--selected': {
+          borderColor: '#f97316',
+        },
+        '.TabIcon': {
+          height: '20px',
+          width: '20px',
+        },
+        // Mobile-specific adjustments
+        '@media (max-width: 640px)': {
+          '.Input': {
+            fontSize: '16px', // Prevent zoom on mobile
+            padding: '14px',
+          },
+          '.Tab': {
+            padding: '14px 12px',
+          }
         },
         ...(options.appearance?.rules || {}),
       },
