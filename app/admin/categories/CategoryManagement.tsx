@@ -685,7 +685,6 @@ export default function CategoryManagement() {
 
   const handleSaveCategory = async (categoryData: Partial<Category>) => {
     try {
-      console.log("Saving category:", categoryData);
       const url = isNewCategory ? "/api/categories" : `/api/categories/${categoryData.id}`;
       const method = isNewCategory ? "POST" : "PUT";
       
@@ -699,19 +698,16 @@ export default function CategoryManagement() {
 
       if (response.ok) {
         const result = await response.json();
-        console.log("Category saved successfully:", result);
         await fetchCategories();
         // Show success notification
         alert(`Category "${categoryData.name}" ${isNewCategory ? 'created' : 'updated'} successfully!`);
       } else {
         const errorData = await response.json().catch(() => ({ error: "Unknown error" })) as any;
-        console.error("Failed to save category:", errorData);
         const errorMessage = errorData?.error || errorData?.message || "Failed to save category";
         alert(`Error saving category: ${errorMessage}`);
         throw new Error(errorMessage);
       }
     } catch (error) {
-      console.error("Error saving category:", error);
       if (error instanceof Error) {
         alert(`Error saving category: ${error.message}`);
       } else {
@@ -731,14 +727,11 @@ export default function CategoryManagement() {
 
       if (response.ok) {
         await fetchCategories();
-        console.log("Category deleted successfully");
       } else {
         const error: any = await response.json();
-        console.error("Failed to delete category:", error);
         alert("Failed to delete category: " + (error.error || "Unknown error"));
       }
     } catch (error) {
-      console.error("Error deleting category:", error);
       alert("Failed to delete category");
     }
   };
@@ -778,7 +771,6 @@ export default function CategoryManagement() {
         })
       ]);
       
-      console.log(`Moved category ${category.name} ${direction}`);
       await fetchCategories(); // Refresh the list
     } catch (error) {
       console.error('Error moving category:', error);
@@ -806,14 +798,11 @@ export default function CategoryManagement() {
       });
       
       if (response.ok) {
-        console.log("Category counts refreshed successfully");
         await fetchCategories(); // Reload categories with updated counts
       } else {
-        console.error("Failed to refresh category counts");
         alert("Failed to refresh category counts");
       }
     } catch (error) {
-      console.error("Error refreshing category counts:", error);
       alert("Failed to refresh category counts");
     } finally {
       setRefreshingCounts(false);

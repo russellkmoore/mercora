@@ -107,14 +107,11 @@ export async function POST(req: NextRequest) {
       const vectorize = (env as any).VECTORIZE;
 
       if (ai && vectorize) {
-        console.log("Starting vector search for question:", question);
-        
         // Step 1: Convert user question to vector using same model as indexed content
         // This ensures semantic similarity matching works correctly
         const questionEmbedding = await ai.run("@cf/baai/bge-base-en-v1.5", {
           text: question,
         });
-        console.log("Generated embedding successfully");
 
         // Step 2: Search vectorized index with timeout protection
         // Use Promise.race to implement timeout
@@ -128,7 +125,6 @@ export async function POST(req: NextRequest) {
         );
         
         vectorResults = await Promise.race([vectorSearchPromise, timeoutPromise]);
-        console.log("Vector search completed, matches:", vectorResults?.matches?.length || 0);
 
         if (vectorResults && vectorResults.matches) {
           // Extract text snippets to provide context to the AI
@@ -140,8 +136,6 @@ export async function POST(req: NextRequest) {
           productIds = vectorResults.matches
             .map((match: any) => match.metadata?.productId)
             .filter((id: any) => id !== undefined && id !== null && id !== "");
-          
-          console.log("Extracted product IDs:", productIds);
         }
       } else {
         console.warn("Vectorize or AI binding not available");
@@ -305,14 +299,12 @@ Generate complete content based on the user's specifications.`;
             temperature: isContentGeneration ? 0.3 : 0.1, // Slightly higher temp for more varied content generation
           });
 
-          console.log("AI response:", response.response);
           assistantReply =
             response.response ||
             "Sorry, I'm having trouble thinking right now. Try asking me about gear recommendations or outdoor tips!";
           isAIResponse = true; // Mark as AI response (including greetings)
         }
       } else {
-        console.warn("AI binding not available - using fallback responses");
 
         // Enhanced fallback responses based on common queries
         const fallbackResponses = {
@@ -368,16 +360,8 @@ Generate complete content based on the user's specifications.`;
       "Adventure rule: if you're not slightly uncomfortable, you're probably not having enough fun.",
     ];
     if (Math.random() < 0.3 && isAIResponse && !isGreeting && !unicornMode) {
-      console.log("Adding flair to response");
       assistantReply +=
         "\n\n" + flairOptions[Math.floor(Math.random() * flairOptions.length)];
-    } else {
-      console.log("Flair conditions:", { 
-        randomChance: Math.random() < 0.3, 
-        isAIResponse, 
-        isGreeting, 
-        unicornMode 
-      });
     }
 
     // Parse agent's recommended products from the response text
@@ -408,8 +392,6 @@ Generate complete content based on the user's specifications.`;
             if (!agentRecommendedProductIds.includes(matchingResult.metadata.productId)) {
               agentRecommendedProductIds.push(matchingResult.metadata.productId);
             }
-          } else {
-            console.log(`Failed to map product: "${productName}"`);
           }
         }
       }
@@ -436,7 +418,6 @@ Generate complete content based on the user's specifications.`;
     
     // Fetch full product data if we have product IDs
     let relatedProducts: Product[] = [];
-    console.log(`Attempting to fetch ${finalProductIds.length} products:`, finalProductIds);
     if (finalProductIds.length > 0) {
       try {
         const db = await getDbAsync();
@@ -547,8 +528,6 @@ Generate complete content based on the user's specifications.`;
           }
         }));
         
-        console.log("MACH products with variants returned:", relatedProducts.length);
-        console.log("Product names returned:", relatedProducts.map(p => p.name));
       } catch (productError) {
         console.error("Error fetching products:", productError);
         // Continue without products if fetch fails

@@ -421,10 +421,6 @@ Generate complete content now:`;
 
       const result = await response.json() as { answer?: string; error?: string };
       
-      // Debug logging
-      console.log('API Response length:', result.answer?.length || 0);
-      console.log('Raw response preview:', result.answer?.substring(0, 200) + '...');
-      
       if (result.answer) {
         // Clean the response to ensure it's just inner HTML content
         let cleanedContent = result.answer
@@ -443,11 +439,6 @@ Generate complete content now:`;
           .replace(/\*winks\*/gi, '') // Remove personality actions
           .replace(/\*.*?\*/gi, '') // Remove any action text in asterisks
           .trim();
-        
-        // Debug cleaned content
-        console.log('Cleaned content length:', cleanedContent.length);
-        console.log('Cleaned content preview:', cleanedContent.substring(0, 200) + '...');
-        console.log('Cleaned content ends with:', cleanedContent.slice(-100));
         
         // Update form data with generated content
         setFormData(prev => ({
