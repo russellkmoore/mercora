@@ -17,8 +17,10 @@ Disallow: /checkout
 Disallow: /orders
 Disallow: /cart
 
-# Block API endpoints
+# Block API endpoints (except MCP server for agent discovery)
 Disallow: /api/
+Allow: /api/mcp
+Allow: /api/mcp/schema
 
 # Block admin/development resources
 Disallow: /_next/
@@ -38,6 +40,10 @@ Crawl-delay: 1
 
 # Sitemap location
 Sitemap: https://voltique.russellkmoore.me/sitemap.xml
+
+# MCP (Model Context Protocol) Server Available
+# Agents can connect to /api/mcp for multi-agent commerce capabilities
+# Schema documentation available at /api/mcp/schema
 
 # Note: This is a demonstration site showcasing serverless architecture
 # and AI-powered eCommerce features. Products are for demo purposes only.

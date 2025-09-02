@@ -70,8 +70,10 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     return NextResponse.next();
   }
   
-  // Skip maintenance check for admin routes - admins should always have access
-  if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) {
+  // Skip maintenance check for admin routes and MCP API - always accessible
+  if (pathname.startsWith('/admin') || 
+      pathname.startsWith('/api/admin') || 
+      pathname.startsWith('/api/mcp')) {
     return NextResponse.next();
   }
   

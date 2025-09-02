@@ -69,7 +69,23 @@
     <priority>0.7</priority>
   </url>
 
+  <!-- MCP (Model Context Protocol) Server Endpoints -->
+  <url>
+    <loc>https://voltique.russellkmoore.me/api/mcp</loc>
+    <lastmod>2025-09-02</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <url>
+    <loc>https://voltique.russellkmoore.me/api/mcp/schema</loc>
+    <lastmod>2025-09-02</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
   <!-- Note: Individual product pages are excluded as per robots.txt -->
   <!-- This sitemap focuses on the main site structure for demo purposes -->
+  <!-- MCP endpoints are included for agent discovery -->
 
 </urlset>
