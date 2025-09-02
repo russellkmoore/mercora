@@ -60,9 +60,14 @@ export default function PaymentForm({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
 
-  // Payment Element options
+  // Payment Element options with mobile optimization
   const paymentElementOptions: StripePaymentElementOptions = {
-    layout: 'tabs',
+    layout: {
+      type: 'tabs',
+      defaultCollapsed: false,
+      radios: false,
+      spacedAccordionItems: false
+    },
     paymentMethodOrder: ['card', 'apple_pay', 'google_pay'],
     wallets: {
       applePay: 'auto', // Will show only if device supports it and domain is verified
@@ -125,38 +130,47 @@ export default function PaymentForm({
 
   return (
     <div className="text-black min-w-0">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Stripe Payment Element */}
-        <div className="min-h-[300px] w-full">
-          <PaymentElement 
-            id="payment-element"
-            options={paymentElementOptions}
-          />
-        </div>
-
-        {/* Error display */}
-        {errorMessage && (
-          <div className="text-red-600 text-sm font-medium p-3 bg-red-50 rounded-lg border border-red-200">
-            {errorMessage}
+      {!stripe || !elements ? (
+        <div className="min-h-[300px] w-full flex items-center justify-center">
+          <div className="flex flex-col items-center gap-2">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-500"></div>
+            <p className="text-sm text-gray-600">Loading payment form...</p>
           </div>
-        )}
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Stripe Payment Element */}
+          <div className="min-h-[300px] w-full overflow-hidden">
+            <PaymentElement 
+              id="payment-element"
+              options={paymentElementOptions}
+            />
+          </div>
 
-        {/* Submit button */}
-        <Button
-          type="submit"
-          disabled={!stripe || !elements || isLoading || disabled}
-          className="w-full bg-black text-white hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isLoading ? (
-            <div className="flex items-center gap-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              Processing...
+          {/* Error display */}
+          {errorMessage && (
+            <div className="text-red-600 text-sm font-medium p-3 bg-red-50 rounded-lg border border-red-200">
+              {errorMessage}
             </div>
-          ) : (
-            'Complete Payment'
           )}
-        </Button>
-      </form>
+
+          {/* Submit button */}
+          <Button
+            type="submit"
+            disabled={!stripe || !elements || isLoading || disabled}
+            className="w-full bg-black text-white hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] touch-manipulation"
+          >
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Processing...
+              </div>
+            ) : (
+              'Complete Payment'
+            )}
+          </Button>
+        </form>
+      )}
 
       {/* Payment security notice */}
       <div className="mt-4 text-xs text-gray-500 text-center">

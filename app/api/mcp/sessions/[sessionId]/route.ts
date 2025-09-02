@@ -5,7 +5,7 @@ import { MCPToolResponse, AgentSession } from '../../../../../lib/mcp/types';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
   // Get specific session
   const auth = await authenticateAgent(request);
@@ -18,7 +18,8 @@ export async function GET(
   }
 
   try {
-    const session = await getSession(params.sessionId);
+    const { sessionId } = await params;
+    const session = await getSession(sessionId);
     
     if (!session) {
       return NextResponse.json({
@@ -45,7 +46,7 @@ export async function GET(
       success: true,
       data: session,
       context: {
-        session_id: session.sessionId,
+        session_id: sessionId,
         agent_id: auth.agentId!,
         processing_time_ms: 0
       },
@@ -71,7 +72,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
   // Update session
   const auth = await authenticateAgent(request);
@@ -84,7 +85,8 @@ export async function PUT(
   }
 
   try {
-    const session = await getSession(params.sessionId);
+    const { sessionId } = await params;
+    const session = await getSession(sessionId);
     
     if (!session) {
       return NextResponse.json({
@@ -108,19 +110,19 @@ export async function PUT(
     }
 
     const updateData = await request.json();
-    const success = await updateSession(params.sessionId, updateData);
+    const success = await updateSession(sessionId, updateData);
     
     if (!success) {
       throw new Error('Failed to update session');
     }
 
-    const updatedSession = await getSession(params.sessionId);
+    const updatedSession = await getSession(sessionId);
     
     const response: MCPToolResponse<AgentSession> = {
       success: true,
       data: updatedSession!,
       context: {
-        session_id: params.sessionId,
+        session_id: sessionId,
         agent_id: auth.agentId!,
         processing_time_ms: 0
       },
@@ -146,7 +148,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
   // Delete session
   const auth = await authenticateAgent(request);
@@ -159,7 +161,8 @@ export async function DELETE(
   }
 
   try {
-    const session = await getSession(params.sessionId);
+    const { sessionId } = await params;
+    const session = await getSession(sessionId);
     
     if (!session) {
       return NextResponse.json({
@@ -182,7 +185,7 @@ export async function DELETE(
       }, { status: 403 });
     }
 
-    const success = await deleteSession(params.sessionId);
+    const success = await deleteSession(sessionId);
     
     if (!success) {
       throw new Error('Failed to delete session');

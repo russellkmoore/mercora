@@ -400,7 +400,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
 
           {/* Payment Form */}
           {currentStep === 'payment' && clientSecret && (
-            <div className="bg-white p-6 rounded-xl min-w-0">
+            <div className="bg-white p-4 sm:p-6 rounded-xl min-w-0 overflow-hidden">
               <h3 className="text-lg font-semibold mb-4 text-gray-900">Payment Information</h3>
               <StripeProvider clientSecret={clientSecret}>
                 <PaymentForm
