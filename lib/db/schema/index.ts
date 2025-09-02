@@ -103,3 +103,6 @@ export * from "./admin_users";
 
 // Pages/CMS schema (application-specific)
 export * from "./pages";
+
+// MCP Server schema (application-specific)
+export * from "./mcp";

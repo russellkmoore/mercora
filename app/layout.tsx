@@ -83,6 +83,11 @@ export const metadata: Metadata = {
   other: {
     // Suppress browser preload warnings
     "resource-hints": "minimal",
+    // MCP Server Discovery
+    "mcp-server": "/api/mcp",
+    "mcp-schema": "/api/mcp/schema",
+    "mcp-capabilities": "commerce,outdoor-gear,multi-agent,e-commerce",
+    "mcp-version": "1.0.0",
   },
 };
 
@@ -112,6 +117,16 @@ export default function RootLayout({
     >
       <html lang="en" suppressHydrationWarning>
         <head>
+          {/* MCP Server Discovery Meta Tags */}
+          <meta name="mcp-server" content="/api/mcp" />
+          <meta name="mcp-schema" content="/api/mcp/schema" />
+          <meta name="mcp-capabilities" content="commerce,outdoor-gear,multi-agent,e-commerce" />
+          <meta name="mcp-version" content="1.0.0" />
+          <meta name="mcp-description" content="Voltique MCP Server for multi-agent outdoor gear commerce" />
+          
+          {/* Additional MCP Discovery */}
+          <link rel="mcp-server" href="/api/mcp" type="application/json" />
+          <link rel="mcp-schema" href="/api/mcp/schema" type="application/json" />
         </head>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white flex flex-col min-h-screen`}
