@@ -1,5 +1,5 @@
 import { MCPToolResponse } from '../types';
-import { CartItem } from '../../types/core';
+import { CartItem } from '../../types/cartitem';
 
 export interface ShippingOption {
   id: string;

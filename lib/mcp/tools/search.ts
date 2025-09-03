@@ -1,7 +1,7 @@
 import { searchProducts } from '../../models/mach/products';
 import { SearchRequest, MCPToolResponse } from '../types';
 import { enhanceUserContext } from '../context';
-import { Product } from '../../types/mach/product_types';
+import { Product } from '../../types';
 
 export async function searchProductsWithContext(
   request: SearchRequest,
@@ -11,7 +11,7 @@ export async function searchProductsWithContext(
   
   try {
     // Enhance search with agent context
-    const userContext = enhanceUserContext(request.agent_context);
+    const userContext = enhanceUserContext(request.agent_context || null);
     
     // Apply budget filter if provided
     const options = { ...request.options };
@@ -27,8 +27,8 @@ export async function searchProductsWithContext(
     if (userContext.preferredBrands?.length > 0) {
       filteredProducts = products.filter(product => 
         userContext.preferredBrands.some((brand: string) => 
-          product.name?.toLowerCase().includes(brand.toLowerCase()) ||
-          product.description?.toLowerCase().includes(brand.toLowerCase())
+          (typeof product.name === 'string' ? product.name : String(product.name || '')).toLowerCase().includes(brand.toLowerCase()) ||
+          (typeof product.description === 'string' ? product.description : String(product.description || '')).toLowerCase().includes(brand.toLowerCase())
         )
       );
     }
