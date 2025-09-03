@@ -304,7 +304,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.6fr] gap-4 lg:gap-6 min-w-0 w-full">
+      <div className="flex flex-col xl:grid xl:grid-cols-[1fr_1.6fr] gap-4 lg:gap-6 w-full">
         <div className="space-y-6 min-w-0">
           {/* Shipping Address Section */}
           {currentStep === 'shipping' ? (
@@ -400,16 +400,18 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
 
           {/* Payment Form */}
           {currentStep === 'payment' && clientSecret && (
-            <div className="bg-white p-4 sm:p-6 rounded-xl min-w-0 overflow-hidden">
+            <div className="bg-white p-4 sm:p-6 rounded-xl w-full min-h-[400px]">
               <h3 className="text-lg font-semibold mb-4 text-gray-900">Payment Information</h3>
-              <StripeProvider clientSecret={clientSecret}>
-                <PaymentForm
-                  clientSecret={clientSecret}
-                  onSuccess={handlePaymentSuccess}
-                  onError={handlePaymentError}
-                  disabled={isLoading}
-                />
-              </StripeProvider>
+              <div className="w-full">
+                <StripeProvider clientSecret={clientSecret}>
+                  <PaymentForm
+                    clientSecret={clientSecret}
+                    onSuccess={handlePaymentSuccess}
+                    onError={handlePaymentError}
+                    disabled={isLoading}
+                  />
+                </StripeProvider>
+              </div>
             </div>
           )}
         </div>
