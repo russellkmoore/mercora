@@ -109,7 +109,7 @@ export async function PUT(
       }, { status: 403 });
     }
 
-    const updateData = await request.json();
+    const updateData = await request.json() as any;
     const success = await updateSession(sessionId, updateData);
     
     if (!success) {

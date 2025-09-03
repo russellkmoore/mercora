@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, primaryKey } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 export const mcpSessions = sqliteTable('mcp_sessions', {
@@ -45,5 +45,5 @@ export const mcpRateLimits = sqliteTable('mcp_rate_limits', {
   count: integer('count').default(0),
   windowStart: text('window_start').default(sql`CURRENT_TIMESTAMP`),
 }, (table) => ({
-  pk: sql`PRIMARY KEY (agent_id, window)`,
+  pk: primaryKey({ columns: [table.agentId, table.window] }),
 }));

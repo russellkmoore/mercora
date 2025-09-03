@@ -1,7 +1,7 @@
 import { searchProducts, getProductBySlug } from '../../models/mach/products';
 import { RecommendRequest, MCPToolResponse } from '../types';
 import { enhanceUserContext } from '../context';
-import { Product } from '../../types/mach/product_types';
+import { Product } from '../../types';
 
 export async function getRecommendations(
   request: RecommendRequest,
@@ -11,7 +11,7 @@ export async function getRecommendations(
   
   try {
     const { context } = request;
-    const userContext = enhanceUserContext(request.agent_context);
+    const userContext = enhanceUserContext(request.agent_context || null);
     
     let recommendations: Product[] = [];
     
@@ -131,7 +131,7 @@ async function getActivityRecommendations(activity: string, userContext: any): P
 }
 
 async function getRelatedProductRecommendations(product: Product, userContext: any): Promise<Product[]> {
-  const category = product.category_name || 'outdoor gear';
+  const category = (product as any).category_name || 'outdoor gear';
   return await searchProducts(category);
 }
 
@@ -154,12 +154,12 @@ function sortRecommendations(products: Product[], userContext: any): Product[] {
     // Prefer products matching user activities
     if (userContext.activities) {
       for (const activity of userContext.activities) {
-        if (a.name?.toLowerCase().includes(activity.toLowerCase()) || 
-            a.description?.toLowerCase().includes(activity.toLowerCase())) {
+        if ((typeof a.name === 'string' ? a.name : String(a.name || '')).toLowerCase().includes(activity.toLowerCase()) || 
+            (typeof a.description === 'string' ? a.description : String(a.description || '')).toLowerCase().includes(activity.toLowerCase())) {
           aScore += 10;
         }
-        if (b.name?.toLowerCase().includes(activity.toLowerCase()) || 
-            b.description?.toLowerCase().includes(activity.toLowerCase())) {
+        if ((typeof b.name === 'string' ? b.name : String(b.name || '')).toLowerCase().includes(activity.toLowerCase()) || 
+            (typeof b.description === 'string' ? b.description : String(b.description || '')).toLowerCase().includes(activity.toLowerCase())) {
           bScore += 10;
         }
       }
@@ -168,8 +168,8 @@ function sortRecommendations(products: Product[], userContext: any): Product[] {
     // Prefer products from preferred brands
     if (userContext.preferredBrands) {
       for (const brand of userContext.preferredBrands) {
-        if (a.name?.toLowerCase().includes(brand.toLowerCase())) aScore += 5;
-        if (b.name?.toLowerCase().includes(brand.toLowerCase())) bScore += 5;
+        if ((typeof a.name === 'string' ? a.name : String(a.name || '')).toLowerCase().includes(brand.toLowerCase())) aScore += 5;
+        if ((typeof b.name === 'string' ? b.name : String(b.name || '')).toLowerCase().includes(brand.toLowerCase())) bScore += 5;
       }
     }
     
@@ -209,9 +209,9 @@ function generateCrossSiteRecommendations(context: any, userContext: any): strin
 function generateBundlingRecommendations(products: Product[]): string[] {
   const recommendations: string[] = [];
   
-  const hasTent = products.some(p => p.name?.toLowerCase().includes('tent'));
-  const hasSleeping = products.some(p => p.name?.toLowerCase().includes('sleeping') || p.name?.toLowerCase().includes('bag'));
-  const hasBackpack = products.some(p => p.name?.toLowerCase().includes('pack') || p.name?.toLowerCase().includes('backpack'));
+  const hasTent = products.some(p => (typeof p.name === 'string' ? p.name : String(p.name || '')).toLowerCase().includes('tent'));
+  const hasSleeping = products.some(p => (typeof p.name === 'string' ? p.name : String(p.name || '')).toLowerCase().includes('sleeping') || (typeof p.name === 'string' ? p.name : String(p.name || '')).toLowerCase().includes('bag'));
+  const hasBackpack = products.some(p => (typeof p.name === 'string' ? p.name : String(p.name || '')).toLowerCase().includes('pack') || (typeof p.name === 'string' ? p.name : String(p.name || '')).toLowerCase().includes('backpack'));
   
   if (hasTent && hasSleeping) {
     recommendations.push('Complete shelter system: tent + sleeping setup bundle available');
@@ -228,7 +228,7 @@ function generateCostRecommendations(products: Product[], budget?: number): stri
   if (!budget) return [];
   
   const recommendations: string[] = [];
-  const totalCost = products.reduce((sum, p) => sum + (p.variants?.[0]?.price || 0), 0);
+  const totalCost = products.reduce((sum, p) => sum + (typeof p.variants?.[0]?.price === 'number' ? p.variants[0].price : (p.variants?.[0]?.price as any)?.amount || 0), 0);
   
   if (totalCost > budget * 1.2) {
     recommendations.push('Consider base models to stay within budget');
@@ -251,8 +251,8 @@ function calculateRecommendationSatisfaction(products: Product[], userContext: a
   if (userContext.activities?.length > 0) {
     const matchingProducts = products.filter(p => 
       userContext.activities.some((activity: string) => 
-        p.name?.toLowerCase().includes(activity.toLowerCase()) ||
-        p.description?.toLowerCase().includes(activity.toLowerCase())
+        (typeof p.name === 'string' ? p.name : String(p.name || '')).toLowerCase().includes(activity.toLowerCase()) ||
+        (typeof p.description === 'string' ? p.description : String(p.description || '')).toLowerCase().includes(activity.toLowerCase())
       )
     );
     satisfaction += (matchingProducts.length / products.length) * 20;

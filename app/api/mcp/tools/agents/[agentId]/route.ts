@@ -4,7 +4,7 @@ import { getAgentDetails, updateAgentStatus } from '../../../../../../lib/mcp/to
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { agentId: string } }
+  { params }: { params: Promise<{ agentId: string }> }
 ) {
   const auth = await authenticateAgent(request);
   
@@ -16,10 +16,11 @@ export async function GET(
   }
 
   try {
+    const { agentId } = await params;
     const { searchParams } = request.nextUrl;
     const sessionId = searchParams.get('session_id') || 'temp';
     
-    const result = await getAgentDetails(params.agentId, sessionId, auth.agentId!);
+    const result = await getAgentDetails(agentId, sessionId, auth.agentId!);
     
     return NextResponse.json(result);
   } catch (error) {
@@ -36,7 +37,7 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { agentId: string } }
+  { params }: { params: Promise<{ agentId: string }> }
 ) {
   const auth = await authenticateAgent(request);
   
@@ -48,7 +49,8 @@ export async function PATCH(
   }
 
   try {
-    const body = await request.json();
+    const { agentId } = await params;
+    const body = await request.json() as any;
     
     // Currently only support status updates
     if (typeof body.isActive !== 'boolean') {
@@ -63,7 +65,7 @@ export async function PATCH(
     
     const sessionId = body.session_id || 'temp';
     const result = await updateAgentStatus(
-      params.agentId,
+      agentId,
       body.isActive,
       sessionId,
       auth.agentId!

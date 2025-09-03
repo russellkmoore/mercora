@@ -98,16 +98,7 @@ export default function StripeProvider({
           height: '20px',
           width: '20px',
         },
-        // Mobile-specific adjustments
-        '@media (max-width: 640px)': {
-          '.Input': {
-            fontSize: '16px', // Prevent zoom on mobile
-            padding: '14px',
-          },
-          '.Tab': {
-            padding: '14px 12px',
-          }
-        },
+        // Note: Stripe doesn't support media queries, mobile styles handled at component level
         ...(options.appearance?.rules || {}),
       },
     },

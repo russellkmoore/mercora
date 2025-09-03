@@ -2,7 +2,7 @@ import { getDbAsync } from '../db';
 import { mcpSessions } from '../db/schema/mcp';
 import { eq, and, lt, gte } from 'drizzle-orm';
 import { AgentSession, AgentContext } from './types';
-import { CartItem } from '../types/core';
+import { CartItem } from '../types/cartitem';
 import { createAgentSessionId } from './context';
 
 export async function createSession(agentId: string, agentContext?: AgentContext): Promise<AgentSession> {
@@ -117,7 +117,7 @@ export async function cleanupExpiredSessions(): Promise<number> {
     const result = await db.delete(mcpSessions)
       .where(lt(mcpSessions.expiresAt, new Date().toISOString()));
     
-    return result.changes || 0;
+    return (result as any).changes || 0;
   } catch (error) {
     console.error('Failed to cleanup expired sessions:', error);
     return 0;

@@ -1,6 +1,6 @@
-import { Product } from '../types/mach/product_types';
-import { CartItem } from '../types/core';
-import { Address } from '../types/mach/address';
+import { Product } from '../types';
+import { CartItem } from '../types/cartitem';
+import { MACHAddress as Address } from '../types/mach/Address';
 
 // Agent Context
 export interface AgentContext {

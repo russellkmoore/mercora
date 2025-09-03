@@ -67,11 +67,11 @@ export async function createAgent(
   try {
     // Validate input
     if (!request.agentId || request.agentId.length < 3) {
-      throw new ValidationError('agentId', 'Agent ID must be at least 3 characters long');
+      throw ValidationError('agentId', 'Agent ID must be at least 3 characters long');
     }
 
     if (!request.name || request.name.length < 3) {
-      throw new ValidationError('name', 'Agent name must be at least 3 characters long');
+      throw ValidationError('name', 'Agent name must be at least 3 characters long');
     }
 
     // Check if agent already exists
@@ -82,7 +82,7 @@ export async function createAgent(
       .limit(1);
 
     if (existingAgent.length > 0) {
-      throw new ValidationError('agentId', 'Agent ID already exists');
+      throw ValidationError('agentId', 'Agent ID already exists');
     }
 
     // Create the agent
@@ -104,13 +104,13 @@ export async function createAgent(
     const agentData = createdAgent[0];
     const agent: AgentInfo = {
       agentId: agentData.agentId,
-      name: agentData.name,
+      name: agentData.name || '',
       description: agentData.description || undefined,
       permissions: JSON.parse(agentData.permissions || '[]'),
-      rateLimitRpm: agentData.rateLimitRpm,
-      rateLimitOph: agentData.rateLimitOph,
-      isActive: agentData.isActive,
-      createdAt: agentData.createdAt,
+      rateLimitRpm: agentData.rateLimitRpm || 100,
+      rateLimitOph: agentData.rateLimitOph || 10,
+      isActive: agentData.isActive || false,
+      createdAt: agentData.createdAt || '',
       lastUsed: agentData.lastUsed || undefined
     };
 
@@ -147,7 +147,7 @@ export async function createAgent(
     const processingTime = Date.now() - startTime;
     
     if (error instanceof ValidationError) {
-      return createErrorResponse(error, sessionId, adminAgentId, processingTime, {
+      return createErrorResponse(new Error(`Validation error: ${(error as any).message}`), sessionId, adminAgentId, processingTime, {
         agent: {} as AgentInfo,
         apiKey: '',
         setup_instructions: []
@@ -198,13 +198,13 @@ export async function listAgents(
         const stats = await getAgentStats(agent.agentId);
         return {
           agentId: agent.agentId,
-          name: agent.name,
+          name: agent.name || '',
           description: agent.description || undefined,
           permissions: JSON.parse(agent.permissions || '[]'),
-          rateLimitRpm: agent.rateLimitRpm,
-          rateLimitOph: agent.rateLimitOph,
-          isActive: agent.isActive,
-          createdAt: agent.createdAt,
+          rateLimitRpm: agent.rateLimitRpm || 100,
+          rateLimitOph: agent.rateLimitOph || 10,
+          isActive: agent.isActive || false,
+          createdAt: agent.createdAt || '',
           lastUsed: agent.lastUsed || undefined,
           stats
         };
@@ -267,19 +267,19 @@ export async function getAgentDetails(
       .limit(1);
 
     if (agentResult.length === 0) {
-      throw new ResourceNotFoundError('Agent', agentId);
+      throw ResourceNotFoundError('Agent', agentId);
     }
 
     const agentData = agentResult[0];
     const agent: AgentInfo = {
       agentId: agentData.agentId,
-      name: agentData.name,
+      name: agentData.name || '',
       description: agentData.description || undefined,
       permissions: JSON.parse(agentData.permissions || '[]'),
-      rateLimitRpm: agentData.rateLimitRpm,
-      rateLimitOph: agentData.rateLimitOph,
-      isActive: agentData.isActive,
-      createdAt: agentData.createdAt,
+      rateLimitRpm: agentData.rateLimitRpm || 100,
+      rateLimitOph: agentData.rateLimitOph || 10,
+      isActive: agentData.isActive || false,
+      createdAt: agentData.createdAt || '',
       lastUsed: agentData.lastUsed || undefined
     };
 
@@ -300,7 +300,7 @@ export async function getAgentDetails(
 
     const sessionsWithItemCount = recentSessions.map(session => ({
       sessionId: session.sessionId,
-      createdAt: session.createdAt,
+      createdAt: session.createdAt || '',
       expiresAt: session.expiresAt,
       itemsInCart: session.cart ? JSON.parse(session.cart).length : 0
     }));
@@ -333,7 +333,7 @@ export async function getAgentDetails(
     const processingTime = Date.now() - startTime;
     
     if (error instanceof ResourceNotFoundError) {
-      return createErrorResponse(error, sessionId, adminAgentId, processingTime, {
+      return createErrorResponse(new Error(`Resource not found: ${(error as any).message}`), sessionId, adminAgentId, processingTime, {
         agent: {} as AgentInfo,
         stats: {} as AgentStats,
         recent_sessions: []
@@ -372,7 +372,7 @@ export async function updateAgentStatus(
       .limit(1);
 
     if (agentResult.length === 0) {
-      throw new ResourceNotFoundError('Agent', agentId);
+      throw ResourceNotFoundError('Agent', agentId);
     }
 
     const previousStatus = agentResult[0].isActive;
@@ -391,13 +391,13 @@ export async function updateAgentStatus(
     const agentData = updatedAgentResult[0];
     const agent: AgentInfo = {
       agentId: agentData.agentId,
-      name: agentData.name,
+      name: agentData.name || '',
       description: agentData.description || undefined,
       permissions: JSON.parse(agentData.permissions || '[]'),
-      rateLimitRpm: agentData.rateLimitRpm,
-      rateLimitOph: agentData.rateLimitOph,
-      isActive: agentData.isActive,
-      createdAt: agentData.createdAt,
+      rateLimitRpm: agentData.rateLimitRpm || 100,
+      rateLimitOph: agentData.rateLimitOph || 10,
+      isActive: agentData.isActive || false,
+      createdAt: agentData.createdAt || '',
       lastUsed: agentData.lastUsed || undefined
     };
 
@@ -407,7 +407,7 @@ export async function updateAgentStatus(
       success: true,
       data: {
         agent,
-        previous_status: previousStatus
+        previous_status: previousStatus || false
       },
       context: {
         session_id: sessionId,
@@ -464,7 +464,7 @@ async function getAgentStats(agentId: string): Promise<AgentStats> {
     return {
       totalRequests: sessionStats[0]?.count || 0,
       activeSessions: activeSessionStats[0]?.count || 0,
-      lastActivity: sessionStats[0]?.lastActivity || undefined
+      lastActivity: (sessionStats[0] as any)?.lastActivity || undefined
     };
   } catch (error) {
     return {

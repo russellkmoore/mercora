@@ -49,7 +49,7 @@ export async function authenticateAgent(request: NextRequest): Promise<AgentAuth
     const agentData = agent[0];
 
     // Check rate limits
-    const rateLimitCheck = await checkRateLimit(agentData.agentId, agentData.rateLimitRpm, agentData.rateLimitOph);
+    const rateLimitCheck = await checkRateLimit(agentData.agentId, agentData.rateLimitRpm || 100, agentData.rateLimitOph || 10);
     if (!rateLimitCheck.success) {
       return rateLimitCheck;
     }
@@ -93,7 +93,7 @@ async function checkRateLimit(agentId: string, rpmLimit: number, ophLimit: numbe
       ))
       .limit(1);
 
-    if (minuteUsage.length > 0 && minuteUsage[0].count >= rpmLimit) {
+    if (minuteUsage.length > 0 && (minuteUsage[0]?.count || 0) >= rpmLimit) {
       return {
         success: false,
         error: {
@@ -113,7 +113,7 @@ async function checkRateLimit(agentId: string, rpmLimit: number, ophLimit: numbe
       ))
       .limit(1);
 
-    if (hourUsage.length > 0 && hourUsage[0].count >= ophLimit) {
+    if (hourUsage.length > 0 && (hourUsage[0]?.count || 0) >= ophLimit) {
       return {
         success: false,
         error: {

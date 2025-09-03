@@ -2,8 +2,8 @@ import { createOrder } from '../../models/mach/orders';
 import { getSessionCart } from '../session';
 import { OrderRequest, OrderResponse, MCPToolResponse } from '../types';
 import { enhanceUserContext } from '../context';
-import { Address } from '../../types/mach/address';
-import { CartItem } from '../../types/core';
+import { MACHAddress as Address } from '../../types/mach/Address';
+import { CartItem } from '../../types/cartitem';
 
 export async function placeOrder(
   request: OrderRequest,
@@ -38,7 +38,7 @@ export async function placeOrder(
     }
 
     // Enhanced user context for order
-    const userContext = enhanceUserContext(request.agent_context);
+    const userContext = enhanceUserContext(request.agent_context || null);
     
     // Calculate order totals
     const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -78,23 +78,26 @@ export async function placeOrder(
     // Create order using existing order system
     const orderData = {
       user_id: userContext.userId || request.agent_context?.agentId || 'agent-order',
-      total_amount: total,
+      total_amount: { amount: total, currency: 'USD' },
       status: 'confirmed' as const,
-      shipping_address: formatAddressForDB(request.shippingAddress),
-      billing_address: formatAddressForDB(request.billingAddress || request.shippingAddress),
+      shipping_address: request.shippingAddress,
+      billing_address: request.billingAddress || request.shippingAddress,
       items: cart.map(item => ({
         product_id: item.productId,
         variant_id: item.variantId,
+        sku: item.variantId || `${item.productId}-default`,
         quantity: item.quantity,
-        price: item.price,
-        name: item.name
+        unit_price: { amount: item.price, currency: 'USD' },
+        total_price: { amount: item.price * item.quantity, currency: 'USD' },
+        product_name: item.name
       })),
       shipping_method: request.shippingOption || 'standard',
       payment_method: request.paymentMethod || 'agent-processed',
       special_instructions: request.specialInstructions,
       // Agent-specific fields
       agent_id: request.agent_context?.agentId,
-      agent_context: request.agent_context ? JSON.stringify(request.agent_context) : undefined
+      agent_context: request.agent_context ? JSON.stringify(request.agent_context) : undefined,
+      currency_code: 'USD'
     };
 
     const order = await createOrder(orderData);
@@ -109,7 +112,7 @@ export async function placeOrder(
     const response: OrderResponse = {
       orderId: order.id!.toString(),
       status: order.status,
-      total: order.total_amount,
+      total: typeof order.total_amount === 'object' ? (order.total_amount as any).amount : order.total_amount,
       tracking_number: order.tracking_number || undefined,
       estimated_delivery: estimatedDelivery
     };
@@ -219,7 +222,7 @@ function calculateShipping(address: Address, subtotal: number): number {
   if (subtotal >= 100) return 0;
   
   // Alaska/Hawaii surcharge
-  if (address.state === 'AK' || address.state === 'HI') {
+  if (address.region === 'AK' || address.region === 'HI') {
     return 19.99;
   }
   
@@ -236,7 +239,7 @@ function calculateTax(subtotal: number, address: Address): number {
     'FL': 0.06    // Florida
   };
   
-  const rate = taxRates[address.state] || 0.05; // Default 5%
+  const rate = taxRates[address.region || ''] || 0.05; // Default 5%
   return subtotal * rate;
 }
 
@@ -245,7 +248,7 @@ function calculateEstimatedDelivery(address: Address, shippingOption: string): s
     return '1-2 business days';
   }
   
-  if (address.state === 'AK' || address.state === 'HI') {
+  if (address.region === 'AK' || address.region === 'HI') {
     return '5-7 business days';
   }
   
@@ -254,10 +257,10 @@ function calculateEstimatedDelivery(address: Address, shippingOption: string): s
 
 function formatAddressForDB(address: Address): string {
   return JSON.stringify({
-    street: address.street,
-    street2: address.street2,
+    street: address.line1,
+    street2: address.line2,
     city: address.city,
-    state: address.state,
+    state: address.region,
     postal_code: address.postal_code,
     country: address.country || 'US'
   });
