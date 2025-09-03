@@ -23,10 +23,11 @@
  * - **link**: Text-only button styled as a link
  *
  * === Sizes ===
- * - **sm**: Compact button for dense layouts (32px height)
- * - **default**: Standard button size (36px height)
- * - **lg**: Large button for primary actions (40px height)
- * - **icon**: Square button optimized for icons (36px x 36px)
+ * - **sm**: Compact button for desktop layouts (40px height - mobile optimized)
+ * - **default**: Standard button size (48px height - mobile-first)
+ * - **lg**: Large button for primary actions (52px height)
+ * - **xl**: Extra large for key CTAs (56px height)
+ * - **icon**: Square button optimized for icons (48px x 48px - mobile touch)
  *
  * === Usage ===
  * ```tsx
@@ -70,10 +71,11 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3",
-        sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
-        lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
-        icon: "size-9",
+        default: "h-12 px-4 py-3 has-[>svg]:px-3", // 48px mobile-first
+        sm: "h-10 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5", // 40px mobile optimized  
+        lg: "h-13 rounded-md px-6 has-[>svg]:px-4", // 52px for primary actions
+        xl: "h-14 rounded-md px-8 has-[>svg]:px-6", // 56px for key CTAs
+        icon: "size-12", // 48px x 48px mobile touch
       },
     },
     defaultVariants: {
