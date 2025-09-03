@@ -42,7 +42,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(response);
   } catch (error) {
     console.error('MCP capabilities error:', error);
-    return createHttpErrorResponse(error, 500);
+    return createHttpErrorResponse(
+      error instanceof Error ? error : new Error('Unknown error occurred'),
+      500
+    );
   }
 }
 
@@ -55,7 +58,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
+    const body = await request.json() as any;
     const { tool, params, session_id } = body;
 
     // Route to appropriate tool handler
@@ -136,6 +139,9 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error('MCP tool execution error:', error);
-    return createHttpErrorResponse(error, 500);
+    return createHttpErrorResponse(
+      error instanceof Error ? error : new Error('Unknown error occurred'),
+      500
+    );
   }
 }

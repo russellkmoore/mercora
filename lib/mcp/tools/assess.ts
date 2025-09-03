@@ -10,12 +10,12 @@ export async function assessFulfillmentCapability(
   const startTime = Date.now();
   
   try {
-    const { requirements } = request;
-    const userContext = enhanceUserContext(request.agent_context);
+    const requirements = request.requirements;
+    const userContext = enhanceUserContext(request.agent_context || null);
     
     // Get our categories and capabilities
     const categories = await listCategories();
-    const categoryNames = categories.map(cat => cat.name.toLowerCase());
+    const categoryNames = categories.map(cat => typeof cat.name === 'string' ? cat.name.toLowerCase() : String(cat.name || '').toLowerCase());
     
     // Define Voltique's core specialties
     const ourSpecialties = [
@@ -106,7 +106,7 @@ export async function assessFulfillmentCapability(
       success: false,
       data: {
         can_fulfill: [],
-        cannot_fulfill: requirements.items,
+        cannot_fulfill: request.requirements?.items || [],
         recommendations: [],
         estimated_cost: 0,
         estimated_delivery: 'Unknown'

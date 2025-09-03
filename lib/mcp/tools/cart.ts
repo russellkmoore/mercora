@@ -1,7 +1,7 @@
 import { getSession, updateSessionCart, getSessionCart } from '../session';
 import { getProductBySlug } from '../../models/mach/products';
 import { CartRequest, CartResponse, MCPToolResponse } from '../types';
-import { CartItem } from '../../types/core';
+import { CartItem } from '../../types/cartitem';
 
 export async function addToCart(
   request: CartRequest & { sessionId: string },
@@ -20,13 +20,13 @@ export async function addToCart(
     }
 
     // Find the specific variant
-    const variant = product.variants?.find(v => v.id === request.variantId);
+    const variant = product.variants?.find(v => String(v.id) === String(request.variantId));
     if (!variant) {
       throw new Error('Product variant not found');
     }
 
     // Check if item already exists in cart
-    const existingItemIndex = currentCart.findIndex(item => item.variantId === request.variantId);
+    const existingItemIndex = currentCart.findIndex(item => String(item.variantId) === String(request.variantId));
     
     let updatedCart: CartItem[];
     if (existingItemIndex >= 0) {
@@ -36,14 +36,12 @@ export async function addToCart(
     } else {
       // Add new item to cart
       const newItem: CartItem = {
-        productId: product.id!,
-        variantId: request.variantId,
+        productId: String(product.id!),
+        variantId: String(request.variantId),
         quantity: request.quantity || 1,
-        name: product.name || '',
-        price: variant.price || 0,
-        image_url: product.image_url || '',
-        slug: product.slug || '',
-        variant_name: variant.name || 'Default'
+        name: typeof product.name === 'string' ? product.name : String(product.name || ''),
+        price: typeof variant.price === 'number' ? variant.price : (variant.price as any)?.amount || 0,
+        primaryImageUrl: (product as any).image_url || ''
       };
       updatedCart = [...currentCart, newItem];
     }
@@ -119,14 +117,14 @@ export async function bulkAddToCart(
           continue;
         }
 
-        const variant = product.variants?.find(v => v.id === item.variantId);
+        const variant = product.variants?.find(v => String(v.id) === String(item.variantId));
         if (!variant) {
           failedItems.push(`Variant ${item.variantId} not found for product ${item.productId}`);
           continue;
         }
 
         // Check if item already exists in cart
-        const existingItemIndex = currentCart.findIndex(cartItem => cartItem.variantId === item.variantId);
+        const existingItemIndex = currentCart.findIndex(cartItem => String(cartItem.variantId) === String(item.variantId));
         
         if (existingItemIndex >= 0) {
           // Update quantity of existing item
@@ -134,14 +132,12 @@ export async function bulkAddToCart(
         } else {
           // Add new item to cart
           const newItem: CartItem = {
-            productId: product.id!,
-            variantId: item.variantId,
+            productId: String(product.id!),
+            variantId: String(item.variantId),
             quantity: item.quantity || 1,
-            name: product.name || '',
-            price: variant.price || 0,
-            image_url: product.image_url || '',
-            slug: product.slug || '',
-            variant_name: variant.name || 'Default'
+            name: typeof product.name === 'string' ? product.name : String(product.name || ''),
+            price: typeof variant.price === 'number' ? variant.price : (variant.price as any)?.amount || 0,
+            primaryImageUrl: (product as any).image_url || ''
           };
           currentCart.push(newItem);
         }
@@ -266,7 +262,7 @@ export async function updateCart(
   
   try {
     const currentCart = await getSessionCart(sessionId);
-    const itemIndex = currentCart.findIndex(item => item.variantId === request.variantId);
+    const itemIndex = currentCart.findIndex(item => String(item.variantId) === String(request.variantId));
     
     if (itemIndex === -1) {
       throw new Error('Item not found in cart');
