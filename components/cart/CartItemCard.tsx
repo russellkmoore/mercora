@@ -34,7 +34,7 @@ export default function CartItemCard({ item }: CartItemCardProps) {
           {!isCheckoutPage && (
             <Button
               size="sm"
-              className="bg-neutral-100 text-black border border-gray-300 hover:bg-neutral-200 h-7 w-7 p-0 text-sm"
+              className="bg-neutral-100 text-black border border-gray-300 hover:bg-neutral-200 h-12 w-12 p-0 text-base"
               onClick={() => updateQuantity(item.variantId, item.quantity - 1)}
             >
               -
@@ -44,7 +44,7 @@ export default function CartItemCard({ item }: CartItemCardProps) {
           {!isCheckoutPage && (
             <Button
               size="sm"
-              className="bg-neutral-100 text-black border border-gray-300 hover:bg-neutral-200 h-7 w-7 p-0 text-sm"
+              className="bg-neutral-100 text-black border border-gray-300 hover:bg-neutral-200 h-12 w-12 p-0 text-base"
               onClick={() => updateQuantity(item.variantId, item.quantity + 1)}
             >
               +
@@ -59,7 +59,7 @@ export default function CartItemCard({ item }: CartItemCardProps) {
           <Button
             variant="outline"
             size="sm"
-            className="text-red-600 mt-2 border border-red-200 bg-red-50 hover:bg-orange-500 hover:text-white text-xs h-7"
+            className="text-red-600 mt-2 border border-red-200 bg-red-50 hover:bg-orange-500 hover:text-white text-sm h-12"
             onClick={() => removeItem(item.variantId)}
           >
             Remove

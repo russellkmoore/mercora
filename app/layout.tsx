@@ -51,6 +51,7 @@ import PromotionalBanner from "@/components/PromotionalBanner";
 import { Toaster } from "sonner";
 import { dark } from "@clerk/themes";
 import { Suspense } from "react";
+import WebVitals from "@/components/analytics/WebVitals";
 
 import {
   ClerkProvider,
@@ -159,6 +160,9 @@ export default function RootLayout({
               duration: 3000,
             }}
           />
+          
+          {/* Core Web Vitals monitoring */}
+          <WebVitals />
         </body>
       </html>
     </ClerkProvider>

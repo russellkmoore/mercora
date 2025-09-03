@@ -214,7 +214,7 @@ export default function HeaderClient({
               {hasChildCategories ? (
                 <button
                   onClick={() => toggleCategoryExpansion(category.id)}
-                  className="mr-2 p-1 text-gray-400 hover:text-white flex-shrink-0"
+                  className="mr-2 p-3 text-gray-400 hover:text-white flex-shrink-0 min-h-[48px] min-w-[48px] flex items-center justify-center"
                   aria-label={isExpanded ? 'Collapse category' : 'Expand category'}
                 >
                   {isExpanded ? (
