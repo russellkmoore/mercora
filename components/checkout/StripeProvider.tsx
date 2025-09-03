@@ -71,6 +71,9 @@ export default function StripeProvider({
           fontSize: '16px', // 16px prevents zoom on iOS
           minHeight: '44px', // Touch-friendly minimum height
           transition: 'border-color 0.15s ease-in-out',
+          width: '100%',
+          boxSizing: 'border-box',
+          '-webkit-appearance': 'none', // Remove iOS styling
         },
         '.Input:focus': {
           borderColor: '#f97316',
@@ -85,11 +88,15 @@ export default function StripeProvider({
           fontWeight: '500',
           marginBottom: '8px',
           color: '#374151',
+          display: 'block',
+          width: '100%',
         },
         '.Tab': {
           minHeight: '44px',
           padding: '12px 16px',
           fontSize: '16px',
+          width: '100%',
+          boxSizing: 'border-box',
         },
         '.Tab--selected': {
           borderColor: '#f97316',
@@ -97,6 +104,13 @@ export default function StripeProvider({
         '.TabIcon': {
           height: '20px',
           width: '20px',
+        },
+        '.TabList': {
+          width: '100%',
+        },
+        '.TabContent': {
+          width: '100%',
+          marginTop: '16px',
         },
         // Note: Stripe doesn't support media queries, mobile styles handled at component level
         ...(options.appearance?.rules || {}),
