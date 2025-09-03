@@ -60,13 +60,18 @@ export default function PaymentForm({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
 
+  // Detect mobile Safari
+  const isMobileSafari = typeof window !== 'undefined' && 
+    /iPad|iPhone|iPod/.test(navigator.userAgent) && 
+    /Safari/.test(navigator.userAgent);
+
   // Payment Element options with mobile optimization
   const paymentElementOptions: StripePaymentElementOptions = {
     layout: {
       type: 'tabs',
       defaultCollapsed: false,
       radios: false,
-      spacedAccordionItems: false
+      spacedAccordionItems: isMobileSafari // More spacing on mobile Safari
     },
     paymentMethodOrder: ['card', 'apple_pay', 'google_pay'],
     wallets: {
@@ -129,7 +134,7 @@ export default function PaymentForm({
   };
 
   return (
-    <div className="text-black min-w-0">
+    <div className="text-black w-full">
       {!stripe || !elements ? (
         <div className="min-h-[300px] w-full flex items-center justify-center">
           <div className="flex flex-col items-center gap-2">
@@ -138,9 +143,9 @@ export default function PaymentForm({
           </div>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6 w-full">
           {/* Stripe Payment Element */}
-          <div className="min-h-[300px] w-full overflow-hidden">
+          <div className="min-h-[300px] w-full">
             <PaymentElement 
               id="payment-element"
               options={paymentElementOptions}
