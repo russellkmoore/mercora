@@ -40,6 +40,7 @@ import { getCategoryBySlug } from "@/lib/models";
 import { getProductsByCategory } from "@/lib/models/mach/products";
 import CategoryDisplay from "./CategoryDisplay";
 import Image from "next/image";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 /**
  * Category page component that displays products for a specific category
@@ -93,8 +94,20 @@ export default async function CategoryPage({ params }: any) {
 
   const categoryImageUrl = getCategoryImageUrl();
 
+  // Create custom breadcrumbs with category name
+  const categoryName = typeof category.name === 'string' ? category.name : (category.name?.en || 'Category');
+  const breadcrumbItems = [
+    { label: "Home", href: "/" },
+    { label: "Categories", href: "/categories" },
+    { label: categoryName, href: `/category/${params.slug}`, current: true }
+  ];
+
   return (
-    <div className="mx-auto px-4 sm:px-6">
+    <div>
+      {/* Mobile Breadcrumb Navigation */}
+      <Breadcrumbs items={breadcrumbItems} className="lg:hidden" />
+      
+      <div className="mx-auto px-4 sm:px-6">
       
       {/* Category Hero Image */}
       {categoryImageUrl && (
@@ -147,6 +160,7 @@ export default async function CategoryPage({ params }: any) {
       {!error && (
         <CategoryDisplay products={products} />
       )}
+      </div>
     </div>
   );
 }
