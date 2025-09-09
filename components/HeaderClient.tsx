@@ -199,7 +199,104 @@ export default function HeaderClient({
   };
 
   /**
-   * Recursive component to render category tree for mobile menu
+   * Simplified mobile category list with flat structure and visual grouping
+   */
+  const SimpleMobileCategoryList = ({ 
+    categories, 
+    onCategorySelect 
+  }: { 
+    categories: MACHCategory[], 
+    onCategorySelect: () => void 
+  }) => {
+    // Group categories by parent for better visual organization
+    const parentCategories = categories.filter(cat => !cat.parent_id);
+    const childCategories = categories.filter(cat => cat.parent_id);
+    
+    // Create parent -> children mapping
+    const categoryGroups = parentCategories.map(parent => ({
+      parent,
+      children: childCategories.filter(child => child.parent_id === parent.id)
+    }));
+
+    return (
+      <div className="space-y-1 max-h-80 overflow-y-auto">
+        {/* Featured/Top Level Categories */}
+        {categoryGroups.slice(0, 6).map(group => (
+          <div key={group.parent.id} className="mb-4">
+            {/* Parent Category - Prominent Display */}
+            <Link
+              href={`/category/${getCategorySlug(group.parent)}`}
+              onClick={onCategorySelect}
+              className="flex items-center justify-between w-full p-4 bg-gradient-to-r from-orange-600/20 to-orange-500/10 rounded-lg border border-orange-500/30 hover:border-orange-400 transition-all duration-200 group"
+              prefetch={true}
+            >
+              <div>
+                <div className="text-white font-semibold text-base group-hover:text-orange-300 transition-colors">
+                  {getCategoryName(group.parent)}
+                </div>
+                {group.children.length > 0 && (
+                  <div className="text-xs text-gray-400 mt-1">
+                    {group.children.length} subcategories
+                  </div>
+                )}
+              </div>
+              <ChevronRight className="w-5 h-5 text-orange-400 group-hover:text-orange-300 transition-colors" />
+            </Link>
+            
+            {/* Child Categories - Compact Grid */}
+            {group.children.length > 0 && (
+              <div className="grid grid-cols-2 gap-2 mt-2 pl-4">
+                {group.children.slice(0, 4).map(child => (
+                  <Link
+                    key={child.id}
+                    href={`/category/${getCategorySlug(child)}`}
+                    onClick={onCategorySelect}
+                    className="text-sm text-gray-300 hover:text-orange-400 py-2 px-3 rounded-md hover:bg-neutral-800/50 transition-all duration-200 truncate"
+                    prefetch={true}
+                  >
+                    {getCategoryName(child)}
+                  </Link>
+                ))}
+                {group.children.length > 4 && (
+                  <Link
+                    href={`/category/${getCategorySlug(group.parent)}`}
+                    onClick={onCategorySelect}
+                    className="text-xs text-orange-500 hover:text-orange-400 py-2 px-3 rounded-md hover:bg-neutral-800/50 transition-all duration-200 col-span-2 text-center border border-orange-500/20 hover:border-orange-400/40"
+                    prefetch={true}
+                  >
+                    View all {group.children.length} items →
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+        
+        {/* Additional categories if any */}
+        {categoryGroups.length > 6 && (
+          <div className="border-t border-neutral-700 pt-4 mt-6">
+            <div className="text-xs text-gray-400 mb-3 uppercase tracking-wide">More Categories</div>
+            <div className="grid grid-cols-2 gap-2">
+              {categoryGroups.slice(6).map(group => (
+                <Link
+                  key={group.parent.id}
+                  href={`/category/${getCategorySlug(group.parent)}`}
+                  onClick={onCategorySelect}
+                  className="text-sm text-gray-300 hover:text-orange-400 py-3 px-4 rounded-md hover:bg-neutral-800/50 transition-all duration-200 truncate text-center border border-neutral-700 hover:border-orange-500/30"
+                  prefetch={true}
+                >
+                  {getCategoryName(group.parent)}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  /**
+   * Recursive component to render category tree for mobile menu (LEGACY - keeping for fallback)
    */
   const CategoryMobileTree = ({ cats, level = 0 }: { cats: MACHCategory[], level?: number }) => (
     <>
@@ -320,7 +417,7 @@ export default function HeaderClient({
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" className="bg-black text-white w-full max-w-sm">
+          <SheetContent side="right" className="bg-black text-white w-full max-w-sm overflow-y-auto">
             {/* Accessibility components */}
             <VisuallyHidden>
               <SheetTitle>Mobile Navigation Menu</SheetTitle>
@@ -329,7 +426,18 @@ export default function HeaderClient({
               </SheetDescription>
             </VisuallyHidden>
 
-            <div className="flex flex-col space-y-4 mt-8">
+            {/* Mobile Menu Header */}
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-neutral-700">
+              <div>
+                <h2 className="text-xl font-bold text-white">Menu</h2>
+                <p className="text-sm text-gray-400">Browse our outdoor gear</p>
+              </div>
+              <div className="w-8 h-8 bg-orange-500/20 rounded-full flex items-center justify-center">
+                <Grid3X3 className="w-4 h-4 text-orange-400" />
+              </div>
+            </div>
+
+            <div className="space-y-6">
               <Link 
                 href="/" 
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -340,30 +448,11 @@ export default function HeaderClient({
                 <span>Home</span>
               </Link>
 
-              <div className="px-4 py-2">
-                <h3 className="text-orange-500 font-semibold mb-2">Categories</h3>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {rootCategories.length > 0 ? (
-                    <CategoryMobileTree cats={rootCategories} />
-                  ) : (
-                    // Fallback: show all categories if no root categories found
-                    categories.map((category) => (
-                      <Link
-                        key={category.id}
-                        href={`/category/${getCategorySlug(category)}`}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className="block text-white hover:text-orange-500 py-2 px-2 rounded hover:bg-neutral-800"
-                        prefetch={true}
-                      >
-                        {getCategoryName(category)}
-                      </Link>
-                    ))
-                  )}
-                </div>
+              <div>
+                <SimpleMobileCategoryList categories={categories} onCategorySelect={() => setIsMobileMenuOpen(false)} />
               </div>
 
-
-              <div className="px-4 border-t border-neutral-700 pt-4 space-y-3">
+              <div className="border-t border-neutral-700 pt-6 space-y-3">
                 <button 
                   className="flex items-center space-x-3 text-white hover:text-orange-500 py-3 px-4 rounded-lg hover:bg-neutral-800 w-full text-left"
                   onClick={() => {
