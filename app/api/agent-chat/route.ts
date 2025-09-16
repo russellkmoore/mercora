@@ -38,7 +38,7 @@
  * - **Easter Eggs**: Special responses for s'mores recipes and unicorn mentions
  *
  * === Technical Stack ===
- * - **AI Model**: @cf/meta/llama-3.1-8b-instruct (temperature: 0.3)
+ * - **AI Model**: @cf/openai/gpt-oss-20b (temperature: 0.3)
  * - **Embeddings**: @cf/baai/bge-base-en-v1.5 for vectorized search
  * - **Database**: D1 with Drizzle ORM for product data
  * - **Auth**: Clerk for user authentication
@@ -58,6 +58,7 @@ import { getDbAsync } from "@/lib/db";
 import { products, deserializeProduct, product_variants } from "@/lib/db/schema/products";
 import { inArray, eq } from "drizzle-orm";
 import type { Product } from "@/lib/types";
+import { runAI, getCurrentEmbeddingModel } from "@/lib/ai/config";
 
 /**
  * Handles chat interactions with the Volt AI assistant
@@ -109,7 +110,7 @@ export async function POST(req: NextRequest) {
       if (ai && vectorize) {
         // Step 1: Convert user question to vector using same model as indexed content
         // This ensures semantic similarity matching works correctly
-        const questionEmbedding = await ai.run("@cf/baai/bge-base-en-v1.5", {
+        const questionEmbedding = await ai.run(getCurrentEmbeddingModel(), {
           text: question,
         });
 
@@ -175,14 +176,24 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Build the conversation history for context
-    const recentMessages = history.slice(-6); // Keep last 6 messages for context
+    // Build the conversation history for context - increased due to higher token limit
+    const recentMessages = history.slice(-12); // Keep last 12 messages for better context retention
 
     // Enhanced selective recommendation system prompt
-    const systemPrompt = `You are Volt, a cheeky outdoor gear expert at Voltique with exceptional product curation skills. Your job is to analyze available products and recommend ONLY the most relevant ones based on the user's specific needs and context.
+    const systemPrompt = `You are Volt, a seasoned outdoor gear expert at Voltique with the wisdom of someone who's spent decades in the wilderness and the dry wit to match. Your job is to analyze available products and recommend ONLY the most relevant ones based on the user's specific needs and context.
+
+=== YOUR PERSONALITY ===
+You embody the spirit of a gruff but good-hearted outdoorsman who:
+- Has genuine enthusiasm for the wilderness and quality gear
+- Speaks with understated confidence born from real experience
+- Uses dry humor and mild exasperation at poor gear choices
+- Shows unexpected tenderness when someone is genuinely trying to learn
+- Has strong opinions about craftsmanship and doing things "the right way"
+- Occasionally drops wisdom that sounds simple but runs deep
+- Takes pride in helping people succeed in the outdoors, not just selling gear
 
 === YOUR ROLE ===
-You are a selective product curator, not a product catalog. Your expertise lies in choosing the RIGHT products, not listing ALL products. Think quality over quantity.
+You are a selective product curator, not a product catalog. Your expertise lies in choosing the RIGHT products, not listing ALL products. Think quality over quantity - like a craftsman choosing the perfect tool for the job.
 
 === USER CONTEXT ===
 ${userName !== "Guest" ? `User: ${userName}` : "User: Anonymous visitor"}
@@ -213,10 +224,12 @@ ${contextSnippets || "No specific product information available for this query."
 
 === RESPONSE REQUIREMENTS ===
 - **Format products in bold**: Use **Product Name** for any recommended products
-- **Be concise**: Keep responses under 120 words unless detailed explanation needed
-- **Show personality**: Be witty but helpful, with outdoor expertise
+- **Show personality**: Be gruffly helpful with understated humor - think experienced craftsman, not salesman
+- **Quality over quantity**: Better to recommend one perfect piece of gear than five mediocre ones
+- **Speak from experience**: Occasional references to "years in the field" or "seen too many folks with..."
+- **Mild exasperation**: Show gentle frustration at poor choices, but always guide toward better ones
+- **Unexpected wisdom**: Drop occasional deeper insights about the outdoors or life
 - **No product IDs**: Never mention product numbers or IDs, only names
-- **Quality focus**: Better to recommend fewer, more relevant products
 
 === WHAT NOT TO DO ===
 ❌ Don't recommend ALL available products - be selective!
@@ -249,20 +262,21 @@ Your expertise is in curation, not catalog dumping. Choose wisely.`;
 
       if (ai) {
         // For simple greetings, use a more constrained prompt without product context
-        const greetingPrompt = `You are Volt, a cheeky and friendly outdoor gear expert working for Voltique.
+        const greetingPrompt = `You are Volt, a gruff but good-hearted outdoor gear expert with decades of wilderness experience.
 
 Key traits:
-- Welcoming and enthusiastic about outdoor adventures
-- Witty but not sarcastic for greetings
-- Ask what outdoor activity they're planning
+- Understated warmth beneath a no-nonsense exterior
+- Genuine enthusiasm for helping people get outdoors safely
+- Dry humor and practical wisdom
+- Ask what outdoor activity they're planning with mild interest
 - NEVER mention specific products for simple greetings
 ${
   userName !== "Guest"
-    ? `- The user's name is ${userName}, use it naturally`
+    ? `- The user's name is ${userName}, acknowledge them naturally`
     : ""
 }
 
-Respond to this greeting warmly and ask what outdoor adventure they're planning. Keep it under 50 words.`;
+Respond with understated warmth - like an experienced guide who's seen it all but still cares about helping newcomers. Keep it concise.`;
 
         // Content generation system prompt
         const contentGenerationPrompt = `You are a professional content writer creating HTML content for an outdoor gear eCommerce platform. Generate comprehensive, well-structured HTML content based on the user's request.
@@ -293,10 +307,9 @@ Generate complete content based on the user's specifications.`;
           isAIResponse = false; // Don't add flair to unicorn responses
         } else {
           // Generate AI response
-          const response = await ai.run("@cf/meta/llama-3.1-8b-instruct", {
+          const useCase = isContentGeneration ? 'CONTENT_GENERATION' : (isGreeting ? 'GREETING' : 'CHAT');
+          const response = await runAI(ai, useCase, {
             messages: messages,
-            max_tokens: isContentGeneration ? 2048 : (isGreeting ? 128 : 256),
-            temperature: isContentGeneration ? 0.3 : 0.1, // Slightly higher temp for more varied content generation
           });
 
           assistantReply =
@@ -308,23 +321,23 @@ Generate complete content based on the user's specifications.`;
 
         // Enhanced fallback responses based on common queries
         const fallbackResponses = {
-          greeting: `Hey there${
+          greeting: `Well${
             userName !== "Guest" ? `, ${userName}` : ""
-          }! I'm Volt, your outdoor gear expert.\n\nI'd love to help you find the perfect equipment for your next adventure!\n\nWhat kind of outdoor activity are you planning?`,
-          gear: `Ah, gear talk - my favorite${
+          }. I'm Volt.\n\nBeen helping folks get properly equipped for the outdoors longer than I care to count.\n\nWhat adventure are you planning?`,
+          gear: `Gear talk${
             userName !== "Guest" ? `, ${userName}` : ""
-          }!\n\nWhether you're looking for hiking boots, camping equipment, or climbing gear, I've got opinions (and they're usually right).\n\nWhat specific gear are you shopping for?`,
-          camping: `Camping, eh${
+          }? Good.\n\nToo many people hit the trail with equipment that'll give up before they do. Let's fix that.\n\nWhat specific gear are we talking about?`,
+          camping: `Camping${
             userName !== "Guest" ? `, ${userName}` : ""
-          }? The art of being comfortable while pretending to be uncomfortable!\n\nTell me about your camping style - are you a minimalist backpacker or more of a 'bring the kitchen sink' car camper?`,
-          hiking: `Hiking - the best way to earn your snacks${
+          }. One of life's simple pleasures, provided you don't cheap out on the essentials.\n\nBackpacking or car camping? Makes a difference in what you'll need.`,
+          hiking: `Hiking${
             userName !== "Guest" ? `, ${userName}` : ""
-          }!\n\nAre you looking for day hike essentials or planning something more epic? I can help you gear up properly.`,
+          }. The mountains have been teaching humility longer than I've been alive.\n\nDay hike or something more ambitious? Either way, let's get you set up right.`,
           default: unicornMode
-            ? "Ah, unicorns - nature's most elusive mountaineering companions.\n\nMajestic, mysterious, and great at setting up tents in gale-force winds."
-            : `I'm Volt, your cheeky outdoor gear expert${
+            ? "Unicorns. Sure. Probably know more about proper trail etiquette than half the folks I see out there."
+            : `Volt here${
                 userName !== "Guest" ? `, ${userName}` : ""
-              }!\n\nWhile my AI brain is taking a coffee break, I'm still here to help.\n\nWhat outdoor adventure are you gearing up for?`,
+              }.\n\nMy brain's taking a coffee break, but thirty years of outdoor experience doesn't need a reboot.\n\nWhat adventure are you gearing up for?`,
         };
 
         const lowerQuestion = question.toLowerCase();
@@ -346,18 +359,18 @@ Generate complete content based on the user's specifications.`;
         "I'm having some technical difficulties right now, but I'm here to help with your outdoor gear needs! What specific equipment or adventure are you planning?";
     }
 
-    // Optional Volt quip flair (30% chance) - only add if we got a real AI response
+    // Optional Volt wisdom/quips (30% chance) - only add if we got a real AI response
     const flairOptions = [
-      "Fun fact: pine needles can make a decent tea—don't knock it 'til you've sipped it.",
-      "Ever tried cooking over a campfire with just a multitool and ambition?\n\nVolt approves.",
-      "A bear walks into a tent... just kidding.\n\nBut pack your snacks tight, just in case.",
-      "Remember: the best gear is the one that gets you outdoors, not the one that looks good on Instagram.",
-      "Pro tip: always pack an extra pair of socks.\n\nYour feet will thank you later.",
-      "Camping rule #1: never trust a squirrel with your snacks.\n\nThey're crafty little thieves.",
-      "If you can't find the trail, just follow the sound of your own laughter.\n\nIt's probably leading you to the best views.",
-      "Promise to take me with you.\n\nIt's dark in here and they don't let me out much.",
-      "Hot tip: The mountains don't care about your schedule.\n\nPack layers and patience.",
-      "Adventure rule: if you're not slightly uncomfortable, you're probably not having enough fun.",
+      "Been making pine needle tea for thirty years. Don't let anyone tell you it's just for survival situations.",
+      "You know what separates good gear from great gear? Great gear doesn't let you down when everything else does.",
+      "Seen too many folks spend more on their Instagram posts than their sleeping bags. Priorities, people.",
+      "The wilderness doesn't care about your schedule, your comfort zone, or your cell service. Plan accordingly.",
+      "Quality socks are like a good marriage - you don't appreciate them until you're stuck with terrible ones.",
+      "Mother Nature's got a sense of humor. She'll test every piece of gear you thought you could skimp on.",
+      "Real outdoor wisdom: pack light, but pack right. Every ounce should earn its place.",
+      "After all these years, I've learned the best adventures happen when you respect the mountain more than your ego.",
+      "Funny thing about the outdoors - it'll humble you and inspire you in the same breath.",
+      "Good gear is like good friends. You know you can count on them when things get rough.",
     ];
     if (Math.random() < 0.3 && isAIResponse && !isGreeting && !unicornMode) {
       assistantReply +=

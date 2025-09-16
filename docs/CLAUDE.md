@@ -354,7 +354,7 @@ User Query → BGE Embeddings → Vector Search → Context → Llama 3.1 → Re
 ### Key Components
 - **Vector Database**: 30 products + 8 knowledge articles indexed
 - **Embedding Model**: `@cf/baai/bge-base-en-v1.5` (768 dimensions)
-- **Language Model**: `@cf/meta/llama-3.1-8b-instruct`
+- **Language Model**: `@cf/openai/gpt-oss-20b` (centrally configured in `/lib/ai/config.ts`)
 - **Personality**: Cheeky, knowledgeable outdoor gear expert
 
 ### Personalization Features

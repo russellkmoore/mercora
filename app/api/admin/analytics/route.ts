@@ -5,7 +5,7 @@
  * It analyzes real order and product data to generate trends, insights, and recommendations.
  *
  * === Core Features ===
- * - AI-powered trend analysis using Llama 3.1 8B Instruct
+ * - AI-powered trend analysis using GPT-OSS-20B
  * - Natural language business insights
  * - Anomaly detection and smart alerts
  * - Actionable recommendations for inventory and marketing
@@ -51,6 +51,7 @@ import { products, product_variants, deserializeProduct } from "@/lib/db/schema/
 import { orders } from "@/lib/db/schema/order";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
 import { sql } from "drizzle-orm";
+import { runAI } from "@/lib/ai/config";
 
 interface AnalyticsRequest {
   question?: string;
@@ -274,13 +275,11 @@ ${question}`;
       if (ai) {
         console.log("Generating AI business insights...");
         
-        const response = await ai.run("@cf/meta/llama-3.1-8b-instruct", {
+        const response = await runAI(ai, 'ANALYTICS', {
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: question }
           ],
-          max_tokens: 512,
-          temperature: 0.2 // Low temperature for factual, consistent analysis
         });
 
         aiInsights = response.response || "Unable to generate insights at this time.";
