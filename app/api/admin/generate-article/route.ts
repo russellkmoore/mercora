@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
+import { runAI } from "@/lib/ai/config";
 
 export async function POST(request: NextRequest) {
   try {
@@ -68,19 +69,17 @@ Topic Description: ${prompt}
 Please create a comprehensive knowledge base article covering this topic.`;
 
     // Generate content using Cloudflare AI
-    const response = await ai.run("@cf/meta/llama-3.1-8b-instruct", {
+    const response = await runAI(ai, 'CONTENT_GENERATION', {
       messages: [
         {
           role: "system",
           content: systemPrompt
         },
         {
-          role: "user", 
+          role: "user",
           content: userPrompt
         }
       ],
-      max_tokens: 2048,
-      temperature: 0.7,
     });
 
     const generatedContent = response.response || response.content || "";

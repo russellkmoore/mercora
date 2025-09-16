@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
+import { runAI } from "@/lib/ai/config";
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,19 +75,17 @@ Product Details: ${prompt}
 Please create a compelling product description for this outdoor gear item.`;
 
     // Generate content using Cloudflare AI
-    const response = await ai.run("@cf/meta/llama-3.1-8b-instruct", {
+    const response = await runAI(ai, 'MARKETING', {
       messages: [
         {
           role: "system",
           content: systemPrompt
         },
         {
-          role: "user", 
+          role: "user",
           content: userPrompt
         }
       ],
-      max_tokens: 1024,
-      temperature: 0.8, // Slightly more creative for marketing content
     });
 
     const generatedDescription = response.response || response.content || "";
