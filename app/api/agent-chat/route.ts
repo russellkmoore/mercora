@@ -312,8 +312,24 @@ Generate complete content based on the user's specifications.`;
             messages: messages,
           });
 
-          assistantReply =
-            response.response ||
+          // Debug: Log the actual response to see its structure
+          console.log("AI Response structure:", JSON.stringify(response, null, 2));
+
+          // Extract response from GPT-OSS-20B format
+          let responseText = "";
+          if (response.output && Array.isArray(response.output)) {
+            // Find the message output in the array
+            const messageOutput = response.output.find(item => item.type === 'message');
+            if (messageOutput && messageOutput.content && Array.isArray(messageOutput.content)) {
+              const textContent = messageOutput.content.find(content => content.type === 'output_text');
+              if (textContent && textContent.text) {
+                responseText = textContent.text;
+              }
+            }
+          }
+
+          assistantReply = responseText ||
+            response.response || response.content || response.text ||
             "Sorry, I'm having trouble thinking right now. Try asking me about gear recommendations or outdoor tips!";
           isAIResponse = true; // Mark as AI response (including greetings)
         }

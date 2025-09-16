@@ -107,11 +107,38 @@ export async function runAI(
 ) {
   const config = getAIConfig(useCase);
 
-  const params = {
-    ...options,
-    max_tokens: options.maxTokens ?? config.maxTokens,
-    temperature: options.temperature ?? config.temperature,
-  };
+  // Handle different model parameter formats
+  let params: any;
+
+  if (config.model.includes('@cf/openai/')) {
+    // OpenAI models (like GPT-OSS-20B) expect 'input' format
+    if (options.messages && options.messages.length > 0) {
+      // Convert messages to a single input string
+      const systemMessage = options.messages.find(m => m.role === 'system')?.content || '';
+      const userMessages = options.messages.filter(m => m.role !== 'system');
+      const lastUserMessage = userMessages[userMessages.length - 1]?.content || '';
+
+      params = {
+        instructions: systemMessage,
+        input: lastUserMessage,
+        max_tokens: options.maxTokens ?? config.maxTokens,
+        temperature: options.temperature ?? config.temperature,
+      };
+    } else {
+      params = {
+        input: options.text || '',
+        max_tokens: options.maxTokens ?? config.maxTokens,
+        temperature: options.temperature ?? config.temperature,
+      };
+    }
+  } else {
+    // Meta/Llama models expect 'messages' format
+    params = {
+      ...options,
+      max_tokens: options.maxTokens ?? config.maxTokens,
+      temperature: options.temperature ?? config.temperature,
+    };
+  }
 
   return await ai.run(config.model, params);
 }
