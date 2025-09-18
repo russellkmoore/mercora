@@ -531,20 +531,56 @@ export async function updateCategory(id: string, input: Partial<CreateCategoryIn
 }
 
 /**
- * Delete a category (soft delete by setting status to archived)
+ * Delete a category (hard delete with cascading product category removal)
  */
 export async function deleteCategory(id: string): Promise<boolean> {
-  const result = await updateCategory(id, { status: "archived" });
-  return !!result;
+  const db = await getDb();
+
+  try {
+    // Start transaction-like operation
+    // First, remove this category from all products that reference it
+    const allProducts = await db.select().from(products);
+
+    for (const product of allProducts) {
+      if (product.categories) {
+        try {
+          const categoryIds = JSON.parse(product.categories);
+          if (Array.isArray(categoryIds) && categoryIds.includes(id)) {
+            // Remove the category ID from the array
+            const updatedCategories = categoryIds.filter(catId => catId !== id);
+
+            // Update the product with the new categories array
+            await db
+              .update(products)
+              .set({
+                categories: JSON.stringify(updatedCategories),
+                updated_at: new Date().toISOString()
+              })
+              .where(eq(products.id, product.id));
+          }
+        } catch (parseError) {
+          // If categories field is not valid JSON, skip this product
+          console.warn(`Product ${product.id} has invalid categories JSON:`, product.categories);
+        }
+      }
+    }
+
+    // Then delete the category itself
+    await db.delete(categories).where(eq(categories.id, id));
+
+    return true;
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    return false;
+  }
 }
 
 /**
- * Hard delete a category (permanent removal)
+ * Hard delete a category (permanent removal) - deprecated, use deleteCategory instead
  */
 export async function hardDeleteCategory(id: string): Promise<boolean> {
-    
-  await (await getDb()).delete(categories).where(eq(categories.id, id));
-  return true;
+  // Use the new deleteCategory function which handles cascading
+  return deleteCategory(id);
 }
 
 /**
