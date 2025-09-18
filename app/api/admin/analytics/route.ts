@@ -51,7 +51,7 @@ import { products, product_variants, deserializeProduct } from "@/lib/db/schema/
 import { orders } from "@/lib/db/schema/order";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
 import { sql } from "drizzle-orm";
-import { runAI } from "@/lib/ai/config";
+import { runAI, extractAIResponse } from "@/lib/ai/config";
 
 interface AnalyticsRequest {
   question?: string;
@@ -282,7 +282,7 @@ ${question}`;
           ],
         });
 
-        aiInsights = response.response || "Unable to generate insights at this time.";
+        aiInsights = extractAIResponse(response) || "Unable to generate insights at this time.";
         console.log("AI insights generated successfully");
       } else {
         console.warn("AI binding not available - using fallback analysis");

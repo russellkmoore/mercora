@@ -49,12 +49,13 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  BarChart3, Package, Users, 
+import {
+  BarChart3, Package, Users,
   ShoppingCart, AlertTriangle,
   Calendar, Clock, DollarSign, Brain, Lightbulb
 } from "lucide-react";
 import Link from "next/link";
+import { marked } from "marked";
 
 interface DashboardStats {
   totalProducts: number;
@@ -449,7 +450,12 @@ export default function AdminDashboard() {
                   AI Analysis
                 </h4>
                 <div className="bg-neutral-800/50 rounded-lg p-4">
-                  <p className="text-gray-300 text-sm whitespace-pre-line">{aiAnalytics.insights}</p>
+                  <div
+                    className="text-gray-300 text-sm prose prose-sm prose-invert max-w-none"
+                    dangerouslySetInnerHTML={{
+                      __html: aiAnalytics.insights ? marked(aiAnalytics.insights) : ''
+                    }}
+                  />
                 </div>
               </div>
 

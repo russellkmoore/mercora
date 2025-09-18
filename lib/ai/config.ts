@@ -50,35 +50,35 @@ export const AI_MODELS = {
   CHAT: {
     ...TEXT_GENERATION_MODEL,
     temperature: 0.1, // Lower temperature for more consistent responses
-    maxTokens: 800, // 3x increase: Better product explanations and multi-step recommendations
+    maxTokens: 400, // Reduced for faster, more concise responses
   },
 
   /** For business analytics and data analysis */
   ANALYTICS: {
     ...TEXT_GENERATION_MODEL,
     temperature: 0.2, // Very low temperature for factual analysis
-    maxTokens: 1500, // 3x increase: Deeper insights, trend analysis, and detailed recommendations
+    maxTokens: 800, // Reduced for faster dashboard loading
   },
 
   /** For article/knowledge base content generation */
   CONTENT_GENERATION: {
     ...TEXT_GENERATION_MODEL,
     temperature: 0.3, // Balanced creativity for informative content
-    maxTokens: 4000, // 2x increase: More comprehensive articles with examples and details
+    maxTokens: 2000, // Reduced but still comprehensive
   },
 
   /** For product description generation */
   MARKETING: {
     ...TEXT_GENERATION_MODEL,
     temperature: 0.8, // Higher creativity for marketing content
-    maxTokens: 2000, // 2x increase: Richer descriptions with use cases and detailed features
+    maxTokens: 800, // Reduced for faster admin UI
   },
 
   /** For greeting responses */
   GREETING: {
     ...TEXT_GENERATION_MODEL,
     temperature: 0.1, // Consistent friendly greetings
-    maxTokens: 200, // Modest increase: More personalized greetings with context
+    maxTokens: 100, // Keep greetings brief
   },
 
   /** For vectorized search embeddings */
@@ -162,4 +162,23 @@ export function getCurrentTextModel(): string {
  */
 export function getCurrentEmbeddingModel(): string {
   return EMBEDDING_MODEL.model;
+}
+
+/**
+ * Extract text response from AI model output (handles different response formats)
+ */
+export function extractAIResponse(response: any): string {
+  // Handle GPT-OSS-20B format
+  if (response.output && Array.isArray(response.output)) {
+    const messageOutput = response.output.find((item: any) => item.type === 'message');
+    if (messageOutput && messageOutput.content && Array.isArray(messageOutput.content)) {
+      const textContent = messageOutput.content.find((content: any) => content.type === 'output_text');
+      if (textContent && textContent.text) {
+        return textContent.text;
+      }
+    }
+  }
+
+  // Handle traditional formats (Llama, etc.)
+  return response.response || response.content || response.text || "";
 }
