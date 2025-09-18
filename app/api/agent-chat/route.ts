@@ -58,7 +58,7 @@ import { getDbAsync } from "@/lib/db";
 import { products, deserializeProduct, product_variants } from "@/lib/db/schema/products";
 import { inArray, eq } from "drizzle-orm";
 import type { Product } from "@/lib/types";
-import { runAI, getCurrentEmbeddingModel } from "@/lib/ai/config";
+import { runAI, getCurrentEmbeddingModel, extractAIResponse } from "@/lib/ai/config";
 
 /**
  * Handles chat interactions with the Volt AI assistant
@@ -223,12 +223,14 @@ Location: ${requestLocation.country ?
 ${contextSnippets || "No specific product information available for this query."}
 
 === RESPONSE REQUIREMENTS ===
+- **Keep it concise**: Aim for 2-3 sentences max unless detailed explanation is specifically requested
+- **Use their name**: When the user has a name, use it naturally in recommendations ("Here's what I'd suggest for you, [Name]...")
+- **Personal recommendations**: Make it clear you're recommending products specifically for them, not just listing options
 - **Format products in bold**: Use **Product Name** for any recommended products
 - **Show personality**: Be gruffly helpful with understated humor - think experienced craftsman, not salesman
 - **Quality over quantity**: Better to recommend one perfect piece of gear than five mediocre ones
-- **Speak from experience**: Occasional references to "years in the field" or "seen too many folks with..."
-- **Mild exasperation**: Show gentle frustration at poor choices, but always guide toward better ones
-- **Unexpected wisdom**: Drop occasional deeper insights about the outdoors or life
+- **Speak from experience**: Brief references to "years in the field" or "seen too many folks with..."
+- **Get to the point**: Skip lengthy explanations unless specifically asked for details
 - **No product IDs**: Never mention product numbers or IDs, only names
 
 === WHAT NOT TO DO ===
@@ -317,21 +319,8 @@ Generate complete content based on the user's specifications.`;
             console.log("AI Response structure:", JSON.stringify(response, null, 2));
           }
 
-          // Extract response from GPT-OSS-20B format
-          let responseText = "";
-          if (response.output && Array.isArray(response.output)) {
-            // Find the message output in the array
-            const messageOutput = response.output.find((item: any) => item.type === 'message');
-            if (messageOutput && messageOutput.content && Array.isArray(messageOutput.content)) {
-              const textContent = messageOutput.content.find((content: any) => content.type === 'output_text');
-              if (textContent && textContent.text) {
-                responseText = textContent.text;
-              }
-            }
-          }
-
-          assistantReply = responseText ||
-            response.response || response.content || response.text ||
+          // Extract response using helper function
+          assistantReply = extractAIResponse(response) ||
             "Sorry, I'm having trouble thinking right now. Try asking me about gear recommendations or outdoor tips!";
           isAIResponse = true; // Mark as AI response (including greetings)
         }

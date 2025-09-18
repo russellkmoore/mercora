@@ -401,9 +401,8 @@ export default function AdminSettingsPage() {
   const triggerVectorReindex = async () => {
     try {
       setLoading(true);
-      // Call admin vectorize endpoint with token parameter
-      // Using the known development token - in production this would come from secure auth
-      const response = await fetch("/api/admin/vectorize?token=voltique-admin-secure-token-1756375065");
+      // Call admin vectorize endpoint (now uses session auth)
+      const response = await fetch("/api/admin/vectorize");
       if (response.ok) {
         const result = await response.json() as any;
         setVectorStatus(prev => ({

@@ -15,7 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
-import { runAI } from "@/lib/ai/config";
+import { runAI, extractAIResponse } from "@/lib/ai/config";
 
 export async function POST(request: NextRequest) {
   try {
@@ -88,7 +88,7 @@ Please create a compelling product description for this outdoor gear item.`;
       ],
     });
 
-    const generatedDescription = response.response || response.content || "";
+    const generatedDescription = extractAIResponse(response) || "";
 
     if (!generatedDescription) {
       return NextResponse.json(

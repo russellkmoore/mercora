@@ -205,9 +205,8 @@ export default function ProductManagement() {
   const triggerVectorization = async () => {
     setIsVectorizing(true);
     try {
-      // Call admin vectorize endpoint with token parameter
-      // Using the known development token - in production this would come from secure auth
-      const response = await fetch("/api/admin/vectorize?token=voltique-admin-secure-token-1756375065");
+      // Call admin vectorize endpoint (now uses session auth)
+      const response = await fetch("/api/admin/vectorize");
       if (response.ok) {
         const result = await response.json() as any;
         console.log("Vectorization triggered successfully:", result?.message);

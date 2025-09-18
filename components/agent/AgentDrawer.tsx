@@ -319,7 +319,7 @@ export default function AgentDrawer({
                     </div>
                     <div className="bg-white text-gray-800 px-3 py-2 rounded-lg max-w-[75%] shadow-sm border">
                       <p>
-                        <strong>Voltique AI:</strong> {msg.content}
+                        <strong>Volt:</strong> {msg.content}
                       </p>
                     </div>
                   </div>
@@ -343,8 +343,13 @@ export default function AgentDrawer({
           </div>
         </div>
 
+        {/* AI Disclaimer */}
+        <div className="flex-shrink-0 text-xs text-gray-500 text-center px-2 py-1">
+          AI-generated responses may contain inaccuracies. Verify gear recommendations before purchase.
+        </div>
+
         {/* Input area - fixed */}
-        <div className="flex-shrink-0 mt-3">
+        <div className="flex-shrink-0">
           <div className="relative">
             <input
               ref={inputRef}

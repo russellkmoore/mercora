@@ -35,25 +35,24 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDbAsync } from "@/lib/db";
 import { products, deserializeProduct, product_variants } from "@/lib/db/schema/products";
 import { eq } from "drizzle-orm";
+import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
 
 export async function GET(request: NextRequest) {
   try {
+    // Check admin permissions first
+    const authResult = await checkAdminPermissions(request);
+    if (!authResult.success) {
+      return NextResponse.json(
+        { error: authResult.error || "Admin access required" },
+        { status: 401 }
+      );
+    }
+
     // Get Cloudflare bindings
     const { env } = await getCloudflareContext({ async: true });
     const media = (env as any).MEDIA;
     const vectorize = (env as any).VECTORIZE;
     const ai = (env as any).AI;
-    
-    // Access environment variables/secrets through process.env
-    const ADMIN_VECTORIZE_TOKEN = process.env.ADMIN_VECTORIZE_TOKEN;
-
-    // Token check - allow bypass if no token is set (for development)
-    const url = new URL(request.url);
-    const token = url.searchParams.get("token");
-    
-    if (ADMIN_VECTORIZE_TOKEN && token !== ADMIN_VECTORIZE_TOKEN) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     if (!media || !vectorize || !ai) {
       return NextResponse.json(
