@@ -312,16 +312,18 @@ Generate complete content based on the user's specifications.`;
             messages: messages,
           });
 
-          // Debug: Log the actual response to see its structure
-          console.log("AI Response structure:", JSON.stringify(response, null, 2));
+          // Debug: Log the actual response to see its structure (only in development)
+          if (process.env.NODE_ENV === 'development') {
+            console.log("AI Response structure:", JSON.stringify(response, null, 2));
+          }
 
           // Extract response from GPT-OSS-20B format
           let responseText = "";
           if (response.output && Array.isArray(response.output)) {
             // Find the message output in the array
-            const messageOutput = response.output.find(item => item.type === 'message');
+            const messageOutput = response.output.find((item: any) => item.type === 'message');
             if (messageOutput && messageOutput.content && Array.isArray(messageOutput.content)) {
-              const textContent = messageOutput.content.find(content => content.type === 'output_text');
+              const textContent = messageOutput.content.find((content: any) => content.type === 'output_text');
               if (textContent && textContent.text) {
                 responseText = textContent.text;
               }
