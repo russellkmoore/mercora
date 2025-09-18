@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
-import { runAI } from "@/lib/ai/config";
+import { runAI, extractAIResponse } from "@/lib/ai/config";
 
 export async function POST(request: NextRequest) {
   try {
@@ -82,7 +82,7 @@ Please create a comprehensive knowledge base article covering this topic.`;
       ],
     });
 
-    const generatedContent = response.response || response.content || "";
+    const generatedContent = extractAIResponse(response) || "";
 
     if (!generatedContent) {
       return NextResponse.json(
