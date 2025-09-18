@@ -666,11 +666,12 @@ export default function CategoryManagement() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch("/api/categories?include_inactive=true");
+      // Exclude archived categories to prevent UI clutter
+      const response = await fetch("/api/categories?include_inactive=true&exclude_archived=true");
       if (response.ok) {
         const result: any = await response.json();
         const categories: Category[] = result.data || [];
-        
+
         setCategories(categories);
         setFilteredCategories(categories);
       } else {

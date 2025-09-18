@@ -12,13 +12,26 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(url.searchParams.get('offset') || '0');
     const statusParam = url.searchParams.get('status');
     const includeInactive = url.searchParams.get('include_inactive') === 'true';
+    const excludeArchived = url.searchParams.get('exclude_archived') === 'true';
     const allowedStatuses = ['active', 'inactive', 'archived'] as const;
     const status = allowedStatuses.includes(statusParam as any) ? (statusParam as typeof allowedStatuses[number]) : null;
     const search = url.searchParams.get('search');
 
+    // Determine which statuses to include
+    let statusFilter: typeof allowedStatuses[number][] | undefined;
+
+    if (status) {
+      statusFilter = [status];
+    } else if (excludeArchived) {
+      statusFilter = includeInactive ? ['active', 'inactive'] : ['active'];
+    } else if (includeInactive) {
+      statusFilter = ['active', 'inactive', 'archived'];
+    } else {
+      statusFilter = ['active'];
+    }
+
     const categories = await listCategoriesWithRealTimeCounts({
-      status: status ? [status] : undefined,
-      include_inactive: includeInactive,
+      status: statusFilter,
       limit,
       offset,
       search: search || undefined
