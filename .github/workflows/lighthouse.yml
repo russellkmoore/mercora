@@ -32,9 +32,9 @@ jobs:
         with:
           configPath: '.lighthouserc.json'
           urls: |
-            https://voltique.russellkmoore.me
-            https://voltique.russellkmoore.me/category/featured
-            https://voltique.russellkmoore.me/checkout
+            https://mercora.russellkmoore.workers.dev
+            https://mercora.russellkmoore.workers.dev/category/featured
+            https://mercora.russellkmoore.workers.dev/checkout
           uploadArtifacts: true
           temporaryPublicStorage: true
         env:
