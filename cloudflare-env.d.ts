@@ -6,6 +6,7 @@ declare namespace Cloudflare {
 		NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: string;
 		RESEND_API_KEY: string;
 		MEDIA: R2Bucket;
+		NEXT_INC_CACHE_R2_BUCKET: R2Bucket;
 		DB: D1Database;
 		VECTORIZE: VectorizeIndex;
 		AI: Ai;

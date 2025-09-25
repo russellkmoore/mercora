@@ -670,11 +670,14 @@ export default function AdminDashboard() {
               <p className="text-gray-300 text-sm mb-3">
                 {stats.lowStockAlerts} products are running low on inventory and may need restocking soon.
               </p>
-              <Link href="/admin/products">
-                <Button variant="outline" size="sm" className="border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-black">
-                  Review Inventory
-                </Button>
-              </Link>
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-black"
+              >
+                <Link href="/admin/products">Review Inventory</Link>
+              </Button>
             </div>
           </div>
         </Card>

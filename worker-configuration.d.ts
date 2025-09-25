@@ -4,6 +4,7 @@
 declare namespace Cloudflare {
 	interface Env {
 		MEDIA: R2Bucket;
+		NEXT_INC_CACHE_R2_BUCKET: R2Bucket;
 		DB: D1Database;
 		VECTORIZE: VectorizeIndex;
 		AI: Ai;
