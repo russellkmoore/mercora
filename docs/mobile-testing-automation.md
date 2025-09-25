@@ -83,20 +83,21 @@ npm run report:mobile
 ## 🔍 Core Web Vitals Monitoring
 
 ### **Web Vitals Implementation**
-```javascript
-// lib/utils/web-vitals.js
-import { getCLS, getFID, getFCP, getLCP, getTTFB } from 'web-vitals';
+```typescript
+// lib/hooks/useWebVitals.ts
+import { onCLS, onFCP, onINP, onLCP, onTTFB } from 'web-vitals';
 
 export function sendToAnalytics(metric) {
-  const body = JSON.stringify({
+  const payload = {
     ...metric,
     url: window.location.pathname,
     timestamp: Date.now(),
     userAgent: navigator.userAgent,
-    connection: navigator.connection?.effectiveType || 'unknown'
-  });
+    isMobile: /Mobi|Android/i.test(navigator.userAgent)
+  };
 
-  // Use navigator.sendBeacon when available for reliability
+  const body = JSON.stringify(payload);
+
   if (navigator.sendBeacon) {
     navigator.sendBeacon('/api/analytics/vitals', body);
   } else {
@@ -107,27 +108,42 @@ export function sendToAnalytics(metric) {
       headers: {
         'Content-Type': 'application/json'
       }
-    }).catch(console.error);
+    }).catch((error) => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Web Vitals analytics beacon failed', error);
+      }
+    });
   }
 }
 
 export function initWebVitals() {
-  // Only track on production and for real users
-  if (process.env.NODE_ENV !== 'production') return;
-  
-  getCLS(sendToAnalytics);
-  getFID(sendToAnalytics);
-  getFCP(sendToAnalytics);
-  getLCP(sendToAnalytics);
-  getTTFB(sendToAnalytics);
+  if (typeof window === 'undefined') return;
 
-  // Track mobile-specific metrics
+  const shouldTrack =
+    process.env.NODE_ENV === 'production' ||
+    process.env.NEXT_PUBLIC_ENABLE_WEB_VITALS_DEV === 'true';
+
+  if (!shouldTrack) return;
+
+  window.__webVitals = window.__webVitals || {};
+
+  const track = (metric) => {
+    window.__webVitals[metric.name.toLowerCase()] = metric.value;
+    sendToAnalytics(metric);
+  };
+
+  onCLS(track);
+  onFCP(track);
+  onINP(track, { reportAllChanges: true });
+  onLCP(track);
+  onTTFB(track);
+
   if ('ontouchstart' in window) {
-    trackMobileMetrics();
+    trackMobileMetrics(track);
   }
 }
 
-function trackMobileMetrics() {
+function trackMobileMetrics(track) {
   let touchStartTime;
   let scrollStartTime;
 
@@ -140,11 +156,21 @@ function trackMobileMetrics() {
     if (touchStartTime) {
       const touchLatency = Date.now() - touchStartTime;
       if (touchLatency > 100) { // Only track slow touches
-        sendToAnalytics({
+        track({
           name: 'touch-latency',
           value: touchLatency,
+          delta: touchLatency,
           id: Date.now().toString(),
-          element: e.target.tagName.toLowerCase()
+          rating:
+            touchLatency > 300
+              ? 'poor'
+              : touchLatency > 150
+                ? 'needs-improvement'
+                : 'good',
+          entries: [],
+          navigationType: 'navigate',
+          userAgent: navigator.userAgent,
+          isMobile: true,
         });
       }
     }
@@ -162,11 +188,16 @@ function trackMobileMetrics() {
   // Track orientation changes
   window.addEventListener('orientationchange', () => {
     setTimeout(() => {
-      sendToAnalytics({
+      track({
         name: 'orientation-change',
         value: screen.orientation?.angle || 0,
+        delta: 0,
         id: Date.now().toString(),
-        viewport: `${window.innerWidth}x${window.innerHeight}`
+        rating: 'good',
+        entries: [],
+        navigationType: 'navigate',
+        userAgent: navigator.userAgent,
+        isMobile: true,
       });
     }, 100);
   });
@@ -176,12 +207,16 @@ function trackMobileMetrics() {
   window.addEventListener('resize', () => {
     const currentViewportSize = `${window.innerWidth}x${window.innerHeight}`;
     if (currentViewportSize !== lastViewportSize) {
-      sendToAnalytics({
+      track({
         name: 'viewport-change',
         value: window.innerWidth,
+        delta: window.innerWidth,
         id: Date.now().toString(),
-        from: lastViewportSize,
-        to: currentViewportSize
+        rating: 'good',
+        entries: [],
+        navigationType: 'navigate',
+        userAgent: navigator.userAgent,
+        isMobile: true,
       });
       lastViewportSize = currentViewportSize;
     }
@@ -317,27 +352,28 @@ test.describe('Mobile Performance', () => {
     
     const vitals = await page.evaluate(() => {
       return new Promise((resolve) => {
-        const vitals = {};
-        
-        // Mock web-vitals library behavior
-        if (window.getCLS) {
-          window.getCLS((metric) => vitals.cls = metric.value);
-        }
-        if (window.getLCP) {
-          window.getLCP((metric) => vitals.lcp = metric.value);
-        }
-        if (window.getFID) {
-          window.getFID((metric) => vitals.fid = metric.value);
-        }
-        
-        setTimeout(() => resolve(vitals), 3000);
+        const stop = setTimeout(() => resolve(window.__webVitals || {}), 5000);
+
+        const collect = () => {
+          const store = window.__webVitals;
+          if (store && store.cls && store.lcp && store.inp && store.ttfb) {
+            clearTimeout(stop);
+            resolve({ ...store });
+            return;
+          }
+
+          setTimeout(collect, 250);
+        };
+
+        collect();
       });
     });
     
     // Assert Core Web Vitals thresholds
     if (vitals.lcp) expect(vitals.lcp).toBeLessThan(2500);
     if (vitals.cls) expect(vitals.cls).toBeLessThan(0.1);
-    if (vitals.fid) expect(vitals.fid).toBeLessThan(100);
+    if (vitals.inp) expect(vitals.inp).toBeLessThan(200);
+    if (vitals.ttfb) expect(vitals.ttfb).toBeLessThan(1000);
   });
 
   test('should load product pages quickly', async ({ page }) => {
