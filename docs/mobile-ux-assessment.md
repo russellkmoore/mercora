@@ -175,22 +175,41 @@
 ### **Real User Monitoring (RUM)**
 ```javascript
 // Recommended: Add to _app.tsx or layout.tsx
-import { getCLS, getFID, getFCP, getLCP, getTTFB } from 'web-vitals';
+import { onCLS, onFCP, onINP, onLCP, onTTFB } from 'web-vitals';
 
 // Track Core Web Vitals
 function sendToAnalytics(metric) {
-  // Send to your analytics service
-  const body = JSON.stringify(metric);
-  // Use beacon API for reliability
-  (navigator.sendBeacon && navigator.sendBeacon('/api/analytics', body)) ||
-    fetch('/api/analytics', {body, method: 'POST', keepalive: true});
+  const payload = {
+    ...metric,
+    url: window.location.pathname,
+    timestamp: Date.now(),
+    isMobile: /Mobi|Android/i.test(navigator.userAgent),
+    userAgent: navigator.userAgent,
+  };
+
+  const body = JSON.stringify(payload);
+
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon('/api/analytics/vitals', body);
+  } else {
+    fetch('/api/analytics/vitals', {
+      body,
+      method: 'POST',
+      keepalive: true,
+      headers: { 'Content-Type': 'application/json' },
+    }).catch((error) => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Web Vitals analytics beacon failed', error);
+      }
+    });
+  }
 }
 
-getCLS(sendToAnalytics);
-getFID(sendToAnalytics);
-getFCP(sendToAnalytics);
-getLCP(sendToAnalytics);
-getTTFB(sendToAnalytics);
+onCLS(sendToAnalytics);
+onFCP(sendToAnalytics);
+onINP(sendToAnalytics, { reportAllChanges: true });
+onLCP(sendToAnalytics);
+onTTFB(sendToAnalytics);
 ```
 
 ### **Lighthouse CI Integration**
@@ -228,9 +247,18 @@ const trackMobileEvents = () => {
     const touchDuration = Date.now() - touchStartTime;
     if (touchDuration > 100) {
       sendToAnalytics({
-        name: 'touch-delay',
+        name: 'touch-latency',
         value: touchDuration,
-        element: e.target.tagName
+        delta: touchDuration,
+        id: Date.now().toString(),
+        rating:
+          touchDuration > 300
+            ? 'poor'
+            : touchDuration > 150
+              ? 'needs-improvement'
+              : 'good',
+        entries: [],
+        navigationType: 'navigate'
       });
     }
   });
@@ -265,7 +293,7 @@ const trackMobileEvents = () => {
    - Improve error message visibility
 
 3. **Performance Optimization**
-   - Implement Core Web Vitals monitoring
+   - ✅ Core Web Vitals monitoring in production via `useWebVitals`
    - Optimize image loading strategy
    - Add service worker for caching
 
@@ -327,7 +355,7 @@ const trackMobileEvents = () => {
 - Optimize button sizing
 
 ### **Week 3-4: Performance & Monitoring**
-- Implement Core Web Vitals tracking
+- ✅ Core Web Vitals tracking implemented
 - Set up Lighthouse CI
 - Optimize critical performance bottlenecks
 
@@ -345,9 +373,8 @@ const trackMobileEvents = () => {
 
 **Next Actions:**
 1. Begin device matrix testing using development server
-2. Set up Core Web Vitals monitoring
-3. Create automated Lighthouse testing pipeline
-4. Start with high-priority touch target optimizations
+2. Create automated Lighthouse testing pipeline
+3. Start with high-priority touch target optimizations
 
 **Testing Environment**: https://voltique.russellkmoore.me  
 **Development Server**: Available via `npm run dev`
