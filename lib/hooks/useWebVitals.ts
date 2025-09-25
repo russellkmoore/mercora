@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { getCLS, getFID, getFCP, getLCP, getTTFB, Metric } from "web-vitals";
+import { onCLS, onFCP, onINP, onLCP, onTTFB } from "web-vitals";
+import type { Metric } from "web-vitals";
 
 interface ExtendedMetric extends Metric {
   url?: string;
@@ -20,19 +21,19 @@ export function useWebVitals() {
       process.env.NODE_ENV === "production" ||
       process.env.NEXT_PUBLIC_ENABLE_WEB_VITALS_DEV === "true";
 
-    // Only run in production builds (unless explicitly enabled for dev)
     if (!shouldTrack) {
       return;
     }
 
     const sendToAnalytics = (metric: ExtendedMetric) => {
-      const body = JSON.stringify({
+      const payload: ExtendedMetric = {
         ...metric,
         url: window.location.pathname,
         timestamp: Date.now(),
         isMobile: /Mobi|Android/i.test(navigator.userAgent),
         userAgent: navigator.userAgent,
-      });
+      };
+      const body = JSON.stringify(payload);
 
       if (navigator.sendBeacon) {
         navigator.sendBeacon("/api/analytics/vitals", body);
@@ -42,15 +43,19 @@ export function useWebVitals() {
           method: "POST",
           keepalive: true,
           headers: { "Content-Type": "application/json" },
-        }).catch(console.error);
+        }).catch((error) => {
+          if (process.env.NODE_ENV !== "production") {
+            console.error("Web Vitals analytics beacon failed", error);
+          }
+        });
       }
     };
 
-    getCLS(sendToAnalytics);
-    getFID(sendToAnalytics);
-    getFCP(sendToAnalytics);
-    getLCP(sendToAnalytics);
-    getTTFB(sendToAnalytics);
+    onCLS(sendToAnalytics);
+    onFCP(sendToAnalytics);
+    onINP(sendToAnalytics, { reportAllChanges: true });
+    onLCP(sendToAnalytics);
+    onTTFB(sendToAnalytics);
 
     let touchStartTime = 0;
     const handleTouchStart = () => {
@@ -68,7 +73,12 @@ export function useWebVitals() {
           name: "touch-latency",
           value: touchLatency,
           id: Date.now().toString(),
-          rating: touchLatency > 300 ? "poor" : touchLatency > 150 ? "needs-improvement" : "good",
+          rating:
+            touchLatency > 300
+              ? "poor"
+              : touchLatency > 150
+                ? "needs-improvement"
+                : "good",
           userAgent: navigator.userAgent,
           isMobile: true,
         } as ExtendedMetric);
