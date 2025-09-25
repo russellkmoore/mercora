@@ -4,12 +4,16 @@ import { useEffect } from "react";
 import { onCLS, onFCP, onINP, onLCP, onTTFB } from "web-vitals";
 import type { Metric } from "web-vitals";
 
-interface ExtendedMetric extends Metric {
+interface CustomMetric extends Omit<Metric, "name"> {
+  name: string;
+}
+
+type ExtendedMetric = (Metric | CustomMetric) & {
   url?: string;
   timestamp?: number;
   isMobile?: boolean;
   userAgent?: string;
-}
+};
 
 export function useWebVitals() {
   useEffect(() => {
@@ -69,9 +73,10 @@ export function useWebVitals() {
 
       const touchLatency = Date.now() - touchStartTime;
       if (touchLatency > 100) {
-        sendToAnalytics({
+        const touchMetric: ExtendedMetric = {
           name: "touch-latency",
           value: touchLatency,
+          delta: touchLatency,
           id: Date.now().toString(),
           rating:
             touchLatency > 300
@@ -79,9 +84,13 @@ export function useWebVitals() {
               : touchLatency > 150
                 ? "needs-improvement"
                 : "good",
+          entries: [],
+          navigationType: "navigate",
           userAgent: navigator.userAgent,
           isMobile: true,
-        } as ExtendedMetric);
+        };
+
+        sendToAnalytics(touchMetric);
       }
     };
 
