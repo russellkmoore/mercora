@@ -124,7 +124,8 @@ export default function RootLayout({
           <meta name="mcp-capabilities" content="commerce,outdoor-gear,multi-agent,e-commerce" />
           <meta name="mcp-version" content="1.0.0" />
           <meta name="mcp-description" content="Voltique MCP Server for multi-agent outdoor gear commerce" />
-          
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+
           {/* Additional MCP Discovery */}
           <link rel="mcp-server" href="/api/mcp" type="application/json" />
           <link rel="mcp-schema" href="/api/mcp/schema" type="application/json" />
