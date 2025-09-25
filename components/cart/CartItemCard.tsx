@@ -33,8 +33,9 @@ export default function CartItemCard({ item }: CartItemCardProps) {
         <div className="flex items-center gap-2 mt-2">
           {!isCheckoutPage && (
             <Button
+              variant="outline"
               size="sm"
-              className="bg-neutral-100 text-black border border-gray-300 hover:bg-neutral-200 h-12 w-12 p-0 text-base"
+              className="h-10 w-10 p-0 text-base touch-manipulation bg-neutral-100 text-black border border-gray-300 hover:bg-neutral-200"
               onClick={() => updateQuantity(item.variantId, item.quantity - 1)}
             >
               -
@@ -43,8 +44,9 @@ export default function CartItemCard({ item }: CartItemCardProps) {
           <span className="text-sm min-w-[20px] text-center">{item.quantity}</span>
           {!isCheckoutPage && (
             <Button
+              variant="outline"
               size="sm"
-              className="bg-neutral-100 text-black border border-gray-300 hover:bg-neutral-200 h-12 w-12 p-0 text-base"
+              className="h-10 w-10 p-0 text-base touch-manipulation bg-neutral-100 text-black border border-gray-300 hover:bg-neutral-200"
               onClick={() => updateQuantity(item.variantId, item.quantity + 1)}
             >
               +
@@ -59,7 +61,7 @@ export default function CartItemCard({ item }: CartItemCardProps) {
           <Button
             variant="outline"
             size="sm"
-            className="text-red-600 mt-2 border border-red-200 bg-red-50 hover:bg-orange-500 hover:text-white text-sm h-12"
+            className="text-red-600 mt-2 border border-red-200 bg-red-50 hover:bg-orange-500 hover:text-white text-sm h-12 touch-manipulation"
             onClick={() => removeItem(item.variantId)}
           >
             Remove
