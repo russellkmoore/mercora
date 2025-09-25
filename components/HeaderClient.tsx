@@ -191,11 +191,11 @@ export default function HeaderClient({
   const getIndentationClass = (level: number): string => {
     const indentationClasses = {
       0: '',
-      1: 'ml-6 border-l border-neutral-700 pl-4',
-      2: 'ml-12 border-l border-neutral-700 pl-4', 
-      3: 'ml-16 border-l border-neutral-700 pl-4'
+      1: 'ml-4 border-l-2 border-orange-500/20 pl-3',
+      2: 'ml-8 border-l-2 border-orange-500/10 pl-3',
+      3: 'ml-10 border-l-2 border-orange-500/5 pl-3'
     };
-    return indentationClasses[level as keyof typeof indentationClasses] || 'ml-20 border-l border-neutral-700 pl-4';
+    return indentationClasses[level as keyof typeof indentationClasses] || 'ml-12 border-l border-neutral-700 pl-4';
   };
 
   /**
@@ -417,7 +417,10 @@ export default function HeaderClient({
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" className="bg-black text-white w-full max-w-sm overflow-y-auto">
+          <SheetContent
+            side="right"
+            className="bg-black text-white transition-all ease-in-out px-3 w-full sm:w-[400px] !max-w-[400px] !duration-300 data-[state=closed]:!duration-200 data-[state=open]:!duration-300 flex flex-col h-full border-l border-neutral-800 overflow-y-auto"
+          >
             {/* Accessibility components */}
             <VisuallyHidden>
               <SheetTitle>Mobile Navigation Menu</SheetTitle>

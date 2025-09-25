@@ -128,3 +128,42 @@
     background: rgb(82 82 82); /* neutral-600 */
   }
 }
+
+@layer utilities {
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+
+  .mobile-scroll {
+    -webkit-overflow-scrolling: touch;
+    overflow-scrolling: touch;
+  }
+
+  @media (max-width: 768px) {
+    .mobile-button-spacing button {
+      margin: 8px 0;
+      min-height: 44px;
+    }
+  }
+}
+
+@layer base {
+  @media (hover: none) and (pointer: coarse) {
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible {
+      outline: 2px solid #f97316;
+      outline-offset: 2px;
+    }
+  }
+
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
