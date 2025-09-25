@@ -114,7 +114,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
 
   return (
     <Link href={`/product/${slug}`} prefetch={true}>
-      <div className="bg-neutral-800 rounded-lg overflow-hidden shadow hover:shadow-lg transition cursor-pointer">
+      <div className="bg-neutral-800 rounded-lg overflow-hidden shadow hover:shadow-lg transition cursor-pointer touch-manipulation">
         <div className="relative aspect-video bg-neutral-700">
             <Image
               src={imageUrl}
@@ -129,11 +129,11 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
               blurDataURL={getDarkBlurPlaceholder()}
             />
         </div>
-        <div className="p-3 sm:p-4">
-          <h3 className="text-lg sm:text-xl font-semibold mb-2 line-clamp-2">
+        <div className="p-4 sm:p-4 space-y-3">
+          <h3 className="text-lg sm:text-xl font-semibold line-clamp-2 leading-snug">
             {name}
           </h3>
-          <p className="text-gray-400 text-xs sm:text-sm mb-2 line-clamp-3">
+          <p className="text-gray-400 text-sm sm:text-sm line-clamp-2 leading-relaxed">
             {shortDescription}
           </p>
           {price !== null && (
