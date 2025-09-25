@@ -44,17 +44,19 @@ export default function OrderConfirmationModal({
         </div>
 
         <DialogFooter className="flex flex-col gap-4 pt-4">
-          <Link href="/" passHref>
-            <Button className="flex-1 bg-black text-white hover:bg-orange-500 transition-colors">
-              Continue Shopping
-            </Button>
-          </Link>
+          <Button
+            asChild
+            className="flex-1 bg-black text-white hover:bg-orange-500 transition-colors"
+          >
+            <Link href="/">Continue Shopping</Link>
+          </Button>
           {userId && (
-            <Link href="/orders" passHref>
-              <Button className="flex-1 bg-black text-white hover:bg-orange-500 transition-colors">
-                View Order History
-              </Button>
-            </Link>
+            <Button
+              asChild
+              className="flex-1 bg-black text-white hover:bg-orange-500 transition-colors"
+            >
+              <Link href="/orders">View Order History</Link>
+            </Button>
           )}
         </DialogFooter>
       </DialogContent>

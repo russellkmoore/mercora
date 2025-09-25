@@ -136,11 +136,14 @@ export default function CartDrawer() {
                   <span>Total: ${total.toFixed(2)}</span>
                 </div>
                 
-                <Link href="/checkout" onClick={() => setIsOpen(false)}>
-                  <Button className="w-full bg-orange-500 hover:bg-orange-600 mt-4">
+                <Button
+                  asChild
+                  className="w-full bg-orange-500 hover:bg-orange-600 mt-4"
+                >
+                  <Link href="/checkout" onClick={() => setIsOpen(false)}>
                     Proceed to Checkout
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               </div>
             </div>
           )}
