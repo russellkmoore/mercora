@@ -157,6 +157,8 @@ export interface MACHSEO {
 export interface MACHRating {
   average: number; // 0-5
   count: number; // Total number of ratings
+  distribution?: Record<number, number>; // Optional histogram keyed by star value
+  lastPublishedAt?: string; // ISO timestamp of the most recent published review
 }
 
 /**
