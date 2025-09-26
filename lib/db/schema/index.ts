@@ -106,3 +106,6 @@ export * from "./pages";
 
 // MCP Server schema (application-specific)
 export * from "./mcp";
+
+// Reviews & Ratings schema (application-specific)
+export * from "./reviews";

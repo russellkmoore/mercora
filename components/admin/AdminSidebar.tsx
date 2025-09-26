@@ -39,7 +39,8 @@ import {
   Menu,
   X,
   ClipboardList,
-  FileEdit
+  FileEdit,
+  MessageSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -74,6 +75,12 @@ const navItems: NavItem[] = [
     href: "/admin/orders",
     icon: ClipboardList,
     description: "Order management"
+  },
+  {
+    label: "Reviews",
+    href: "/admin/reviews",
+    icon: MessageSquare,
+    description: "Moderate customer feedback"
   },
   {
     label: "Promotions",
