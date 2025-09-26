@@ -17,4 +17,5 @@ export * from "./cartitem";
 export * from "./money";
 export * from "./apiPermissions";
 export * from "./agent";
+export * from "./review";
 

@@ -74,6 +74,13 @@ export const AI_MODELS = {
     maxTokens: 800, // Reduced for faster admin UI
   },
 
+  /** For automated safety and content moderation checks */
+  MODERATION: {
+    ...TEXT_GENERATION_MODEL,
+    temperature: 0, // Deterministic moderation responses
+    maxTokens: 300, // Keep responses concise
+  },
+
   /** For greeting responses */
   GREETING: {
     ...TEXT_GENERATION_MODEL,
