@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 
 interface BreadcrumbItem {
   label: string;
-  href: string;
+  href?: string;
   current?: boolean;
 }
 
@@ -20,10 +20,9 @@ export default function Breadcrumbs({ items, className = "" }: BreadcrumbsProps)
 
   // Auto-generate breadcrumbs from URL if no items provided
   const generateBreadcrumbs = (): BreadcrumbItem[] => {
-    const pathSegments = pathname.split('/').filter(Boolean);
-    const breadcrumbs: BreadcrumbItem[] = [
-      { label: "Home", href: "/" }
-    ];
+    const pathSegments = pathname.split("/").filter(Boolean);
+    const breadcrumbs: BreadcrumbItem[] = [{ label: "Home", href: "/" }];
+    const nonLinkableSegments = new Set(["category", "product"]);
 
     let currentPath = "";
     pathSegments.forEach((segment, index) => {
@@ -50,8 +49,8 @@ export default function Breadcrumbs({ items, className = "" }: BreadcrumbsProps)
 
       breadcrumbs.push({
         label,
-        href: currentPath,
-        current: isLast
+        href: !isLast && !nonLinkableSegments.has(segment) ? currentPath : undefined,
+        current: isLast,
       });
     });
 
@@ -70,33 +69,42 @@ export default function Breadcrumbs({ items, className = "" }: BreadcrumbsProps)
       className={`flex items-center space-x-2 text-sm text-gray-400 bg-neutral-900/50 px-4 py-3 border-b border-neutral-800 ${className}`}
       aria-label="Breadcrumb navigation"
     >
-      {breadcrumbItems.map((item, index) => (
-        <div key={item.href} className="flex items-center space-x-2">
-          {index > 0 && (
-            <ChevronRight className="w-4 h-4 text-gray-600" />
-          )}
-          {index === 0 ? (
-            <Link
-              href={item.href}
-              className="flex items-center hover:text-orange-400 transition-colors"
-            >
-              <Home className="w-4 h-4" />
-              <span className="ml-1 hidden sm:inline">{item.label}</span>
-            </Link>
-          ) : item.current ? (
-            <span className="text-white font-medium truncate max-w-[150px] sm:max-w-none">
-              {item.label}
-            </span>
-          ) : (
-            <Link
-              href={item.href}
-              className="hover:text-orange-400 transition-colors truncate max-w-[100px] sm:max-w-none"
-            >
-              {item.label}
-            </Link>
-          )}
-        </div>
-      ))}
+      {breadcrumbItems.map((item, index) => {
+        const key = item.href ?? `${item.label}-${index}`;
+        const linkHref = item.href;
+
+        return (
+          <div key={key} className="flex items-center space-x-2">
+            {index > 0 && (
+              <ChevronRight className="w-4 h-4 text-gray-600" />
+            )}
+            {index === 0 ? (
+              <Link
+                href={linkHref ?? "/"}
+                className="flex items-center hover:text-orange-400 transition-colors"
+              >
+                <Home className="w-4 h-4" />
+                <span className="ml-1 hidden sm:inline">{item.label}</span>
+              </Link>
+            ) : item.current ? (
+              <span className="text-white font-medium truncate max-w-[150px] sm:max-w-none">
+                {item.label}
+              </span>
+            ) : linkHref ? (
+              <Link
+                href={linkHref}
+                className="hover:text-orange-400 transition-colors truncate max-w-[100px] sm:max-w-none"
+              >
+                {item.label}
+              </Link>
+            ) : (
+              <span className="truncate max-w-[100px] sm:max-w-none text-gray-300">
+                {item.label}
+              </span>
+            )}
+          </div>
+        );
+      })}
     </nav>
   );
 }
