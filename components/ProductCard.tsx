@@ -39,8 +39,10 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import type { Product, ProductVariant } from "@/lib/types/";
+import type { Product, ProductVariant } from "@/lib/types";
 import { getDarkBlurPlaceholder } from "@/lib/utils/image-placeholders";
+import { normalizeProductRating } from "@/lib/utils/ratings";
+import { StarRating } from "@/components/reviews/StarRating";
 
 /**
  * Props interface for ProductCard component
@@ -48,6 +50,17 @@ import { getDarkBlurPlaceholder } from "@/lib/utils/image-placeholders";
 interface ProductCardProps {
   product: Product;
   priority?: boolean; // For above-the-fold images
+}
+
+function formatReviewDate(value?: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 /**
@@ -111,6 +124,11 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
     }
   })();
   const imageAlt = name;
+  const ratingSummary = normalizeProductRating(product.rating);
+  const hasRatings = Boolean(ratingSummary && ratingSummary.count > 0);
+  const lastUpdatedLabel = ratingSummary?.lastPublishedAt
+    ? formatReviewDate(ratingSummary.lastPublishedAt)
+    : null;
 
   return (
     <Link href={`/product/${slug}`} prefetch={true}>
@@ -136,6 +154,24 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
           <p className="text-gray-400 text-sm sm:text-sm line-clamp-2 leading-relaxed">
             {shortDescription}
           </p>
+          <div className="flex items-center justify-between gap-2 text-xs sm:text-sm">
+            {hasRatings ? (
+              <div className="flex items-center gap-2">
+                <StarRating value={ratingSummary!.average} size="sm" />
+                <span className="text-sm font-semibold text-white">
+                  {ratingSummary!.average.toFixed(1)}
+                </span>
+                <span className="text-xs text-gray-400">({ratingSummary!.count})</span>
+              </div>
+            ) : (
+              <span className="text-xs text-gray-500">Be the first to review</span>
+            )}
+            {lastUpdatedLabel && (
+              <span className="hidden text-[11px] text-gray-500 sm:inline">
+                Updated {lastUpdatedLabel}
+              </span>
+            )}
+          </div>
           {price !== null && (
             <div className="text-sm">
               {onSale && compareAt != null ? (
