@@ -118,8 +118,12 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 - ✅ **Production Deployment**: Live at `https://voltique.russellkmoore.me/api/mcp`
 
 ### 🌟 **Enhanced Customer Features**
-
-- 📋 **Reviews & Ratings**: User-generated content with moderation
+- 📋 **Reviews & Ratings**
+  - ✅ **Schema Alignment**: Product aggregates, dedicated review tables, flags, and reminder logs finalized with moderation states and audit metadata.
+  - ✅ **Submission Flow**: Authenticated order-history capture form with AI-assisted moderation and single-review enforcement for fulfilled items.
+  - ✅ **Product UI**: Star summaries on cards, detailed review highlights, filtering, verified badges, and order-history calls to action on product pages.
+  - ✅ **Moderation Strategy**: Automated AI + vector screening backed by an admin queue for publishing, suppression, flag resolution, and customer notifications.
+  - ✅ **Operations**: Review status/response emails and post-delivery reminder tooling ensure feedback loops stay active without duplicate outreach.
 - 📋 **Wishlist System**: Save products for later with sharing capabilities
 - 📋 **Social Features**: Product sharing, user-generated content integration
 
