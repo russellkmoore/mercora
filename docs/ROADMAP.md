@@ -1,9 +1,9 @@
 # Mercora eCommerce Platform – Development Roadmap
 
 > **Status**: Production-ready AI-powered eCommerce platform with comprehensive admin dashboard
-> 
+>
 > **Last Updated**: September 25, 2025
-> 
+>
 > **Current Focus**: Content Management System (CMS) and MCP Server Development
 
 ## 🎯 Platform Overview
@@ -13,6 +13,7 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 ## ✅ PHASE 1 COMPLETE - Production & Business Value
 
 ### 🛒 **Core eCommerce Foundation (✅ Complete)**
+
 - ✅ **Product Catalog**: Dynamic categories, filtering, sorting, and responsive design
 - ✅ **Shopping Experience**: Product cards, detail pages, shopping cart, and checkout flow
 - ✅ **Discount System**: MACH Alliance-compliant promotional codes with percentage, fixed, and shipping discounts
@@ -21,6 +22,7 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 - ✅ **Performance**: Edge-optimized deployment with sub-100ms response times globally
 
 ### 🤖 **AI-Powered Intelligence System (✅ Complete)**
+
 - ✅ **Volt AI Assistant**: Conversational shopping expert with cheeky personality
 - ✅ **Vector Search**: Semantic product discovery using BGE embeddings (38 indexed items)
 - ✅ **Consolidated Vectorization**: Unified `/api/admin/vectorize` endpoint for atomic product + knowledge indexing
@@ -31,6 +33,7 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 - ✅ **Personalized Recommendations**: Hybrid algorithm + AI system with 70% accuracy improvement
 
 ### 💳 **Payment Integration (✅ Complete)**
+
 - ✅ **Stripe Integration**: Real payment processing with Stripe Elements
 - ✅ **Webhook Handling**: Order confirmation and payment status updates
 - ✅ **Tax Calculation**: Real-time US sales tax via Stripe Tax
@@ -38,6 +41,7 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 - ✅ **Production Setup**: Complete deployment guide with all services
 
 ### 📊 **Admin Dashboard (✅ Complete)**
+
 - ✅ **Product Management**: Full CRUD operations for catalog management
 - ✅ **Order Management**: Complete order processing with status updates
 - ✅ **Category Management**: Hierarchical category organization with product mapping
@@ -52,6 +56,7 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 - ✅ **Content Generation**: AI-powered article and product description generation
 
 ### 🏗️ **Technical Infrastructure (✅ Production-Ready)**
+
 - ✅ **Edge Architecture**: Cloudflare Workers + D1 + R2 + Vectorize + AI
 - ✅ **Modern Stack**: Next.js 15, TypeScript, Tailwind CSS, Drizzle ORM
 - ✅ **Clean API Structure**: RESTful endpoints with unified order management
@@ -62,11 +67,13 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 ## ✅ PHASE 2 COMPLETE - User Experience & Engagement
 
 ### 📧 **Communication System (✅ Complete)**
+
 - ✅ **Transactional Emails**: Order confirmations, shipping notifications, delivery updates
 - ✅ **Email Templates**: Professional, branded email designs with React Email
 - ~~Notification Preferences~~ - *Not needed for transactional-only emails*
 
 ### 🎯 **Advanced Personalization (✅ Complete)**  
+
 - ✅ **VIP Customer Promotions**: Targeted discounts and loyalty benefits through existing promotion system
 - ~~Recently Viewed~~ - *No clear UI placement identified*
 - ~~Customers Also Bought~~ - *No clear UI placement identified*  
@@ -74,6 +81,7 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 - ~~Custom Landing Pages~~ - *Unable to visualize implementation*
 
 ### 📱 **Mobile Experience (Status: Optimization Underway)**
+
 - ✅ **Core Web Vitals Monitoring Live**: `useWebVitals` hook captures CLS/FCP/INP/LCP/TTFB and touch latency analytics
 - ✅ **Mobile UX Assessment Complete**: Comprehensive evaluation finished Sept 2, 2025 (`docs/mobile-ux-assessment.md`)
 - 🔄 **Optimization Workstream Active**: Implementing touch-target, navigation, and product card updates (`docs/mobile-improvements-actionable.md`)
@@ -83,6 +91,7 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 ## 🚀 PHASE 3 - Innovation & Advanced Features
 
 ### 📄 **Content Management System (✅ Complete)**
+
 *Essential for standalone pages like privacy policy, terms of service, about us, etc.*
 
 - ✅ **CMS Pages Management**: Create, edit, and manage static content pages
@@ -94,7 +103,6 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 - ✅ **AI Content Generation**: AI-powered article generation and enhancement
 
 ### 🤖 **Agentic Commerce via MCP Server (✅ Complete - Revolutionary Achievement)**
-*Transformed shopping into conversational experience through developer tools*
 
 - ✅ **MCP Server Implementation**: Production-ready Model Context Protocol server with 17 tools
   - ✅ **Product Discovery**: Search catalog, get recommendations, assess fulfillment capability
@@ -110,16 +118,13 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 - ✅ **Production Deployment**: Live at `https://voltique.russellkmoore.me/api/mcp`
 
 ### 🌟 **Enhanced Customer Features**
-- 📋 **Reviews & Ratings**
-  - ✅ **Schema Alignment**: Product aggregates, dedicated review tables, flags, and reminder logs finalized with moderation states and audit metadata.
-  - ✅ **Submission Flow**: Authenticated order-history capture form with AI-assisted moderation and single-review enforcement for fulfilled items.
-  - ✅ **Product UI**: Star summaries on cards, detailed review highlights, filtering, verified badges, and order-history calls to action on product pages.
-  - ✅ **Moderation Strategy**: Automated AI + vector screening backed by an admin queue for publishing, suppression, flag resolution, and customer notifications.
-  - ✅ **Operations**: Review status/response emails and post-delivery reminder tooling ensure feedback loops stay active without duplicate outreach.
+
+- 📋 **Reviews & Ratings**: User-generated content with moderation
 - 📋 **Wishlist System**: Save products for later with sharing capabilities
 - 📋 **Social Features**: Product sharing, user-generated content integration
 
 ### 🔧 **Advanced Technical Features**
+
 - 📋 **Visual Search**: Image-based product discovery
 - 📋 **Predictive Analytics**: Inventory management and demand forecasting
 - 📋 **Multi-language Support**: Expand to international markets
@@ -128,11 +133,13 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 ## 🎯 Immediate Next Steps (Next 2-4 Weeks)
 
 ### **🔥 High Priority**
+
 1. **Mobile UX Optimization Sprint** - Ship assessment-driven touch, navigation, and product card improvements
 2. **Advanced Email Marketing** - Newsletter system and customer communication enhancement  
 3. **Enhanced Customer Features** - Reviews & ratings, wishlist system
 
-### **🚀 Strategic Priority**  
+### **🚀 Strategic Priority**
+
 1. **Advanced Analytics** - Enhanced business intelligence and customer insights
 2. **Performance Optimization** - Core Web Vitals instrumentation shipped; focus shifts to image strategy & caching
 3. **International Expansion** - Multi-language support and global markets
@@ -140,6 +147,7 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 ## 📊 Success Metrics
 
 ### **Business Metrics**
+
 - **Revenue**: Monthly recurring revenue and average order value
 - **Conversion**: Visit-to-purchase conversion rates
 - **Customer Satisfaction**: Net Promoter Score and support ticket volume
@@ -147,6 +155,7 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 - **Developer Adoption**: MCP server usage and developer community growth
 
 ### **Technical Metrics**
+
 - **Performance**: Page load times, Core Web Vitals scores
 - **Mobile Experience**: Mobile-specific performance and usability metrics
 - **Reliability**: Uptime, error rates, API response times
@@ -156,6 +165,7 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 ## 🎪 Innovation Focus
 
 ### **Revolutionary Opportunity: MCP Server**
+
 The MCP (Model Context Protocol) server represents a paradigm shift in eCommerce:
 
 - **Developer-First Shopping**: Purchase outdoor gear directly through development tools
@@ -165,6 +175,7 @@ The MCP (Model Context Protocol) server represents a paradigm shift in eCommerce
 - **Community Building**: Foster developer community around outdoor activities
 
 ### **Strategic Vision**
+
 - **Conversational Commerce**: Natural language shopping through AI assistants
 - **Integrated Workflows**: Shopping as part of development and productivity tools
 - **Community Platform**: Developer-focused outdoor gear recommendations and reviews
@@ -175,6 +186,7 @@ The MCP (Model Context Protocol) server represents a paradigm shift in eCommerce
 ## 🎯 Resource Allocation
 
 **Current Focus Distribution:**
+
 - **40%** Enhanced Customer Features & Mobile UX (User experience priority)
 - **30%** Advanced Analytics & Business Intelligence (Data-driven growth)  
 - **20%** Performance Optimization & International Expansion (Scale preparation)
@@ -186,5 +198,5 @@ The MCP (Model Context Protocol) server represents a paradigm shift in eCommerce
 
 **Last Updated**: 2025-09-25  
 **Status**: Phase 1 & 2 Complete, MCP Server Complete, Phase 3 Customer Focus  
-**Live Platform**: https://voltique.russellkmoore.me  
-**MCP Server**: https://voltique.russellkmoore.me/api/mcp
+**Live Platform**: <https://voltique.russellkmoore.me>  
+**MCP Server**: <https://voltique.russellkmoore.me/api/mcp>
