@@ -40,7 +40,8 @@
  * @returns JSX element with product page layout or 404 if not found
  */
 
-import { getProductBySlug, getProductReviews } from "@/lib/models";
+import { auth } from "@clerk/nextjs/server";
+import { getProductBySlug, getProductReviews, getProductReviewEligibility } from "@/lib/models";
 import { notFound } from "next/navigation";
 import ProductDisplay from "./ProductDisplay";
 
@@ -51,19 +52,26 @@ import ProductDisplay from "./ProductDisplay";
  * @returns Server-rendered product page or 404 if product not found
  */
 export default async function ProductPage({ params }: any) {
+  const { userId } = await auth();
   const product = await getProductBySlug(params.slug);
   if (!product) return notFound();
 
-  const reviews = await getProductReviews({
-    productId: product.id,
-    status: ["published"],
-    limit: 50,
-  });
+  const [reviews, reviewEligibility] = await Promise.all([
+    getProductReviews({
+      productId: product.id,
+      status: ["published"],
+      limit: 50,
+    }),
+    getProductReviewEligibility({
+      productId: product.id,
+      customerId: userId,
+    }),
+  ]);
 
   return (
     <main className="bg-neutral-900 text-white min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
       <div className="max-w-5xl mx-auto">
-        <ProductDisplay product={product} reviews={reviews} />
+        <ProductDisplay product={product} reviews={reviews} reviewEligibility={reviewEligibility} />
       </div>
     </main>
   );

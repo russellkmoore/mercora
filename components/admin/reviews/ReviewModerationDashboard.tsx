@@ -59,7 +59,10 @@ interface ReminderResponse {
 }
 
 type ApiErrorPayload = { error?: string } | null;
-interface ReminderTriggerResponse { sent?: number }
+interface ReminderTriggerResponse {
+  sent?: number;
+  failed?: Array<{ error: string }>;
+}
 
 const limit = 20;
 
@@ -317,7 +320,16 @@ export default function ReviewModerationDashboard() {
         throw new Error(payload?.error ?? "Unable to send reminders");
       }
       const payload = await response.json() as ReminderTriggerResponse;
-      toast.success(`Sent ${payload?.sent ?? 0} reminder${payload?.sent === 1 ? "" : "s"}`);
+      const sentCount = payload?.sent ?? 0;
+      const failedCount = payload?.failed?.length ?? 0;
+      toast.success(
+        `Sent ${sentCount} reminder${sentCount === 1 ? "" : "s"}`,
+        failedCount
+          ? {
+              description: `${failedCount} reminder${failedCount === 1 ? "" : "s"} could not be delivered. Check logs for details.`,
+            }
+          : undefined
+      );
       fetchReminders();
     } catch (err) {
       console.error(err);

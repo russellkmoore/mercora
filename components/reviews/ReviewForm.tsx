@@ -17,6 +17,7 @@ interface ReviewFormProps {
   existingReview?: Review;
   onSubmitted(review: Review): void;
   disabledReason?: string | null;
+  canSubmit?: boolean;
 }
 
 const ratingScale = [1, 2, 3, 4, 5];
@@ -42,6 +43,7 @@ export function ReviewForm({
   existingReview,
   onSubmitted,
   disabledReason,
+  canSubmit = true,
 }: ReviewFormProps) {
   const [rating, setRating] = useState(existingReview?.rating ?? 5);
   const [title, setTitle] = useState('');
@@ -81,6 +83,10 @@ export function ReviewForm({
     if (submitting || existingReview) return;
     if (disabledReason) {
       setError(disabledReason);
+      return;
+    }
+    if (!canSubmit) {
+      setError('Reviews unlock once delivery is confirmed.');
       return;
     }
 
@@ -172,6 +178,11 @@ export function ReviewForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+      {!canSubmit && (
+        <p className="text-xs text-amber-300">
+          {disabledReason || 'Reviews unlock once delivery is confirmed.'}
+        </p>
+      )}
       <div className="flex flex-col gap-2">
         <label className="text-sm font-medium text-white" htmlFor={`rating-${productId}`}>
           Rate your experience
@@ -185,9 +196,13 @@ export function ReviewForm({
                 'text-2xl transition-colors',
                 value <= rating ? 'text-yellow-400' : 'text-neutral-600 hover:text-yellow-200'
               )}
-              onClick={() => setRating(value)}
+              onClick={() => {
+                if (!canSubmit) return;
+                setRating(value);
+              }}
               aria-label={`${value} star${value === 1 ? '' : 's'}`}
               aria-pressed={value === rating}
+              disabled={!canSubmit}
             >
               {value <= rating ? '★' : '☆'}
             </button>
@@ -207,7 +222,7 @@ export function ReviewForm({
           onChange={(event) => setTitle(event.target.value)}
           className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-white focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
           placeholder={`Share your thoughts on ${productName}`}
-          disabled={submitting}
+          disabled={submitting || !canSubmit}
         />
       </div>
 
@@ -224,11 +239,11 @@ export function ReviewForm({
           rows={4}
           minLength={30}
           required
-          disabled={submitting}
+          disabled={submitting || !canSubmit}
         />
       </div>
 
-      {disabledReason && (
+      {disabledReason && canSubmit && (
         <p className="text-xs text-amber-300">{disabledReason}</p>
       )}
 
@@ -240,7 +255,7 @@ export function ReviewForm({
         <button
           type="submit"
           className="rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-black transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-400"
-          disabled={submitting || Boolean(disabledReason)}
+          disabled={submitting || !canSubmit}
         >
           {submitting ? 'Submitting…' : 'Submit review'}
         </button>

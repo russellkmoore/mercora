@@ -25,7 +25,8 @@ import type {
   ReviewQueueResult,
   ReviewModerationMetrics,
   ReviewReminderCandidate,
-  ReviewListOptions
+  ReviewListOptions,
+  ProductReviewEligibility,
 } from '@/lib/types';
 import { sendReviewReminderEmail, sendReviewStatusNotification } from '@/lib/utils/review-notifications';
 
@@ -545,6 +546,75 @@ export async function getProductReviews(options: ReviewListOptions = {}): Promis
   );
 }
 
+export async function getProductReviewEligibility(input: {
+  productId: string;
+  customerId?: string | null;
+}): Promise<ProductReviewEligibility> {
+  const { productId, customerId } = input;
+
+  if (!productId) {
+    throw new Error('Product ID is required to determine review eligibility.');
+  }
+
+  if (!customerId) {
+    return {
+      requiresAuth: true,
+      hasEligibleOrder: false,
+      hasSubmittedReview: false,
+      canReview: false,
+    };
+  }
+
+  const db = await getDbAsync();
+
+  const [existingReview] = await db
+    .select({ id: product_reviews.id })
+    .from(product_reviews)
+    .where(
+      and(
+        eq(product_reviews.product_id, productId),
+        eq(product_reviews.customer_id, customerId)
+      )
+    )
+    .limit(1);
+
+  const hasSubmittedReview = Boolean(existingReview?.id);
+
+  const orderRows = await db
+    .select({ order: orders })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.customer_id, customerId),
+        sql`(${orders.status} IN ('delivered','refunded') OR ${orders.delivered_at} IS NOT NULL)`
+      )
+    );
+
+  let hasEligibleOrder = false;
+
+  for (const row of orderRows) {
+    const order = row.order;
+    if (!order) continue;
+
+    const items: OrderItem[] = Array.isArray(order.items)
+      ? (order.items as OrderItem[])
+      : parseJsonField<OrderItem[]>(order.items) ?? [];
+
+    const matchesProduct = items.some((item) => item?.product_id === productId);
+    if (matchesProduct) {
+      hasEligibleOrder = true;
+      break;
+    }
+  }
+
+  return {
+    requiresAuth: false,
+    hasEligibleOrder,
+    hasSubmittedReview,
+    canReview: hasEligibleOrder && !hasSubmittedReview,
+  };
+}
+
 export async function submitReviewForOrderItem(input: SubmitReviewInput): Promise<Review> {
   if (!input.orderId) {
     throw new Error('Order ID is required.');
@@ -580,9 +650,12 @@ export async function submitReviewForOrderItem(input: SubmitReviewInput): Promis
     throw new Error('You can only review products from your own orders.');
   }
 
-  const isDelivered = order.status === 'delivered' || Boolean(order.delivered_at);
+  const isDelivered =
+    order.status === 'delivered' ||
+    order.status === 'refunded' ||
+    Boolean(order.delivered_at);
   if (!isDelivered) {
-    throw new Error('You can only review items after the order has been delivered.');
+    throw new Error('You can only review items after the order has been delivered or returned.');
   }
 
   const orderItems: OrderItem[] = Array.isArray(order.items)
