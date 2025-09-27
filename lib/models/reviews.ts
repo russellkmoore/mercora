@@ -550,9 +550,10 @@ export async function getProductReviewEligibility(input: {
   productId: string;
   customerId?: string | null;
 }): Promise<ProductReviewEligibility> {
-  const { productId, customerId } = input;
+  const normalizedProductId = String(input.productId ?? "").trim();
+  const { customerId } = input;
 
-  if (!productId) {
+  if (!normalizedProductId) {
     throw new Error('Product ID is required to determine review eligibility.');
   }
 
@@ -572,7 +573,7 @@ export async function getProductReviewEligibility(input: {
     .from(product_reviews)
     .where(
       and(
-        eq(product_reviews.product_id, productId),
+        eq(product_reviews.product_id, normalizedProductId),
         eq(product_reviews.customer_id, customerId)
       )
     )
@@ -600,7 +601,10 @@ export async function getProductReviewEligibility(input: {
       ? (order.items as OrderItem[])
       : parseJsonField<OrderItem[]>(order.items) ?? [];
 
-    const matchesProduct = items.some((item) => item?.product_id === productId);
+    const matchesProduct = items.some((item) => {
+      if (!item?.product_id) return false;
+      return String(item.product_id) === normalizedProductId;
+    });
     if (matchesProduct) {
       hasEligibleOrder = true;
       break;
@@ -616,10 +620,11 @@ export async function getProductReviewEligibility(input: {
 }
 
 export async function submitReviewForOrderItem(input: SubmitReviewInput): Promise<Review> {
+  const normalizedProductId = String(input.productId ?? "").trim();
   if (!input.orderId) {
     throw new Error('Order ID is required.');
   }
-  if (!input.productId) {
+  if (!normalizedProductId) {
     throw new Error('Product ID is required.');
   }
   if (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5) {
@@ -666,7 +671,8 @@ export async function submitReviewForOrderItem(input: SubmitReviewInput): Promis
     if (input.orderItemId && item.id && item.id === input.orderItemId) {
       return true;
     }
-    return item.product_id === input.productId;
+    if (!item.product_id) return false;
+    return String(item.product_id) === normalizedProductId;
   });
 
   if (!matchingItem) {
@@ -680,7 +686,7 @@ export async function submitReviewForOrderItem(input: SubmitReviewInput): Promis
       and(
         eq(product_reviews.order_id, input.orderId),
         eq(product_reviews.customer_id, input.customerId),
-        eq(product_reviews.product_id, input.productId)
+        eq(product_reviews.product_id, normalizedProductId)
       )
     )
     .limit(1);
@@ -700,7 +706,7 @@ export async function submitReviewForOrderItem(input: SubmitReviewInput): Promis
   const [created] = await db
     .insert(product_reviews)
     .values({
-      product_id: input.productId,
+      product_id: normalizedProductId,
       order_id: input.orderId,
       order_item_id: input.orderItemId ?? matchingItem.id ?? null,
       customer_id: input.customerId,
@@ -733,7 +739,7 @@ export async function submitReviewForOrderItem(input: SubmitReviewInput): Promis
     await db.insert(review_media).values(mediaInserts);
   }
 
-  await recalcProductRating(input.productId, db);
+  await recalcProductRating(normalizedProductId, db);
 
   const review = await getReviewById(created.id!, db);
   if (!review) {
