@@ -623,7 +623,7 @@ function CategoryEditor({ category, isOpen, onClose, onSave, isNew = false, allC
                   </Button>
                 </div>
                 <p className="text-xs text-gray-400">
-                  Use the "Manage Products" button to add, remove, or organize products in this category.
+                  Use the &quot;Manage Products&quot; button to add, remove, or organize products in this category.
                 </p>
               </div>
             </div>

@@ -35,7 +35,7 @@
 
 import ProductCard from "@/components/ProductCard";
 import type { Product } from "@/lib/types";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useEnhancedUserContext } from "@/lib/hooks/useEnhancedUserContext";
 import { getPersonalizedRecommendations } from "@/lib/utils/personalized-recommendations";
 import Image from "next/image";
@@ -58,18 +58,25 @@ export default function ProductRecommendations({
   const [isLoading, setIsLoading] = useState(false);
   const [agentAnswer, setAgentAnswer] = useState<string | null>(null);
   const userContext = useEnhancedUserContext();
+  const {
+    userId,
+    firstName,
+    orders,
+    isVipCustomer,
+    isLoading: contextLoading,
+  } = userContext;
   
   console.log('ProductRecommendations component mount/render:', {
     productId: product?.id,
     productName: product?.name,
-    userContextLoading: userContext.isLoading,
-    userContextUserId: userContext.userId
+    userContextLoading: contextLoading,
+    userContextUserId: userId,
   });
   
   // Create stable reference for user context values we actually need
   const stableUserContext = useMemo(() => {
     // Extract all purchased products from order history
-    const purchasedProducts = userContext.orders?.flatMap(order => 
+    const purchasedProducts = orders?.flatMap(order => 
       (order.items || []).map(item => ({
         name: item.product_name,
         id: item.product_id,
@@ -86,55 +93,29 @@ export default function ProductRecommendations({
     }, [] as typeof purchasedProducts);
 
     return {
-      userId: userContext.userId,
-      firstName: userContext.firstName,
-      orders: userContext.orders,
-      isVipCustomer: userContext.isVipCustomer,
-      orderCount: userContext.orders?.length || 0,
-      isLoading: userContext.isLoading,
+      userId,
+      firstName,
+      orders,
+      isVipCustomer,
+      orderCount: orders?.length || 0,
+      isLoading: contextLoading,
       purchasedProducts: uniquePurchasedProducts,
       purchasedProductNames: uniquePurchasedProducts.map(p => p.name).filter(Boolean),
     };
   }, [
-    userContext.userId, 
-    userContext.firstName, 
-    userContext.orders?.length, 
-    userContext.isVipCustomer,
-    userContext.isLoading,
-    // Include orders in dependency so we recalculate when orders change
-    JSON.stringify(userContext.orders?.map(o => ({ 
-      items: o.items?.map(i => ({ name: i.product_name, id: i.product_id })) 
-    })))
+    userId,
+    firstName,
+    orders,
+    isVipCustomer,
+    contextLoading,
   ]);
   
   
   // Fetch AI-powered recommendations with enhanced user context
-  useEffect(() => {
-    if (!product) {
-      return;
-    }
-    
-    // Debounce to prevent rapid consecutive calls
-    const timeoutId = setTimeout(async () => {
-      setIsLoading(true);
-      try {
-        const aiRecommendations = await fetchAIRecommendations(product, stableUserContext);
-        setRecommendedProducts(aiRecommendations.slice(0, maxRecommendations));
-      } catch (error) {
-        console.error("Error fetching AI recommendations:", error);
-        setRecommendedProducts([]);
-      } finally {
-        setIsLoading(false);
-      }
-    }, 500); // 500ms debounce
-
-    return () => clearTimeout(timeoutId);
-  }, [product?.id]);
-
   /**
    * Fetch AI-powered recommendations with enhanced user context
    */
-  const fetchAIRecommendations = async (
+  const fetchAIRecommendations = useCallback(async (
     currentProduct: Product, 
     userContext: typeof stableUserContext
   ): Promise<Product[]> => {
@@ -191,7 +172,28 @@ export default function ProductRecommendations({
       console.error("fetchAIRecommendations error:", error);
       return []; // Return empty array instead of throwing
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!product) {
+      return undefined;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setIsLoading(true);
+      try {
+        const aiRecommendations = await fetchAIRecommendations(product, stableUserContext);
+        setRecommendedProducts(aiRecommendations.slice(0, maxRecommendations));
+      } catch (error) {
+        console.error("Error fetching AI recommendations:", error);
+        setRecommendedProducts([]);
+      } finally {
+        setIsLoading(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [product, stableUserContext, maxRecommendations, fetchAIRecommendations]);
 
   // Don't render anything if no product context
   if (!product) {

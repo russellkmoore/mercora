@@ -287,13 +287,13 @@ export default function AgentDrawer({
                   />
                 </div>
                 <div className="space-y-2">
-                  <p className="font-semibold text-gray-700">Hi! I'm Volt, your gear expert.</p>
+                  <p className="font-semibold text-gray-700">Hi! I&rsquo;m Volt, your gear expert.</p>
                   <p className="text-xs leading-relaxed max-w-xs">
-                    Ask me about outdoor gear, product recommendations, or anything adventure-related. 
-                    I'm here to help you find the perfect equipment!
+                    Ask me about outdoor gear, product recommendations, or anything adventure-related.
+                    I&rsquo;m here to help you find the perfect equipment!
                   </p>
                   <p className="text-xs text-gray-600 italic">
-                    Try: "what do I use to start a fire? or "Tell me your secret s'mores recipe"
+                    Try: &ldquo;what do I use to start a fire?&rdquo; or &ldquo;Tell me your secret s&rsquo;mores recipe&rdquo;
                   </p>
                 </div>
               </div>
@@ -400,7 +400,7 @@ export default function AgentDrawer({
               <div className="space-y-2">
                 <div className="text-2xl">🎒</div>
                 <p className="font-medium text-gray-700">Product recommendations will appear here</p>
-                <p className="text-xs">Ask Volt about specific gear and I'll show you the best options!</p>
+                <p className="text-xs">Ask Volt about specific gear and I&rsquo;ll show you the best options!</p>
               </div>
             </div>
           )}

@@ -56,7 +56,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-function formatReviewDate(value?: string) {
+function formatReviewDate(value?: string | null) {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;

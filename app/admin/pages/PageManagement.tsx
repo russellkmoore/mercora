@@ -701,7 +701,7 @@ Generate complete content now:`;
                               <AlertDialogHeader>
                                 <AlertDialogTitle className="text-white">Delete Page</AlertDialogTitle>
                                 <AlertDialogDescription className="text-gray-400">
-                                  Are you sure you want to delete "{page.title}"? This action cannot be undone.
+                                  Are you sure you want to delete &quot;{page.title}&quot;? This action cannot be undone.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>

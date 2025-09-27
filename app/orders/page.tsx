@@ -72,7 +72,7 @@ export default async function OrdersPage() {
         <h2 className="text-xl sm:text-2xl font-bold mb-6">Order History</h2>
         {orders.length === 0 ? (
           // Empty state for users with no orders
-          <p className="text-gray-400">You haven't placed any orders yet.</p>
+          <p className="text-gray-400">You haven&rsquo;t placed any orders yet.</p>
         ) : (
           // Order history list with proper spacing
           <div className="space-y-4 sm:space-y-6">

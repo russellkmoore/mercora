@@ -20,7 +20,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -127,7 +127,7 @@ export default function OrderDetailPage() {
     applyRestockingFeeOnPartialReturn: true
   });
 
-  const fetchOrder = async () => {
+  const fetchOrder = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/orders?admin=true&orderId=${orderId}`);
@@ -142,9 +142,9 @@ export default function OrderDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [orderId]);
 
-  const fetchRefundPolicy = async () => {
+  const fetchRefundPolicy = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/settings?category=refund');
       if (response.ok) {
@@ -172,7 +172,7 @@ export default function OrderDetailPage() {
       console.error("Error fetching refund policy:", error);
       // Keep default values on error
     }
-  };
+  }, []);
 
   const formatCurrency = (amount: number, currency: string = "USD") => {
     return new Intl.NumberFormat("en-US", {
@@ -381,7 +381,7 @@ export default function OrderDetailPage() {
       fetchOrder();
       fetchRefundPolicy();
     }
-  }, [orderId]);
+  }, [orderId, fetchOrder, fetchRefundPolicy]);
 
 
   if (loading) {
@@ -739,7 +739,7 @@ export default function OrderDetailPage() {
                 </div>
                 <p className="text-sm text-gray-300">
                   This will cancel the entire order and process a full refund of ${formatCurrency(order.total_amount.amount)} 
-                  to the customer's original payment method via Stripe.
+                  to the customer&rsquo;s original payment method via Stripe.
                 </p>
               </div>
               

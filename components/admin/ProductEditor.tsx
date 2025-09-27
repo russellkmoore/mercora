@@ -792,7 +792,7 @@ export default function ProductEditor({
                       <div className="space-y-4">
                         <div>
                           <p className="text-sm text-gray-300 mb-3">
-                            Tell me about this product and I'll create a compelling description that highlights its key features and benefits!
+                            Tell me about this product and I&rsquo;ll create a compelling description that highlights its key features and benefits!
                           </p>
                           <Textarea
                             value={aiPrompt}
@@ -1247,7 +1247,7 @@ export default function ProductEditor({
                   className="bg-neutral-700 border-neutral-600"
                 />
                 <div className="text-xs text-gray-400 mt-1">
-                  Product IDs for "You might also like" recommendations
+                  Product IDs for &quot;You might also like&quot; recommendations
                 </div>
               </div>
               
