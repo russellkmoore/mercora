@@ -49,7 +49,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -135,7 +135,7 @@ export default function AdminOrdersPage() {
   const [ordersPerPage] = useState(20); // Same as products page
   const [totalPages, setTotalPages] = useState(1);
 
-  const fetchOrders = async (page: number = 1) => {
+  const fetchOrders = useCallback(async (page: number = 1) => {
     try {
       setLoading(true);
       const offset = (page - 1) * ordersPerPage;
@@ -162,7 +162,7 @@ export default function AdminOrdersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [ordersPerPage]);
 
   const handlePageChange = (page: number) => {
     setLoading(true);
@@ -294,7 +294,7 @@ export default function AdminOrdersPage() {
 
   useEffect(() => {
     fetchOrders(1);
-  }, []);
+  }, [fetchOrders]);
 
   if (loading) {
     return (

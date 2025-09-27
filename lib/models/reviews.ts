@@ -24,7 +24,8 @@ import type {
   ReviewFlagStatus,
   ReviewQueueResult,
   ReviewModerationMetrics,
-  ReviewReminderCandidate
+  ReviewReminderCandidate,
+  ReviewListOptions
 } from '@/lib/types';
 import { sendReviewReminderEmail, sendReviewStatusNotification } from '@/lib/utils/review-notifications';
 
@@ -120,7 +121,8 @@ function extractCustomerContact(customer?: CustomerRow | null, order?: OrderRow 
     );
     if (person) {
       email = person.email ?? email;
-      name = person.full_name ?? [person.first_name, person.last_name].filter(Boolean).join(' ') || name;
+      const fallbackName = [person.first_name, person.last_name].filter(Boolean).join(' ');
+      name = person.full_name ?? (fallbackName || name);
     }
   }
 
@@ -839,7 +841,7 @@ export async function updateReviewStatus(input: ReviewStatusUpdateInput): Promis
 
   if (input.status === 'published') {
     updates.published_at = current.published_at ?? timestamp;
-  } else if (current.status === 'published' && input.status !== 'published') {
+  } else if (current.status === 'published') {
     updates.published_at = null;
   }
 

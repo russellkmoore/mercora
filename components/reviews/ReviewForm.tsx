@@ -4,6 +4,11 @@ import { useEffect, useMemo, useState, FormEvent } from 'react';
 import { cn } from '@/lib/utils';
 import type { Review } from '@/lib/types';
 
+interface ReviewSubmitResponse {
+  data: Review;
+  error?: string;
+}
+
 interface ReviewFormProps {
   orderId: string;
   orderItemId?: string;
@@ -51,7 +56,7 @@ export function ReviewForm({
       setTitle(existingReview.title ?? '');
       setBody(existingReview.body ?? '');
     }
-  }, [existingReview?.id]);
+  }, [existingReview]);
 
   const statusLabel = useMemo(() => {
     if (!existingReview) return null;
@@ -69,7 +74,7 @@ export function ReviewForm({
       default:
         return existingReview.status;
     }
-  }, [existingReview?.status]);
+  }, [existingReview]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -98,7 +103,7 @@ export function ReviewForm({
         }),
       });
 
-      const payload = await response.json();
+      const payload = await response.json() as ReviewSubmitResponse;
 
       if (!response.ok) {
         throw new Error(payload?.error || 'Unable to submit review.');

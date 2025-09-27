@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -27,32 +27,7 @@ export default function CategoryDetail({ categoryId }: CategoryDetailProps) {
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [showAddProducts, setShowAddProducts] = useState(false);
 
-  useEffect(() => {
-    fetchCategoryData();
-  }, [categoryId]);
-
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredProducts(showAddProducts ? allProducts : categoryProducts);
-      return;
-    }
-
-    const productsToFilter = showAddProducts ? allProducts : categoryProducts;
-    const filtered = productsToFilter.filter((product) => {
-      const name = typeof product.name === "string" ? product.name : Object.values(product.name || {})[0] || "";
-      const description = typeof product.description === "string" ? product.description : Object.values(product.description || {})[0] || "";
-      
-      return (
-        name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.id.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    });
-
-    setFilteredProducts(filtered);
-  }, [searchQuery, categoryProducts, allProducts, showAddProducts]);
-
-  const fetchCategoryData = async () => {
+  const fetchCategoryData = useCallback(async () => {
     setLoading(true);
     try {
       // Fetch category details
@@ -80,7 +55,33 @@ export default function CategoryDetail({ categoryId }: CategoryDetailProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [categoryId]);
+
+  useEffect(() => {
+    fetchCategoryData();
+  }, [fetchCategoryData]);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredProducts(showAddProducts ? allProducts : categoryProducts);
+      return;
+    }
+
+    const productsToFilter = showAddProducts ? allProducts : categoryProducts;
+    const filtered = productsToFilter.filter((product) => {
+      const name = typeof product.name === "string" ? product.name : Object.values(product.name || {})[0] || "";
+      const description = typeof product.description === "string" ? product.description : Object.values(product.description || {})[0] || "";
+      
+      return (
+        name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.id.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    });
+
+    setFilteredProducts(filtered);
+  }, [searchQuery, categoryProducts, allProducts, showAddProducts]);
+
 
   const handleToggleProductSelection = (productId: string) => {
     setSelectedProducts(prev =>

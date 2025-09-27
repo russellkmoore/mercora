@@ -48,6 +48,19 @@ import {
   Sparkles,
 } from "lucide-react";
 
+interface ReviewQueueResponse {
+  data?: Review[];
+  meta?: { total?: number };
+  metrics?: ReviewModerationMetrics;
+}
+
+interface ReminderResponse {
+  data?: ReviewReminderCandidate[];
+}
+
+type ApiErrorPayload = { error?: string } | null;
+interface ReminderTriggerResponse { sent?: number }
+
 const limit = 20;
 
 const statusOptions: Array<{ label: string; value: "all" | ReviewStatus }> = [
@@ -164,11 +177,11 @@ export default function ReviewModerationDashboard() {
         throw new Error("Failed to load review queue");
       }
 
-      const payload = await response.json();
+      const payload = await response.json() as ReviewQueueResponse;
       setReviews(payload.data ?? []);
       setTotal(payload.meta?.total ?? 0);
       if (payload.metrics) {
-        setMetrics(payload.metrics as ReviewModerationMetrics);
+        setMetrics(payload.metrics);
       }
     } catch (err) {
       console.error(err);
@@ -196,7 +209,7 @@ export default function ReviewModerationDashboard() {
       if (!response.ok) {
         throw new Error("Unable to load reminder candidates");
       }
-      const payload = await response.json();
+      const payload = await response.json() as ReminderResponse;
       setReminders(payload.data ?? []);
     } catch (err) {
       console.error(err);
@@ -247,7 +260,7 @@ export default function ReviewModerationDashboard() {
       });
 
       if (!response.ok) {
-        const payload = await response.json().catch(() => null);
+        const payload = await response.json().catch(() => null) as ApiErrorPayload;
         throw new Error(payload?.error ?? "Unable to update review");
       }
 
@@ -275,7 +288,7 @@ export default function ReviewModerationDashboard() {
         }),
       });
       if (!response.ok) {
-        const payload = await response.json().catch(() => null);
+        const payload = await response.json().catch(() => null) as ApiErrorPayload;
         throw new Error(payload?.error ?? "Unable to send response");
       }
       toast.success("Response saved");
@@ -300,10 +313,10 @@ export default function ReviewModerationDashboard() {
         body: JSON.stringify({ limit: reminders.length }),
       });
       if (!response.ok) {
-        const payload = await response.json().catch(() => null);
+        const payload = await response.json().catch(() => null) as ApiErrorPayload;
         throw new Error(payload?.error ?? "Unable to send reminders");
       }
-      const payload = await response.json();
+      const payload = await response.json() as ReminderTriggerResponse;
       toast.success(`Sent ${payload?.sent ?? 0} reminder${payload?.sent === 1 ? "" : "s"}`);
       fetchReminders();
     } catch (err) {

@@ -35,6 +35,7 @@
  * @returns JSX element with complete home page layout
  */
 
+import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
 import { getProductsByCategory } from "@/lib/models/mach/products";
 
@@ -58,11 +59,11 @@ export default async function HomePage() {
           High-performance electric gear, rugged and designed for the edge of
           the map. Modular. Adaptable. Voltique.
         </p>
-        <a href="/category/featured">
+        <Link href="/category/featured" className="inline-block">
           <button className="px-4 sm:px-6 py-2 sm:py-3 text-base sm:text-lg font-semibold border border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-black transition rounded">
             Shop Featured Gear
           </button>
-        </a>
+        </Link>
       </section>
 
       {/* Featured Products Grid */}

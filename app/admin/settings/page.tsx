@@ -642,7 +642,7 @@ export default function AdminSettingsPage() {
               </div>
               <p className="text-sm text-gray-400 leading-relaxed">
                 Store name, contact information, and branding are configured during initial setup. 
-                These are typically one-time settings that don't need frequent changes.
+                These are typically one-time settings that don&rsquo;t need frequent changes.
               </p>
               <div className="mt-3 space-y-2">
                 <div className="flex justify-between text-sm">
@@ -1051,7 +1051,7 @@ export default function AdminSettingsPage() {
                 </div>
               ) : adminUsers.length === 0 ? (
                 <div className="text-gray-400 py-4 text-center">
-                  No admin users found. This shouldn't happen - there should always be at least one admin.
+                  No admin users found. This shouldn&rsquo;t happen - there should always be at least one admin.
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -1094,7 +1094,7 @@ export default function AdminSettingsPage() {
                     className="bg-neutral-700 border-neutral-600 text-white font-mono text-sm"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Enter the Clerk User ID (starts with "user_")
+                    Enter the Clerk User ID (starts with &quot;user_&quot;)
                   </p>
                 </div>
                 <Button
@@ -1132,5 +1132,4 @@ export default function AdminSettingsPage() {
 }
 
 {/* Legacy sections removed - replaced with functional settings */}
-
 

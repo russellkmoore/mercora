@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getReviewsForOrder, submitReviewForOrderItem } from '@/lib/models';
+import type { ReviewSubmissionPayload } from '@/lib/types';
 
 function resolveStatusFromError(message: string): number {
   const normalized = message.toLowerCase();
@@ -13,14 +14,14 @@ function resolveStatusFromError(message: string): number {
   return 400;
 }
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
 
   try {
-    const { id: orderId } = params;
+    const { id: orderId } = await params;
     if (!orderId) {
       return NextResponse.json({ error: 'Order ID is required.' }, { status: 400 });
     }
@@ -33,19 +34,19 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
 
   try {
-    const { id: orderId } = params;
+    const { id: orderId } = await params;
     if (!orderId) {
       return NextResponse.json({ error: 'Order ID is required.' }, { status: 400 });
     }
 
-    const payload = await request.json();
+    const payload = await request.json() as ReviewSubmissionPayload;
     const review = await submitReviewForOrderItem({
       ...payload,
       orderId,

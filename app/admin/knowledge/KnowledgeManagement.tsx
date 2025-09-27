@@ -232,7 +232,7 @@ function ArticleEditor({ article, isOpen, onClose, onSave, isNew = false }: Arti
                       <div className="space-y-4">
                         <div>
                           <p className="text-sm text-gray-300 mb-3">
-                            Tell me a little about what you want me to know and I'll get us started with a comprehensive article!
+                            Tell me a little about what you want me to know and I&rsquo;ll get us started with a comprehensive article!
                           </p>
                           <Textarea
                             value={aiPrompt}

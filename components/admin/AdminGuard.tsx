@@ -160,7 +160,7 @@ export default function AdminGuard({
                   <AlertTriangle className="w-5 h-5 text-yellow-500" />
                 </div>
                 <p className="text-yellow-300 text-sm">
-                  You don't have admin privileges for this application.
+                  You don&rsquo;t have admin privileges for this application.
                   Please contact the system administrator to request access.
                 </p>
               </div>

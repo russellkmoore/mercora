@@ -45,7 +45,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -137,7 +137,7 @@ export default function AdminDashboard() {
     error: undefined,
   });
 
-  const fetchDashboardStats = async () => {
+  const fetchDashboardStats = useCallback(async () => {
     try {
       // Calculate time range filter
       const now = new Date();
@@ -243,9 +243,9 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeRange]);
 
-  const fetchAIAnalytics = async (timeframe: "day" | "week" | "month" | "quarter" = "week") => {
+  const fetchAIAnalytics = useCallback(async (timeframe: "day" | "week" | "month" | "quarter" = "week") => {
     setAiAnalytics(prev => ({ ...prev, loading: true, error: undefined }));
     
     try {
@@ -300,12 +300,12 @@ export default function AdminDashboard() {
         error: error instanceof Error ? error.message : "Failed to fetch analytics",
       }));
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchDashboardStats();
     fetchAIAnalytics();
-  }, [timeRange]);
+  }, [timeRange, fetchDashboardStats, fetchAIAnalytics]);
 
 
   if (loading) {

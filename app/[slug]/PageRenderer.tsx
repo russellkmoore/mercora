@@ -7,6 +7,7 @@
 
 "use client";
 
+import Link from "next/link";
 import { useEffect } from "react";
 import { PageSelect } from "@/lib/db/schema/pages";
 import { Calendar, User } from "lucide-react";
@@ -140,8 +141,8 @@ export default function PageRenderer({ page }: PageRendererProps) {
                 <div className="bg-neutral-900 border border-neutral-700 rounded-lg p-6">
                   <h3 className="text-lg font-semibold text-white mb-2">Need Help?</h3>
                   <p className="text-gray-400 mb-4">
-                    If you have any questions about this document or our policies, 
-                    please don't hesitate to contact us.
+                    If you have any questions about this document or our policies,
+                    please don&rsquo;t hesitate to contact us.
                   </p>
                   <div className="flex flex-wrap gap-4">
                     <a 
@@ -150,12 +151,12 @@ export default function PageRenderer({ page }: PageRendererProps) {
                     >
                       Contact Support
                     </a>
-                    <a 
-                      href="/about" 
+                    <Link
+                      href="/about"
                       className="text-orange-400 hover:text-orange-300 transition-colors"
                     >
                       About Us
-                    </a>
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -175,18 +176,18 @@ export default function PageRenderer({ page }: PageRendererProps) {
                   Discover our AI-powered outdoor gear recommendations and start your next adventure.
                 </p>
                 <div className="flex flex-wrap justify-center gap-4">
-                  <a 
+                  <Link
                     href="/products"
                     className="bg-orange-600 hover:bg-orange-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
                   >
                     Shop Products
-                  </a>
-                  <a 
+                  </Link>
+                  <Link
                     href="/agent"
                     className="bg-transparent border-2 border-orange-600 text-orange-400 hover:bg-orange-600 hover:text-white px-8 py-3 rounded-lg font-semibold transition-colors"
                   >
                     Chat with Volt AI
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>
