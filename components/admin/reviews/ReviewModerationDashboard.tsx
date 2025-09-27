@@ -133,8 +133,8 @@ export default function ReviewModerationDashboard() {
   const [metrics, setMetrics] = useState<ReviewModerationMetrics | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<"all" | ReviewStatus>("needs_review");
-  const [flaggedOnly, setFlaggedOnly] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<"all" | ReviewStatus>("pending");
+  const [flaggedOnly, setFlaggedOnly] = useState(false);
   const [searchDraft, setSearchDraft] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
