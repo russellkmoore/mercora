@@ -180,16 +180,22 @@ export default function OrderCard({ order }: { order: Order }) {
                       </div>
                       <p className="text-xs text-gray-400">Quantity: {item.quantity}</p>
                     </div>
-                    <ReviewForm
-                      orderId={orderId}
-                      orderItemId={item.id}
-                      productId={item.product_id}
-                      productName={item.product_name}
-                      existingReview={review}
-                      onSubmitted={handleReviewSubmitted}
-                      disabledReason={disabledReason}
-                      canSubmit={reviewable}
-                    />
+                    {reviewable ? (
+                      <ReviewForm
+                        orderId={orderId}
+                        orderItemId={item.id}
+                        productId={item.product_id}
+                        productName={item.product_name}
+                        existingReview={review}
+                        onSubmitted={handleReviewSubmitted}
+                        disabledReason={disabledReason}
+                        canSubmit={reviewable}
+                      />
+                    ) : (
+                      <p className="text-xs text-amber-300">
+                        Reviews unlock once delivery is confirmed for this order.
+                      </p>
+                    )}
                   </div>
                 );
               })}
