@@ -194,15 +194,61 @@ export default function ProductDisplay({
             <p className="mt-3 text-sm text-amber-300">Be the first to share feedback once your order is delivered.</p>
           )}
 
+          <div className="mt-6">
+            <div className="rounded-lg border border-neutral-800 bg-neutral-900">
+              <div className="flex flex-wrap border-b border-neutral-800">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("details")}
+                  className={`flex-1 px-4 py-3 text-sm font-semibold sm:flex-none sm:px-6 ${
+                    activeTab === "details"
+                      ? "border-b-2 border-orange-500 text-white"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Details
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("reviews")}
+                  className={`flex-1 px-4 py-3 text-sm font-semibold sm:flex-none sm:px-6 ${
+                    activeTab === "reviews"
+                      ? "border-b-2 border-orange-500 text-white"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  {reviewsTabLabel}
+                </button>
+              </div>
+              <div className="p-6">
+                {activeTab === "details" ? (
+                  <div className="space-y-4 text-sm text-gray-300">
+                    {productDescription ? (
+                      <p className="whitespace-pre-line leading-relaxed text-gray-300">{productDescription}</p>
+                    ) : (
+                      <p className="text-sm text-gray-500">Product description coming soon.</p>
+                    )}
+                  </div>
+                ) : (
+                  <ProductReviewsSection
+                    reviews={reviews}
+                    ratingSummary={ratingSummary}
+                    eligibility={reviewEligibility}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="mt-6 space-y-6">
             {variants.length > 1 && (
               <div>
                 <label className="mb-2 block text-sm font-medium text-white">Choose an option:</label>
                 <Select value={selectedVariantId} onValueChange={setSelectedVariantId}>
-                  <SelectTrigger className="w-full bg-neutral-800 border-neutral-700 text-white hover:bg-neutral-700 sm:w-auto">
+                  <SelectTrigger className="w-full border border-neutral-700 bg-neutral-900 text-white hover:bg-neutral-800 sm:w-auto">
                     <SelectValue placeholder="Select a variant" />
                   </SelectTrigger>
-                  <SelectContent className="bg-neutral-800 border-neutral-700">
+                  <SelectContent className="bg-neutral-900 border border-neutral-700 text-white">
                     {variants.map((variant) => {
                       const optionDisplay = variant.option_values?.map((value) => `${value.value}`).join(", ") || `Variant ${variant.id}`;
                       const priceDisplay = variant.price ? `$${(variant.price.amount / 100).toFixed(2)}` : "";
@@ -211,7 +257,7 @@ export default function ProductDisplay({
                         <SelectItem
                           key={variant.id}
                           value={variant.id}
-                          className="text-white hover:bg-neutral-700 focus:bg-neutral-700"
+                          className="text-white hover:bg-neutral-800 focus:bg-neutral-800"
                         >
                           <div className="flex w-full items-center justify-between">
                             <span>{optionDisplay}</span>
@@ -235,6 +281,12 @@ export default function ProductDisplay({
               </div>
             ) : (
               <p className="text-lg font-semibold text-white sm:text-xl">${(price / 100).toFixed(2)}</p>
+            )}
+
+            {selectedVariant?.inventory && (
+              <p className="text-xs text-gray-500">
+                {quantityInStock > 0 ? `${quantityInStock} in stock` : "Backordered"}
+              </p>
             )}
 
             {available ? (
@@ -278,56 +330,6 @@ export default function ProductDisplay({
           </div>
         </div>
       </div>
-
-      {/* Details & Reviews Tabs */}
-      <section className="mt-10 rounded-lg border border-neutral-800 bg-neutral-900">
-        <div className="flex flex-wrap border-b border-neutral-800">
-          <button
-            type="button"
-            onClick={() => setActiveTab("details")}
-            className={`flex-1 px-4 py-3 text-sm font-semibold sm:flex-none sm:px-6 ${
-              activeTab === "details"
-                ? "border-b-2 border-orange-500 text-white"
-                : "text-gray-400 hover:text-white"
-            }`}
-          >
-            Details
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("reviews")}
-            className={`flex-1 px-4 py-3 text-sm font-semibold sm:flex-none sm:px-6 ${
-              activeTab === "reviews"
-                ? "border-b-2 border-orange-500 text-white"
-                : "text-gray-400 hover:text-white"
-            }`}
-          >
-            {reviewsTabLabel}
-          </button>
-        </div>
-        <div className="p-6">
-          {activeTab === "details" ? (
-            <div className="space-y-4 text-sm text-gray-300">
-              {productDescription ? (
-                <p className="whitespace-pre-line leading-relaxed text-gray-300">{productDescription}</p>
-              ) : (
-                <p className="text-sm text-gray-500">Product description coming soon.</p>
-              )}
-              {selectedVariant?.inventory && (
-                <p className="text-xs text-gray-500">
-                  {quantityInStock > 0 ? `${quantityInStock} in stock` : "Backordered"}
-                </p>
-              )}
-            </div>
-          ) : (
-            <ProductReviewsSection
-              reviews={reviews}
-              ratingSummary={ratingSummary}
-              eligibility={reviewEligibility}
-            />
-          )}
-        </div>
-      </section>
 
       {/* AI-Powered Product Recommendations */}
       <ProductRecommendations product={product} />

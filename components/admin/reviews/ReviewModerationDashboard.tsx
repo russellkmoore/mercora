@@ -153,6 +153,7 @@ export default function ReviewModerationDashboard() {
   const [loadingReminders, setLoadingReminders] = useState(false);
   const [reminderError, setReminderError] = useState<string | null>(null);
   const [sendingReminders, setSendingReminders] = useState(false);
+  const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
 
   const fetchQueue = useCallback(async () => {
     try {
@@ -182,6 +183,7 @@ export default function ReviewModerationDashboard() {
 
       const payload = await response.json() as ReviewQueueResponse;
       setReviews(payload.data ?? []);
+      setExpandedReviewId(null);
       setTotal(payload.meta?.total ?? 0);
       if (payload.metrics) {
         setMetrics(payload.metrics);
@@ -430,10 +432,10 @@ export default function ReviewModerationDashboard() {
                 value={statusFilter}
                 onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}
               >
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-48 border border-neutral-700 bg-neutral-900 text-white hover:bg-neutral-800">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="border border-neutral-700 bg-neutral-900 text-white">
                   {statusOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
@@ -483,8 +485,12 @@ export default function ReviewModerationDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {reviews.map((review) => (
-                  <TableRow key={review.id} className="align-top">
+                {reviews.map((review) => {
+                  const isExpanded = expandedReviewId === review.id;
+                  const bodyIsLong = (review.body?.length ?? 0) > 280;
+
+                  return (
+                    <TableRow key={review.id} className="align-top">
                     <TableCell className="max-w-[220px] whitespace-normal">
                       <div className="font-semibold text-white">
                         {review.product_name ?? review.product_id}
@@ -522,9 +528,25 @@ export default function ReviewModerationDashboard() {
                     <TableCell className="max-w-[260px] whitespace-normal">
                       <div className="space-y-2">
                         {review.body && (
-                          <p className="text-sm text-muted-foreground line-clamp-3 whitespace-pre-wrap">
+                          <div
+                            className={`text-sm text-muted-foreground whitespace-pre-wrap ${
+                              isExpanded ? "max-h-72 overflow-y-auto pr-1" : "line-clamp-3"
+                            }`}
+                          >
                             {review.body}
-                          </p>
+                          </div>
+                        )}
+                        {review.body && bodyIsLong && (
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="px-0 text-xs text-orange-300 hover:text-orange-200"
+                            onClick={() =>
+                              setExpandedReviewId((current) => (current === review.id ? null : review.id))
+                            }
+                          >
+                            {isExpanded ? "Show less" : "Show full review"}
+                          </Button>
                         )}
                         {moderationReasons(review).length > 0 && (
                           <div className="flex flex-wrap gap-1">
@@ -553,21 +575,24 @@ export default function ReviewModerationDashboard() {
                           size="sm"
                           variant="outline"
                           onClick={() => openActionDialog(review, "needs_review")}
+                          title="Route this review back to manual moderation"
                           disabled={loading || saving}
                         >
-                          Send back
+                          Escalate
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => openActionDialog(review, "suppressed")}
+                          title="Hide this review from the storefront"
                           disabled={loading || saving}
                         >
-                          Suppress
+                          Hide
                         </Button>
                         <Button
                           size="sm"
                           onClick={() => openActionDialog(review, "publish")}
+                          title="Approve and publish this review"
                           disabled={loading || saving}
                         >
                           Approve
@@ -580,14 +605,16 @@ export default function ReviewModerationDashboard() {
                             setResponseText(review.admin_response ?? "");
                             setResponseNotify(true);
                           }}
+                          title="Send a customer-facing reply without changing review status"
                           disabled={saving}
                         >
-                          Respond
+                          Reply
                         </Button>
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
                 {reviews.length === 0 && !loading && (
                   <TableRow>
                     <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
