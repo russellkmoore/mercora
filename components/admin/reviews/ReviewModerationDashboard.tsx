@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -491,6 +492,14 @@ export default function ReviewModerationDashboard() {
                       </div>
                       <div className="text-xs text-muted-foreground">
                         Order #{review.order_id}
+                      </div>
+                      <div className="text-xs">
+                        <Link
+                          href={`/product/${review.product_slug ?? review.product_id}`}
+                          className="text-orange-300 underline underline-offset-2 hover:text-orange-200"
+                        >
+                          View product page
+                        </Link>
                       </div>
                       {review.is_verified && (
                         <Badge variant="outline" className="mt-1 text-xs text-emerald-200">
