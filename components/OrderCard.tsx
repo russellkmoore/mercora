@@ -7,6 +7,10 @@ import { ReviewForm } from "@/components/reviews/ReviewForm";
 
 type OrderStatus = "pending" | "processing" | "shipped" | "delivered" | "cancelled" | "refunded";
 
+interface OrderReviewsResponse {
+  data?: Review[];
+}
+
 function formatOrderDate(value?: string) {
   if (!value) return "";
   const date = new Date(value);
@@ -62,7 +66,7 @@ export default function OrderCard({ order }: { order: Order }) {
           throw new Error('Unable to load review status.');
         }
 
-        const payload = await response.json();
+        const payload = await response.json() as OrderReviewsResponse;
         if (cancelled) return;
 
         const incoming: Record<string, Review> = {};

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -175,23 +175,24 @@ export default function ProductManagement() {
   const [showProductEditor, setShowProductEditor] = useState(false);
   const [isNewProduct, setIsNewProduct] = useState(false);
 
-  const fetchProducts = async (page: number = 1) => {
+  const fetchProducts = useCallback(async (page: number = 1) => {
     try {
+      setLoading(true);
       const offset = (page - 1) * productsPerPage;
       const url = `/api/products?limit=${productsPerPage}&offset=${offset}`;
       const response = await fetch(url);
-      
+
       if (response.ok) {
         const result: any = await response.json();
         const products: Product[] = result.data || result || [];
         const meta = result.meta || {};
-        
+
         // Update totals from API metadata
         const total = meta.total || products.length;
         setTotalProducts(total);
         setTotalPages(Math.ceil(total / productsPerPage));
         setCurrentPage(page);
-        
+
         setProducts(products);
         setFilteredProducts(products);
       }
@@ -200,7 +201,7 @@ export default function ProductManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [productsPerPage]);
 
   const triggerVectorization = async () => {
     setIsVectorizing(true);
@@ -226,7 +227,7 @@ export default function ProductManagement() {
 
   useEffect(() => {
     fetchProducts(1);
-  }, []);
+  }, [fetchProducts]);
 
   const handlePageChange = (page: number) => {
     setLoading(true);

@@ -12,14 +12,14 @@ interface PatchPayload {
   flagNotes?: string;
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await checkAdminPermissions(request);
   if (!auth.success) {
     return NextResponse.json({ success: false, error: auth.error }, { status: 401 });
   }
 
   try {
-    const { id } = params;
+    const { id } = await params;
     if (!id) {
       return NextResponse.json({ success: false, error: "Review ID is required" }, { status: 400 });
     }
