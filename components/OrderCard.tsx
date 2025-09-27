@@ -30,7 +30,8 @@ function buildReviewKey(review: Review) {
 
 export default function OrderCard({ order }: { order: Order }) {
   const date = formatOrderDate(order.created_at || "");
-  const total = (order.total_amount?.amount ?? 0).toFixed(2);
+  const totalAmount = order.total_amount?.amount ?? 0;
+  const total = (totalAmount / 100).toFixed(2);
   const items = Array.isArray(order.items) ? order.items : [];
   const itemCount = items.length;
   const previewItem = items?.[0]?.product_name || "Item";
@@ -50,7 +51,10 @@ export default function OrderCard({ order }: { order: Order }) {
     }[order.status as OrderStatus] ?? "bg-gray-700 text-white";
 
   const orderId = order.id ?? "";
-  const reviewable = order.status === "delivered" || Boolean(order.delivered_at);
+  const reviewable =
+    order.status === "delivered" ||
+    order.status === "refunded" ||
+    Boolean(order.delivered_at);
   const disabledReason = reviewable ? null : "Reviews unlock once delivery is confirmed.";
 
   useEffect(() => {
@@ -184,6 +188,7 @@ export default function OrderCard({ order }: { order: Order }) {
                       existingReview={review}
                       onSubmitted={handleReviewSubmitted}
                       disabledReason={disabledReason}
+                      canSubmit={reviewable}
                     />
                   </div>
                 );
