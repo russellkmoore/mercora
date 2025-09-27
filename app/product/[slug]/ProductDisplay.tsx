@@ -315,9 +315,7 @@ export default function ProductDisplay({
               )}
               {selectedVariant?.inventory && (
                 <p className="text-xs text-gray-500">
-                  {selectedVariant.inventory.quantity > 0
-                    ? `${selectedVariant.inventory.quantity} in stock`
-                    : "Backordered"}
+                  {quantityInStock > 0 ? `${quantityInStock} in stock` : "Backordered"}
                 </p>
               )}
             </div>
