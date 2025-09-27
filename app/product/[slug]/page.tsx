@@ -45,6 +45,8 @@ import { getProductBySlug, getProductReviews, getProductReviewEligibility } from
 import { notFound } from "next/navigation";
 import ProductDisplay from "./ProductDisplay";
 
+export const revalidate = 0;
+
 /**
  * Product page component that displays detailed information for a specific product
  * 
