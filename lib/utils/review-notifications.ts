@@ -105,9 +105,9 @@ export async function sendReviewReminderEmail(input: ReviewReminderEmailInput): 
         <h2 style="margin: 0; font-size: 22px; font-weight: 700; color: #f97316;">How's your new gear?</h2>
         <p style="margin: 16px 0 0; color: #e5e7eb; line-height: 24px;">${greeting}</p>
         <p style="margin: 12px 0 0; color: #d1d5db; line-height: 24px;">
-          We hope you're putting <strong>${input.productName}</strong> to good use. When you have a moment, we'd love to hear how it's working out.
+          We hope you're putting <strong>${input.productName}</strong> to good use. When you have a moment, we'd love to hear how it's working out. You'll find the prompt alongside order <strong>${input.orderId}</strong> in your history.
         </p>
-        <a href="https://voltique.russellkmoore.me/account/orders/${input.orderId}" style="display: inline-block; margin-top: 20px; padding: 12px 20px; background: linear-gradient(135deg, #f97316, #ea580c); color: #fff; border-radius: 9999px; text-decoration: none; font-weight: 600;">Share your review</a>
+        <a href="https://voltique.russellkmoore.me/orders" style="display: inline-block; margin-top: 20px; padding: 12px 20px; background: linear-gradient(135deg, #f97316, #ea580c); color: #fff; border-radius: 9999px; text-decoration: none; font-weight: 600;">Share your review</a>
         <p style="margin: 24px 0 0; color: #9ca3af; font-size: 14px; line-height: 22px;">
           Reviews help other shoppers make confident choices and give our team insight into what to improve next.
         </p>

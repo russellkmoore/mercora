@@ -21,7 +21,7 @@ export const product_reviews = sqliteTable(
       .notNull()
       .default('pending'),
     is_verified: integer('is_verified', { mode: 'boolean' }).default(true),
-    automated_moderation: text('automated_moderation', { mode: 'json' }),
+    automated_moderation: text('automated_moderation'),
     moderation_notes: text('moderation_notes'),
     admin_response: text('admin_response'),
     response_author_id: text('response_author_id'),

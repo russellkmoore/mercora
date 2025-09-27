@@ -108,3 +108,10 @@ export interface ReviewReminderCandidate {
   customerName?: string | null;
   orderItemId?: string | null;
 }
+
+export interface ProductReviewEligibility {
+  requiresAuth: boolean;
+  hasEligibleOrder: boolean;
+  hasSubmittedReview: boolean;
+  canReview: boolean;
+}
