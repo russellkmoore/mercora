@@ -1,12 +1,14 @@
 {
   "name": "mercora",
   "version": "0.1.0",
+  "license": "MIT",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "typecheck": "tsc --noEmit",
     "deploy": "rm -rf .next .open-next .wrangler/state .wrangler/public && opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "clean": "rm -rf .open-next .next .wrangler/state .wrangler/public",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
