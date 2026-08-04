@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { getNavigationPages } from "@/lib/models/pages";
 import { getSocialMediaSettings } from "@/lib/utils/settings";
+import { getStoreConfig } from "@/lib/store-config";
 
 export default async function Footer() {
+  const store = getStoreConfig();
   const [navigationPages, socialMedia] = await Promise.all([
     getNavigationPages(),
     getSocialMediaSettings()
@@ -99,10 +101,10 @@ export default async function Footer() {
         </div>
       </div>
       <div className="text-center text-xs text-neutral-500 pb-4 pt-2 relative z-10">
-        ©2025 Voltique. All rights reserved.
+        ©{new Date().getFullYear()} {store.identity.name}. All rights reserved.
       </div>
       <div className="absolute bottom-0 left-[10px] sm:left-[20px] text-[60px] sm:text-[100px] lg:text-[140px] font-bold text-neutral-900 leading-none z-0 select-none">
-        VOLTIQUE
+        {store.identity.name.toUpperCase()}
       </div>
     </footer>
   );

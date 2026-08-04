@@ -42,7 +42,7 @@
 
 export const dynamic = "force-dynamic";
 
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
@@ -52,6 +52,8 @@ import { Toaster } from "sonner";
 import { dark } from "@clerk/themes";
 import { Suspense } from "react";
 import WebVitals from "@/components/analytics/WebVitals";
+import { getStoreConfig } from "@/lib/store-config";
+import { StoreConfigProvider } from "@/lib/store";
 
 import {
   ClerkProvider,
@@ -78,22 +80,24 @@ const geistMono = Geist_Mono({
 });
 
 // SEO metadata for the application
-export const metadata: Metadata = {
-  title: "Mercora",
-  description: "Marketplace powered by open knowledge",
-  other: {
-    // Suppress browser preload warnings
-    "resource-hints": "minimal",
-    // MCP Server Discovery
-    "mcp-server": "/api/mcp",
-    "mcp-schema": "/api/mcp/schema",
-    "mcp-capabilities": "commerce,outdoor-gear,multi-agent,e-commerce",
-    "mcp-version": "1.0.0",
-  },
-};
+export function generateMetadata(): Metadata {
+  const config = getStoreConfig();
+  return {
+    metadataBase: new URL(config.urls.site),
+    title: config.identity.name,
+    description: config.identity.description,
+    other: {
+      "resource-hints": "minimal",
+      "mcp-server": "/api/mcp",
+      "mcp-schema": "/api/mcp/schema",
+      "mcp-capabilities": config.mcp.capabilities,
+      "mcp-version": "1.0.0",
+    },
+  };
+}
 
 // Viewport configuration (separate export in Next.js 15+)
-export const viewport = {
+export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -110,6 +114,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const config = getStoreConfig();
   return (
     <ClerkProvider
       appearance={{
@@ -121,9 +126,9 @@ export default function RootLayout({
           {/* MCP Server Discovery Meta Tags */}
           <meta name="mcp-server" content="/api/mcp" />
           <meta name="mcp-schema" content="/api/mcp/schema" />
-          <meta name="mcp-capabilities" content="commerce,outdoor-gear,multi-agent,e-commerce" />
+          <meta name="mcp-capabilities" content={config.mcp.capabilities} />
           <meta name="mcp-version" content="1.0.0" />
-          <meta name="mcp-description" content="Voltique MCP Server for multi-agent outdoor gear commerce" />
+          <meta name="mcp-description" content={config.mcp.description} />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
 
           {/* Additional MCP Discovery */}
@@ -131,9 +136,19 @@ export default function RootLayout({
           <link rel="mcp-schema" href="/api/mcp/schema" type="application/json" />
         </head>
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white flex flex-col min-h-screen`}
+          className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
+          style={{
+            backgroundColor: config.theme.surface,
+            color: config.theme.foreground,
+            "--store-primary": config.theme.primary,
+            "--store-surface": config.theme.surface,
+            "--store-surface-elevated": config.theme.surfaceElevated,
+            "--store-foreground": config.theme.foreground,
+            "--store-muted-foreground": config.theme.mutedForeground,
+          } as React.CSSProperties}
           suppressHydrationWarning
         >
+          <StoreConfigProvider config={config}>
           {/* Promotional banner - shown above header when enabled */}
           <Suspense fallback={null}>
             <PromotionalBanner />
@@ -157,13 +172,14 @@ export default function RootLayout({
             position="top-center"
             toastOptions={{
               className:
-                "bg-orange-500/80 text-black font-semibold rounded-md mt-[60px] shadow-lg animate-in fade-in slide-in-from-top-5",
+                "bg-[var(--store-primary)]/80 text-black font-semibold rounded-md mt-[60px] shadow-lg animate-in fade-in slide-in-from-top-5",
               duration: 3000,
             }}
           />
           
           {/* Core Web Vitals monitoring */}
           <WebVitals />
+          </StoreConfigProvider>
         </body>
       </html>
     </ClerkProvider>

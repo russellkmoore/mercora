@@ -27,11 +27,15 @@ import AdminHeader from "@/components/admin/AdminHeader";
 import AdminLayoutProvider from "@/components/admin/AdminLayoutProvider";
 import AdminGuard from "@/components/admin/AdminGuard";
 import { Toaster } from "sonner";
+import { getStoreConfig } from "@/lib/store-config";
 
-export const metadata = {
-  title: "Voltique Admin",
-  description: "Admin dashboard for Voltique outdoor gear store",
-};
+export function generateMetadata() {
+  const store = getStoreConfig();
+  return {
+    title: `${store.identity.name} Admin`,
+    description: `Admin dashboard for ${store.identity.name}`,
+  };
+}
 
 /**
  * Admin layout component that wraps all admin pages
