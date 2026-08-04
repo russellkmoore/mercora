@@ -4,8 +4,11 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { isUserAdmin } from "../models/admin";
 import { getApiTokenByHash, updateApiTokenLastUsed } from "../models/auth";
 import { sha256Hex, timingSafeEqual } from "./crypto";
+import { hasSameOrigin } from "./same-origin";
 
 export { sha256Hex, timingSafeEqual };
+
+const ORIGIN_REQUIRED_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 export interface AuthResult {
   success: boolean;
@@ -144,6 +147,12 @@ export async function authenticateRequest(
           lastUsedAt: token.lastUsedAt ?? null,
         },
       };
+    }
+
+    // Service/API tokens above are not ambient browser credentials. Clerk
+    // sessions are cookie-backed, so mutating requests must be same-origin.
+    if (ORIGIN_REQUIRED_METHODS.has(request.method.toUpperCase()) && !hasSameOrigin(request)) {
+      return deny(403, "Request origin validation failed");
     }
 
     const { userId, sessionClaims } = await auth();

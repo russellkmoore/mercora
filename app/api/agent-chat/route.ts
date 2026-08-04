@@ -74,6 +74,7 @@ const MAX_USER_CONTEXT_LENGTH = 1_000;
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_HISTORY_CONTENT_LENGTH = 4_000;
 const MAX_ORDERS = 3;
+const MAX_REQUEST_BODY_BYTES = 256 * 1024;
 
 type ChatRole = "user" | "assistant";
 
@@ -87,6 +88,39 @@ interface PromptOrder {
   id: string;
   itemCount: number;
   totalMinor: number;
+}
+
+class RequestBodyTooLargeError extends Error {}
+
+async function readBoundedJson(req: NextRequest): Promise<unknown> {
+  const declaredLength = Number(req.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BODY_BYTES) {
+    throw new RequestBodyTooLargeError();
+  }
+
+  if (!req.body) return null;
+  const reader = req.body.getReader();
+  const decoder = new TextDecoder();
+  let totalBytes = 0;
+  let text = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_REQUEST_BODY_BYTES) {
+        await reader.cancel();
+        throw new RequestBodyTooLargeError();
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+
+  return JSON.parse(text);
 }
 
 function cleanPromptText(value: string, maxLength: number): string {
@@ -185,7 +219,15 @@ function isContentGenerationRequest(question: string, userContext: string): bool
  */
 export async function POST(req: NextRequest) {
   try {
-    const body: unknown = await req.json();
+    let body: unknown;
+    try {
+      body = await readBoundedJson(req);
+    } catch (error) {
+      if (error instanceof RequestBodyTooLargeError) {
+        return NextResponse.json({ error: "Request body too large" }, { status: 413 });
+      }
+      return NextResponse.json({ error: "Invalid JSON request body" }, { status: 400 });
+    }
     if (!isPlainRecord(body)) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }

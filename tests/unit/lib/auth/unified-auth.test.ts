@@ -14,6 +14,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest } from 'next/server';
 import { authenticateRequest } from '@/lib/auth/unified-auth';
 import { getApiTokenByHash, updateApiTokenLastUsed } from '@/lib/models/auth';
+import { isUserAdmin } from '@/lib/models/admin';
 
 describe('authenticateRequest fail-closed behavior', () => {
   beforeEach(() => {
@@ -42,6 +43,7 @@ describe('authenticateRequest fail-closed behavior', () => {
   it('accepts the same service secret from an Authorization header', async () => {
     const result = await authenticateRequest(
       new NextRequest('http://localhost/api/orders', {
+        method: 'POST',
         headers: { authorization: 'Bearer expected-service-secret' },
       }),
       ['orders:read']
@@ -49,6 +51,36 @@ describe('authenticateRequest fail-closed behavior', () => {
 
     expect(result.success).toBe(true);
     expect(result.tokenInfo?.tokenName).toBe('admin-service');
+  });
+
+  it('rejects a mutating Clerk-cookie request without an exact Origin', async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: 'user_123', sessionClaims: null } as never);
+    vi.mocked(isUserAdmin).mockResolvedValue(true);
+
+    const result = await authenticateRequest(
+      new NextRequest('https://shop.example/api/orders', { method: 'PUT' }),
+      ['orders:write']
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.response?.status).toBe(403);
+    expect(auth).not.toHaveBeenCalled();
+  });
+
+  it('accepts an exact-origin mutating Clerk admin request', async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: 'user_123', sessionClaims: null } as never);
+    vi.mocked(isUserAdmin).mockResolvedValue(true);
+
+    const result = await authenticateRequest(
+      new NextRequest('https://shop.example/api/orders', {
+        method: 'PUT',
+        headers: { origin: 'https://shop.example' },
+      }),
+      ['orders:write']
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.tokenInfo?.tokenName).toBe('clerk:user_123');
   });
 
   it('fails closed in production when no credentials are present', async () => {
