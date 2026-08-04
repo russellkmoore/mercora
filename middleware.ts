@@ -56,6 +56,8 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { getSettings } from "@/lib/utils/settings";
+import { getStoreConfig } from "@/lib/store-config";
+import { escapeHtmlText, safeMaintenanceMessage } from "@/lib/utils/maintenance-html";
 
 /**
  * Custom middleware that combines Clerk authentication with maintenance mode checking
@@ -83,8 +85,10 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     const isMaintenanceMode = systemSettings['system.maintenance_mode'] || false;
     
     if (isMaintenanceMode) {
-      const maintenanceMessage = systemSettings['system.maintenance_message'] || 
-        "We're making some improvements! We'll be back soon.";
+      const maintenanceMessage = safeMaintenanceMessage(
+        systemSettings['system.maintenance_message']
+      );
+      const storeName = escapeHtmlText(getStoreConfig().identity.name);
       
       // Return maintenance page for all non-admin routes
       return new NextResponse(
@@ -94,7 +98,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
         <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Maintenance - Voltique</title>
+          <title>Maintenance - ${storeName}</title>
           <style>
             body {
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -144,7 +148,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
         </head>
         <body>
           <div class="container">
-            <div class="logo">Voltique</div>
+            <div class="logo">${storeName}</div>
             <div class="message">${maintenanceMessage}</div>
             <div class="submessage">We'll be back online shortly.</div>
             <div class="spinner"></div>
