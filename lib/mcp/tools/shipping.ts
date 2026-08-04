@@ -1,5 +1,6 @@
 import { MCPToolResponse } from '../types';
 import { CartItem } from '../../types/cartitem';
+import { Money, cartSubtotal } from '../../money';
 
 export interface ShippingOption {
   id: string;
@@ -41,7 +42,7 @@ export async function getShippingOptions(
     
     // Calculate total weight and shipping cost factors
     const totalWeight = cart.reduce((sum, item) => sum + (item.quantity * 2), 0); // Assume 2lbs per item average
-    const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const cartTotal = cartSubtotal(cart);
     
     // Determine shipping zone based on state
     const zone = getShippingZone(address.state, address.country || 'US');
@@ -56,7 +57,7 @@ export async function getShippingOptions(
       name: 'Standard Shipping',
       description: 'USPS Ground - 5-7 business days',
       estimated_days: '5-7 business days',
-      price: standardCost,
+      price: standardCost.toMach().amount,
       carrier: 'USPS'
     });
     
@@ -67,7 +68,7 @@ export async function getShippingOptions(
       name: 'Expedited Shipping',
       description: 'UPS 2-Day - 2-3 business days',
       estimated_days: '2-3 business days', 
-      price: expeditedCost,
+      price: expeditedCost.toMach().amount,
       carrier: 'UPS'
     });
     
@@ -79,7 +80,7 @@ export async function getShippingOptions(
         name: 'Overnight Shipping',
         description: 'FedEx Next Day - 1 business day',
         estimated_days: '1 business day',
-        price: overnightCost,
+        price: overnightCost.toMach().amount,
         carrier: 'FedEx'
       });
     }
@@ -150,10 +151,10 @@ function getShippingZone(state: string, country: string): string {
   return 'continental';
 }
 
-function calculateStandardShipping(zone: string, weight: number, cartTotal: number): number {
+function calculateStandardShipping(zone: string, weight: number, cartTotal: Money): Money {
   // Free shipping over $75
-  if (cartTotal >= 75) {
-    return 0;
+  if (cartTotal.gte(Money.fromMajor(75, cartTotal.currency))) {
+    return Money.zero(cartTotal.currency);
   }
   
   let baseCost = 0;
@@ -174,10 +175,10 @@ function calculateStandardShipping(zone: string, weight: number, cartTotal: numb
     baseCost += Math.ceil((weight - 10) / 5) * 5;
   }
   
-  return Math.round(baseCost * 100) / 100;
+  return Money.fromMajor(baseCost, cartTotal.currency);
 }
 
-function calculateExpeditedShipping(zone: string, weight: number): number {
+function calculateExpeditedShipping(zone: string, weight: number): Money {
   let baseCost = 0;
   switch (zone) {
     case 'continental':
@@ -196,10 +197,10 @@ function calculateExpeditedShipping(zone: string, weight: number): number {
     baseCost += Math.ceil((weight - 5) / 3) * 8;
   }
   
-  return Math.round(baseCost * 100) / 100;
+  return Money.fromMajor(baseCost);
 }
 
-function calculateOvernightShipping(weight: number): number {
+function calculateOvernightShipping(weight: number): Money {
   let baseCost = 39.99;
   
   // Higher weight surcharge for overnight
@@ -207,7 +208,7 @@ function calculateOvernightShipping(weight: number): number {
     baseCost += Math.ceil((weight - 3) / 2) * 12;
   }
   
-  return Math.round(baseCost * 100) / 100;
+  return Money.fromMajor(baseCost);
 }
 
 function checkShippingRestrictions(address: any, cart: CartItem[]): string[] {
@@ -243,12 +244,12 @@ function checkShippingRestrictions(address: any, cart: CartItem[]): string[] {
   return restrictions;
 }
 
-function generateShippingRecommendations(options: ShippingOption[], cartTotal: number, budget?: number): string[] {
+function generateShippingRecommendations(options: ShippingOption[], cartTotal: Money, budget?: number): string[] {
   const recommendations: string[] = [];
   
   // Free shipping threshold
-  if (cartTotal < 75 && cartTotal >= 60) {
-    recommendations.push(`Add $${75 - cartTotal} to cart for free standard shipping`);
+  if (cartTotal.lt(Money.fromMajor(75)) && cartTotal.gte(Money.fromMajor(60))) {
+    recommendations.push(`Add ${Money.fromMajor(75).subtract(cartTotal).format()} to cart for free standard shipping`);
   }
   
   // Budget-based recommendations

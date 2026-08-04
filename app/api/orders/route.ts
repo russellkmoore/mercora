@@ -233,14 +233,14 @@ export async function POST(request: NextRequest) {
         items: body.items.map(item => ({
           productId: item.product_id,
           name: item.product_name,
-          price: typeof item.unit_price === 'object' ? item.unit_price.amount : item.unit_price,
+          price: Money.fromStored(item.unit_price, body.currency_code).toJSON(),
           quantity: item.quantity,
           imageUrl: (item as any).imageUrl || '',
         })),
-        subtotal: body.extensions?.subtotal || 0,
-        shipping: body.extensions?.shippingCost || 0,
-        tax: body.extensions?.taxAmount || 0,
-        total: typeof body.total_amount === 'object' ? body.total_amount.amount : body.total_amount,
+        subtotal: Money.fromStored(body.extensions?.subtotal ?? 0, body.currency_code).toJSON(),
+        shipping: Money.fromStored(body.extensions?.shipping_cost ?? 0, body.currency_code).toJSON(),
+        tax: Money.fromStored(body.extensions?.tax_amount ?? 0, body.currency_code).toJSON(),
+        total: Money.fromStored(body.total_amount, body.currency_code).toJSON(),
         shippingAddress: shippingAddr ? {
           street: [shippingAddr.line1, shippingAddr.line2].filter(Boolean).join(', '),
           city: typeof shippingAddr.city === 'string' ? shippingAddr.city : (shippingAddr.city ? Object.values(shippingAddr.city)[0] : ''),
@@ -475,7 +475,7 @@ function transformOrderForEmail(order: any): any {
     items: items.map((item: any) => ({
       productId: item.product_id || item.id,
       name: item.product_name || item.name || item.title,
-      price: item.unit_price?.amount || item.unit_price || item.price || 0,
+      price: Money.fromStored(item.unit_price ?? item.price ?? 0, order.currency_code).toJSON(),
       quantity: item.quantity || 1,
       imageUrl: item.imageUrl || '',
     })),

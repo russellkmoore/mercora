@@ -4,6 +4,7 @@ import type { Address } from "@/lib/types";
 import type { ShippingOption } from "@/lib/types/shipping";
 import type { CartItem } from "@/lib/types/cartitem";
 import { getSettings } from "@/lib/utils/settings";
+import { Money, cartSubtotal } from "@/lib/money";
 
 export async function POST(req: NextRequest) {
   try {
@@ -39,9 +40,7 @@ export async function POST(req: NextRequest) {
     const enabledMethods = shippingMethods.filter((method: any) => method.enabled);
 
     // Calculate order total to check for free shipping
-    const orderTotal = items.reduce((total: number, item: CartItem) => {
-      return total + (item.price * item.quantity);
-    }, 0);
+    const orderTotal = cartSubtotal(items);
 
     const freeShippingThreshold = storeSettings['store.free_shipping_threshold'] || 75;
     const freeShippingMethods = shippingSettings['shipping.free_methods'] || ['standard'];
@@ -50,9 +49,9 @@ export async function POST(req: NextRequest) {
     const shippingOptions: ShippingOption[] = enabledMethods.map((method: any) => ({
       id: method.id,
       label: method.label,
-      cost: (orderTotal >= freeShippingThreshold && freeShippingMethods.includes(method.id)) 
-        ? 0 
-        : method.cost,
+      cost: (orderTotal.gte(Money.fromMajor(freeShippingThreshold)) && freeShippingMethods.includes(method.id))
+        ? Money.zero(orderTotal.currency).toJSON()
+        : Money.fromMajor(method.cost, orderTotal.currency).toJSON(),
       estimatedDays: method.estimatedDays,
     }));
 

@@ -1,7 +1,8 @@
 import type { CartItem } from "@/lib/types/cartitem";
+import { cartItemTotal, cartSubtotal } from "@/lib/money";
 
-export function calculateCartTotal(items: CartItem[]): number {
-  return items.reduce((total, item) => total + item.price * item.quantity, 0);
+export function calculateCartTotal(items: CartItem[]) {
+  return cartSubtotal(items).toJSON();
 }
 
 export function formatCartForCheckout(items: CartItem[]) {
@@ -10,17 +11,17 @@ export function formatCartForCheckout(items: CartItem[]) {
     productName: name,
     price,
     quantity,
-    lineTotal: price * quantity,
+    lineTotal: cartItemTotal({ productId, name, price, quantity, variantId: '', primaryImageUrl: '' }).toJSON(),
   }));
 }
 
-export function isValidCartItem(item: any): item is CartItem {
+export function isValidCartItem(item: unknown): item is CartItem {
   return (
-    item &&
-    typeof item.id === "number" &&
-    typeof item.name === "string" &&
-    typeof item.price === "number" &&
-    typeof item.quantity === "number"
+    typeof item === 'object' && item !== null &&
+    'variantId' in item && typeof item.variantId === 'string' &&
+    'name' in item && typeof item.name === 'string' &&
+    'price' in item && typeof item.price === 'object' && item.price !== null &&
+    'quantity' in item && typeof item.quantity === 'number'
   );
 }
 

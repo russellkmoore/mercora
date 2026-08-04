@@ -38,6 +38,7 @@ import OrderSummary from './OrderSummary';
 import ProgressBar from './ProgressBar';
 import OrderConfirmationModal from './OrderConfirmationModal';
 import type { Address, ShippingOption } from '@/lib/types';
+import { Money, cartSubtotal, type StoredMoney } from '@/lib/money';
 
 interface CheckoutClientProps {
   userId: string | null;
@@ -153,7 +154,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
         throw new Error(err.error || 'Failed to calculate tax');
       }
 
-      const taxData = await taxRes.json() as { amount: number };
+      const taxData = await taxRes.json() as { amount: StoredMoney };
       setTaxAmount(taxData.amount);
 
       // Create order and payment intent
@@ -180,16 +181,18 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
       setOrderId(newOrderId);
 
       // Calculate total amount (subtotal + shipping + tax)
-      const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-      const totalAmount = subtotal + (selectedShippingOption.cost || 0) + (taxAmount || 0);
+      const subtotal = cartSubtotal(items);
+      const shipping = Money.fromStored(selectedShippingOption.cost, subtotal.currency);
+      const tax = taxAmount ? Money.fromStored(taxAmount, subtotal.currency) : Money.zero(subtotal.currency);
+      const totalAmount = subtotal.add(shipping).add(tax);
 
       // Create payment intent
       const res = await fetch('/api/payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: totalAmount,
-          taxAmount: taxAmount || 0,
+          amount: totalAmount.toJSON(),
+          taxAmount: tax.toJSON(),
           shippingAddress,
           orderId: newOrderId,
           description: `${items.length} item(s) - ${items.map(i => i.name).join(', ')}`,
@@ -223,20 +226,14 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
             variant_id: item.variantId,
             sku: `${item.productId}-${item.variantId || 'default'}`, // Generate a simple SKU
             quantity: item.quantity,
-            unit_price: {
-              amount: Math.round(item.price * 100), // Convert to cents
-              currency: 'USD'
-            },
-            total_price: {
-              amount: Math.round(item.price * item.quantity * 100), // Convert to cents
-              currency: 'USD'
-            },
+            unit_price: Money.fromStored(item.price).toJSON(),
+            total_price: Money.fromStored(item.price).times(item.quantity).toJSON(),
             product_name: item.name, // This now includes variant info like "Vivid Mission Pack - Regular"
           })),
-          total_amount: {
-            amount: Math.round((items.reduce((sum, item) => sum + item.price * item.quantity, 0) + (shippingOption?.cost || 0) + (taxAmount || 0)) * 100), // Convert to cents
-            currency: 'USD'
-          },
+          total_amount: cartSubtotal(items)
+            .add(shippingOption ? Money.fromStored(shippingOption.cost) : Money.zero())
+            .add(taxAmount ? Money.fromStored(taxAmount) : Money.zero())
+            .toJSON(),
           currency_code: 'USD',
           shipping_address: shippingAddress,
           billing_address: shippingAddress, // Use same as shipping for now
@@ -245,9 +242,9 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
           payment_status: 'paid', // Payment succeeded since we reached this point
           extensions: {
             payment_intent_id: paymentIntentId,
-            shipping_cost: shippingOption?.cost || 0,
-            tax_amount: Math.round((taxAmount || 0) * 100), // Convert to cents
-            subtotal: Math.round(items.reduce((sum, item) => sum + item.price * item.quantity, 0) * 100), // Convert to cents
+            shipping_cost: shippingOption ? Money.fromStored(shippingOption.cost).toJSON() : Money.zero().toJSON(),
+            tax_amount: taxAmount ? Money.fromStored(taxAmount).toJSON() : Money.zero().toJSON(),
+            subtotal: cartSubtotal(items).toJSON(),
           }
         }),
       });
@@ -370,7 +367,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
               </div>
               <div className="text-sm text-gray-600">
                 <p>{shippingOption.label}</p>
-                <p className="text-gray-500">${shippingOption.cost?.toFixed(2) || '0.00'} - {shippingOption.estimatedDays ? `${shippingOption.estimatedDays} business days` : 'Standard delivery'}</p>
+                <p className="text-gray-500">{Money.fromStored(shippingOption.cost).format()} - {shippingOption.estimatedDays ? `${shippingOption.estimatedDays} business days` : 'Standard delivery'}</p>
               </div>
             </div>
           )}
@@ -394,7 +391,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
           <OrderSummary
             items={items}
             shippingOption={shippingOption}
-            taxAmount={taxAmount ?? 0}
+            taxAmount={taxAmount}
             showDiscountInput={currentStep !== 'confirmation'}
           />
 

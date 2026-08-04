@@ -4,6 +4,7 @@ import { OrderRequest, OrderResponse, MCPToolResponse } from '../types';
 import { enhanceUserContext } from '../context';
 import { MACHAddress as Address } from '../../types/mach/Address';
 import { CartItem } from '../../types/cartitem';
+import { Money, cartSubtotal } from '../../money';
 
 export async function placeOrder(
   request: OrderRequest,
@@ -41,19 +42,19 @@ export async function placeOrder(
     const userContext = enhanceUserContext(request.agent_context || null);
     
     // Calculate order totals
-    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const subtotal = cartSubtotal(cart);
     const shipping = calculateShipping(request.shippingAddress, subtotal);
     const tax = calculateTax(subtotal, request.shippingAddress);
-    const total = subtotal + shipping + tax;
+    const total = subtotal.add(shipping).add(tax);
 
     // Validate order limits if agent has budget constraints
-    if (userContext.budget && total > userContext.budget) {
+    if (userContext.budget && total.gt(Money.fromMajor(userContext.budget, total.currency))) {
       return {
         success: false,
         data: {
           orderId: '',
           status: 'budget_exceeded',
-          total: total,
+          total: total.toMach().amount,
           estimated_delivery: ''
         },
         context: {
@@ -63,7 +64,7 @@ export async function placeOrder(
         },
         recommendations: {
           cost_optimization: [
-            `Order total $${total} exceeds budget $${userContext.budget}`,
+            `Order total ${total.format()} exceeds budget $${userContext.budget}`,
             'Consider removing items or choosing base models'
           ]
         },
@@ -78,7 +79,7 @@ export async function placeOrder(
     // Create order using existing order system
     const orderData = {
       user_id: userContext.userId || request.agent_context?.agentId || 'agent-order',
-      total_amount: { amount: total, currency: 'USD' },
+      total_amount: total.toJSON(),
       status: 'confirmed' as const,
       shipping_address: request.shippingAddress,
       billing_address: request.billingAddress || request.shippingAddress,
@@ -87,8 +88,8 @@ export async function placeOrder(
         variant_id: item.variantId,
         sku: item.variantId || `${item.productId}-default`,
         quantity: item.quantity,
-        unit_price: { amount: item.price, currency: 'USD' },
-        total_price: { amount: item.price * item.quantity, currency: 'USD' },
+        unit_price: Money.fromStored(item.price).toJSON(),
+        total_price: Money.fromStored(item.price).times(item.quantity).toJSON(),
         product_name: item.name
       })),
       shipping_method: request.shippingOption || 'standard',
@@ -112,7 +113,7 @@ export async function placeOrder(
     const response: OrderResponse = {
       orderId: order.id!.toString(),
       status: order.status,
-      total: typeof order.total_amount === 'object' ? (order.total_amount as any).amount : order.total_amount,
+      total: Money.fromStored(order.total_amount).toMach().amount,
       tracking_number: order.tracking_number || undefined,
       estimated_delivery: estimatedDelivery
     };
@@ -129,7 +130,7 @@ export async function placeOrder(
       },
       recommendations: {
         bundling_opportunities: generatePostOrderRecommendations(cart),
-        cost_optimization: [`Order saved $${(userContext.budget || total) - total} vs budget`]
+        cost_optimization: [`Order saved ${Money.fromMajor(userContext.budget || total.toMach().amount).subtract(total).format()} vs budget`]
       },
       metadata: {
         can_fulfill_percentage: 100,
@@ -217,20 +218,20 @@ export async function getOrderStatus(
   }
 }
 
-function calculateShipping(address: Address, subtotal: number): number {
+function calculateShipping(address: Address, subtotal: Money): Money {
   // Free shipping over $100
-  if (subtotal >= 100) return 0;
+  if (subtotal.gte(Money.fromMajor(100, subtotal.currency))) return Money.zero(subtotal.currency);
   
   // Alaska/Hawaii surcharge
   if (address.region === 'AK' || address.region === 'HI') {
-    return 19.99;
+    return Money.fromMajor(19.99, subtotal.currency);
   }
   
   // Standard shipping
-  return 9.99;
+  return Money.fromMajor(9.99, subtotal.currency);
 }
 
-function calculateTax(subtotal: number, address: Address): number {
+function calculateTax(subtotal: Money, address: Address): Money {
   // Simple tax calculation - in production, use proper tax service
   const taxRates: Record<string, number> = {
     'CA': 0.0875, // California
@@ -240,7 +241,7 @@ function calculateTax(subtotal: number, address: Address): number {
   };
   
   const rate = taxRates[address.region || ''] || 0.05; // Default 5%
-  return subtotal * rate;
+  return subtotal.applyRate(rate);
 }
 
 function calculateEstimatedDelivery(address: Address, shippingOption: string): string {
