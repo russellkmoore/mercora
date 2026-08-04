@@ -30,6 +30,7 @@
 
 import { loadStripe as loadStripeLib, Stripe } from '@stripe/stripe-js';
 import StripeServer from 'stripe';
+import { Money } from '@/lib/money';
 
 // Environment variables with validation
 const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
@@ -300,16 +301,16 @@ export const stripeConfig = {
  * Utility function to format amounts for Stripe
  * Stripe requires amounts in cents (smallest currency unit)
  */
-export const formatAmountForStripe = (amount: number): number => {
-  return Math.round(amount * 100);
+export const formatAmountForStripe = (amount: number, currency = 'USD'): number => {
+  return Money.fromMajor(amount, currency).toMinorUnits();
 };
 
 /**
  * Utility function to format amounts from Stripe
  * Converts cents back to dollars
  */
-export const formatAmountFromStripe = (amount: number): number => {
-  return amount / 100;
+export const formatAmountFromStripe = (amount: number, currency = 'USD'): number => {
+  return Money.fromMinor(amount, currency).toMach().amount;
 };
 
 /**
