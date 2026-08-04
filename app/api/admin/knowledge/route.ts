@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
         const vectorizeUrl = new URL('/api/admin/vectorize', request.url);
 
         await fetch(vectorizeUrl.toString(), {
-          method: 'GET',
+          method: 'POST',
           headers: {
             Authorization: `Bearer ${adminToken}`
           }
@@ -209,7 +209,7 @@ export async function DELETE(request: NextRequest) {
         const vectorizeUrl = new URL('/api/admin/vectorize', request.url);
 
         await fetch(vectorizeUrl.toString(), {
-          method: 'GET',
+          method: 'POST',
           headers: {
             Authorization: `Bearer ${adminToken}`
           }

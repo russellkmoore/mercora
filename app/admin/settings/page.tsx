@@ -402,7 +402,7 @@ export default function AdminSettingsPage() {
     try {
       setLoading(true);
       // Call admin vectorize endpoint (now uses session auth)
-      const response = await fetch("/api/admin/vectorize");
+      const response = await fetch("/api/admin/vectorize", { method: "POST" });
       if (response.ok) {
         const result = await response.json() as any;
         setVectorStatus(prev => ({
@@ -1132,4 +1132,3 @@ export default function AdminSettingsPage() {
 }
 
 {/* Legacy sections removed - replaced with functional settings */}
-

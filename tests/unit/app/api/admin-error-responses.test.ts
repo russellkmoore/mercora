@@ -56,7 +56,10 @@ vi.mock('@/lib/models/reviews', () => ({
 import { NextRequest } from 'next/server';
 import { GET as GET_KNOWLEDGE } from '@/app/api/admin/knowledge/route';
 import { POST as UPDATE_VECTORIZE_STATUS } from '@/app/api/admin/knowledge/vectorize-status/route';
-import { GET as RUN_VECTORIZE } from '@/app/api/admin/vectorize/route';
+import {
+  GET as GET_VECTORIZE,
+  POST as RUN_VECTORIZE,
+} from '@/app/api/admin/vectorize/route';
 import { POST as CREATE_PAGE } from '@/app/api/admin/pages/route';
 import { PUT as UPDATE_PAGE } from '@/app/api/admin/pages/[id]/route';
 import { PATCH as UPDATE_REVIEW } from '@/app/api/admin/reviews/[id]/route';
@@ -126,13 +129,58 @@ describe('admin route error responses', () => {
     mocks.getCloudflareContext.mockRejectedValueOnce(new Error('Cloudflare binding secret'));
 
     const response = await RUN_VECTORIZE(
-      new NextRequest('http://localhost/api/admin/vectorize')
+      new NextRequest('http://localhost/api/admin/vectorize', { method: 'POST' })
     );
     const body = await response.json();
 
     expect(response.status).toBe(500);
     expect(body).toEqual({ error: 'Internal server error' });
     expect(JSON.stringify(body)).not.toContain('binding secret');
+  });
+
+  it('rejects vectorize GET without authenticating or mutating bindings', async () => {
+    const response = await GET_VECTORIZE();
+
+    expect(response.status).toBe(405);
+    expect(response.headers.get('allow')).toBe('POST');
+    expect(mocks.checkAdminPermissions).not.toHaveBeenCalled();
+    expect(mocks.getCloudflareContext).not.toHaveBeenCalled();
+    expect(mocks.getDbAsync).not.toHaveBeenCalled();
+  });
+
+  it('allows a service-authenticated vectorize POST without Origin', async () => {
+    const vectorize = {
+      query: vi.fn().mockResolvedValue({ matches: [] }),
+      deleteByIds: vi.fn(),
+      upsert: vi.fn(),
+    };
+    const ai = { run: vi.fn() };
+    mocks.checkAdminPermissions.mockResolvedValueOnce({
+      success: true,
+      userId: 'admin-service',
+      isServiceToken: true,
+    });
+    mocks.media.list.mockResolvedValue({ objects: [] });
+    mocks.getCloudflareContext.mockResolvedValueOnce({
+      env: { MEDIA: mocks.media, VECTORIZE: vectorize, AI: ai },
+    });
+    mocks.getDbAsync.mockResolvedValueOnce({
+      select: vi.fn().mockReturnValue({
+        from: vi.fn().mockResolvedValue([]),
+      }),
+    });
+
+    const response = await RUN_VECTORIZE(new NextRequest(
+      'http://localhost/api/admin/vectorize',
+      {
+        method: 'POST',
+        headers: { Authorization: 'Bearer service-secret' },
+      }
+    ));
+
+    expect(response.status).toBe(200);
+    expect(vectorize.query).toHaveBeenCalledTimes(1);
+    expect(mocks.getDbAsync).toHaveBeenCalledTimes(1);
   });
 
   it.each([

@@ -83,7 +83,7 @@ Update your `wrangler.jsonc` with the created resource IDs:
 ```json
 {
   "name": "mercora-production",
-  "compatibility_date": "2024-01-01",
+  "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [
     {
