@@ -3,6 +3,7 @@ import {
   MAX_SAFE_FILENAME_LENGTH,
   isSafeFilenameSegment,
   isSafeKnowledgeFilename,
+  normalizeKnowledgeFilename,
   normalizeSafeFilenameSegment,
 } from '@/lib/utils/safe-filename';
 
@@ -35,5 +36,18 @@ describe('safe filename segments', () => {
     expect(normalizeSafeFilenameSegment('a'.repeat(MAX_SAFE_FILENAME_LENGTH))).toHaveLength(
       MAX_SAFE_FILENAME_LENGTH
     );
+  });
+
+  it('appends .md before enforcing the final knowledge filename bound', () => {
+    expect(normalizeKnowledgeFilename('a'.repeat(252), true)).toBe(
+      `${'a'.repeat(252)}.md`
+    );
+    expect(normalizeKnowledgeFilename('a'.repeat(253), true)).toBeNull();
+  });
+
+  it('requires existing knowledge delete/status names to end in lowercase .md', () => {
+    expect(normalizeKnowledgeFilename('guide.md')).toBe('guide.md');
+    expect(normalizeKnowledgeFilename('guide')).toBeNull();
+    expect(normalizeKnowledgeFilename('guide.MD')).toBeNull();
   });
 });
