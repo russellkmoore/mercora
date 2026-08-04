@@ -66,7 +66,7 @@
     "resend": "^6.18.1",
     "server-only": "^0.0.1",
     "sonner": "^2.0.6",
-    "stripe": "^18.4.0",
+    "stripe": "^22.4.0",
     "tailwind-merge": "^3.6.0",
     "web-vitals": "^5.1.0",
     "zustand": "^5.0.6"
