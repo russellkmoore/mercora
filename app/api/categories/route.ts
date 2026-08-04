@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listCategories, createCategory, updateCategory, listCategoriesWithRealTimeCounts } from "@/lib/models";
 import type { ApiResponse, Category } from "@/lib/types";
+import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
 
 /**
  * GET /api/categories - List categories
@@ -71,6 +72,11 @@ export async function GET(request: NextRequest) {
  * POST /api/categories - Create category
  */
 export async function POST(request: NextRequest) {
+  const adminAuth = await checkAdminPermissions(request);
+  if (!adminAuth.success) {
+    return NextResponse.json({ error: adminAuth.error }, { status: 401 });
+  }
+
   try {
     const body = await request.json() as any;
     if (!body.name) {
