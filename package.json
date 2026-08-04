@@ -44,7 +44,7 @@
     "@stripe/react-stripe-js": "^3.9.0",
     "@stripe/stripe-js": "^7.8.0",
     "big.js": "^7.0.1",
-    "@tailwindcss/typography": "^0.5.16",
+    "@tailwindcss/typography": "^0.5.20",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "critters": "^0.0.25",
