@@ -120,7 +120,7 @@ export default async function CategoryPage({ params }: any) {
             sizes="(min-width: 1024px) 100vw, 100vw"
             priority={true}
           />
-          <div className="absolute inset-0 bg-black bg-opacity-40 flex items-end">
+          <div className="absolute inset-0 bg-black/40 flex items-end">
             <div className="p-6 sm:p-8 text-white">
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2">
                 {typeof category.name === 'string' ? category.name : (category.name?.en || 'Category')}
