@@ -166,7 +166,7 @@ export default function PageRenderer({ page }: PageRendererProps) {
 
         {/* Related Pages or CTA Section (for about page) */}
         {(page.template || 'default') === 'about' && (
-          <div className="bg-gradient-to-r from-orange-900/20 to-orange-800/20 py-16 mt-16">
+          <div className="bg-linear-to-r from-orange-900/20 to-orange-800/20 py-16 mt-16">
             <div className="container mx-auto px-4">
               <div className="max-w-4xl mx-auto text-center">
                 <h2 className="text-3xl font-bold text-white mb-6">

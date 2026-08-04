@@ -90,7 +90,7 @@ export default function ShippingForm({
           <Input
             name="city"
             placeholder="City"
-            className="flex-[2] touch-manipulation"
+            className="flex-2 touch-manipulation"
             value={typeof address.city === "string" ? address.city : ""}
             onChange={onChange}
             autoComplete="address-level2"
@@ -119,7 +119,7 @@ export default function ShippingForm({
         </div>
 
         <div className="flex gap-2 items-end">
-          <div className="flex-[3]">
+          <div className="flex-3">
             <Select onValueChange={onSelectCountry} value={address.country || ""}>
               <SelectTrigger id="country" className="bg-white text-black touch-manipulation">
                 <SelectValue placeholder="Select Country" />

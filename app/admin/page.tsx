@@ -409,7 +409,7 @@ export default function AdminDashboard() {
 
       {/* AI Business Insights */}
       <div className="space-y-6">
-        <Card className="bg-gradient-to-r from-purple-900/20 to-blue-800/20 border-purple-500/30 p-6">
+        <Card className="bg-linear-to-r from-purple-900/20 to-blue-800/20 border-purple-500/30 p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center">
