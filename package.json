@@ -47,7 +47,7 @@
     "@radix-ui/react-toggle-group": "^1.1.10",
     "@radix-ui/react-visually-hidden": "^1.2.3",
     "@react-email/components": "^1.0.12",
-    "@react-email/render": "^1.1.4",
+    "@react-email/render": "^2.1.0",
     "@shadcn/ui": "^0.0.4",
     "@stripe/react-stripe-js": "^3.9.0",
     "@stripe/stripe-js": "^7.8.0",
