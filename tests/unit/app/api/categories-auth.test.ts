@@ -48,6 +48,26 @@ describe('category mutation authorization', () => {
     expect(response.status).toBe(401);
     expect(vi.mocked(deleteCategory)).not.toHaveBeenCalled();
   });
+
+  it('allows an authenticated admin to create a category', async () => {
+    vi.mocked(checkAdminPermissions).mockResolvedValueOnce({
+      success: true,
+      userId: 'admin-1',
+    });
+    vi.mocked(createCategory).mockResolvedValue({
+      id: 'category-1',
+      name: 'Packs',
+    } as never);
+
+    const response = await POST(new NextRequest(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Packs' }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(vi.mocked(createCategory)).toHaveBeenCalledWith({ name: 'Packs' });
+  });
 });
 
 describe('category read behavior', () => {

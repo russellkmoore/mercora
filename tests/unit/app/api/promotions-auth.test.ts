@@ -26,6 +26,7 @@ import {
   hardDeleteCouponInstance,
   updateCouponInstance,
 } from '@/lib/models/mach/couponInstance';
+import { checkAdminPermissions } from '@/lib/auth/admin-middleware';
 
 const url = 'http://localhost/api/promotions';
 
@@ -58,5 +59,24 @@ describe('promotion route authorization', () => {
     expect(response.status).toBe(401);
     expect(vi.mocked(getDbAsync)).not.toHaveBeenCalled();
     expect(vi.mocked(hardDeleteCouponInstance)).not.toHaveBeenCalled();
+  });
+
+  it('allows an authenticated admin to delete a promotion', async () => {
+    vi.mocked(checkAdminPermissions).mockResolvedValueOnce({
+      success: true,
+      userId: 'admin-1',
+    });
+    vi.mocked(listCouponInstances).mockResolvedValue([]);
+    const where = vi.fn().mockResolvedValue({ success: true, meta: { changes: 1 } });
+    const deleteFrom = vi.fn(() => ({ where }));
+    vi.mocked(getDbAsync).mockResolvedValue({ delete: deleteFrom } as never);
+
+    const response = await DELETE(
+      new NextRequest(`${url}?id=promotion-1`, { method: 'DELETE' })
+    );
+
+    expect(response.status).toBe(200);
+    expect(deleteFrom).toHaveBeenCalledTimes(1);
+    expect(where).toHaveBeenCalledTimes(1);
   });
 });

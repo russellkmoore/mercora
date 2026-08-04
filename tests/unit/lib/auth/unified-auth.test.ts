@@ -13,7 +13,7 @@ vi.mock('@/lib/models/auth', () => ({
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest } from 'next/server';
 import { authenticateRequest } from '@/lib/auth/unified-auth';
-import { getApiTokenByHash } from '@/lib/models/auth';
+import { getApiTokenByHash, updateApiTokenLastUsed } from '@/lib/models/auth';
 
 describe('authenticateRequest fail-closed behavior', () => {
   beforeEach(() => {
@@ -35,6 +35,7 @@ describe('authenticateRequest fail-closed behavior', () => {
 
     expect(result.success).toBe(false);
     expect(result.response?.status).toBe(401);
+    expect(vi.mocked(updateApiTokenLastUsed)).not.toHaveBeenCalled();
     expect(vi.mocked(getApiTokenByHash)).not.toHaveBeenCalled();
   });
 
@@ -58,5 +59,55 @@ describe('authenticateRequest fail-closed behavior', () => {
 
     expect(result.success).toBe(false);
     expect(result.response?.status).toBe(401);
+  });
+
+  it('rejects a database token with a malformed expiry timestamp', async () => {
+    vi.mocked(getApiTokenByHash).mockResolvedValue({
+      id: 1,
+      tokenName: 'malformed-expiry',
+      tokenHash: 'stored-hash',
+      permissions: ['orders:read'],
+      active: true,
+      expiresAt: 'definitely-not-a-date',
+      lastUsedAt: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const result = await authenticateRequest(
+      new NextRequest('http://localhost/api/orders', {
+        headers: { authorization: 'Bearer database-token' },
+      }),
+      ['orders:read']
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.response?.status).toBe(401);
+    expect(vi.mocked(updateApiTokenLastUsed)).not.toHaveBeenCalled();
+  });
+
+  it('rejects a database token with an expired timestamp', async () => {
+    vi.mocked(getApiTokenByHash).mockResolvedValue({
+      id: 2,
+      tokenName: 'expired-token',
+      tokenHash: 'stored-hash',
+      permissions: ['orders:read'],
+      active: true,
+      expiresAt: '2000-01-01T00:00:00.000Z',
+      lastUsedAt: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const result = await authenticateRequest(
+      new NextRequest('http://localhost/api/orders', {
+        headers: { authorization: 'Bearer database-token' },
+      }),
+      ['orders:read']
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.response?.status).toBe(401);
+    expect(vi.mocked(updateApiTokenLastUsed)).not.toHaveBeenCalled();
   });
 });
