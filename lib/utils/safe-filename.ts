@@ -31,3 +31,23 @@ export function isSafeFilenameSegment(value: unknown): value is string {
 export function isSafeKnowledgeFilename(value: unknown): value is string {
   return isSafeFilenameSegment(value);
 }
+
+/**
+ * Normalize a knowledge article filename and enforce its `.md` contract.
+ * When `appendExtension` is true, a missing `.md` suffix is added before the
+ * final bounded-segment validation.
+ */
+export function normalizeKnowledgeFilename(
+  value: unknown,
+  appendExtension = false
+): string | null {
+  const normalized = normalizeSafeFilenameSegment(value);
+  if (!normalized) return null;
+
+  const filename = appendExtension && !normalized.endsWith('.md')
+    ? `${normalized}.md`
+    : normalized;
+
+  if (!filename.endsWith('.md')) return null;
+  return normalizeSafeFilenameSegment(filename);
+}

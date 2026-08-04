@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
-import { uploadToR2, generateR2Path, getContentTypeFromFilename, R2_FOLDERS } from "@/lib/utils/r2";
+import { uploadToR2, generateR2Path, R2_FOLDERS } from "@/lib/utils/r2";
+import { EXT_BY_MIME, matchesImageSignature } from "@/lib/utils/image-signature";
+import { normalizeSafeFilenameSegment } from "@/lib/utils/safe-filename";
+
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 
 /**
  * POST /api/admin/upload-image
@@ -20,11 +24,11 @@ export async function POST(request: NextRequest) {
     }
 
     const formData = await request.formData();
-    const file = formData.get("file") as File;
-    const folder = formData.get("folder") as string; // "products" or "categories"
-    const filename = formData.get("filename") as string;
+    const file = formData.get("file");
+    const folder = formData.get("folder");
+    const filename = normalizeSafeFilenameSegment(formData.get("filename"));
 
-    if (!file) {
+    if (!(file instanceof File)) {
       return NextResponse.json(
         { error: "No file provided" },
         { status: 400 }
@@ -32,7 +36,7 @@ export async function POST(request: NextRequest) {
     }
 
     const validFolders = [R2_FOLDERS.PRODUCTS, R2_FOLDERS.CATEGORIES];
-    if (!folder || !validFolders.includes(folder as any)) {
+    if (typeof folder !== 'string' || !validFolders.includes(folder as any)) {
       return NextResponse.json(
         { error: `Invalid folder. Must be one of: ${validFolders.join(', ')}` },
         { status: 400 }
@@ -41,33 +45,42 @@ export async function POST(request: NextRequest) {
 
     if (!filename) {
       return NextResponse.json(
-        { error: "No filename provided" },
+        { error: "Invalid filename" },
         { status: 400 }
       );
     }
 
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
+    // Both File.type and File.name are client-controlled. The allowlist maps a
+    // declared type to the only extension the server may persist.
+    const fileExtension = EXT_BY_MIME[file.type];
+    if (!fileExtension) {
       return NextResponse.json(
         { error: "Invalid file type. Only JPEG, PNG, and WebP are allowed." },
         { status: 400 }
       );
     }
 
-    // Validate file size (max 10MB)
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
+    if (file.size === 0 || file.size > MAX_IMAGE_SIZE) {
       return NextResponse.json(
-        { error: "File too large. Maximum size is 10MB." },
+        { error: "Invalid file size. Image must be between 1 byte and 10MB." },
         { status: 400 }
       );
     }
 
-    // Generate R2 path
-    const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-    const fullFilename = `${filename}.${fileExtension}`;
-    const r2Path = generateR2Path(folder, fullFilename);
+    const arrayBuffer = await file.arrayBuffer();
+    if (!matchesImageSignature(new Uint8Array(arrayBuffer), file.type)) {
+      return NextResponse.json(
+        { error: "File content does not match the declared image type." },
+        { status: 400 }
+      );
+    }
+
+    // The caller supplies only a safe human-readable stem. Uniqueness and the
+    // extension are server controlled so uploads cannot collide or smuggle a
+    // dangerous suffix through File.name.
+    const storedFilename = `${filename}-${Date.now()}-${crypto.randomUUID()}.${fileExtension}`;
+    const r2Path = generateR2Path(folder, storedFilename);
+    const storedContentType = file.type === 'image/jpg' ? 'image/jpeg' : file.type;
 
     // Get R2 bucket from environment
     const env = process.env as any;
@@ -80,12 +93,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Convert file to array buffer
-    const arrayBuffer = await file.arrayBuffer();
-
-    // Upload to R2 using consolidated utility
+    // Persist only the verified, normalized MIME type.
     await uploadToR2(bucket, r2Path, arrayBuffer, {
-      contentType: file.type || getContentTypeFromFilename(fullFilename),
+      contentType: storedContentType,
       customMetadata: {
         originalName: file.name,
         folder: folder,
@@ -99,9 +109,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       path: storedPath, // This gets saved in database and used with image-loader.ts
-      filename: `${filename}.${fileExtension}`,
+      filename: storedFilename,
       size: file.size,
-      type: file.type
+      type: storedContentType
     });
 
   } catch (error) {

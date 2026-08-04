@@ -6,6 +6,7 @@ const { media } = vi.hoisted(() => ({
   media: {
     put: vi.fn(),
     delete: vi.fn(),
+    get: vi.fn(),
   },
 }));
 
@@ -21,6 +22,7 @@ vi.mock('@opennextjs/cloudflare', () => ({
 
 import { NextRequest } from 'next/server';
 import { DELETE, POST } from '@/app/api/admin/knowledge/route';
+import { POST as UPDATE_VECTORIZE_STATUS } from '@/app/api/admin/knowledge/vectorize-status/route';
 
 function productionSources(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -47,7 +49,7 @@ describe('knowledge vectorization auth transport', () => {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        filename: 'shipping.md',
+        filename: '  shipping.md  ',
         title: 'Shipping',
         content: '# Shipping',
       }),
@@ -55,6 +57,11 @@ describe('knowledge vectorization auth transport', () => {
 
     expect(response.status).toBe(200);
     expect(media.put).toHaveBeenCalledTimes(1);
+    expect(media.put).toHaveBeenCalledWith(
+      'knowledge_md/shipping.md',
+      '# Shipping',
+      expect.any(Object)
+    );
     expect(fetch).toHaveBeenCalledWith(
       'http://localhost/api/admin/vectorize',
       {
@@ -93,5 +100,84 @@ describe('knowledge vectorization auth transport', () => {
     });
 
     expect(offenders).toEqual([]);
+  });
+
+  it('rejects traversal on POST before writing or triggering vectorization', async () => {
+    const response = await POST(new NextRequest('http://localhost/api/admin/knowledge', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        filename: '../escape.md',
+        title: 'Escape',
+        content: '# Escape',
+      }),
+    }));
+
+    expect(response.status).toBe(400);
+    expect(media.put).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects traversal on DELETE before deleting or triggering vectorization', async () => {
+    const response = await DELETE(
+      new NextRequest('http://localhost/api/admin/knowledge?filename=..%2Fescape.md', {
+        method: 'DELETE',
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(media.delete).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects traversal before reading a knowledge object for a status update', async () => {
+    const response = await UPDATE_VECTORIZE_STATUS(
+      new NextRequest('http://localhost/api/admin/knowledge/vectorize-status', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ filename: '..\\escape.md', vectorized: true }),
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(media.get).not.toHaveBeenCalled();
+    expect(media.put).not.toHaveBeenCalled();
+  });
+
+  it('rejects a POST stem whose appended .md suffix exceeds the key-segment bound', async () => {
+    const response = await POST(new NextRequest('http://localhost/api/admin/knowledge', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        filename: 'a'.repeat(253),
+        title: 'Too long',
+        content: '# Too long',
+      }),
+    }));
+
+    expect(response.status).toBe(400);
+    expect(media.put).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-markdown names for DELETE and status updates', async () => {
+    const deleteResponse = await DELETE(
+      new NextRequest('http://localhost/api/admin/knowledge?filename=guide.txt', {
+        method: 'DELETE',
+      })
+    );
+    const statusResponse = await UPDATE_VECTORIZE_STATUS(
+      new NextRequest('http://localhost/api/admin/knowledge/vectorize-status', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ filename: 'guide.txt', vectorized: true }),
+      })
+    );
+
+    expect(deleteResponse.status).toBe(400);
+    expect(statusResponse.status).toBe(400);
+    expect(media.delete).not.toHaveBeenCalled();
+    expect(media.get).not.toHaveBeenCalled();
+    expect(media.put).not.toHaveBeenCalled();
   });
 });
