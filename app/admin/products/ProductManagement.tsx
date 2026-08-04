@@ -9,6 +9,10 @@ import { Search, Plus, Edit, Trash2, Bot, RefreshCw, Tag } from "lucide-react";
 import Image from "next/image";
 import ProductEditor from "@/components/admin/ProductEditor";
 import type { Product } from "@/lib/types/";
+import {
+  fromWireProduct,
+  type WireProduct,
+} from "@/lib/models/mach/product-serializer";
 
 interface ProductTableProps {
   products: Product[];
@@ -184,7 +188,8 @@ export default function ProductManagement() {
 
       if (response.ok) {
         const result: any = await response.json();
-        const products: Product[] = result.data || result || [];
+        const wireProducts: WireProduct[] = result.data || result || [];
+        const products = wireProducts.map(fromWireProduct);
         const meta = result.meta || {};
 
         // Update totals from API metadata

@@ -92,6 +92,8 @@ export interface MACHProductVariant {
   
   // Commerce (SHOULD/COULD)
   inventory?: MACHProductInventory; // Simplified inventory info for this variant
+  /** Storefront-safe availability signal; public projections omit exact inventory. */
+  available_for_sale?: boolean;
   tax_category?: string; // Tax classification override
   shipping_required?: boolean; // Whether physical shipping is needed
   

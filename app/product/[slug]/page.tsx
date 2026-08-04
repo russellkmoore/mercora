@@ -44,6 +44,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getProductBySlug, getProductReviews, getProductReviewEligibility } from "@/lib/models";
 import { notFound } from "next/navigation";
 import ProductDisplay from "./ProductDisplay";
+import { toPublicProduct } from "@/lib/models/mach/product-serializer";
 
 export const revalidate = 0;
 
@@ -55,8 +56,9 @@ export const revalidate = 0;
  */
 export default async function ProductPage({ params }: any) {
   const { userId } = await auth();
-  const product = await getProductBySlug(params.slug);
-  if (!product) return notFound();
+  const storedProduct = await getProductBySlug(params.slug);
+  if (!storedProduct || storedProduct.status !== "active") return notFound();
+  const product = toPublicProduct(storedProduct);
 
   const [reviews, reviewEligibility] = await Promise.all([
     getProductReviews({

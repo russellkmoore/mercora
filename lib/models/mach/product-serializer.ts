@@ -1,5 +1,5 @@
 import type { Product, ProductVariant } from '@/lib/types';
-import { toWireMoney, type MachMoney } from '@/lib/money';
+import { Money, toWireMoney, type MachMoney } from '@/lib/money';
 
 export type WireVariant = Omit<ProductVariant, 'price' | 'compare_at_price' | 'cost'> & {
   price: MachMoney;
@@ -38,6 +38,7 @@ function toPublicVariant(variant: ProductVariant): ProductVariant {
 
   return {
     ...publicVariant,
+    available_for_sale: (variant.inventory?.quantity ?? 0) > 0,
     ...(publicVariant.media
       ? { media: publicVariant.media.map(toPublicMedia) }
       : {}),
@@ -63,7 +64,9 @@ export function toPublicProduct(product: Product): Product {
     ...(publicProduct.media
       ? { media: publicProduct.media.map(toPublicMedia) }
       : {}),
-    variants: publicProduct.variants?.map(toPublicVariant),
+    variants: publicProduct.variants
+      ?.filter((variant) => variant.status == null || variant.status === 'active')
+      .map(toPublicVariant),
   };
 }
 
@@ -76,6 +79,23 @@ export function toWireProduct(product: Product): WireProduct {
       price: toWireMoney(price),
       ...(compare_at_price != null ? { compare_at_price: toWireMoney(compare_at_price) } : {}),
       ...(cost != null ? { cost: toWireMoney(cost) } : {}),
+    })),
+  };
+}
+
+/** Convert an HTTP/MCP wire product back to the stored minor-unit UI model. */
+export function fromWireProduct(product: WireProduct): Product {
+  return {
+    ...product,
+    variants: product.variants?.map(({ price, compare_at_price, cost, ...variant }) => ({
+      ...variant,
+      price: Money.fromMajor(price.amount, price.currency).toJSON(),
+      ...(compare_at_price != null
+        ? { compare_at_price: Money.fromMajor(compare_at_price.amount, compare_at_price.currency).toJSON() }
+        : {}),
+      ...(cost != null
+        ? { cost: Money.fromMajor(cost.amount, cost.currency).toJSON() }
+        : {}),
     })),
   };
 }

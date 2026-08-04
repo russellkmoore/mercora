@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { toPublicProduct, toWireProduct } from '@/lib/models/mach/product-serializer';
+import {
+  fromWireProduct,
+  toPublicProduct,
+  toWireProduct,
+} from '@/lib/models/mach/product-serializer';
 import type { Product } from '@/lib/types';
 
 function productFixture(): Product {
@@ -21,6 +25,7 @@ function productFixture(): Product {
       {
         id: 'variant-1',
         sku: 'TRAIL-1',
+        status: 'active',
         option_values: [],
         price: { amount: 2599, currency: 'USD' },
         compare_at_price: { amount: 2999, currency: 'USD' },
@@ -28,6 +33,14 @@ function productFixture(): Product {
         barcode: '012345678905',
         inventory: { track_inventory: true, quantity: 42 },
         attributes: { color: 'green', material: 'canvas' },
+      },
+      {
+        id: 'variant-2',
+        sku: 'TRAIL-HIDDEN',
+        status: 'inactive',
+        option_values: [],
+        price: { amount: 9999, currency: 'USD' },
+        inventory: { track_inventory: true, quantity: 5 },
       },
     ],
   };
@@ -52,7 +65,9 @@ describe('public product serialization', () => {
     expect(variant).not.toHaveProperty('cost');
     expect(variant).not.toHaveProperty('barcode');
     expect(variant).not.toHaveProperty('inventory');
+    expect(variant.available_for_sale).toBe(true);
     expect(variant.attributes).toEqual({ color: 'green', material: 'canvas' });
+    expect(publicProduct.variants).toHaveLength(1);
 
     expect(product).toHaveProperty('extensions.integrationSecret', 'do-not-leak');
     expect(product.variants![0]).toHaveProperty('cost.amount', 800);
@@ -67,5 +82,14 @@ describe('public product serialization', () => {
       precision: 2,
     });
     expect(wireProduct.variants![0]).not.toHaveProperty('cost');
+  });
+
+  it('round-trips wire money for admin UI consumers', () => {
+    const wireProduct = toWireProduct(productFixture());
+    const storedProduct = fromWireProduct(wireProduct);
+
+    expect(storedProduct.variants![0].price).toEqual({ amount: 2599, currency: 'USD' });
+    expect(storedProduct.variants![0].compare_at_price).toEqual({ amount: 2999, currency: 'USD' });
+    expect(storedProduct.variants![0].cost).toEqual({ amount: 800, currency: 'USD' });
   });
 });
