@@ -15,7 +15,7 @@ const ROUTES = [
   'app/api/categories/[id]/route.ts',
 ] as const;
 
-describe('U04/U05 error response source policy', () => {
+describe('admin error response source policy', () => {
   it('does not put raw exception expressions directly into route JSON fields', () => {
     const offenders = ROUTES.filter((route) => {
       const contents = readFileSync(join(process.cwd(), route), 'utf8');

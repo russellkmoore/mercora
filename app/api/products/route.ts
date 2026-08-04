@@ -99,6 +99,16 @@ export async function GET(request: NextRequest) {
       : products.map(toPublicProduct)
     ).map(toWireProduct);
 
+    const productLink = (linkOffset: number): string => {
+      const params = new URLSearchParams({
+        limit: String(limit),
+        offset: String(linkOffset),
+      });
+      if (category?.trim()) params.set('category', category.trim());
+      if (isAdmin && requestedStatus) params.set('status', requestedStatus);
+      return `/api/products?${params.toString()}`;
+    };
+
     const response: ApiResponse<WireProduct[]> = {
       data: responseProducts,
       meta: {
@@ -108,15 +118,15 @@ export async function GET(request: NextRequest) {
         schema: "mach:product"
       },
       links: {
-        self: `/api/products?limit=${limit}&offset=${offset}`,
-        first: `/api/products?limit=${limit}&offset=0`,
+        self: productLink(offset),
+        first: productLink(0),
         ...(offset + limit < total && {
-          next: `/api/products?limit=${limit}&offset=${offset + limit}`
+          next: productLink(offset + limit)
         }),
         ...(offset > 0 && {
-          prev: `/api/products?limit=${limit}&offset=${Math.max(0, offset - limit)}`
+          prev: productLink(Math.max(0, offset - limit))
         }),
-        last: `/api/products?limit=${limit}&offset=${Math.floor(total / limit) * limit}`
+        last: productLink(Math.max(0, Math.floor((total - 1) / limit) * limit))
       }
     };
     return NextResponse.json(response);

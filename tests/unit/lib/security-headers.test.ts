@@ -30,7 +30,7 @@ describe('contentSecurityPolicy', () => {
   it('does not add a custom store or CDN host when optional config is unset', () => {
     const policy = contentSecurityPolicy({ NODE_ENV: 'production' });
 
-    expect(policy).not.toMatch(/beauteas|voltique|mercora\.example\.com/i);
+    expect(policy).not.toMatch(/custom-store|demo-cdn|shop\.example\.com/i);
   });
 
   it('cannot inject CSP tokens or newlines through invalid or path config', () => {

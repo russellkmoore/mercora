@@ -14,7 +14,7 @@ import { NextRequest } from 'next/server';
 import { GET as getProducts } from '@/app/api/products/route';
 import { GET as getProductDetail } from '@/app/api/products/[id]/route';
 import { checkAdminPermissions } from '@/lib/auth/admin-middleware';
-import { getProduct, listProducts } from '@/lib/models/mach/products';
+import { getProduct, getProductsByCategory, listProducts } from '@/lib/models/mach/products';
 
 const activeProduct = {
   id: 'active-product',
@@ -70,6 +70,39 @@ describe('public product endpoints', () => {
     for (const [options] of vi.mocked(listProducts).mock.calls) {
       expect(options?.status).toEqual(['active']);
     }
+  });
+
+  it('points the last link at the final populated page for exact multiples', async () => {
+    const twentyProducts = Array.from({ length: 20 }, (_, index) => ({
+      ...activeProduct,
+      id: `active-product-${index}`,
+    }));
+    vi.mocked(listProducts).mockResolvedValue(twentyProducts as never);
+
+    const response = await getProducts(
+      new NextRequest('http://localhost/api/products?limit=20&offset=0')
+    );
+    const body = await response.json() as any;
+
+    expect(body.meta.total).toBe(20);
+    expect(body.links.last).toBe('/api/products?limit=20&offset=0');
+  });
+
+  it('preserves category filters in pagination links', async () => {
+    const categoryProducts = Array.from({ length: 21 }, (_, index) => ({
+      ...activeProduct,
+      id: `category-product-${index}`,
+    }));
+    vi.mocked(getProductsByCategory).mockResolvedValue(categoryProducts as never);
+
+    const response = await getProducts(
+      new NextRequest('http://localhost/api/products?category=trail%20gear&limit=20')
+    );
+    const body = await response.json() as any;
+
+    expect(body.data).toHaveLength(20);
+    expect(body.links.next).toBe('/api/products?limit=20&offset=20&category=trail+gear');
+    expect(body.links.last).toBe('/api/products?limit=20&offset=20&category=trail+gear');
   });
 
   it('returns a projected active detail to a public caller', async () => {

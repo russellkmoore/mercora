@@ -41,6 +41,7 @@ import { getProductsByCategory } from "@/lib/models/mach/products";
 import CategoryDisplay from "./CategoryDisplay";
 import Image from "next/image";
 import Breadcrumbs from "@/components/Breadcrumbs";
+import { toPublicProduct } from "@/lib/models/mach/product-serializer";
 
 /**
  * Category page component that displays products for a specific category
@@ -59,7 +60,9 @@ export default async function CategoryPage({ params }: any) {
   let error: string | null = null;
   
   try {
-    products = await getProductsByCategory(category.id as string);
+    products = (await getProductsByCategory(category.id as string))
+      .filter((product) => product.status === "active")
+      .map(toPublicProduct);
   } catch (e: any) {
     error = e?.message || 'Unknown error';
   }
