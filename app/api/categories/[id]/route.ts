@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCategory, updateCategory, deleteCategory } from "@/lib/models/mach/category";
 import type { ApiResponse, Category } from "@/lib/types";
+import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
 
 /**
  * GET /api/categories/[id] - Get category by ID
@@ -36,6 +37,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
  * PUT /api/categories/[id] - Update category
  */
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const adminAuth = await checkAdminPermissions(request);
+  if (!adminAuth.success) {
+    return NextResponse.json({ error: adminAuth.error }, { status: 401 });
+  }
+
   try {
     const { id: categoryId } = await params;
     if (!categoryId) {
@@ -90,6 +96,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
  * DELETE /api/categories/[id] - Delete category (soft delete)
  */
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const adminAuth = await checkAdminPermissions(request);
+  if (!adminAuth.success) {
+    return NextResponse.json({ error: adminAuth.error }, { status: 401 });
+  }
+
   try {
     const { id: categoryId } = await params;
     if (!categoryId) {
