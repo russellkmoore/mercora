@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getProduct, updateProduct, deleteProduct } from "@/lib/models/mach/products";
 import type { Product } from "@/lib/types";
+import { toWireProduct } from "@/lib/models/mach/product-serializer";
 
 /**
  * GET /api/products/[id] - Get a specific product
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!product) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
-    return NextResponse.json({ data: product, meta: { schema: "mach:product" } });
+    return NextResponse.json({ data: toWireProduct(product), meta: { schema: "mach:product" } });
   } catch (error) {
     console.error("Product GET error:", error);
     return NextResponse.json({ error: "Failed to retrieve product" }, { status: 500 });
@@ -51,7 +52,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     return NextResponse.json({ 
-      data: updatedProduct, 
+      data: toWireProduct(updatedProduct),
       meta: { schema: "mach:product" } 
     });
 

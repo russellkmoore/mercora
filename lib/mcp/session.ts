@@ -4,6 +4,7 @@ import { eq, and, lt, gte } from 'drizzle-orm';
 import { AgentSession, AgentContext } from './types';
 import { CartItem } from '../types/cartitem';
 import { createAgentSessionId } from './context';
+import { Money } from '../money';
 
 export async function createSession(agentId: string, agentContext?: AgentContext): Promise<AgentSession> {
   const sessionId = createAgentSessionId(agentId);
@@ -61,7 +62,7 @@ export async function getSession(sessionId: string): Promise<AgentSession | null
         userPreferences: sessionData.userPreferences ? JSON.parse(sessionData.userPreferences) : undefined,
         session_context: sessionData.sessionContext || undefined
       },
-      cart: sessionData.cart ? JSON.parse(sessionData.cart) : [],
+      cart: normalizeCart(sessionData.cart ? JSON.parse(sessionData.cart) : []),
       created_at: sessionData.createdAt!,
       expires_at: sessionData.expiresAt
     };
@@ -152,7 +153,7 @@ export async function getActiveSessionsForAgent(agentId: string): Promise<AgentS
         userPreferences: sessionData.userPreferences ? JSON.parse(sessionData.userPreferences) : undefined,
         session_context: sessionData.sessionContext || undefined
       },
-      cart: sessionData.cart ? JSON.parse(sessionData.cart) : [],
+      cart: normalizeCart(sessionData.cart ? JSON.parse(sessionData.cart) : []),
       created_at: sessionData.createdAt!,
       expires_at: sessionData.expiresAt
     }));
@@ -160,4 +161,30 @@ export async function getActiveSessionsForAgent(agentId: string): Promise<AgentS
     console.error('Failed to get active sessions:', error);
     return [];
   }
+}
+
+function normalizeCart(value: unknown): CartItem[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const candidate = item as Partial<CartItem> & { price?: unknown };
+    const quantity = candidate.quantity;
+    if (!candidate.productId || !candidate.variantId || !candidate.name || typeof quantity !== 'number' || !Number.isSafeInteger(quantity) || quantity < 1) {
+      return [];
+    }
+    try {
+      return [{
+        productId: candidate.productId,
+        variantId: candidate.variantId,
+        name: candidate.name,
+        quantity,
+        primaryImageUrl: candidate.primaryImageUrl ?? '',
+        price: typeof candidate.price === 'number'
+          ? Money.fromMajor(candidate.price).toJSON()
+          : Money.fromStored(candidate.price).toJSON(),
+      }];
+    } catch {
+      return [];
+    }
+  });
 }

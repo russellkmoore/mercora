@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Order, Review } from "@/lib/types";
 import { ReviewForm } from "@/components/reviews/ReviewForm";
+import { Money } from "@/lib/money";
 
 type OrderStatus = "pending" | "processing" | "shipped" | "delivered" | "cancelled" | "refunded";
 
@@ -30,8 +31,7 @@ function buildReviewKey(review: Review) {
 
 export default function OrderCard({ order }: { order: Order }) {
   const date = formatOrderDate(order.created_at || "");
-  const totalAmount = order.total_amount?.amount ?? 0;
-  const total = (totalAmount / 100).toFixed(2);
+  const total = Money.fromStored(order.total_amount).format();
   const items = Array.isArray(order.items) ? order.items : [];
   const itemCount = items.length;
   const previewItem = items?.[0]?.product_name || "Item";
@@ -138,7 +138,7 @@ export default function OrderCard({ order }: { order: Order }) {
       </div>
 
       <div className="mt-2 text-lg font-semibold text-white">
-        Total: <span className="text-green-400">${total}</span>
+        Total: <span className="text-green-400">{total}</span>
       </div>
 
       <div className="mt-4 flex flex-col gap-2">

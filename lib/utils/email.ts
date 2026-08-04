@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { Money, type StoredMoney } from '@/lib/money';
 
 let resend: Resend | null = null;
 
@@ -16,14 +17,14 @@ export interface OrderData {
   items: Array<{
     productId: string;
     name: string;
-    price: number;
+    price: StoredMoney;
     quantity: number;
     imageUrl?: string;
   }>;
-  subtotal: number;
-  shipping: number;
-  tax: number;
-  total: number;
+  subtotal: StoredMoney;
+  shipping: StoredMoney;
+  tax: StoredMoney;
+  total: StoredMoney;
   shippingAddress: {
     street: string;
     city: string;
@@ -53,7 +54,7 @@ export interface OrderStatusUpdateData {
   items: Array<{
     productId: string;
     name: string;
-    price: number;
+    price: StoredMoney;
     quantity: number;
     imageUrl?: string;
   }>;
@@ -116,10 +117,10 @@ function generateOrderConfirmationHTML(orderData: OrderData): string {
       </td>
       <td style="padding: 12px 0 12px 16px; vertical-align: top;">
         <div style="color: #1e293b; font-size: 16px; font-weight: bold; margin: 0 0 4px;">${item.name}</div>
-        <div style="color: #64748b; font-size: 14px; margin: 0;">Quantity: ${item.quantity} × $${item.price.toFixed(2)}</div>
+        <div style="color: #64748b; font-size: 14px; margin: 0;">Quantity: ${item.quantity} × ${Money.fromStored(item.price).format()}</div>
       </td>
       <td style="padding: 12px 0; text-align: right; vertical-align: top;">
-        <div style="color: #1e293b; font-size: 16px; font-weight: bold; margin: 0;">$${(item.price * item.quantity).toFixed(2)}</div>
+        <div style="color: #1e293b; font-size: 16px; font-weight: bold; margin: 0;">${Money.fromStored(item.price).times(item.quantity).format()}</div>
       </td>
     </tr>
   `;
@@ -167,19 +168,19 @@ function generateOrderConfirmationHTML(orderData: OrderData): string {
           <table style="width: 100%;">
             <tr style="padding: 4px 0;">
               <td style="color: #64748b; font-size: 14px;">Subtotal:</td>
-              <td style="text-align: right; color: #1e293b; font-size: 14px;">$${orderData.subtotal.toFixed(2)}</td>
+              <td style="text-align: right; color: #1e293b; font-size: 14px;">${Money.fromStored(orderData.subtotal).format()}</td>
             </tr>
             <tr style="padding: 4px 0;">
               <td style="color: #64748b; font-size: 14px;">Shipping:</td>
-              <td style="text-align: right; color: #1e293b; font-size: 14px;">$${orderData.shipping.toFixed(2)}</td>
+              <td style="text-align: right; color: #1e293b; font-size: 14px;">${Money.fromStored(orderData.shipping).format()}</td>
             </tr>
             <tr style="padding: 4px 0;">
               <td style="color: #64748b; font-size: 14px;">Tax:</td>
-              <td style="text-align: right; color: #1e293b; font-size: 14px;">$${orderData.tax.toFixed(2)}</td>
+              <td style="text-align: right; color: #1e293b; font-size: 14px;">${Money.fromStored(orderData.tax).format()}</td>
             </tr>
             <tr style="border-top: 2px solid #e2e8f0; padding: 12px 0 0; margin: 12px 0 0;">
               <td style="color: #1e293b; font-size: 16px; font-weight: bold; padding-top: 12px;">Total:</td>
-              <td style="text-align: right; color: #f97316; font-size: 18px; font-weight: bold; padding-top: 12px;">$${orderData.total.toFixed(2)}</td>
+              <td style="text-align: right; color: #f97316; font-size: 18px; font-weight: bold; padding-top: 12px;">${Money.fromStored(orderData.total).format()}</td>
             </tr>
           </table>
         </div>
