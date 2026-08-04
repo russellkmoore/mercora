@@ -49,8 +49,21 @@ import type { ImageLoaderProps } from "next/image";
  * @param src - Image source path (absolute or relative)
  * @returns Normalized path without leading slash
  */
-function normalizeSrc(src: string) {
-  return src.startsWith("/") ? src.slice(1) : src;
+function imageCdn() {
+  const value = process.env.NEXT_PUBLIC_IMAGE_CDN?.trim();
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.origin : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function toObjectKey(src: string, cdn: string | undefined) {
+  if (cdn && src.startsWith(cdn)) return src.slice(cdn.length).replace(/^\//, "");
+  if (/^https?:\/\//.test(src)) return null;
+  return src.replace(/^\//, "");
 }
 
 /**
@@ -66,18 +79,20 @@ export default function cloudflareLoader({
   width,
   quality,
 }: ImageLoaderProps) {
-  // Skip optimization in development for faster builds
+  // Read public configuration at invocation time. Import-time environment reads
+  // can capture a different build's configuration.
   if (process.env.NODE_ENV === "development") {
     return src;
   }
-  
-  // Build Cloudflare image transformation parameters
+
+  if (src.startsWith("/placeholder") || src.startsWith("/logo")) return src;
+  const cdn = imageCdn();
+  const key = toObjectKey(src, cdn);
+  if (key === null) return src;
+  if (!cdn) return `/media/${key}`;
+  if (process.env.NEXT_PUBLIC_IMAGE_TRANSFORMS === "false") return `${cdn}/${key}`;
+
   const params = [`width=${width}`, "format=auto"];
   if (quality) params.push(`quality=${quality}`);
-  const paramsString = params.join(",");
-  
-  // Construct Cloudflare image URL with transformations
-  return `https://voltique-images.russellkmoore.me/cdn-cgi/image/${paramsString}/${normalizeSrc(
-    src
-  )}`;
+  return `${cdn}/cdn-cgi/image/${params.join(",")}/${key}`;
 }
