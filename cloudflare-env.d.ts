@@ -10,6 +10,8 @@ declare namespace Cloudflare {
 		DB: D1Database;
 		VECTORIZE: VectorizeIndex;
 		AI: Ai;
+		AI_RATE_LIMITER: RateLimit;
+		PUBLIC_RATE_LIMITER: RateLimit;
 		ASSETS: Fetcher;
 	}
 }
