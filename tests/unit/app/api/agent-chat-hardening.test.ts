@@ -50,6 +50,16 @@ beforeEach(() => {
 });
 
 describe("agent-chat request bounds", () => {
+  it("rejects a declared oversized body before parsing, auth, or limiting", async () => {
+    const response = await post(
+      { question: "hello" },
+      { "content-length": String(256 * 1024 + 1) }
+    );
+    expect(response.status).toBe(413);
+    expect(auth).not.toHaveBeenCalled();
+    expect(enforceRateLimit).not.toHaveBeenCalled();
+  });
+
   it("rejects oversized input before auth, limiting, or Workers work", async () => {
     const response = await post({ question: "x".repeat(4_001) });
     expect(response.status).toBe(400);
