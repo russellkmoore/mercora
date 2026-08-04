@@ -320,7 +320,7 @@ export default function KnowledgeManagement() {
 
   const fetchArticles = async () => {
     try {
-      const response = await fetch("/api/admin/knowledge?token=voltique-admin");
+      const response = await fetch("/api/admin/knowledge");
       if (response.ok) {
         const articles: KnowledgeArticle[] = await response.json();
         console.log("Loaded articles:", articles.length);
@@ -365,7 +365,7 @@ export default function KnowledgeManagement() {
   const handleSaveArticle = async (articleData: Partial<KnowledgeArticle>) => {
     try {
       console.log("Saving article:", articleData);
-      const response = await fetch("/api/admin/knowledge?token=voltique-admin", {
+      const response = await fetch("/api/admin/knowledge", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

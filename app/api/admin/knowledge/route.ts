@@ -142,10 +142,12 @@ export async function POST(request: NextRequest) {
         console.warn("ADMIN_VECTORIZE_TOKEN not configured, skipping vectorization");
       } else {
         const vectorizeUrl = new URL('/api/admin/vectorize', request.url);
-        vectorizeUrl.searchParams.set('token', adminToken);
-        
+
         await fetch(vectorizeUrl.toString(), {
-          method: 'GET'
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${adminToken}`
+          }
         });
       }
     } catch (vectorError) {
@@ -205,10 +207,12 @@ export async function DELETE(request: NextRequest) {
         console.warn("ADMIN_VECTORIZE_TOKEN not configured, skipping vectorization");
       } else {
         const vectorizeUrl = new URL('/api/admin/vectorize', request.url);
-        vectorizeUrl.searchParams.set('token', adminToken);
-        
+
         await fetch(vectorizeUrl.toString(), {
-          method: 'GET'
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${adminToken}`
+          }
         });
       }
     } catch (vectorError) {
