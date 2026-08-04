@@ -2,11 +2,13 @@ import { searchProducts, getProductBySlug } from '../../models/mach/products';
 import { RecommendRequest, MCPToolResponse } from '../types';
 import { enhanceUserContext } from '../context';
 import { Product } from '../../types';
+import { Money } from '../../money';
+import { toWireProduct, type WireProduct } from '../../models/mach/product-serializer';
 
 export async function getRecommendations(
   request: RecommendRequest,
   sessionId: string
-): Promise<MCPToolResponse<Product[]>> {
+): Promise<MCPToolResponse<WireProduct[]>> {
   const startTime = Date.now();
   
   try {
@@ -37,8 +39,8 @@ export async function getRecommendations(
     if (context.budget || userContext.budget) {
       const budget = context.budget || userContext.budget;
       recommendations = recommendations.filter(product => {
-        const price = product.variants?.[0]?.price || 0;
-        return price <= budget!;
+        const price = product.variants?.[0]?.price;
+        return !price || Money.fromStored(price).toMach().amount <= budget!;
       });
     }
     
@@ -60,7 +62,7 @@ export async function getRecommendations(
     
     return {
       success: true,
-      data: recommendations,
+      data: recommendations.map(toWireProduct),
       context: {
         session_id: sessionId,
         agent_id: request.agent_context?.agentId || 'unknown',
@@ -174,8 +176,8 @@ function sortRecommendations(products: Product[], userContext: any): Product[] {
     }
     
     // Consider price within budget
-    const aPrice = a.variants?.[0]?.price || 0;
-    const bPrice = b.variants?.[0]?.price || 0;
+    const aPrice = a.variants?.[0]?.price ? Money.fromStored(a.variants[0].price).toMach().amount : 0;
+    const bPrice = b.variants?.[0]?.price ? Money.fromStored(b.variants[0].price).toMach().amount : 0;
     
     if (userContext.budget) {
       if (aPrice <= userContext.budget) aScore += 2;
@@ -228,7 +230,10 @@ function generateCostRecommendations(products: Product[], budget?: number): stri
   if (!budget) return [];
   
   const recommendations: string[] = [];
-  const totalCost = products.reduce((sum, p) => sum + (typeof p.variants?.[0]?.price === 'number' ? p.variants[0].price : (p.variants?.[0]?.price as any)?.amount || 0), 0);
+  const totalCost = products.reduce((sum, product) => {
+    const price = product.variants?.[0]?.price;
+    return sum.add(price ? Money.fromStored(price) : Money.zero(sum.currency));
+  }, Money.zero()).toMach().amount;
   
   if (totalCost > budget * 1.2) {
     recommendations.push('Consider base models to stay within budget');

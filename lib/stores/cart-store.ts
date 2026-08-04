@@ -43,6 +43,7 @@ import type { CartItem } from "@/lib/types/cartitem";
 import type { Address } from "@/lib/types";
 import type { BillingInfo } from "@/lib/types/billing";
 import type { ShippingOption } from "@/lib/types/shipping";
+import { Money, cartSubtotal, type StoredMoney } from "@/lib/money";
 
 /**
  * Interface for applied discount information
@@ -52,7 +53,7 @@ export interface AppliedDiscount {
   code: string;
   type: "cart" | "product" | "shipping";
   description: string;
-  amount: number;
+  amount: StoredMoney;
   displayName: string; // e.g., "20% Off", "Free Shipping", "$10 Off"
 }
 
@@ -68,7 +69,7 @@ interface CartState {
   /** Array of applied discounts and their details */
   appliedDiscounts: AppliedDiscount[];
   /** Total discount amount across all types */
-  totalDiscount: number;
+  totalDiscount: StoredMoney;
 
   // === Checkout Information ===
   /** Customer shipping address */
@@ -80,7 +81,7 @@ interface CartState {
   /** Payment and billing information */
   billingInfo?: BillingInfo;
   /** Calculated tax amount for the order */
-  taxAmount?: number;
+  taxAmount?: StoredMoney;
 
   // === Cart Management Actions ===
   /** Add an item to the cart (merges quantities if item exists) */
@@ -92,7 +93,7 @@ interface CartState {
   /** Clear all items from the cart */
   clearCart: () => void;
   /** Calculate total price of all items in cart */
-  get total(): number;
+  get total(): StoredMoney;
 
   // === Discount Management Actions ===
   /** Apply a discount to the cart */
@@ -105,12 +106,12 @@ interface CartState {
   updateShippingDiscounts: () => void;
   /** Calculate order totals with discounts applied */
   calculateTotals: () => {
-    subtotal: number;
-    cartDiscount: number;
-    shippingCost: number;
-    shippingDiscount: number;
-    tax: number;
-    total: number;
+    subtotal: StoredMoney;
+    cartDiscount: StoredMoney;
+    shippingCost: StoredMoney;
+    shippingDiscount: StoredMoney;
+    tax: StoredMoney;
+    total: StoredMoney;
   };
 
   // === Checkout Information Setters ===
@@ -123,7 +124,7 @@ interface CartState {
   /** Set payment/billing information */
   setBillingInfo: (info: BillingInfo) => void;
   /** Update calculated tax amount */
-  setTaxAmount: (amount: number) => void;
+  setTaxAmount: (amount: StoredMoney) => void;
 }
 
 /**
@@ -138,7 +139,7 @@ export const useCartStore = create<CartState>()(
       // Initial state
       items: [],
       appliedDiscounts: [],
-      totalDiscount: 0,
+      totalDiscount: Money.zero().toJSON(),
       shippingAddress: undefined,
       billingAddress: undefined,
       shippingOption: undefined,
@@ -195,12 +196,7 @@ export const useCartStore = create<CartState>()(
       /**
        * Calculate total price of all items in cart
        */
-      get total() {
-        const items = get().items;
-        return items.reduce((total, item) => {
-          return total + item.price * item.quantity;
-        }, 0);
-      },
+      get total() { return cartSubtotal(get().items).toJSON(); },
 
       /**
        * Clear entire cart and reset all checkout information
@@ -210,7 +206,7 @@ export const useCartStore = create<CartState>()(
         set({
           items: [],
           appliedDiscounts: [],
-          totalDiscount: 0,
+          totalDiscount: Money.zero().toJSON(),
           shippingAddress: undefined,
           billingAddress: undefined,
           shippingOption: undefined,
@@ -230,7 +226,7 @@ export const useCartStore = create<CartState>()(
         
         if (!existing) {
           const newDiscounts = [...state.appliedDiscounts, discount];
-          const newTotalDiscount = newDiscounts.reduce((sum, d) => sum + d.amount, 0);
+          const newTotalDiscount = sumDiscounts(newDiscounts).toJSON();
           
           set({
             appliedDiscounts: newDiscounts,
@@ -245,7 +241,7 @@ export const useCartStore = create<CartState>()(
       removeDiscount: (promotionId) => {
         const state = get();
         const newDiscounts = state.appliedDiscounts.filter(d => d.promotionId !== promotionId);
-        const newTotalDiscount = newDiscounts.reduce((sum, d) => sum + d.amount, 0);
+        const newTotalDiscount = sumDiscounts(newDiscounts).toJSON();
         
         set({
           appliedDiscounts: newDiscounts,
@@ -258,7 +254,7 @@ export const useCartStore = create<CartState>()(
        */
       clearDiscounts: () => set({
         appliedDiscounts: [],
-        totalDiscount: 0,
+        totalDiscount: Money.zero().toJSON(),
       }),
 
       /**
@@ -267,34 +263,34 @@ export const useCartStore = create<CartState>()(
        */
       updateShippingDiscounts: () => {
         const state = get();
-        const shippingCost = state.shippingOption?.cost || 0;
+        const shippingCost = state.shippingOption ? Money.fromStored(state.shippingOption.cost) : Money.zero();
         
         const updatedDiscounts = state.appliedDiscounts.map(discount => {
           if (discount.type === 'shipping') {
             // Get the discount details from the displayName to determine type
             if (discount.displayName.includes('Free Shipping') || discount.displayName.includes('100%')) {
               // Free shipping (100% off)
-              return { ...discount, amount: shippingCost };
+              return { ...discount, amount: shippingCost.toJSON() };
             } else if (discount.displayName.includes('%')) {
               // Percentage discount
               const match = discount.displayName.match(/(\d+)%/);
               if (match) {
                 const percentage = parseInt(match[1]);
-                return { ...discount, amount: shippingCost * (percentage / 100) };
+                return { ...discount, amount: shippingCost.applyRate((percentage / 100).toString()).toJSON() };
               }
             } else if (discount.displayName.includes('$')) {
               // Fixed amount discount
               const match = discount.displayName.match(/\$(\d+)/);
               if (match) {
-                const fixedAmount = parseInt(match[1]);
-                return { ...discount, amount: Math.min(fixedAmount, shippingCost) };
+                const fixedAmount = Money.fromMajor(match[1]);
+                return { ...discount, amount: shippingCost.lte(fixedAmount) ? shippingCost.toJSON() : fixedAmount.toJSON() };
               }
             }
           }
           return discount;
         });
 
-        const newTotalDiscount = updatedDiscounts.reduce((sum, d) => sum + d.amount, 0);
+        const newTotalDiscount = sumDiscounts(updatedDiscounts).toJSON();
         
         set({
           appliedDiscounts: updatedDiscounts,
@@ -308,31 +304,31 @@ export const useCartStore = create<CartState>()(
        */
       calculateTotals: () => {
         const state = get();
-        const subtotal = state.items.reduce((total, item) => total + (item.price * item.quantity), 0);
-        const shippingCost = state.shippingOption?.cost || 0;
+        const subtotal = cartSubtotal(state.items);
+        const shippingCost = state.shippingOption ? Money.fromStored(state.shippingOption.cost) : Money.zero(subtotal.currency);
         
         // Separate cart and shipping discounts
         const cartDiscounts = state.appliedDiscounts.filter(d => d.type === 'cart');
         const shippingDiscounts = state.appliedDiscounts.filter(d => d.type === 'shipping');
         
-        const cartDiscountAmount = cartDiscounts.reduce((sum, d) => sum + d.amount, 0);
-        const shippingDiscountAmount = shippingDiscounts.reduce((sum, d) => sum + d.amount, 0);
+        const cartDiscountAmount = sumDiscounts(cartDiscounts, subtotal.currency);
+        const shippingDiscountAmount = sumDiscounts(shippingDiscounts, subtotal.currency);
         
         // Apply discounts with minimums of 0
-        const discountedSubtotal = Math.max(0, subtotal - cartDiscountAmount);
-        const discountedShipping = Math.max(0, shippingCost - shippingDiscountAmount);
+        const discountedSubtotal = subtotal.lte(cartDiscountAmount) ? Money.zero(subtotal.currency) : subtotal.subtract(cartDiscountAmount);
+        const discountedShipping = shippingCost.lte(shippingDiscountAmount) ? Money.zero(subtotal.currency) : shippingCost.subtract(shippingDiscountAmount);
         
         // Calculate tax on discounted amounts
-        const tax = state.taxAmount || 0;
-        const total = discountedSubtotal + discountedShipping + tax;
+        const tax = state.taxAmount ? Money.fromStored(state.taxAmount, subtotal.currency) : Money.zero(subtotal.currency);
+        const total = discountedSubtotal.add(discountedShipping).add(tax);
         
         return {
-          subtotal,
-          cartDiscount: cartDiscountAmount,
-          shippingCost,
-          shippingDiscount: shippingDiscountAmount,
-          tax,
-          total,
+          subtotal: subtotal.toJSON(),
+          cartDiscount: cartDiscountAmount.toJSON(),
+          shippingCost: shippingCost.toJSON(),
+          shippingDiscount: shippingDiscountAmount.toJSON(),
+          tax: tax.toJSON(),
+          total: total.toJSON(),
         };
       },
 
@@ -350,11 +346,39 @@ export const useCartStore = create<CartState>()(
       setBillingInfo: (info) => set({ billingInfo: info }),
       
       /** Update calculated tax amount */
-      setTaxAmount: (amount) => set({ taxAmount: amount }),
+      setTaxAmount: (amount) => set({ taxAmount: Money.fromStored(amount).toJSON() }),
     }),
     {
       name: 'cart-storage',
       skipHydration: true,
+      version: 1,
+      migrate: (persistedState: unknown) => migrateCartState(persistedState),
     }
   )
 );
+
+function sumDiscounts(discounts: AppliedDiscount[], currency = 'USD'): Money {
+  return discounts.reduce((total, discount) => total.add(Money.fromStored(discount.amount, currency)), Money.zero(currency));
+}
+
+function migrateCartState(persistedState: unknown): unknown {
+  if (!persistedState || typeof persistedState !== 'object') return persistedState;
+  const state = persistedState as { items?: unknown[]; taxAmount?: unknown; totalDiscount?: unknown; appliedDiscounts?: unknown[]; shippingOption?: { cost?: unknown } };
+  const toStored = (value: unknown): StoredMoney => typeof value === 'number' ? Money.fromMajor(value).toJSON() : Money.fromStored(value).toJSON();
+  return {
+    ...state,
+    items: state.items?.map((item) => {
+      if (!item || typeof item !== 'object') return item;
+      const cartItem = item as { price?: unknown };
+      return { ...cartItem, ...(cartItem.price !== undefined && { price: toStored(cartItem.price) }) };
+    }),
+    taxAmount: state.taxAmount === undefined ? undefined : toStored(state.taxAmount),
+    totalDiscount: state.totalDiscount === undefined ? Money.zero().toJSON() : toStored(state.totalDiscount),
+    appliedDiscounts: state.appliedDiscounts?.map((discount) => {
+      if (!discount || typeof discount !== 'object') return discount;
+      const applied = discount as { amount?: unknown };
+      return { ...applied, ...(applied.amount !== undefined && { amount: toStored(applied.amount) }) };
+    }),
+    shippingOption: state.shippingOption ? { ...state.shippingOption, ...(state.shippingOption.cost !== undefined && { cost: toStored(state.shippingOption.cost) }) } : undefined,
+  };
+}

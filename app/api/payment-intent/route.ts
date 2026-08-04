@@ -33,11 +33,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createPaymentIntent, formatAmountForStripe } from '@/lib/stripe';
+import { Money, type StoredMoney } from '@/lib/money';
 import type { Address } from '@/lib/types';
 
 interface PaymentIntentRequest {
-  amount: number;
-  taxAmount: number;
+  amount: StoredMoney;
+  taxAmount: StoredMoney;
   shippingAddress: Address;
   orderId: string;
   description?: string;
@@ -53,8 +54,20 @@ export async function POST(req: NextRequest) {
       description,
     }: PaymentIntentRequest = await req.json();
 
+    let totalMoney: Money;
+    let taxMoney: Money;
+    try {
+      totalMoney = Money.fromStored(amount);
+      taxMoney = Money.fromStored(taxAmount, totalMoney.currency);
+    } catch {
+      return NextResponse.json(
+        { error: 'Amounts must be valid integer minor-unit Money values' },
+        { status: 400 }
+      );
+    }
+
     // Validate required fields
-    if (!amount || amount <= 0) {
+    if (!totalMoney.gt(Money.zero(totalMoney.currency))) {
       return NextResponse.json(
         { error: 'Valid amount is required' },
         { status: 400 }
@@ -77,15 +90,15 @@ export async function POST(req: NextRequest) {
 
     // Create Payment Intent
     const paymentIntent = await createPaymentIntent({
-      amount: formatAmountForStripe(amount),
+      amount: formatAmountForStripe(totalMoney.toJSON()),
       currency: 'usd',
       automatic_payment_methods: {
         enabled: true,
       },
       metadata: {
         orderId,
-        taxAmount: taxAmount.toString(),
-        totalAmount: amount.toString(),
+        taxAmount: String(taxMoney.toMinorUnits()),
+        totalAmount: String(totalMoney.toMinorUnits()),
       },
       shipping: {
         address: {
@@ -115,4 +128,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

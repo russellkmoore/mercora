@@ -4,6 +4,7 @@ import { ShippingOption } from "@/lib/types/shipping";
 import { Address } from "@/lib/types";
 import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Money } from "@/lib/money";
 
 interface Props {
   address: Partial<Address>;
@@ -52,7 +53,7 @@ export default function ShippingOptions({
               <div>
                 <div className="font-medium text-sm">{option.label}</div>
                 <div className="text-sm text-gray-500">
-                  ${option.cost.toFixed(2)} – Estimated {option.estimatedDays}{" "}
+                  {Money.fromStored(option.cost).format()} – Estimated {option.estimatedDays}{" "}
                   days
                 </div>
               </div>

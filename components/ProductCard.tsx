@@ -43,6 +43,7 @@ import type { Product, ProductVariant } from "@/lib/types";
 import { getDarkBlurPlaceholder } from "@/lib/utils/image-placeholders";
 import { normalizeProductRating } from "@/lib/utils/ratings";
 import { StarRating } from "@/components/reviews/StarRating";
+import { Money } from "@/lib/money";
 
 /**
  * Props interface for ProductCard component
@@ -177,10 +178,10 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
               {onSale && compareAt != null ? (
                 <div className="text-green-400">
                   <span className="line-through text-gray-400 mr-2">
-                    ${(compareAt / 100).toFixed(2)}
+                    {Money.fromMinor(compareAt).format()}
                   </span>
                   <span className="font-semibold">
-                    ${(price / 100).toFixed(2)}
+                    {Money.fromMinor(price).format()}
                   </span>
                   <span className="ml-2 text-xs text-orange-500 font-bold">
                     On Sale
@@ -188,7 +189,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
                 </div>
               ) : (
                 <div className="text-white font-semibold">
-                  ${(price / 100).toFixed(2)}
+                  {Money.fromMinor(price).format()}
                 </div>
               )}
             </div>

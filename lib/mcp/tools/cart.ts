@@ -1,7 +1,8 @@
 import { getSession, updateSessionCart, getSessionCart } from '../session';
 import { getProductBySlug } from '../../models/mach/products';
-import { CartRequest, CartResponse, MCPToolResponse } from '../types';
+import { CartRequest, CartResponse, MCPToolResponse, WireCartItem } from '../types';
 import { CartItem } from '../../types/cartitem';
+import { Money, cartSubtotal } from '../../money';
 
 export async function addToCart(
   request: CartRequest & { sessionId: string },
@@ -40,7 +41,7 @@ export async function addToCart(
         variantId: String(request.variantId),
         quantity: request.quantity || 1,
         name: typeof product.name === 'string' ? product.name : String(product.name || ''),
-        price: typeof variant.price === 'number' ? variant.price : (variant.price as any)?.amount || 0,
+        price: Money.fromStored(variant.price).toJSON(),
         primaryImageUrl: (product as any).image_url || ''
       };
       updatedCart = [...currentCart, newItem];
@@ -51,14 +52,14 @@ export async function addToCart(
     
     // Calculate totals
     const totalItems = updatedCart.reduce((sum, item) => sum + item.quantity, 0);
-    const estimatedTotal = updatedCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const estimatedTotal = cartSubtotal(updatedCart).toMach().amount;
     
     const processingTime = Date.now() - startTime;
     
     return {
       success: true,
       data: {
-        cart: updatedCart,
+        cart: toWireCart(updatedCart),
         total_items: totalItems,
         estimated_total: estimatedTotal
       },
@@ -136,7 +137,7 @@ export async function bulkAddToCart(
             variantId: String(item.variantId),
             quantity: item.quantity || 1,
             name: typeof product.name === 'string' ? product.name : String(product.name || ''),
-            price: typeof variant.price === 'number' ? variant.price : (variant.price as any)?.amount || 0,
+            price: Money.fromStored(variant.price).toJSON(),
             primaryImageUrl: (product as any).image_url || ''
           };
           currentCart.push(newItem);
@@ -153,7 +154,7 @@ export async function bulkAddToCart(
     
     // Calculate totals
     const totalItems = currentCart.reduce((sum, item) => sum + item.quantity, 0);
-    const estimatedTotal = currentCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const estimatedTotal = cartSubtotal(currentCart).toMach().amount;
     
     const processingTime = Date.now() - startTime;
     const successRate = addedItems / request.items.length;
@@ -161,7 +162,7 @@ export async function bulkAddToCart(
     return {
       success: failedItems.length === 0,
       data: {
-        cart: currentCart,
+        cart: toWireCart(currentCart),
         total_items: totalItems,
         estimated_total: estimatedTotal
       },
@@ -281,14 +282,14 @@ export async function updateCart(
     await updateSessionCart(sessionId, updatedCart);
     
     const totalItems = updatedCart.reduce((sum, item) => sum + item.quantity, 0);
-    const estimatedTotal = updatedCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const estimatedTotal = cartSubtotal(updatedCart).toMach().amount;
     
     const processingTime = Date.now() - startTime;
     
     return {
       success: true,
       data: {
-        cart: updatedCart,
+        cart: toWireCart(updatedCart),
         total_items: totalItems,
         estimated_total: estimatedTotal
       },
@@ -339,14 +340,14 @@ export async function getCartEstimate(
   try {
     const cart = await getSessionCart(sessionId);
     const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-    const estimatedTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const estimatedTotal = cartSubtotal(cart).toMach().amount;
     
     const processingTime = Date.now() - startTime;
     
     return {
       success: true,
       data: {
-        cart,
+        cart: toWireCart(cart),
         total_items: totalItems,
         estimated_total: estimatedTotal
       },
@@ -399,11 +400,15 @@ function generateCartBundlingOpportunities(cart: CartItem[]): string[] {
   return opportunities;
 }
 
+function toWireCart(cart: CartItem[]): WireCartItem[] {
+  return cart.map(({ price, ...item }) => ({ ...item, price: Money.fromStored(price).toMach() }));
+}
+
 function generateCartOptimizations(cart: CartItem[], budget?: number): string[] {
   if (!budget) return [];
   
   const optimizations: string[] = [];
-  const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const total = cartSubtotal(cart).toMach().amount;
   
   if (total > budget) {
     optimizations.push(`Cart total $${total} exceeds budget $${budget}`);

@@ -1,4 +1,4 @@
-export type Money = {
-  amount: number; // Amount in the smallest currency unit (e.g., cents for USD)
-  currency: string; // ISO 4217 currency code (e.g., "USD", "EUR")
-};
+import type { StoredMoney } from '@/lib/money';
+
+/** Persisted Mercora money is always an integer minor-unit value. */
+export type Money = StoredMoney;

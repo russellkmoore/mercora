@@ -1,6 +1,9 @@
+import type { StoredMoney } from '@/lib/money';
+
 export type ShippingOption = {
   id: string;
   label: string;
-  cost: number;
+  /** Persisted minor-unit price, not a decimal display value. */
+  cost: StoredMoney;
   estimatedDays: number;
 };

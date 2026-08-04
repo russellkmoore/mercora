@@ -2,6 +2,8 @@ import { searchProducts } from '../../models/mach/products';
 import { listCategories } from '../../models/mach/category';
 import { AssessRequest, AssessResponse, MCPToolResponse } from '../types';
 import { enhanceUserContext } from '../context';
+import { Money } from '../../money';
+import { toWireProduct } from '../../models/mach/product-serializer';
 
 export async function assessFulfillmentCapability(
   request: AssessRequest,
@@ -62,9 +64,9 @@ export async function assessFulfillmentCapability(
     
     // Calculate estimated cost and delivery
     const estimatedCost = recommendations.reduce((sum, product) => {
-      const price = product.variants?.[0]?.price || 0;
-      return sum + price;
-    }, 0);
+      const price = product.variants?.[0]?.price;
+      return sum.add(price ? Money.fromStored(price) : Money.zero(sum.currency));
+    }, Money.zero()).toMach().amount;
     
     const estimatedDelivery = calculateDeliveryEstimate(requirements.location, requirements.timeline);
     
@@ -79,7 +81,7 @@ export async function assessFulfillmentCapability(
       data: {
         can_fulfill: canFulfill,
         cannot_fulfill: cannotFulfill,
-        recommendations,
+        recommendations: recommendations.map(toWireProduct),
         estimated_cost: estimatedCost,
         estimated_delivery: estimatedDelivery
       },
@@ -197,7 +199,7 @@ function generateCostOptimizations(results: Array<{item: string, products: any[]
   
   const optimizations: string[] = [];
   const totalEstimated = results.reduce((sum, result) => {
-    const minPrice = Math.min(...result.products.map(p => p.variants?.[0]?.price || Infinity));
+    const minPrice = Math.min(...result.products.map(p => p.variants?.[0]?.price ? Money.fromStored(p.variants[0].price).toMach().amount : Infinity));
     return sum + (minPrice === Infinity ? 0 : minPrice);
   }, 0);
   

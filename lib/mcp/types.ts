@@ -1,6 +1,10 @@
 import { Product } from '../types';
 import { CartItem } from '../types/cartitem';
 import { MACHAddress as Address } from '../types/mach/Address';
+import type { MachMoney } from '../money';
+import type { WireProduct } from '../models/mach/product-serializer';
+
+export type WireCartItem = Omit<CartItem, 'price'> & { price: MachMoney };
 
 // Agent Context
 export interface AgentContext {
@@ -114,13 +118,13 @@ export interface CapabilitiesResponse {
 export interface AssessResponse {
   can_fulfill: string[];
   cannot_fulfill: string[];
-  recommendations: Product[];
+  recommendations: WireProduct[];
   estimated_cost: number;
   estimated_delivery: string;
 }
 
 export interface CartResponse {
-  cart: CartItem[];
+  cart: WireCartItem[];
   total_items: number;
   estimated_total: number;
 }
