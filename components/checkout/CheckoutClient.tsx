@@ -158,7 +158,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
       setTaxAmount(taxData.amount);
 
       // Create order and payment intent
-      await createPaymentIntent(option);
+      await createPaymentIntent(option, taxData.amount);
 
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -168,7 +168,10 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
   };
 
   // Create Payment Intent with Stripe
-  const createPaymentIntent = async (selectedShippingOption: ShippingOption) => {
+  const createPaymentIntent = async (
+    selectedShippingOption: ShippingOption,
+    calculatedTax: StoredMoney
+  ) => {
     try {
       // Generate order ID
       const timestamp = Date.now();
@@ -183,7 +186,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
       // Calculate total amount (subtotal + shipping + tax)
       const subtotal = cartSubtotal(items);
       const shipping = Money.fromStored(selectedShippingOption.cost, subtotal.currency);
-      const tax = taxAmount ? Money.fromStored(taxAmount, subtotal.currency) : Money.zero(subtotal.currency);
+      const tax = Money.fromStored(calculatedTax, subtotal.currency);
       const totalAmount = subtotal.add(shipping).add(tax);
 
       // Create payment intent
