@@ -8,6 +8,7 @@ export interface AdminAuthResult {
   error?: string;
   userId?: string;
   isDevMode?: boolean;
+  isServiceToken?: boolean;
 }
 
 export async function checkAdminPermissions(request: NextRequest): Promise<AdminAuthResult> {
@@ -29,7 +30,7 @@ export async function checkAdminPermissions(request: NextRequest): Promise<Admin
       const adminToken = process.env.ADMIN_VECTORIZE_TOKEN;
       
       if (adminToken && (await timingSafeEqual(authToken, adminToken))) {
-        return { success: true, userId: "admin-service" };
+        return { success: true, userId: "admin-service", isServiceToken: true };
       }
     }
 

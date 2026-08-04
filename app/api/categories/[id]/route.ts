@@ -3,6 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCategory, updateCategory, deleteCategory } from "@/lib/models/mach/category";
 import type { ApiResponse, Category } from "@/lib/types";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
+import { errorDetails } from "@/lib/utils/error-response";
+
+function categoryValidationMessage(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  return error.message.startsWith('Category validation failed:') ? error.message : undefined;
+}
 
 /**
  * GET /api/categories/[id] - Get category by ID
@@ -77,16 +83,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json(response);
   } catch (error) {
     console.error('Category PUT error:', error);
-    
-    if (error instanceof Error) {
+    const validationMessage = categoryValidationMessage(error);
+    if (validationMessage) {
       return NextResponse.json({
         error: 'Validation failed',
-        message: error.message
+        message: validationMessage
       }, { status: 400 });
     }
-    
+
     return NextResponse.json(
-      { error: 'Failed to update category' },
+      { error: 'Failed to update category', ...errorDetails(error) },
       { status: 500 }
     );
   }

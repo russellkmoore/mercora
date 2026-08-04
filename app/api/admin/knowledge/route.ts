@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
 import { normalizeKnowledgeFilename } from "@/lib/utils/safe-filename";
+import { errorDetails } from "@/lib/utils/error-response";
 
 export async function GET(request: NextRequest) {
   try {
@@ -77,11 +78,10 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error("Error fetching knowledge articles:", error);
-    console.error("Error details:", error instanceof Error ? error.message : String(error));
     return NextResponse.json(
       { 
         error: "Failed to fetch knowledge articles",
-        details: error instanceof Error ? error.message : String(error)
+        ...errorDetails(error),
       },
       { status: 500 }
     );

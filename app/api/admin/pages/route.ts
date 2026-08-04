@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
+import { errorDetails } from "@/lib/utils/error-response";
 import {
   getPages,
   createPage,
@@ -14,6 +15,18 @@ import {
   searchPages,
   PAGE_STATUS
 } from "@/lib/models/pages";
+
+const PAGE_CREATE_VALIDATION_MESSAGES = new Set([
+  "Title is required",
+  "Content is required",
+  "Content is required after sanitization",
+]);
+
+function pageCreateValidationMessage(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  if (PAGE_CREATE_VALIDATION_MESSAGES.has(error.message)) return error.message;
+  return error.message.startsWith("Invalid page data:") ? error.message : undefined;
+}
 
 /**
  * GET /api/admin/pages - Get all pages with admin access
@@ -117,17 +130,16 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error("Error creating page:", error);
-    
-    // Handle validation errors
-    if (error instanceof Error && error.message.includes("Invalid page data")) {
+    const validationMessage = pageCreateValidationMessage(error);
+    if (validationMessage) {
       return NextResponse.json(
-        { success: false, error: error.message },
+        { success: false, error: validationMessage },
         { status: 400 }
       );
     }
 
     return NextResponse.json(
-      { success: false, error: "Failed to create page" },
+      { success: false, error: "Failed to create page", ...errorDetails(error) },
       { status: 500 }
     );
   }
