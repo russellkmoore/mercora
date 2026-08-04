@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCartStore, type AppliedDiscount } from "@/lib/stores/cart-store";
 import { Loader2, Tag, X } from "lucide-react";
+import { Money, cartSubtotal } from "@/lib/money";
 
 // Type definitions for the API response
 interface DiscountValidationResponse {
@@ -45,14 +46,14 @@ export default function DiscountCodeInput() {
 
     try {
       // Calculate cart subtotal for validation
-      const cartSubtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const subtotal = cartSubtotal(items);
       
       // Prepare cart items for validation
       const cartItems = items.map(item => ({
         productId: item.productId,
         categories: [], // We'd need to fetch product details for this, skipping for now
         quantity: item.quantity,
-        price: item.price * 100, // Convert to cents
+        price: Money.fromStored(item.price).toMinorUnits(),
       }));
 
       const response = await fetch("/api/validate-discount", {
@@ -62,7 +63,7 @@ export default function DiscountCodeInput() {
         },
         body: JSON.stringify({
           code: code.trim(),
-          cartSubtotal: cartSubtotal * 100, // Convert to cents
+          cartSubtotal: subtotal.toMinorUnits(),
           cartItems,
         }),
       });
@@ -70,11 +71,11 @@ export default function DiscountCodeInput() {
       const result: DiscountValidationResponse = await response.json();
 
       if (result.valid && result.promotion) {
-        let discountAmount = result.promotion.discountAmount / 100; // Convert back to dollars
+        let discountAmount = Money.fromMinor(result.promotion.discountAmount).toJSON();
         
         // Handle special case for free shipping (100% shipping discount)
         if (result.promotion.type === 'shipping' && result.promotion.discountValue === 100) {
-          discountAmount = 0; // Will be calculated when shipping is selected
+          discountAmount = Money.zero().toJSON(); // Will be calculated when shipping is selected
         }
 
         const discount: AppliedDiscount = {

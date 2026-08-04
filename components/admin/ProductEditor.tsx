@@ -11,6 +11,7 @@ import { X, Save, Package, Tag, DollarSign, Plus, Trash2, Search, ImageIcon, Sta
 import Image from "next/image";
 import type { Product } from "@/lib/types";
 import { getImageDisplayPath, generateR2Filename } from "@/lib/utils/r2";
+import { Money } from "@/lib/money";
 
 interface ProductEditorProps {
   product: Product | null;
@@ -94,9 +95,9 @@ export default function ProductEditor({
 
   // Helper function to load variant data into form fields
   const loadVariantData = (variant: any) => {
-    setPrice(variant?.price?.amount ? (variant.price.amount / 100).toString() : "");
-    setCompareAtPrice(variant?.compare_at_price?.amount ? (variant.compare_at_price.amount / 100).toString() : "");
-    setCost(variant?.cost?.amount ? (variant.cost.amount / 100).toString() : "");
+    setPrice(variant?.price?.amount ? Money.fromStored(variant.price).toMach().amount.toString() : "");
+    setCompareAtPrice(variant?.compare_at_price?.amount ? Money.fromStored(variant.compare_at_price).toMach().amount.toString() : "");
+    setCost(variant?.cost?.amount ? Money.fromStored(variant.cost).toMach().amount.toString() : "");
     setSku(variant?.sku || "");
     setInventory(variant?.inventory?.quantity?.toString() || "");
     setWeight(variant?.weight?.value?.toString() || "");
@@ -182,9 +183,9 @@ export default function ProductEditor({
     
     updatedVariants[selectedVariantIndex] = {
       ...currentVariant,
-      price: price ? { amount: Math.round(parseFloat(price) * 100), currency: "USD" } : undefined,
-      compare_at_price: compareAtPrice ? { amount: Math.round(parseFloat(compareAtPrice) * 100), currency: "USD" } : undefined,
-      cost: cost ? { amount: Math.round(parseFloat(cost) * 100), currency: "USD" } : undefined,
+      price: price ? Money.fromMajor(price).toJSON() : undefined,
+      compare_at_price: compareAtPrice ? Money.fromMajor(compareAtPrice).toJSON() : undefined,
+      cost: cost ? Money.fromMajor(cost).toJSON() : undefined,
       sku: sku || undefined,
       inventory: inventory ? { quantity: parseInt(inventory) } : undefined,
       weight: weight ? { value: parseFloat(weight), unit: "lb" } : undefined,
@@ -653,7 +654,7 @@ export default function ProductEditor({
         const defaultVariant = {
           id: `variant_${Date.now()}`,
           sku: sku || `SKU_${Date.now()}`,
-          price: price ? { amount: Math.round(parseFloat(price) * 100), currency: "USD" } : { amount: 0, currency: "USD" },
+          price: price ? Money.fromMajor(price).toJSON() : Money.zero().toJSON(),
           option_values: [],
           inventory: inventory ? { quantity: parseInt(inventory) || 0, status: "in_stock" } : { quantity: 0, status: "out_of_stock" },
           status: "active" as const,

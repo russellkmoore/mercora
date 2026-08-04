@@ -39,8 +39,12 @@ describe('Money', () => {
     expect(() => usd.gte(eur)).toThrow('Currency mismatch');
     expect(() => Money.fromMinor(1.5)).toThrow('safe integer');
     expect(() => Money.fromMinor(Number.MAX_SAFE_INTEGER + 1)).toThrow('safe integer');
-    expect(() => Money.fromStored({ amount: 'not-a-number', currency: 'USD' })).toThrow('safe integer');
+    expect(() => Money.fromStored({ amount: 'not-a-number', currency: 'USD' })).toThrow('integer');
+    expect(() => Money.fromStored('12.5')).toThrow('integer');
+    expect(() => Money.fromStored('')).toThrow('integer');
     expect(() => Money.fromMajor('90071992547410')).toThrow('safe integer');
+    expect(() => Money.fromMinor(Number.MAX_SAFE_INTEGER).add(Money.fromMinor(1))).toThrow('safe integer');
+    expect(() => Money.fromMinor(Number.MAX_SAFE_INTEGER).times(2)).toThrow('safe integer');
   });
 
   it('uses decimal major units only at MACH wire boundaries', () => {

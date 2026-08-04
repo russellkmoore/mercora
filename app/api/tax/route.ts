@@ -35,6 +35,7 @@ import type { NextRequest } from "next/server";
 import type { CartItem } from "@/lib/types/cartitem";
 import type { Address } from "@/lib/types";
 import { calculateTax, formatAmountForStripe, formatAmountFromStripe } from "@/lib/stripe";
+import { Money, cartSubtotal, type StoredMoney } from "@/lib/money";
 
 // Fallback tax rate for when Stripe Tax is unavailable
 const FALLBACK_TAX_RATE = 0.07;
@@ -42,39 +43,37 @@ const FALLBACK_TAX_RATE = 0.07;
 interface TaxRequest {
   items: CartItem[];
   shippingAddress?: Address;
-  shippingCost?: number;
+  shippingCost?: StoredMoney;
 }
 
 interface TaxBreakdown {
-  subtotal: number;
-  shippingCost: number;
-  taxableAmount: number;
-  taxAmount: number;
-  total: number;
+  subtotal: StoredMoney;
+  shippingCost: StoredMoney;
+  taxableAmount: StoredMoney;
+  taxAmount: StoredMoney;
+  total: StoredMoney;
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { items, shippingAddress, shippingCost = 0 }: TaxRequest = await req.json();
+    const { items, shippingAddress, shippingCost }: TaxRequest = await req.json();
 
     if (!items || items.length === 0) {
       return NextResponse.json({ error: "No items in cart" }, { status: 400 });
     }
 
-    const subtotal = items.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
+    const subtotal = cartSubtotal(items);
+    const shipping = shippingCost ? Money.fromStored(shippingCost, subtotal.currency) : Money.zero(subtotal.currency);
 
     // If no shipping address provided, use fallback calculation
     if (!shippingAddress || !shippingAddress.region || !shippingAddress.postal_code) {
-      const amount = subtotal * FALLBACK_TAX_RATE;
+      const amount = subtotal.applyRate(FALLBACK_TAX_RATE);
       const breakdown: TaxBreakdown = {
-        subtotal,
-        shippingCost,
-        taxableAmount: subtotal,
-        taxAmount: amount,
-        total: subtotal + shippingCost + amount,
+        subtotal: subtotal.toJSON(),
+        shippingCost: shipping.toJSON(),
+        taxableAmount: subtotal.toJSON(),
+        taxAmount: amount.toJSON(),
+        total: subtotal.add(shipping).add(amount).toJSON(),
       };
 
       return NextResponse.json({ 
@@ -87,18 +86,18 @@ export async function POST(req: NextRequest) {
 
     try {
       // Use Stripe Tax for accurate calculation
-      const taxAmount = await calculateStripeToleratedTax(items, shippingAddress, shippingCost);
+      const taxAmount = await calculateStripeToleratedTax(items, shippingAddress, shipping);
       
       const breakdown: TaxBreakdown = {
-        subtotal,
-        shippingCost,
-        taxableAmount: subtotal + shippingCost,
-        taxAmount,
-        total: subtotal + shippingCost + taxAmount,
+        subtotal: subtotal.toJSON(),
+        shippingCost: shipping.toJSON(),
+        taxableAmount: subtotal.add(shipping).toJSON(),
+        taxAmount: taxAmount.toJSON(),
+        total: subtotal.add(shipping).add(taxAmount).toJSON(),
       };
 
       return NextResponse.json({ 
-        amount: taxAmount, 
+        amount: taxAmount.toJSON(),
         breakdown,
         calculated_by: "stripe"
       });
@@ -107,17 +106,17 @@ export async function POST(req: NextRequest) {
       console.error("Stripe Tax calculation failed:", stripeError);
       
       // Fall back to simple calculation
-      const amount = subtotal * FALLBACK_TAX_RATE;
+      const amount = subtotal.applyRate(FALLBACK_TAX_RATE);
       const breakdown: TaxBreakdown = {
-        subtotal,
-        shippingCost,
-        taxableAmount: subtotal,
-        taxAmount: amount,
-        total: subtotal + shippingCost + amount,
+        subtotal: subtotal.toJSON(),
+        shippingCost: shipping.toJSON(),
+        taxableAmount: subtotal.toJSON(),
+        taxAmount: amount.toJSON(),
+        total: subtotal.add(shipping).add(amount).toJSON(),
       };
 
       return NextResponse.json({ 
-        amount, 
+        amount: amount.toJSON(),
         breakdown,
         calculated_by: "fallback",
         error: "Stripe Tax unavailable, using fallback rate"
@@ -140,11 +139,11 @@ export async function POST(req: NextRequest) {
 async function calculateStripeToleratedTax(
   items: CartItem[], 
   shippingAddress: Address, 
-  shippingCost: number
-): Promise<number> {
+  shippingCost: Money
+): Promise<Money> {
   // Build line items for Stripe Tax calculation (products only)
   const lineItems = items.map((item, index) => ({
-    amount: formatAmountForStripe(item.price * item.quantity),
+    amount: formatAmountForStripe(Money.fromStored(item.price).times(item.quantity).toJSON()),
     reference: `item_${index}_${item.productId}`,
     tax_code: 'txcd_99999999', // General - Tangible Goods
   }));
@@ -167,9 +166,9 @@ async function calculateStripeToleratedTax(
   };
 
   // Add shipping cost as a parameter (not as a line item)
-  if (shippingCost > 0) {
+  if (!shippingCost.isZero()) {
     calculationParams.shipping_cost = {
-      amount: formatAmountForStripe(shippingCost),
+      amount: formatAmountForStripe(shippingCost.toJSON()),
       tax_code: 'txcd_92010001', // Shipping tax code
     };
   }
@@ -180,5 +179,5 @@ async function calculateStripeToleratedTax(
   // Sum up all tax amounts
   const totalTaxAmount = (calculation as any).tax_amount_exclusive || 0;
   
-  return formatAmountFromStripe(totalTaxAmount);
+  return Money.fromStored(formatAmountFromStripe(totalTaxAmount));
 }

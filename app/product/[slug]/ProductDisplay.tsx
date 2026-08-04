@@ -38,6 +38,7 @@ import ProductRecommendations from "@/components/ProductRecommendations";
 import { StarRating } from "@/components/reviews/StarRating";
 import { ProductReviewsSection } from "@/components/reviews/ProductReviewsSection";
 import { useCartStore } from "@/lib/stores/cart-store";
+import { Money } from "@/lib/money";
 import { normalizeProductRating } from "@/lib/utils/ratings";
 import { toast } from "sonner";
 import type { Product, Review, ProductReviewEligibility } from "@/lib/types";
@@ -251,7 +252,7 @@ export default function ProductDisplay({
                   <SelectContent className="bg-neutral-900 border border-neutral-700 text-white">
                     {variants.map((variant) => {
                       const optionDisplay = variant.option_values?.map((value) => `${value.value}`).join(", ") || `Variant ${variant.id}`;
-                      const priceDisplay = variant.price ? `$${(variant.price.amount / 100).toFixed(2)}` : "";
+                      const priceDisplay = variant.price ? Money.fromStored(variant.price).format() : "";
 
                       return (
                         <SelectItem
@@ -275,12 +276,12 @@ export default function ProductDisplay({
 
             {onSale ? (
               <div>
-                <p className="text-base text-gray-500 line-through sm:text-lg">${(compareAt! / 100).toFixed(2)}</p>
-                <p className="text-lg font-bold text-green-400 sm:text-xl">${(price / 100).toFixed(2)}</p>
+                <p className="text-base text-gray-500 line-through sm:text-lg">{Money.fromMinor(compareAt!).format()}</p>
+                <p className="text-lg font-bold text-green-400 sm:text-xl">{Money.fromMinor(price).format()}</p>
                 <p className="text-xs italic text-orange-400 sm:text-sm">Limited-time offer</p>
               </div>
             ) : (
-              <p className="text-lg font-semibold text-white sm:text-xl">${(price / 100).toFixed(2)}</p>
+              <p className="text-lg font-semibold text-white sm:text-xl">{Money.fromMinor(price).format()}</p>
             )}
 
             {selectedVariant?.inventory && (
@@ -301,7 +302,7 @@ export default function ProductDisplay({
                     productId: product.id,
                     variantId: selectedVariant?.id,
                     name: fullName,
-                    price: price / 100,
+                    price: Money.fromMinor(price).toJSON(),
                     quantity: 1,
                     primaryImageUrl: (() => {
                       try {

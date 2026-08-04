@@ -10,6 +10,14 @@ function assertSafeMinorUnits(amount: number): void {
   if (!Number.isSafeInteger(amount)) throw new RangeError(`Money minor units must be a safe integer, got ${amount}`);
 }
 
+function parseStoredAmount(value: unknown): number {
+  if (typeof value === 'number') return value;
+  if (typeof value !== 'string' || !/^-?\d+$/.test(value.trim())) {
+    throw new TypeError('Stored money amount must be an integer');
+  }
+  return Number(value);
+}
+
 function asSafeInteger(value: Big): number {
   const amount = Number(value.toFixed(0));
   assertSafeMinorUnits(amount);
@@ -53,15 +61,12 @@ export class Money {
         try { return Money.fromStored(JSON.parse(trimmed), defaultCurrency); }
         catch (error) { throw new TypeError('Stored money JSON is invalid', { cause: error }); }
       }
-      return Money.fromMinor(Number(trimmed), defaultCurrency);
+      return Money.fromMinor(parseStoredAmount(trimmed), defaultCurrency);
     }
     if (typeof value === 'number') return Money.fromMinor(value, defaultCurrency);
     if (value && typeof value === 'object' && 'amount' in value) {
       const stored = value as { amount: unknown; currency?: unknown };
-      return Money.fromMinor(
-        typeof stored.amount === 'number' ? stored.amount : Number(stored.amount),
-        typeof stored.currency === 'string' ? stored.currency : defaultCurrency,
-      );
+      return Money.fromMinor(parseStoredAmount(stored.amount), typeof stored.currency === 'string' ? stored.currency : defaultCurrency);
     }
     throw new TypeError('Stored money must be a number or an { amount, currency } object');
   }

@@ -47,6 +47,7 @@ import { ShoppingCart, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { cartSubtotal, Money } from "@/lib/money";
 
 /**
  * CartDrawer component providing shopping cart functionality
@@ -65,10 +66,7 @@ export default function CartDrawer() {
   }, []);
 
   // Calculate total price for all items in cart with safety checks
-  const total = items.reduce(
-    (acc, item) => acc + (item?.price || 0) * (item?.quantity || 0),
-    0
-  );
+  const total = cartSubtotal(items);
 
   // Only show real count after mounting to prevent hydration mismatch
   const itemCount = hasMounted ? items.length : 0;
@@ -133,7 +131,7 @@ export default function CartDrawer() {
               
               <div className="border-t border-gray-700 pt-4">
                 <div className="flex justify-between items-center text-lg font-bold">
-                  <span>Total: ${total.toFixed(2)}</span>
+                  <span>Total: {total.format()}</span>
                 </div>
                 
                 <Button
