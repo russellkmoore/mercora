@@ -116,12 +116,11 @@ export async function authenticateRequest(
       const token = await getApiTokenByHash(await sha256Hex(presentedToken));
       if (!token) return deny(401, "Invalid API token");
 
-      if (
-        !allowExpired &&
-        token.expiresAt &&
-        new Date(token.expiresAt).getTime() < Date.now()
-      ) {
-        return deny(401, "API token expired");
+      if (!allowExpired && token.expiresAt) {
+        const expiresAt = Date.parse(token.expiresAt);
+        if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+          return deny(401, "API token expired");
+        }
       }
 
       const permissions: string[] = Array.isArray(token.permissions)
