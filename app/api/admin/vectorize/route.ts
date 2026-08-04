@@ -20,7 +20,7 @@
  *
  * === Usage ===
  * ```bash
- * curl -H "Authorization: Bearer YOUR_TOKEN" /api/vectorize
+ * curl -X POST -H "Authorization: Bearer YOUR_TOKEN" /api/admin/vectorize
  * ```
  *
  * === Performance Considerations ===
@@ -37,7 +37,7 @@ import { eq } from "drizzle-orm";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
 import { errorDetails } from "@/lib/utils/error-response";
 
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
     // Check admin permissions first
     const authResult = await checkAdminPermissions(request);
@@ -353,8 +353,11 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
-  return GET(request);
+export async function GET() {
+  return NextResponse.json(
+    { error: "Method not allowed" },
+    { status: 405, headers: { Allow: "POST" } }
+  );
 }
 
 function generateProductMarkdown(product: {

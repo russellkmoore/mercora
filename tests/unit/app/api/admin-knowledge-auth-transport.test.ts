@@ -65,7 +65,7 @@ describe('knowledge vectorization auth transport', () => {
     expect(fetch).toHaveBeenCalledWith(
       'http://localhost/api/admin/vectorize',
       {
-        method: 'GET',
+        method: 'POST',
         headers: { Authorization: 'Bearer vectorize-service-secret' },
       }
     );
@@ -83,7 +83,7 @@ describe('knowledge vectorization auth transport', () => {
     expect(fetch).toHaveBeenCalledWith(
       'http://localhost/api/admin/vectorize',
       {
-        method: 'GET',
+        method: 'POST',
         headers: { Authorization: 'Bearer vectorize-service-secret' },
       }
     );

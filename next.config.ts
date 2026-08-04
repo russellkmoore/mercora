@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { buildSecurityHeaders } from "./lib/security-headers";
 
 const nextConfig: NextConfig = {
   images: {
@@ -49,6 +50,7 @@ const nextConfig: NextConfig = {
       {
         source: "/(.*)",
         headers: [
+          ...buildSecurityHeaders(process.env),
           {
             key: "X-DNS-Prefetch-Control",
             value: "on",

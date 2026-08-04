@@ -2,6 +2,9 @@ import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { isUserAdmin, updateAdminLastLogin } from "../models/admin";
 import { timingSafeEqual } from "./crypto";
+import { hasSameOrigin } from "./same-origin";
+
+const ORIGIN_REQUIRED_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 export interface AdminAuthResult {
   success: boolean;
@@ -32,6 +35,15 @@ export async function checkAdminPermissions(request: NextRequest): Promise<Admin
       if (adminToken && (await timingSafeEqual(authToken, adminToken))) {
         return { success: true, userId: "admin-service", isServiceToken: true };
       }
+    }
+
+    // Header-only dev/service identities are not browser-cookie requests. Any
+    // mutating Clerk/cookie request must come from this request's exact origin.
+    if (ORIGIN_REQUIRED_METHODS.has(request.method.toUpperCase()) && !hasSameOrigin(request)) {
+      return {
+        success: false,
+        error: "Request origin validation failed.",
+      };
     }
 
     // Check Clerk authentication for browser-based requests

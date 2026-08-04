@@ -207,7 +207,7 @@ export default function ProductManagement() {
     setIsVectorizing(true);
     try {
       // Call admin vectorize endpoint (now uses session auth)
-      const response = await fetch("/api/admin/vectorize");
+      const response = await fetch("/api/admin/vectorize", { method: "POST" });
       if (response.ok) {
         const result = await response.json() as any;
         console.log("Vectorization triggered successfully:", result?.message);
