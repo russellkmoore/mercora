@@ -10,6 +10,7 @@ import {
   getProductsByCategory
 } from "@/lib/models/mach/products";
 import type { ApiResponse, Product } from "@/lib/types";
+import { toWireProduct, type WireProduct } from "@/lib/models/mach/product-serializer";
 
 /**
  * GET /api/products - List products
@@ -39,8 +40,8 @@ export async function GET(request: NextRequest) {
           limit, 
           offset 
         });
-    const response: ApiResponse<Product[]> = {
-      data: products,
+    const response: ApiResponse<WireProduct[]> = {
+      data: products.map(toWireProduct),
       meta: {
         total,
         limit,
