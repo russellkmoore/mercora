@@ -17,7 +17,6 @@
  * Supported authentication methods:
  * - Authorization: Bearer <token>
  * - X-API-Key: <token>
- * - Query parameter: ?token=<token> (deprecated, for backward compatibility)
  *
  * === Usage ===
  * ```bash
