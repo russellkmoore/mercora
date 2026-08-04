@@ -36,6 +36,12 @@ import type { CartItem } from "@/lib/types/cartitem";
 import type { Address } from "@/lib/types";
 import { calculateTax, formatAmountForStripe, formatAmountFromStripe } from "@/lib/stripe";
 import { Money, cartSubtotal, type StoredMoney } from "@/lib/money";
+import { enforceRateLimit, getClientIp } from "@/lib/rate-limit";
+import {
+  isBoundedString,
+  isPlainRecord,
+  isValidPublicCartItems,
+} from "@/lib/public-request-validation";
 
 // Fallback tax rate for when Stripe Tax is unavailable
 const FALLBACK_TAX_RATE = 0.07;
@@ -56,10 +62,36 @@ interface TaxBreakdown {
 
 export async function POST(req: NextRequest) {
   try {
-    const { items, shippingAddress, shippingCost }: TaxRequest = await req.json();
+    const limited = await enforceRateLimit(
+      "PUBLIC_RATE_LIMITER",
+      `tax:${getClientIp(req)}`
+    );
+    if (limited) return limited;
 
-    if (!items || items.length === 0) {
-      return NextResponse.json({ error: "No items in cart" }, { status: 400 });
+    const body: unknown = await req.json();
+    if (!isPlainRecord(body)) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    const { items, shippingAddress, shippingCost } = body as unknown as TaxRequest;
+
+    if (!isValidPublicCartItems(items)) {
+      return NextResponse.json({ error: "Cart items are missing or invalid" }, { status: 400 });
+    }
+
+    if (
+      shippingAddress !== undefined &&
+      (!isPlainRecord(shippingAddress) ||
+        (shippingAddress.region !== undefined &&
+          !isBoundedString(shippingAddress.region, 128, { allowEmpty: true })) ||
+        (shippingAddress.postal_code !== undefined &&
+          !isBoundedString(shippingAddress.postal_code, 32, { allowEmpty: true })) ||
+        (shippingAddress.line1 !== undefined &&
+          !isBoundedString(shippingAddress.line1, 256, { allowEmpty: true })) ||
+        (shippingAddress.city !== undefined &&
+          !isBoundedString(shippingAddress.city, 128, { allowEmpty: true })))
+    ) {
+      return NextResponse.json({ error: "Invalid shipping address" }, { status: 400 });
     }
 
     const subtotal = cartSubtotal(items);
