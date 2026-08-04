@@ -5,6 +5,7 @@ import {
   migrationArgs,
   parseWranglerConfig,
   resolveTarget,
+  valueAfter,
 } from "@/scripts/lib/d1-migrate-plan.mjs";
 
 const config = parseWranglerConfig(`{
@@ -13,6 +14,29 @@ const config = parseWranglerConfig(`{
 }`);
 
 describe("D1 migration plans", () => {
+  it("does not treat a positional argument as the value of a missing flag", () => {
+    expect(valueAfter(["local", "--apply"], "--target")).toBeUndefined();
+    expect(valueAfter(["--target"], "--target")).toBeUndefined();
+    expect(valueAfter(["--target", "--apply"], "--target")).toBeUndefined();
+    expect(valueAfter(["--target", "preview"], "--target")).toBe("preview");
+  });
+
+  it("preserves string contents while removing JSONC trailing commas", () => {
+    expect(
+      parseWranglerConfig(`{
+        "objectText": "keep,}",
+        "arrayText": "keep,]",
+        "nested": { "enabled": true, },
+        "items": ["one",],
+      }`),
+    ).toEqual({
+      objectText: "keep,}",
+      arrayText: "keep,]",
+      nested: { enabled: true },
+      items: ["one"],
+    });
+  });
+
   it("sends preview work to the preview database, never production", () => {
     const preview = resolveTarget(config, { target: "preview", environment: undefined });
     expect(migrationArgs(preview, "apply")).toContain("--preview");

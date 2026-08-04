@@ -1,5 +1,7 @@
 import type { Config } from "tailwindcss";
-import { storeDefaults } from "./lib/store-config";
+
+const runtimeColor = (variable: string) =>
+  `rgb(from var(${variable}) r g b / <alpha-value>)`;
 
 const config: Config = {
   content: [
@@ -16,9 +18,9 @@ const config: Config = {
           foreground: "var(--store-foreground)",
           "muted-foreground": "var(--store-muted-foreground)",
         },
-        primary: storeDefaults.theme.primary,
-        background: "#000000",
-        foreground: "#ffffff",
+        primary: runtimeColor("--store-primary"),
+        background: runtimeColor("--store-surface"),
+        foreground: runtimeColor("--store-foreground"),
         border: "#2a2a2a",
         ring: "#333333",
       },
