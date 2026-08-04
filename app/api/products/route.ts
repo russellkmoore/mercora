@@ -15,12 +15,22 @@ import {
   type WireProduct,
 } from "@/lib/models/mach/product-serializer";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
+import { errorDetails } from "@/lib/utils/error-response";
 
 const PRODUCT_STATUSES = ['active', 'inactive', 'draft', 'archived'] as const;
 type ProductStatus = (typeof PRODUCT_STATUSES)[number];
 
 function isProductStatus(value: string): value is ProductStatus {
   return (PRODUCT_STATUSES as readonly string[]).includes(value);
+}
+
+const PRODUCT_CREATE_VALIDATION_MESSAGES = new Set([
+  'Invalid product data provided',
+]);
+
+function productCreateValidationMessage(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  return PRODUCT_CREATE_VALIDATION_MESSAGES.has(error.message) ? error.message : undefined;
 }
 
 function clampInt(
@@ -150,16 +160,16 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Products API error:', error);
-    
-    if (error instanceof Error) {
+    const validationMessage = productCreateValidationMessage(error);
+    if (validationMessage) {
       return NextResponse.json({
         error: 'Validation failed',
-        message: error.message
+        message: validationMessage
       }, { status: 400 });
     }
-    
+
     return NextResponse.json(
-      { error: 'Failed to create product' },
+      { error: 'Failed to create product', ...errorDetails(error) },
       { status: 500 }
     );
   }

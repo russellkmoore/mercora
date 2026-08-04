@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
 import { normalizeKnowledgeFilename } from "@/lib/utils/safe-filename";
+import { errorDetails } from "@/lib/utils/error-response";
 
 // Update vectorization status for knowledge articles
 export async function POST(request: NextRequest) {
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { 
         error: "Failed to update vectorization status",
-        details: error instanceof Error ? error.message : String(error)
+        ...errorDetails(error),
       },
       { status: 500 }
     );

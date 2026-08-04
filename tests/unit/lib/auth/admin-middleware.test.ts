@@ -36,6 +36,22 @@ describe('checkAdminPermissions credential transport', () => {
     );
 
     expect(result).toMatchObject({ success: true, isDevMode: true });
+    expect(result.isServiceToken).not.toBe(true);
+  });
+
+  it('marks a matching header service token as a service identity', async () => {
+    const result = await checkAdminPermissions(
+      new NextRequest('http://localhost/api/admin/vectorize', {
+        headers: { Authorization: 'Bearer service-secret' },
+      })
+    );
+
+    expect(result).toEqual({
+      success: true,
+      userId: 'admin-service',
+      isServiceToken: true,
+    });
+    expect(auth).not.toHaveBeenCalled();
   });
 
   it('does not honor the development bypass header in production', async () => {
