@@ -38,7 +38,7 @@ export default function OrderConfirmationModal({
 
         <div className="space-y-2">
           <p className="text-sm text-gray-400">Your order ID is:</p>
-          <pre className="text-sm font-mono text-blue-300 p-2 bg-zinc-800 rounded break-words whitespace-pre-wrap">
+          <pre className="text-sm font-mono text-blue-300 p-2 bg-zinc-800 rounded wrap-break-word whitespace-pre-wrap">
             {orderId}
           </pre>
         </div>

@@ -229,7 +229,7 @@ export default function HeaderClient({
             <Link
               href={`/category/${getCategorySlug(group.parent)}`}
               onClick={onCategorySelect}
-              className="flex items-center justify-between w-full p-4 bg-gradient-to-r from-orange-600/20 to-orange-500/10 rounded-lg border border-orange-500/30 hover:border-orange-400 transition-all duration-200 group"
+              className="flex items-center justify-between w-full p-4 bg-linear-to-r from-orange-600/20 to-orange-500/10 rounded-lg border border-orange-500/30 hover:border-orange-400 transition-all duration-200 group"
               prefetch={true}
             >
               <div>
@@ -313,7 +313,7 @@ export default function HeaderClient({
               {hasChildCategories ? (
                 <button
                   onClick={() => toggleCategoryExpansion(category.id)}
-                  className="mr-2 p-3 text-gray-400 hover:text-white flex-shrink-0 min-h-[48px] min-w-[48px] flex items-center justify-center"
+                  className="mr-2 p-3 text-gray-400 hover:text-white shrink-0 min-h-[48px] min-w-[48px] flex items-center justify-center"
                   aria-label={isExpanded ? 'Collapse category' : 'Expand category'}
                 >
                   {isExpanded ? (
@@ -323,7 +323,7 @@ export default function HeaderClient({
                   )}
                 </button>
               ) : (
-                <div className="w-8 h-6 mr-2 flex-shrink-0" /> // Spacer for alignment
+                <div className="w-8 h-6 mr-2 shrink-0" /> // Spacer for alignment
               )}
               <Link
                 href={`/category/${getCategorySlug(category)}`}
@@ -421,7 +421,7 @@ export default function HeaderClient({
           </SheetTrigger>
           <SheetContent
             side="right"
-            className="bg-black text-white transition-all ease-in-out px-3 w-full sm:w-[400px] !max-w-[400px] !duration-300 data-[state=closed]:!duration-200 data-[state=open]:!duration-300 flex flex-col h-full border-l border-neutral-800 overflow-y-auto"
+            className="bg-black text-white transition-all ease-in-out px-3 w-full sm:w-[400px] max-w-[400px]! duration-300! data-[state=closed]:duration-200! data-[state=open]:duration-300! flex flex-col h-full border-l border-neutral-800 overflow-y-auto"
           >
             {/* Accessibility components */}
             <VisuallyHidden>
