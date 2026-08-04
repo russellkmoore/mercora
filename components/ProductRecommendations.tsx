@@ -259,7 +259,7 @@ export default function ProductRecommendations({
       {/* Show agent answer only when we have product recommendations */}
       {hasRecommendations && hasAgentAnswer && (
         <div className="flex justify-start items-start mt-10 w-full px-4">
-          <div className="flex-shrink-0 mr-4">
+          <div className="shrink-0 mr-4">
             <Image
               src="/volt.svg"
               alt="Volt mascot"
@@ -271,7 +271,7 @@ export default function ProductRecommendations({
           <div className="flex-1 min-w-0 max-w-4xl">
             <div className="bg-neutral-900 text-white px-6 py-4 rounded-2xl shadow-lg relative text-left"
                 style={{ border: "1px solid #f59e42" }}>
-              <span className="whitespace-pre-wrap break-words block">{agentAnswer}</span>
+              <span className="whitespace-pre-wrap wrap-break-word block">{agentAnswer}</span>
               <span
                 className="absolute left-[-18px] top-6 w-0 h-0"
                 style={{

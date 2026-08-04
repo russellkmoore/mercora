@@ -26,7 +26,7 @@ export default function CartItemCard({ item }: CartItemCardProps) {
           width={56}
           height={56}
           sizes="56px"
-          className="object-cover rounded flex-shrink-0 sm:w-16 sm:h-16"
+          className="object-cover rounded shrink-0 sm:w-16 sm:h-16"
         />
       )}
       <div className="flex-1 min-w-0">

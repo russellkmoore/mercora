@@ -190,7 +190,7 @@ export default function AdminSidebar() {
                 `}
                 title={sidebarCollapsed ? item.label : ''}
               >
-                <Icon className={`w-5 h-5 ${sidebarCollapsed ? '' : 'flex-shrink-0'}`} />
+                <Icon className={`w-5 h-5 ${sidebarCollapsed ? '' : 'shrink-0'}`} />
                 
                 {!sidebarCollapsed && (
                   <div className="flex-1">

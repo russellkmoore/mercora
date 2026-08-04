@@ -814,7 +814,7 @@ export default function AdminSettingsPage() {
               
               <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3 mt-4">
                 <div className="flex items-center space-x-2">
-                  <AlertCircle className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+                  <AlertCircle className="w-4 h-4 text-yellow-400 shrink-0" />
                   <div className="text-sm text-yellow-300">
                     <p className="font-medium">Industry Standard</p>
                     <p className="text-xs text-yellow-400 mt-1">

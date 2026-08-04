@@ -234,7 +234,7 @@ export default function AgentDrawer({
       </SheetTrigger>
       <SheetContent
         side="right"
-        className="bg-[#fdfdfb] text-black transition-all ease-in-out px-3 w-full sm:w-[400px] lg:!w-[800px] !max-w-[800px] !duration-[600ms] data-[state=closed]:!duration-[600ms] data-[state=open]:!duration-[600ms] flex flex-col h-full"
+        className="bg-[#fdfdfb] text-black transition-all ease-in-out px-3 w-full sm:w-[400px] lg:!w-[800px] max-w-[800px]! duration-600! data-[state=closed]:duration-600! data-[state=open]:duration-600! flex flex-col h-full"
       >
         {/* Accessibility components */}
         <VisuallyHidden>
@@ -259,10 +259,10 @@ export default function AgentDrawer({
         </div>
 
         {/* Left fade */}
-        <div className="absolute left-0 top-0 h-full w-2 bg-gradient-to-r from-black/20 to-transparent z-10 pointer-events-none" />
+        <div className="absolute left-0 top-0 h-full w-2 bg-linear-to-r from-black/20 to-transparent z-10 pointer-events-none" />
 
         {/* Header - fixed */}
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           <h2 className="text-lg font-semibold mb-3 mt-2 flex items-center">
             <Search className="mr-2 h-5 w-5" />
             Ask Volt
@@ -270,7 +270,7 @@ export default function AgentDrawer({
         </div>
 
         {/* Chat container - fixed height */}
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           <div 
             ref={chatContainerRef}
             className="border rounded-md p-3 h-60 sm:h-80 overflow-y-auto text-sm space-y-3 bg-gray-100"
@@ -344,12 +344,12 @@ export default function AgentDrawer({
         </div>
 
         {/* AI Disclaimer */}
-        <div className="flex-shrink-0 text-xs text-gray-500 text-center px-2 py-1">
+        <div className="shrink-0 text-xs text-gray-500 text-center px-2 py-1">
           AI-generated responses may contain inaccuracies. Verify gear recommendations before purchase.
         </div>
 
         {/* Input area - fixed */}
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           <div className="relative">
             <input
               ref={inputRef}
@@ -380,7 +380,7 @@ export default function AgentDrawer({
         </div>
 
         {/* Divider */}
-        <hr className="my-4 flex-shrink-0" />
+        <hr className="my-4 shrink-0" />
 
         {/* Products area - scrollable */}
         <div className="flex-1 overflow-y-auto text-sm text-gray-600">

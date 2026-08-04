@@ -74,7 +74,7 @@ File: `components/HeaderClient.tsx`
 // In HeaderClient.tsx, update SheetContent:
 <SheetContent 
   side="right"
-  className="bg-[#fdfdfb] text-black transition-all ease-in-out px-3 w-full sm:w-[400px] !max-w-[400px] !duration-300 data-[state=closed]:!duration-200 data-[state=open]:!duration-300 flex flex-col h-full border-neutral-800"
+  className="bg-[#fdfdfb] text-black transition-all ease-in-out px-3 w-full sm:w-[400px] max-w-[400px]! duration-300! data-[state=closed]:duration-200! data-[state=open]:duration-300! flex flex-col h-full border-neutral-800"
   // Changed from 600ms to 300ms for open, 200ms for close
 >
 ```

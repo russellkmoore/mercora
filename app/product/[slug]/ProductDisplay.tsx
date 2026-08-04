@@ -139,7 +139,7 @@ export default function ProductDisplay({
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12">
         {/* Image Gallery Section */}
         <div>
-          <div className="relative aspect-[3/4] w-full overflow-hidden rounded bg-neutral-800">
+          <div className="relative aspect-3/4 w-full overflow-hidden rounded bg-neutral-800">
             <Image
               src={getMediaUrl(selectedImage)}
               alt={typeof product.name === "string" ? product.name : ""}
@@ -156,7 +156,7 @@ export default function ProductDisplay({
                 type="button"
                 key={`thumb-${index}`}
                 onClick={() => setSelectedImage(imageUrl)}
-                className={`relative h-16 w-16 flex-shrink-0 overflow-hidden rounded border sm:h-20 sm:w-20 ${
+                className={`relative h-16 w-16 shrink-0 overflow-hidden rounded border sm:h-20 sm:w-20 ${
                   selectedImage === imageUrl ? "border-orange-500" : "border-gray-700"
                 }`}
               >
