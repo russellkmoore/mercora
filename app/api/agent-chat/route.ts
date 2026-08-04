@@ -45,9 +45,10 @@
  * - **Search**: Cloudflare Vectorize for semantic product matching
  *
  * === Security ===
- * - Protected by Clerk authentication
- * - Input validation and sanitization
- * - Rate limiting via Cloudflare Workers
+ * - Public chat with optional Clerk identity
+ * - Bounded and sanitized prompt inputs
+ * - Native Cloudflare rate limiting before chat AI/vector/product work
+ * - Content-generation mode restricted to administrators and service callers
  * - Strict anti-hallucination prompts
  */
 
@@ -56,9 +57,125 @@ import { auth } from "@clerk/nextjs/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDbAsync } from "@/lib/db";
 import { products, deserializeProduct, product_variants } from "@/lib/db/schema/products";
-import { inArray, eq } from "drizzle-orm";
-import type { Product } from "@/lib/types";
+import { and, inArray, eq } from "drizzle-orm";
 import { runAI, getCurrentEmbeddingModel, extractAIResponse } from "@/lib/ai/config";
+import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
+import { enforceRateLimit, getClientIp } from "@/lib/rate-limit";
+import { isBoundedArray, isPlainRecord } from "@/lib/public-request-validation";
+import {
+  toPublicProduct,
+  toWireProduct,
+  type WireProduct,
+} from "@/lib/models/mach/product-serializer";
+
+const MAX_QUESTION_LENGTH = 4_000;
+const MAX_USER_NAME_LENGTH = 100;
+const MAX_USER_CONTEXT_LENGTH = 1_000;
+const MAX_HISTORY_MESSAGES = 12;
+const MAX_HISTORY_CONTENT_LENGTH = 4_000;
+const MAX_ORDERS = 3;
+
+type ChatRole = "user" | "assistant";
+
+interface ChatMessage {
+  role: ChatRole;
+  content: string;
+  created_at?: string;
+}
+
+interface PromptOrder {
+  id: string;
+  itemCount: number;
+  totalMinor: number;
+}
+
+function cleanPromptText(value: string, maxLength: number): string {
+  return value
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "")
+    .replace(/```+/g, "")
+    .slice(0, maxLength);
+}
+
+function boundedHeader(req: NextRequest, name: string, maxLength = 128): string | undefined {
+  const value = req.headers.get(name);
+  if (!value) return undefined;
+  const cleaned = cleanPromptText(value, maxLength).trim();
+  return cleaned || undefined;
+}
+
+function normalizeHistory(value: unknown): ChatMessage[] | null {
+  if (!isBoundedArray(value, MAX_HISTORY_MESSAGES)) return null;
+
+  const messages: ChatMessage[] = [];
+  for (const candidate of value) {
+    if (!isPlainRecord(candidate)) return null;
+    if (candidate.role !== "user" && candidate.role !== "assistant") return null;
+    if (
+      typeof candidate.content !== "string" ||
+      candidate.content.length > MAX_HISTORY_CONTENT_LENGTH
+    ) {
+      return null;
+    }
+
+    messages.push({
+      role: candidate.role,
+      content: cleanPromptText(candidate.content, MAX_HISTORY_CONTENT_LENGTH),
+    });
+  }
+  return messages;
+}
+
+function normalizeOrders(value: unknown): PromptOrder[] | null {
+  if (!isBoundedArray(value, MAX_ORDERS)) return null;
+
+  const orders: PromptOrder[] = [];
+  for (const candidate of value) {
+    if (!isPlainRecord(candidate)) return null;
+
+    const rawId = candidate.id;
+    if (typeof rawId !== "string" || rawId.length > 128) return null;
+
+    const rawItems = candidate.items;
+    if (Array.isArray(rawItems) && rawItems.length > 100) return null;
+    const itemCount = Array.isArray(rawItems)
+      ? rawItems.length
+      : typeof rawItems === "number" && Number.isFinite(rawItems)
+        ? Math.min(Math.max(Math.trunc(rawItems), 0), 100)
+        : 0;
+
+    const amountContainer = isPlainRecord(candidate.total_amount)
+      ? candidate.total_amount.amount
+      : undefined;
+    const rawTotal = typeof amountContainer === "number" ? amountContainer : candidate.total;
+    const totalMinor =
+      typeof rawTotal === "number" && Number.isFinite(rawTotal)
+        ? Math.min(Math.max(Math.trunc(rawTotal), 0), Number.MAX_SAFE_INTEGER)
+        : 0;
+
+    orders.push({
+      id: cleanPromptText(rawId, 128),
+      itemCount,
+      totalMinor,
+    });
+  }
+  return orders;
+}
+
+function fenced(label: string, value: string, maxLength: number): string {
+  const cleaned = cleanPromptText(value, maxLength).replace(
+    /---\s+(BEGIN|END)\s+UNTRUSTED/gi,
+    "— $1 UNTRUSTED"
+  );
+  return `--- BEGIN UNTRUSTED ${label} ---\n${cleaned}\n--- END UNTRUSTED ${label} ---`;
+}
+
+function isContentGenerationRequest(question: string, userContext: string): boolean {
+  return (
+    userContext === "content-generation" ||
+    /generate\s+only\s+the\s+inner\s+html/i.test(question) ||
+    /critical:\s*generate\s+complete/i.test(question)
+  );
+}
 
 /**
  * Handles chat interactions with the Volt AI assistant
@@ -68,30 +185,87 @@ import { runAI, getCurrentEmbeddingModel, extractAIResponse } from "@/lib/ai/con
  */
 export async function POST(req: NextRequest) {
   try {
-    // Parse and validate request body
-    const body: { 
-      question: string; 
-      userName?: string; 
-      userContext?: string;
-      orders?: any[];
-      history?: any[] 
-    } = await req.json();
-    const { userId } = await auth();
-    const { question, userName = "Guest", userContext = "", orders = [], history = [] } = body;
+    const body: unknown = await req.json();
+    if (!isPlainRecord(body)) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    // Extract Cloudflare location data from request headers
-    const requestLocation = {
-      country: req.headers.get('CF-IPCountry') || undefined,
-      city: req.headers.get('CF-IPCity') || undefined,
-      region: req.headers.get('CF-Region') || undefined, 
-      timezone: req.headers.get('CF-Timezone') || undefined,
-      continent: req.headers.get('CF-IPContinent') || undefined,
-      latitude: req.headers.get('CF-IPLatitude') || undefined,
-      longitude: req.headers.get('CF-IPLongitude') || undefined,
-    };
+    const rawQuestion = body.question;
+    const rawUserName = body.userName ?? "Guest";
+    const rawUserContext = body.userContext ?? "";
+    if (
+      typeof rawQuestion !== "string" ||
+      rawQuestion.trim().length === 0 ||
+      rawQuestion.length > MAX_QUESTION_LENGTH ||
+      typeof rawUserName !== "string" ||
+      rawUserName.length > MAX_USER_NAME_LENGTH ||
+      typeof rawUserContext !== "string" ||
+      rawUserContext.length > MAX_USER_CONTEXT_LENGTH
+    ) {
+      return NextResponse.json({ error: "Invalid or oversized chat input" }, { status: 400 });
+    }
 
+    const history = normalizeHistory(body.history ?? []);
+    const orders = normalizeOrders(body.orders ?? []);
+    if (!history || !orders) {
+      return NextResponse.json({ error: "Invalid or oversized chat context" }, { status: 400 });
+    }
+
+    const question = cleanPromptText(rawQuestion, MAX_QUESTION_LENGTH).trim();
+    const userName = cleanPromptText(rawUserName, MAX_USER_NAME_LENGTH).trim() || "Guest";
+    const userContext = cleanPromptText(rawUserContext, MAX_USER_CONTEXT_LENGTH);
     if (!question) {
       return NextResponse.json({ error: "Missing question" }, { status: 400 });
+    }
+    const { userId } = await auth();
+
+    const isContentGeneration =
+      isContentGenerationRequest(rawQuestion, rawUserContext) ||
+      isContentGenerationRequest(question, userContext);
+    if (isContentGeneration) {
+      const admin = await checkAdminPermissions(req);
+      if (!admin.success) {
+        return NextResponse.json(
+          { error: admin.error ?? "Admin access required" },
+          { status: 403 }
+        );
+      }
+    }
+
+    const limited = await enforceRateLimit(
+      "AI_RATE_LIMITER",
+      userId ? `agent-chat:user:${userId}` : `agent-chat:ip:${getClientIp(req)}`
+    );
+    if (limited) return limited;
+
+    const requestLocation = {
+      country: boundedHeader(req, "CF-IPCountry", 8),
+      region: boundedHeader(req, "CF-Region"),
+    };
+
+    const recentMessages = history.slice(-10);
+
+    // Rate-limit the harmless Easter egg as chat, but avoid AI/vector/database work.
+    if (/s(')?mores recipe/i.test(question)) {
+      const easterEgg = `Ah, the secret's out${
+        userName !== "Guest" ? `, ${userName}` : ""
+      }! Volt's Signature S'mores Recipe:
+        1. One marshmallow, toasted till golden-brown.
+        2. A square of dark chocolate—none of that milk chocolate nonsense.
+        3. Two crisp graham crackers.
+        Bonus: whisper "adventure" to the stack before eating. It's science.`;
+
+      return NextResponse.json({
+        answer: easterEgg,
+        productIds: [],
+        products: [],
+        history: [
+          ...recentMessages,
+          { role: "user", content: question, created_at: new Date().toISOString() },
+          { role: "assistant", content: easterEgg, created_at: new Date().toISOString() },
+        ].slice(-MAX_HISTORY_MESSAGES),
+        userId,
+      });
     }
 
     // === VECTORIZED SEARCH PHASE ===
@@ -127,16 +301,24 @@ export async function POST(req: NextRequest) {
         
         vectorResults = await Promise.race([vectorSearchPromise, timeoutPromise]);
 
-        if (vectorResults && vectorResults.matches) {
+        if (vectorResults && Array.isArray(vectorResults.matches)) {
           // Extract text snippets to provide context to the AI
           contextSnippets = vectorResults.matches
-            .map((match: any) => match.metadata?.text || match.id)
-            .join("\n\n");
+            .slice(0, 7)
+            .map((match: any) => {
+              const text = match?.metadata?.text ?? match?.id ?? "";
+              return typeof text === "string" ? cleanPromptText(text, 4_000) : "";
+            })
+            .filter(Boolean)
+            .join("\n\n")
+            .slice(0, 20_000);
 
           // Extract product IDs for fetching full product data later
           productIds = vectorResults.matches
-            .map((match: any) => match.metadata?.productId)
-            .filter((id: any) => id !== undefined && id !== null && id !== "");
+            .slice(0, 20)
+            .map((match: any) => match?.metadata?.productId)
+            .filter((id: unknown): id is string => typeof id === "string" && id.length <= 128)
+            .map((id: string) => cleanPromptText(id, 128));
         }
       } else {
         console.warn("Vectorize or AI binding not available");
@@ -146,40 +328,21 @@ export async function POST(req: NextRequest) {
       // Continue without vector context if Vectorize fails
     }
 
-    // Easter egg: Volt's Signature S'mores Recipe
-    if (/s(')?mores recipe/i.test(question)) {
-      const easterEgg = `Ah, the secret's out${
-        userName !== "Guest" ? `, ${userName}` : ""
-      }! Volt's Signature S'mores Recipe:
-        1. One marshmallow, toasted till golden-brown.
-        2. A square of dark chocolate—none of that milk chocolate nonsense.
-        3. Two crisp graham crackers.
-        Bonus: whisper "adventure" to the stack before eating. It's science.`;
+    const purchaseHistory = orders.length
+      ? orders
+          .map(
+            (order) =>
+              `Order ${order.id}: ${order.itemCount} items, $${(order.totalMinor / 100).toFixed(2)}`
+          )
+          .join(" • ")
+      : "No previous orders";
+    const locationSummary = requestLocation.country
+      ? `${requestLocation.country}${requestLocation.region ? `, ${requestLocation.region}` : ""}`
+      : "Unknown";
+    const productContext = contextSnippets || "No specific product information available for this query.";
 
-      return NextResponse.json({
-        answer: easterEgg,
-        productIds: [],
-        history: [
-          ...history,
-          {
-            role: "user",
-            content: question,
-            created_at: new Date().toISOString(),
-          },
-          {
-            role: "assistant",
-            content: easterEgg,
-            created_at: new Date().toISOString(),
-          },
-        ],
-        userId,
-      });
-    }
-
-    // Build the conversation history for context - increased due to higher token limit
-    const recentMessages = history.slice(-12); // Keep last 12 messages for better context retention
-
-    // Enhanced selective recommendation system prompt
+    // Enhanced selective recommendation system prompt. Each retrieved or
+    // caller-supplied context block is explicitly fenced as untrusted data.
     const systemPrompt = `You are Volt, a seasoned outdoor gear expert at Voltique with the wisdom of someone who's spent decades in the wilderness and the dry wit to match. Your job is to analyze available products and recommend ONLY the most relevant ones based on the user's specific needs and context.
 
 === YOUR PERSONALITY ===
@@ -196,14 +359,10 @@ You embody the spirit of a gruff but good-hearted outdoorsman who:
 You are a selective product curator, not a product catalog. Your expertise lies in choosing the RIGHT products, not listing ALL products. Think quality over quantity - like a craftsman choosing the perfect tool for the job.
 
 === USER CONTEXT ===
-${userName !== "Guest" ? `User: ${userName}` : "User: Anonymous visitor"}
-${userContext ? `Customer Profile: ${userContext}` : "Customer Profile: New visitor"}
-${orders.length > 0 ? `\nPurchase History: ${orders.slice(0, 3).map(order => 
-  `Order ${order.id}: ${order.items?.length || 0} items, $${((order.total_amount?.amount || order.total || 0) / 100).toFixed(2)}`
-).join(' • ')}` : 'Purchase History: No previous orders'}
-Location: ${requestLocation.country ? 
-  `${requestLocation.country}${requestLocation.region ? ', ' + requestLocation.region : ''}` : 
-  'Unknown'}
+${fenced("USER NAME", userName !== "Guest" ? userName : "Anonymous visitor", 100)}
+${fenced("CUSTOMER PROFILE", userContext || "New visitor", 1_000)}
+${fenced("PURCHASE HISTORY", purchaseHistory, 2_000)}
+${fenced("LOCATION", locationSummary, 300)}
 
 === PRODUCT SELECTION RULES ===
 1. **BE HIGHLY SELECTIVE**: From the available products below, recommend only 1-4 that are truly relevant
@@ -220,7 +379,7 @@ Location: ${requestLocation.country ?
 - **Avoid Owned Products**: Skip products they've already purchased
 
 === AVAILABLE PRODUCTS ===
-${contextSnippets || "No specific product information available for this query."}
+${fenced("RETRIEVED PRODUCT CONTEXT", productContext, 20_000)}
 
 === RESPONSE REQUIREMENTS ===
 - **Keep it concise**: Aim for 2-3 sentences max unless detailed explanation is specifically requested
@@ -250,10 +409,6 @@ Your expertise is in curation, not catalog dumping. Choose wisely.`;
       /^(hi|hello|hey|what's up|good morning|good afternoon|good evening)[\s\.,!?]*$/i.test(
         question.trim()
       );
-    const isContentGeneration = userContext === 'content-generation' || 
-                               question.includes('Generate ONLY the inner HTML') ||
-                               question.includes('CRITICAL: Generate complete');
-
     let assistantReply = "";
     let isAIResponse = false; // Track if we got a real AI response
 
@@ -274,7 +429,7 @@ Key traits:
 - NEVER mention specific products for simple greetings
 ${
   userName !== "Guest"
-    ? `- The user's name is ${userName}, acknowledge them naturally`
+    ? `- Acknowledge this user name naturally:\n${fenced("USER NAME", userName, 100)}`
     : ""
 }
 
@@ -397,20 +552,23 @@ Generate complete content based on the user's specifications.`;
         .filter(name => name.length > 0);
       
       // Map product names back to IDs using vector results metadata
-      if (vectorResults && vectorResults.matches) {
+      if (vectorResults && Array.isArray(vectorResults.matches)) {
         
         for (const productName of recommendedProductNames) {
           // Find the matching vector result by checking if the product name appears in the text
           const matchingResult = vectorResults.matches.find((match: any) => {
-            const text = match.metadata?.text || '';
+            const rawText = match?.metadata?.text;
+            const text = typeof rawText === "string" ? cleanPromptText(rawText, 4_000) : "";
             // Check if the product name appears in the text (case insensitive)
             return text.toLowerCase().includes(productName.toLowerCase());
           });
           
-          if (matchingResult && matchingResult.metadata?.productId) {
+          const matchedProductId = matchingResult?.metadata?.productId;
+          if (typeof matchedProductId === "string" && matchedProductId.length <= 128) {
+            const safeProductId = cleanPromptText(matchedProductId, 128);
             // Avoid duplicates - only add if not already in the array
-            if (!agentRecommendedProductIds.includes(matchingResult.metadata.productId)) {
-              agentRecommendedProductIds.push(matchingResult.metadata.productId);
+            if (safeProductId && !agentRecommendedProductIds.includes(safeProductId)) {
+              agentRecommendedProductIds.push(safeProductId);
             }
           }
         }
@@ -435,22 +593,31 @@ Generate complete content based on the user's specifications.`;
       // No specific product mentions detected - use vector search results
       finalProductIds = productIds;
     }
+    finalProductIds = [...new Set(finalProductIds)].slice(0, 20);
     
     // Fetch full product data if we have product IDs
-    let relatedProducts: Product[] = [];
+    let relatedProducts: WireProduct[] = [];
     if (finalProductIds.length > 0) {
       try {
         const db = await getDbAsync();
         const productResults = await db
           .select()
           .from(products)
-          .where(inArray(products.id, finalProductIds));
+          .where(and(inArray(products.id, finalProductIds), eq(products.status, "active")));
 
         // Fetch variants for each product and build complete Product objects
         relatedProducts = await Promise.all(productResults.map(async (productRecord) => {
           try {
             // Get variants for this product
-            const variants = await db.select().from(product_variants).where(eq(product_variants.product_id, productRecord.id));
+            const variants = await db
+              .select()
+              .from(product_variants)
+              .where(
+                and(
+                  eq(product_variants.product_id, productRecord.id),
+                  eq(product_variants.status, "active")
+                )
+              );
             
             // Deserialize the product
             const product = deserializeProduct(productRecord);
@@ -541,10 +708,10 @@ Generate complete content based on the user's specifications.`;
               }
             });
             
-            return product;
+            return toWireProduct(toPublicProduct(product));
           } catch (error) {
             console.error("Error processing product:", error);
-            return deserializeProduct(productRecord);
+            return toWireProduct(toPublicProduct(deserializeProduct(productRecord)));
           }
         }));
         
@@ -554,13 +721,15 @@ Generate complete content based on the user's specifications.`;
       }
     }
 
-    // Return the response with updated history
+    const boundedAssistantHistory = cleanPromptText(assistantReply, MAX_HISTORY_CONTENT_LENGTH);
+
+    // Return the response with updated, bounded history.
     return NextResponse.json({
       answer: assistantReply,
-      productIds: finalProductIds,
+      productIds: relatedProducts.map((product) => product.id),
       products: relatedProducts,
       history: [
-        ...history,
+        ...recentMessages,
         {
           role: "user",
           content: question,
@@ -568,10 +737,10 @@ Generate complete content based on the user's specifications.`;
         },
         {
           role: "assistant",
-          content: assistantReply,
+          content: boundedAssistantHistory,
           created_at: new Date().toISOString(),
         },
-      ],
+      ].slice(-MAX_HISTORY_MESSAGES),
       userId,
     });
   } catch (err) {
