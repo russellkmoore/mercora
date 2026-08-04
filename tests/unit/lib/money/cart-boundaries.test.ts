@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { cartItemTotal, cartSubtotal, Money } from '@/lib/money';
+import { isValidCartItem } from '@/lib/models/cart';
 import type { CartItem } from '@/lib/types/cartitem';
 
 const item: CartItem = {
@@ -22,5 +23,12 @@ describe('cart Money boundaries', () => {
   it('converts to decimal only for a MACH response', () => {
     expect(cartSubtotal([item]).toMach()).toEqual({ amount: 59.98, currency: 'USD', precision: 2 });
     expect(Money.fromStored(item.price).format()).toBe('$29.99');
+  });
+
+  it('rejects malformed persisted cart items at the validation boundary', () => {
+    expect(isValidCartItem(item)).toBe(true);
+    expect(isValidCartItem({ ...item, productId: undefined })).toBe(false);
+    expect(isValidCartItem({ ...item, quantity: 1.5 })).toBe(false);
+    expect(isValidCartItem({ ...item, price: { amount: 12.5, currency: 'USD' } })).toBe(false);
   });
 });

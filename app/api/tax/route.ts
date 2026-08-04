@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
       };
 
       return NextResponse.json({ 
-        amount, 
+        amount: amount.toJSON(),
         breakdown,
         calculated_by: "fallback",
         message: "Using fallback tax rate - provide shipping address for accurate calculation"
