@@ -90,7 +90,9 @@ export default function cloudflareLoader({
   const key = toObjectKey(src, cdn);
   if (key === null) return src;
   if (!cdn) return `/media/${key}`;
-  if (process.env.NEXT_PUBLIC_IMAGE_TRANSFORMS === "false") return `${cdn}/${key}`;
+  const transformsEnabled =
+    process.env.NEXT_PUBLIC_IMAGE_TRANSFORMS?.trim().toLowerCase() !== "false";
+  if (!transformsEnabled) return `${cdn}/${key}`;
 
   const params = [`width=${width}`, "format=auto"];
   if (quality) params.push(`quality=${quality}`);

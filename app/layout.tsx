@@ -92,6 +92,7 @@ export function generateMetadata(): Metadata {
       "mcp-schema": "/api/mcp/schema",
       "mcp-capabilities": config.mcp.capabilities,
       "mcp-version": "1.0.0",
+      "mcp-description": config.mcp.description,
     },
   };
 }
@@ -123,15 +124,7 @@ export default function RootLayout({
     >
       <html lang="en" suppressHydrationWarning>
         <head>
-          {/* MCP Server Discovery Meta Tags */}
-          <meta name="mcp-server" content="/api/mcp" />
-          <meta name="mcp-schema" content="/api/mcp/schema" />
-          <meta name="mcp-capabilities" content={config.mcp.capabilities} />
-          <meta name="mcp-version" content="1.0.0" />
-          <meta name="mcp-description" content={config.mcp.description} />
-          <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-          {/* Additional MCP Discovery */}
+          {/* MCP discovery links complement the metadata emitted by generateMetadata. */}
           <link rel="mcp-server" href="/api/mcp" type="application/json" />
           <link rel="mcp-schema" href="/api/mcp/schema" type="application/json" />
         </head>

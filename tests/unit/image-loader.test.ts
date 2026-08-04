@@ -23,6 +23,14 @@ describe("cloudflareLoader", () => {
     expect(cloudflareLoader(args)).toBe("https://images.example.test/products/example.png");
   });
 
+  it("normalizes the Image Transformations feature flag", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_IMAGE_CDN", "https://images.example.test");
+    vi.stubEnv("NEXT_PUBLIC_IMAGE_TRANSFORMS", " FALSE ");
+
+    expect(cloudflareLoader(args)).toBe("https://images.example.test/products/example.png");
+  });
+
   it("never rewrites an unrelated external image", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("NEXT_PUBLIC_IMAGE_CDN", "https://images.example.test");

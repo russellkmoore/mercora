@@ -13,12 +13,12 @@ import {
   migrationArgs,
   parseWranglerConfig,
   resolveTarget,
+  valueAfter,
 } from "./lib/d1-migrate-plan.mjs";
 
 const args = process.argv.slice(2);
-const valueAfter = (flag) => args[args.indexOf(flag) + 1];
-const target = valueAfter("--target");
-const selectedEnvironment = args.includes("--env") ? valueAfter("--env") : undefined;
+const target = valueAfter(args, "--target");
+const selectedEnvironment = valueAfter(args, "--env");
 const apply = args.includes("--apply");
 
 if (!target || (args.includes("--env") && !selectedEnvironment)) {
