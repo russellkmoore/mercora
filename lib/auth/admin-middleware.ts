@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { isUserAdmin, updateAdminLastLogin } from "../models/admin";
+import { timingSafeEqual } from "./crypto";
 
 export interface AdminAuthResult {
   success: boolean;
@@ -12,23 +13,22 @@ export interface AdminAuthResult {
 export async function checkAdminPermissions(request: NextRequest): Promise<AdminAuthResult> {
   try {
     // Check for development mode bypass token first
-    const devToken = request.headers.get("x-dev-admin") || 
-                    request.nextUrl.searchParams.get("dev");
+    const devToken = request.headers.get("x-dev-admin");
     
     if (devToken === "mercora-dev-bypass" && process.env.NODE_ENV === "development") {
       console.log("⚠️ DEV MODE: Admin authentication bypassed with dev token");
       return { success: true, userId: "dev-admin", isDevMode: true };
     }
 
-    // Check for API token-based auth (for server-to-server calls)
+    // Header-only: URL credentials leak through logs, browser history, and Referer.
     const authToken = request.headers.get("authorization")?.replace("Bearer ", "") ||
-                     request.nextUrl.searchParams.get("token");
+                     request.headers.get("x-api-key");
     
     if (authToken) {
       // Use admin vectorize token for server-to-server admin API calls
       const adminToken = process.env.ADMIN_VECTORIZE_TOKEN;
       
-      if (adminToken && authToken === adminToken) {
+      if (adminToken && (await timingSafeEqual(authToken, adminToken))) {
         return { success: true, userId: "admin-service" };
       }
     }
