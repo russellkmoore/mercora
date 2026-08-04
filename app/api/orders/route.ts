@@ -27,6 +27,7 @@ import { authenticateRequest, PERMISSIONS } from "@/lib/auth/unified-auth";
 import { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail, type OrderData } from "@/lib/utils/email";
 import type { Order, CreateOrderRequest, UpdateOrderRequest } from "@/lib/types/order";
 import { getCustomer, createCustomer } from "@/lib/models/mach/customer";
+import { Money, toWireMoney, type MachMoney } from "@/lib/money";
 
 
 
@@ -89,7 +90,7 @@ export async function GET(request: NextRequest) {
     const hydratedOrders = paginatedOrders.map(hydrateOrder);
     
     const response = {
-      data: hydratedOrders,
+      data: hydratedOrders.map(toWireOrder),
       meta: {
         total,
         limit,
@@ -136,7 +137,7 @@ export async function POST(request: NextRequest) {
         details: ['items array is required and must not be empty']
       }, { status: 400 });
     }
-    if (!body.total_amount || typeof body.total_amount.amount !== 'number') {
+    if (!body.total_amount || !Number.isSafeInteger(body.total_amount.amount)) {
       return NextResponse.json({
         error: 'Validation failed',
         details: ['total_amount is required and must be a Money object']
@@ -193,7 +194,7 @@ export async function POST(request: NextRequest) {
       id: orderId,
       customer_id: customerId,
       status: 'pending',
-      total_amount: JSON.stringify(body.total_amount),
+      total_amount: Money.fromStored(body.total_amount, body.currency_code).toJSON(),
       currency_code: body.currency_code,
       shipping_address: body.shipping_address ? JSON.stringify(body.shipping_address) : null,
       billing_address: body.billing_address ? JSON.stringify(body.billing_address) : null,
@@ -263,7 +264,7 @@ export async function POST(request: NextRequest) {
     
 
     const response = {
-      data: hydrateOrder(newOrder),
+      data: toWireOrder(hydrateOrder(newOrder)),
       meta: {
         schema: "mach:order"
       }
@@ -380,7 +381,7 @@ export async function PUT(request: NextRequest) {
     });
 
     const response = {
-      data: hydrateOrder(updatedOrder),
+      data: toWireOrder(hydrateOrder(updatedOrder)),
       meta: {
         schema: "mach:order"
       }
@@ -404,7 +405,7 @@ function hydrateOrder(dbOrder: typeof orders.$inferSelect): Order {
     id: dbOrder.id ?? undefined,
     customer_id: dbOrder.customer_id || undefined,
     status: dbOrder.status,
-    total_amount: typeof dbOrder.total_amount === 'string' ? JSON.parse(dbOrder.total_amount) : { amount: 0, currency: dbOrder.currency_code },
+    total_amount: Money.fromStored(dbOrder.total_amount, dbOrder.currency_code).toJSON(),
     currency_code: dbOrder.currency_code,
     shipping_address: dbOrder.shipping_address ? (typeof dbOrder.shipping_address === 'string' ? JSON.parse(dbOrder.shipping_address) : dbOrder.shipping_address) : undefined,
     billing_address: dbOrder.billing_address ? (typeof dbOrder.billing_address === 'string' ? JSON.parse(dbOrder.billing_address) : dbOrder.billing_address) : undefined,
@@ -420,6 +421,25 @@ function hydrateOrder(dbOrder: typeof orders.$inferSelect): Order {
     extensions: dbOrder.extensions ? (typeof dbOrder.extensions === 'string' ? JSON.parse(dbOrder.extensions) : dbOrder.extensions) : undefined,
     created_at: dbOrder.created_at ?? undefined,
     updated_at: dbOrder.updated_at ?? undefined
+  };
+}
+
+type WireOrderItem = Omit<Order['items'][number], 'unit_price' | 'total_price'> & {
+  unit_price: MachMoney;
+  total_price: MachMoney;
+};
+type WireOrder = Omit<Order, 'total_amount' | 'items'> & { total_amount: MachMoney; items: WireOrderItem[] };
+
+/** Apply decimal MACH serialization last, after all internal minor-unit work. */
+function toWireOrder(order: Order): WireOrder {
+  return {
+    ...order,
+    total_amount: toWireMoney(order.total_amount),
+    items: order.items.map((item) => ({
+      ...item,
+      unit_price: toWireMoney(item.unit_price),
+      total_price: toWireMoney(item.total_price),
+    })),
   };
 }
 
