@@ -172,7 +172,7 @@ export default function RootLayout({
             position="top-center"
             toastOptions={{
               className:
-                "bg-[var(--store-primary)]/80 text-black font-semibold rounded-md mt-[60px] shadow-lg animate-in fade-in slide-in-from-top-5",
+                "bg-(--store-primary)/80 text-black font-semibold rounded-md mt-[60px] shadow-lg animate-in fade-in slide-in-from-top-5",
               duration: 3000,
             }}
           />

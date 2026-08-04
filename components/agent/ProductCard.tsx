@@ -23,7 +23,7 @@ export default function ProductCard({ product }: { product: any }) {
     <div className="border rounded-md p-2 bg-white shadow-sm hover:shadow-md transition-shadow">
       <Link href={`/product/${product.slug}`} className="flex items-center space-x-2" prefetch={true}>
         {/* Smaller image for drawer */}
-        <div className="w-12 h-12 relative flex-shrink-0 overflow-hidden rounded border">
+        <div className="w-12 h-12 relative shrink-0 overflow-hidden rounded border">
           <Image
             src={imageUrl}
             alt={product.name || 'Product'}
