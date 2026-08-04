@@ -9,6 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "deploy": "rm -rf .next .open-next .wrangler/state .wrangler/public && opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "clean": "rm -rf .open-next .next .wrangler/state .wrangler/public",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
@@ -72,6 +74,7 @@
     "tsx": "^4.20.3",
     "tw-animate-css": "^1.3.5",
     "typescript": "^5",
+    "vitest": "^4.1.10",
     "wrangler": "^4.118.0"
   }
 }
