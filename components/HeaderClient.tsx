@@ -64,6 +64,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import CartDrawer from "@/components/cart/CartDrawer";
 import { CartHydrationGuard } from "@/components/cart/CartHydrationGuard";
 import ClientOnly from "@/components/ClientOnly";
+import { useStoreConfig } from "@/lib/store";
 import type { MACHCategory } from '@/lib/types/mach';
 
 /**
@@ -130,6 +131,7 @@ const getCategorySlug = (category: MACHCategory): string => {
 export default function HeaderClient({
   categories,
 }: HeaderClientProps) {
+  const store = useStoreConfig();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
@@ -346,7 +348,7 @@ export default function HeaderClient({
   return (
     <div className="flex justify-between items-center px-4 sm:px-6 py-4 bg-black text-white">
       <Link href="/" className="text-lg sm:text-xl font-bold">
-        Voltique
+        {store.identity.name}
       </Link>
 
       {/* Desktop Navigation */}
