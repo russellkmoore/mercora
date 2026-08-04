@@ -44,11 +44,43 @@ export function stripJsonComments(text) {
       output += current;
     }
   }
-  return output.replace(/,(\s*[}\]])/g, "$1");
+  let result = "";
+  inString = false;
+  escaped = false;
+
+  for (let index = 0; index < output.length; index += 1) {
+    const current = output[index];
+    if (inString) {
+      result += current;
+      if (escaped) escaped = false;
+      else if (current === "\\") escaped = true;
+      else if (current === '"') inString = false;
+      continue;
+    }
+    if (current === '"') {
+      inString = true;
+      result += current;
+      continue;
+    }
+    if (current === ",") {
+      let next = index + 1;
+      while (/\s/.test(output[next] ?? "")) next += 1;
+      if (output[next] === "}" || output[next] === "]") continue;
+    }
+    result += current;
+  }
+
+  return result;
 }
 
 export function parseWranglerConfig(text) {
   return JSON.parse(stripJsonComments(text));
+}
+
+export function valueAfter(args, flag) {
+  const index = args.indexOf(flag);
+  const value = index === -1 ? undefined : args[index + 1];
+  return value?.startsWith("--") ? undefined : value;
 }
 
 function databaseFor(config, environment) {
