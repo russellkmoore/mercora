@@ -8,6 +8,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listPromotions, listCouponInstances } from '@/lib/models';
 import type { Promotion, CouponInstance } from '@/lib/types';
+import { enforceRateLimit, getClientIp } from '@/lib/rate-limit';
+import {
+  isBoundedArray,
+  isBoundedString,
+  isPlainRecord,
+} from '@/lib/public-request-validation';
 
 interface DiscountValidationRequest {
   code: string;
@@ -36,12 +42,48 @@ interface DiscountValidationResponse {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: DiscountValidationRequest = await request.json();
+    const limited = await enforceRateLimit(
+      'PUBLIC_RATE_LIMITER',
+      `validate-discount:${getClientIp(request)}`
+    );
+    if (limited) return limited;
+
+    const rawBody: unknown = await request.json();
+    if (!isPlainRecord(rawBody)) {
+      return NextResponse.json(
+        { valid: false, error: 'Invalid request body' },
+        { status: 400 }
+      );
+    }
+
+    const body = rawBody as unknown as DiscountValidationRequest;
     const { code, cartSubtotal = 0, cartItems = [] } = body;
 
-    if (!code || typeof code !== 'string') {
+    if (!isBoundedString(code, 128)) {
       return NextResponse.json(
         { valid: false, error: 'Discount code is required' },
+        { status: 400 }
+      );
+    }
+
+    if (
+      !Number.isFinite(cartSubtotal) ||
+      cartSubtotal < 0 ||
+      !isBoundedArray(cartItems) ||
+      !cartItems.every((item) =>
+        isPlainRecord(item) &&
+        isBoundedString(item.productId, 128) &&
+        isBoundedArray(item.categories) &&
+        item.categories.every((category) => isBoundedString(category, 128)) &&
+        Number.isInteger(item.quantity) &&
+        item.quantity > 0 &&
+        item.quantity <= 1_000 &&
+        Number.isFinite(item.price) &&
+        item.price >= 0
+      )
+    ) {
+      return NextResponse.json(
+        { valid: false, error: 'Cart data is invalid' },
         { status: 400 }
       );
     }

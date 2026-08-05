@@ -3,7 +3,7 @@ import { listCategories } from '../../models/mach/category';
 import { AssessRequest, AssessResponse, MCPToolResponse } from '../types';
 import { enhanceUserContext } from '../context';
 import { Money } from '../../money';
-import { toWireProduct } from '../../models/mach/product-serializer';
+import { toPublicProduct, toWireProduct } from '../../models/mach/product-serializer';
 
 export async function assessFulfillmentCapability(
   request: AssessRequest,
@@ -81,7 +81,9 @@ export async function assessFulfillmentCapability(
       data: {
         can_fulfill: canFulfill,
         cannot_fulfill: cannotFulfill,
-        recommendations: recommendations.map(toWireProduct),
+        recommendations: recommendations
+          .filter(product => product.status === 'active')
+          .map(product => toWireProduct(toPublicProduct(product))),
         estimated_cost: estimatedCost,
         estimated_delivery: estimatedDelivery
       },

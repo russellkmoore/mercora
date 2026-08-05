@@ -5,17 +5,41 @@ import type { ShippingOption } from "@/lib/types/shipping";
 import type { CartItem } from "@/lib/types/cartitem";
 import { getSettings } from "@/lib/utils/settings";
 import { Money, cartSubtotal } from "@/lib/money";
+import { enforceRateLimit, getClientIp } from "@/lib/rate-limit";
+import {
+  isBoundedString,
+  isPlainRecord,
+  isValidPublicCartItems,
+} from "@/lib/public-request-validation";
 
 export async function POST(req: NextRequest) {
   try {
-    const { address, items }: { address: Address; items: CartItem[] } =
-      await req.json();
+    const limited = await enforceRateLimit(
+      "PUBLIC_RATE_LIMITER",
+      `shipping-options:${getClientIp(req)}`
+    );
+    if (limited) return limited;
 
-    if (!address || !address.postal_code) {
+    const body: unknown = await req.json();
+    if (!isPlainRecord(body)) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    const { address, items } = body as unknown as { address: Address; items: CartItem[] };
+
+    if (
+      !isPlainRecord(address) ||
+      !isBoundedString(address.postal_code, 32) ||
+      !isBoundedString(address.country, 2)
+    ) {
       return NextResponse.json(
         { error: "Missing address data" },
         { status: 400 }
       );
+    }
+
+    if (!isValidPublicCartItems(items)) {
+      return NextResponse.json({ error: "Cart items are missing or invalid" }, { status: 400 });
     }
 
     if (address.country !== "US") {

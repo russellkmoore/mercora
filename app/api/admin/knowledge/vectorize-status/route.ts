@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
+import { normalizeKnowledgeFilename } from "@/lib/utils/safe-filename";
+import { errorDetails } from "@/lib/utils/error-response";
 
 // Update vectorization status for knowledge articles
 export async function POST(request: NextRequest) {
@@ -20,10 +22,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body: any = await request.json();
-    const { filename, vectorized } = body;
+    const { filename: requestedFilename, vectorized } = body;
+    const filename = normalizeKnowledgeFilename(requestedFilename);
 
     if (!filename) {
-      return NextResponse.json({ error: "Filename is required" }, { status: 400 });
+      return NextResponse.json({ error: "A safe filename is required" }, { status: 400 });
     }
 
     const key = `knowledge_md/${filename}`;
@@ -61,7 +64,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { 
         error: "Failed to update vectorization status",
-        details: error instanceof Error ? error.message : String(error)
+        ...errorDetails(error),
       },
       { status: 500 }
     );

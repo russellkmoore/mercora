@@ -8,6 +8,12 @@ export async function GET(request: NextRequest) {
     if (!authResult.success) {
       return NextResponse.json({ error: authResult.error }, { status: 401 });
     }
+    if (authResult.isServiceToken) {
+      return NextResponse.json(
+        { error: 'Service credentials cannot manage admin users' },
+        { status: 403 }
+      );
+    }
 
     // Get admin users from database
     const adminUsers = await getAllAdminUsers();
@@ -31,6 +37,12 @@ export async function POST(request: NextRequest) {
     const authResult = await checkAdminPermissions(request);
     if (!authResult.success) {
       return NextResponse.json({ error: authResult.error }, { status: 401 });
+    }
+    if (authResult.isServiceToken) {
+      return NextResponse.json(
+        { error: 'Service credentials cannot manage admin users' },
+        { status: 403 }
+      );
     }
 
     const { action, userId, email, displayName } = await request.json() as { 

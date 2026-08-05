@@ -6,42 +6,111 @@ import { NextRequest, NextResponse } from "next/server";
 import { 
   listProducts, 
   createProduct, 
-  updateProduct,
   getProductsByCategory
 } from "@/lib/models/mach/products";
 import type { ApiResponse, Product } from "@/lib/types";
-import { toWireProduct, type WireProduct } from "@/lib/models/mach/product-serializer";
+import {
+  toPublicProduct,
+  toWireProduct,
+  type WireProduct,
+} from "@/lib/models/mach/product-serializer";
+import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
+import { errorDetails } from "@/lib/utils/error-response";
+
+const PRODUCT_STATUSES = ['active', 'inactive', 'draft', 'archived'] as const;
+type ProductStatus = (typeof PRODUCT_STATUSES)[number];
+
+function isProductStatus(value: string): value is ProductStatus {
+  return (PRODUCT_STATUSES as readonly string[]).includes(value);
+}
+
+const PRODUCT_CREATE_VALIDATION_MESSAGES = new Set([
+  'Invalid product data provided',
+]);
+
+function productCreateValidationMessage(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  return PRODUCT_CREATE_VALIDATION_MESSAGES.has(error.message) ? error.message : undefined;
+}
+
+function clampInt(
+  raw: string | null,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  const parsed = Number.parseInt(raw ?? '', 10);
+  return Math.min(Math.max(Number.isFinite(parsed) ? parsed : fallback, min), max);
+}
 
 /**
  * GET /api/products - List products
  */
 export async function GET(request: NextRequest) {
   try {
+    // GET remains public. Authentication only selects the admin representation;
+    // no query parameter can opt an unauthenticated caller into that view.
+    const adminAuth = await checkAdminPermissions(request);
+    const isAdmin = adminAuth.success;
     const url = new URL(request.url);
-    const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100);
-    const offset = parseInt(url.searchParams.get('offset') || '0');
-    const status = url.searchParams.get('status') as 'active' | 'inactive' | 'draft' | 'archived' | null;
-    const search = url.searchParams.get('search');
+    const limit = clampInt(url.searchParams.get('limit'), 20, 1, 100);
+    const offset = clampInt(url.searchParams.get('offset'), 0, 0, Number.MAX_SAFE_INTEGER);
+    const requestedStatus = url.searchParams.get('status');
     const category = url.searchParams.get('category');
 
-    // Get total count first (without limit/offset)
-    const allProducts = category && category.trim()
-      ? await getProductsByCategory(category.trim())
-      : await listProducts({ 
-          status: status ? [status] : undefined
-        });
-    const total = allProducts.length;
-    
-    // Then get the paginated results
-    const products = category && category.trim()
-      ? await getProductsByCategory(category.trim())
-      : await listProducts({ 
-          status: status ? [status] : undefined,
-          limit, 
-          offset 
-        });
+    if (isAdmin && requestedStatus && !isProductStatus(requestedStatus)) {
+      return NextResponse.json(
+        {
+          error: 'Validation failed',
+          details: [`Invalid status: ${requestedStatus}`],
+        },
+        { status: 400 }
+      );
+    }
+
+    const statusFilter: ProductStatus[] | undefined = isAdmin
+      ? (requestedStatus ? [requestedStatus as ProductStatus] : undefined)
+      : ['active'];
+    const filterByStatus = (products: Product[]): Product[] =>
+      statusFilter
+        ? products.filter((product) => statusFilter.includes(product.status as ProductStatus))
+        : products;
+
+    let total: number;
+    let products: Product[];
+
+    if (category?.trim()) {
+      // The category model is not status/pagination aware. Filter before
+      // slicing so totals and links describe the same public result set.
+      const visibleProducts = filterByStatus(await getProductsByCategory(category.trim()));
+      total = visibleProducts.length;
+      products = visibleProducts.slice(offset, offset + limit);
+    } else {
+      const [allProducts, page] = await Promise.all([
+        listProducts({ status: statusFilter }),
+        listProducts({ status: statusFilter, limit, offset }),
+      ]);
+      total = filterByStatus(allProducts).length;
+      products = filterByStatus(page);
+    }
+
+    const responseProducts = (isAdmin
+      ? products
+      : products.map(toPublicProduct)
+    ).map(toWireProduct);
+
+    const productLink = (linkOffset: number): string => {
+      const params = new URLSearchParams({
+        limit: String(limit),
+        offset: String(linkOffset),
+      });
+      if (category?.trim()) params.set('category', category.trim());
+      if (isAdmin && requestedStatus) params.set('status', requestedStatus);
+      return `/api/products?${params.toString()}`;
+    };
+
     const response: ApiResponse<WireProduct[]> = {
-      data: products.map(toWireProduct),
+      data: responseProducts,
       meta: {
         total,
         limit,
@@ -49,15 +118,15 @@ export async function GET(request: NextRequest) {
         schema: "mach:product"
       },
       links: {
-        self: `/api/products?limit=${limit}&offset=${offset}`,
-        first: `/api/products?limit=${limit}&offset=0`,
+        self: productLink(offset),
+        first: productLink(0),
         ...(offset + limit < total && {
-          next: `/api/products?limit=${limit}&offset=${offset + limit}`
+          next: productLink(offset + limit)
         }),
         ...(offset > 0 && {
-          prev: `/api/products?limit=${limit}&offset=${Math.max(0, offset - limit)}`
+          prev: productLink(Math.max(0, offset - limit))
         }),
-        last: `/api/products?limit=${limit}&offset=${Math.floor(total / limit) * limit}`
+        last: productLink(Math.max(0, Math.floor((total - 1) / limit) * limit))
       }
     };
     return NextResponse.json(response);
@@ -75,6 +144,11 @@ export async function GET(request: NextRequest) {
  * POST /api/products - Create product
  */
 export async function POST(request: NextRequest) {
+  const adminAuth = await checkAdminPermissions(request);
+  if (!adminAuth.success) {
+    return NextResponse.json({ error: adminAuth.error }, { status: 401 });
+  }
+
   try {
     const body = await request.json() as any;
     
@@ -85,9 +159,9 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     // Optionally, add more MACH spec validation here
-  const product = await createProduct(body as Product);
-    const response: ApiResponse<Product> = {
-      data: product,
+    const product = await createProduct(body as Product);
+    const response: ApiResponse<WireProduct> = {
+      data: toWireProduct(product),
       meta: {
         schema: "mach:product"
       }
@@ -96,16 +170,16 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Products API error:', error);
-    
-    if (error instanceof Error) {
+    const validationMessage = productCreateValidationMessage(error);
+    if (validationMessage) {
       return NextResponse.json({
         error: 'Validation failed',
-        message: error.message
+        message: validationMessage
       }, { status: 400 });
     }
-    
+
     return NextResponse.json(
-      { error: 'Failed to create product' },
+      { error: 'Failed to create product', ...errorDetails(error) },
       { status: 500 }
     );
   }

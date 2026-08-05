@@ -68,8 +68,9 @@ export default function CategoryDisplay({ products }: CategoryDisplayProps) {
   const getAvailability = (product: Product) => {
     const variants = product.variants || [];
     const defaultVariant = variants.find((v) => v.id === product.default_variant_id) || variants[0];
-    const quantityInStock = defaultVariant?.inventory?.quantity ?? 0;
-    return quantityInStock > 0 ? 1 : 0; // 1 for available, 0 for not available
+    const available = defaultVariant?.available_for_sale ??
+      (defaultVariant?.inventory?.quantity ?? 0) > 0;
+    return available ? 1 : 0;
   };
 
   const sortedProducts = [...products].sort((a, b) => {
