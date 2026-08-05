@@ -109,3 +109,6 @@ export * from "./mcp";
 
 // Reviews & Ratings schema (application-specific)
 export * from "./reviews";
+
+// Analytics cache schema (Admin BI dashboard, application-specific)
+export * from "./analytics";

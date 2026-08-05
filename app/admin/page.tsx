@@ -88,11 +88,13 @@ interface AIAnalytics {
   trends: {
     orderTrends: string;
     topCategories: string[];
-    timeframe: string;
+    timeframe?: string;
+    range?: string;
     analysisDate: string;
   };
   loading: boolean;
   error?: string;
+  generatedAt?: string;
 }
 
 
@@ -130,11 +132,12 @@ export default function AdminDashboard() {
     trends: {
       orderTrends: "",
       topCategories: [],
-      timeframe: "week",
+      range: "30d",
       analysisDate: "",
     },
     loading: false,
     error: undefined,
+    generatedAt: undefined,
   });
 
   const fetchDashboardStats = useCallback(async () => {
@@ -245,50 +248,43 @@ export default function AdminDashboard() {
     }
   }, [timeRange]);
 
-  const fetchAIAnalytics = useCallback(async (timeframe: "day" | "week" | "month" | "quarter" = "week") => {
-    setAiAnalytics(prev => ({ ...prev, loading: true, error: undefined }));
-    
-    try {
-      const response = await fetch("/api/admin/analytics", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          question: "Analyze current business performance and trends",
-          timeframe,
-          focus: "all"
-        }),
-      });
+  // Map an API analytics response onto dashboard state.
+  const applyAnalytics = useCallback((data: any) => {
+    setAiAnalytics({
+      insights: data.insights || "",
+      alerts: data.alerts || [],
+      recommendations: data.recommendations || [],
+      metrics: data.metrics || {
+        totalRevenue: 0,
+        totalOrders: 0,
+        averageOrderValue: 0,
+        activeProducts: 0,
+        lowStockProducts: 0,
+        conversionRate: "0%",
+      },
+      trends: data.trends || {
+        orderTrends: "",
+        topCategories: [],
+        range: timeRange,
+        analysisDate: new Date().toISOString(),
+      },
+      loading: false,
+      error: undefined,
+      generatedAt: data.generatedAt,
+    });
+  }, [timeRange]);
 
+  // Fast path: read the pre-generated (cron/refresh) payload from cache. No AI on load.
+  const fetchAIAnalytics = useCallback(async () => {
+    setAiAnalytics(prev => ({ ...prev, loading: true, error: undefined }));
+    try {
+      const response = await fetch(`/api/admin/analytics?range=${timeRange}`);
       if (!response.ok) {
         throw new Error(`Analytics request failed: ${response.statusText}`);
       }
-
       const data = await response.json() as any;
-      
       if (data.success) {
-        setAiAnalytics({
-          insights: data.insights || "",
-          alerts: data.alerts || [],
-          recommendations: data.recommendations || [],
-          metrics: data.metrics || {
-            totalRevenue: 0,
-            totalOrders: 0,
-            averageOrderValue: 0,
-            activeProducts: 0,
-            lowStockProducts: 0,
-            conversionRate: "0%",
-          },
-          trends: data.trends || {
-            orderTrends: "",
-            topCategories: [],
-            timeframe,
-            analysisDate: new Date().toISOString(),
-          },
-          loading: false,
-          error: undefined,
-        });
+        applyAnalytics(data);
       } else {
         throw new Error(data.error || "Analytics request failed");
       }
@@ -300,7 +296,35 @@ export default function AdminDashboard() {
         error: error instanceof Error ? error.message : "Failed to fetch analytics",
       }));
     }
-  }, []);
+  }, [timeRange, applyAnalytics]);
+
+  // Manual refresh: regenerate all ranges (same work the cron performs), then show current range.
+  const refreshAnalytics = useCallback(async () => {
+    setAiAnalytics(prev => ({ ...prev, loading: true, error: undefined }));
+    try {
+      const response = await fetch("/api/admin/analytics/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ range: timeRange }),
+      });
+      if (!response.ok) {
+        throw new Error(`Refresh failed: ${response.statusText}`);
+      }
+      const data = await response.json() as any;
+      if (data.success) {
+        applyAnalytics(data);
+      } else {
+        throw new Error(data.error || "Refresh failed");
+      }
+    } catch (error) {
+      console.error("Error refreshing AI analytics:", error);
+      setAiAnalytics(prev => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error.message : "Failed to refresh analytics",
+      }));
+    }
+  }, [timeRange, applyAnalytics]);
 
   useEffect(() => {
     fetchDashboardStats();
@@ -420,15 +444,20 @@ export default function AdminDashboard() {
                 <p className="text-sm text-gray-400">Powered by advanced analytics</p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3">
+              {aiAnalytics.generatedAt && (
+                <span className="text-xs text-gray-400">
+                  Updated {new Date(aiAnalytics.generatedAt).toLocaleString()}
+                </span>
+              )}
               <Button
-                onClick={() => fetchAIAnalytics("week")}
+                onClick={refreshAnalytics}
                 disabled={aiAnalytics.loading}
                 variant="outline"
                 size="sm"
                 className="border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white"
               >
-                {aiAnalytics.loading ? "Analyzing..." : "Refresh"}
+                {aiAnalytics.loading ? "Refreshing..." : "Refresh"}
               </Button>
             </div>
           </div>
