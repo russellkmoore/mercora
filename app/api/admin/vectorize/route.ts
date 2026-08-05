@@ -17,11 +17,10 @@
  * Supported authentication methods:
  * - Authorization: Bearer <token>
  * - X-API-Key: <token>
- * - Query parameter: ?token=<token> (deprecated, for backward compatibility)
  *
  * === Usage ===
  * ```bash
- * curl -H "Authorization: Bearer YOUR_TOKEN" /api/vectorize
+ * curl -X POST -H "Authorization: Bearer YOUR_TOKEN" /api/admin/vectorize
  * ```
  *
  * === Performance Considerations ===
@@ -36,8 +35,9 @@ import { getDbAsync } from "@/lib/db";
 import { products, deserializeProduct, product_variants } from "@/lib/db/schema/products";
 import { eq } from "drizzle-orm";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
+import { errorDetails } from "@/lib/utils/error-response";
 
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
     // Check admin permissions first
     const authResult = await checkAdminPermissions(request);
@@ -243,7 +243,8 @@ export async function GET(request: NextRequest) {
         
       } catch (error) {
         const productAny = productRecord as any;
-        productErrors.push(`Error processing product ${productAny.id}: ${error}`);
+        console.error(`Error processing product ${productAny.id}:`, error);
+        productErrors.push(`Failed to process product ${productAny.id}`);
       }
     }
 
@@ -294,7 +295,8 @@ export async function GET(request: NextRequest) {
 
         knowledgeResults.push(slug);
       } catch (error) {
-        knowledgeErrors.push(`Error processing ${obj.key}: ${error}`);
+        console.error(`Error processing ${obj.key}:`, error);
+        knowledgeErrors.push(`Failed to process ${obj.key}`);
       }
     }
 
@@ -345,14 +347,17 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Consolidated vectorization error:", error);
     return NextResponse.json(
-      { error: "Internal server error", details: String(error) },
+      { error: "Internal server error", ...errorDetails(error) },
       { status: 500 }
     );
   }
 }
 
-export async function POST(request: NextRequest) {
-  return GET(request);
+export async function GET() {
+  return NextResponse.json(
+    { error: "Method not allowed" },
+    { status: 405, headers: { Allow: "POST" } }
+  );
 }
 
 function generateProductMarkdown(product: {

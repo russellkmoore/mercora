@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
+import { errorDetails } from "@/lib/utils/error-response";
 import {
   getPageById,
   updatePage,
@@ -16,6 +17,13 @@ import {
   unpublishPage,
   archivePage
 } from "@/lib/models/pages";
+
+function pageValidationMessage(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  if (error.message.startsWith("Invalid page data:")) return error.message;
+  if (error.message === "Content is required after sanitization") return error.message;
+  return undefined;
+}
 
 /**
  * GET /api/admin/pages/[id] - Get page by ID with admin access
@@ -165,23 +173,16 @@ export async function PUT(
 
   } catch (error) {
     console.error("Error updating page:", error);
-    
-    // Handle validation errors
-    if (error instanceof Error && error.message.includes("Invalid page data")) {
+    const validationMessage = pageValidationMessage(error);
+    if (validationMessage) {
       return NextResponse.json(
-        { success: false, error: error.message },
+        { success: false, error: validationMessage },
         { status: 400 }
       );
     }
 
-    // Return more detailed error information
-    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-    const errorStack = error instanceof Error ? error.stack : "No stack trace available";
-    
-    console.error("Detailed error:", { message: errorMessage, stack: errorStack });
-
     return NextResponse.json(
-      { success: false, error: `Failed to update page: ${errorMessage}` },
+      { success: false, error: "Failed to update page", ...errorDetails(error) },
       { status: 500 }
     );
   }

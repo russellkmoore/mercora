@@ -2,6 +2,7 @@ import { searchProducts } from '../../models/mach/products';
 import { SearchRequest, MCPToolResponse } from '../types';
 import { enhanceUserContext } from '../context';
 import { Product } from '../../types';
+import { toPublicProduct } from '../../models/mach/product-serializer';
 
 export async function searchProductsWithContext(
   request: SearchRequest,
@@ -53,7 +54,9 @@ export async function searchProductsWithContext(
 
     return {
       success: true,
-      data: filteredProducts,
+      data: filteredProducts
+        .filter(product => product.status === 'active')
+        .map(toPublicProduct),
       context: {
         session_id: sessionId,
         agent_id: request.agent_context?.agentId || 'unknown',

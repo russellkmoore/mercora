@@ -2,6 +2,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCategory, updateCategory, deleteCategory } from "@/lib/models/mach/category";
 import type { ApiResponse, Category } from "@/lib/types";
+import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
+import { errorDetails } from "@/lib/utils/error-response";
+
+function categoryValidationMessage(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  return error.message.startsWith('Category validation failed:') ? error.message : undefined;
+}
 
 /**
  * GET /api/categories/[id] - Get category by ID
@@ -36,6 +43,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
  * PUT /api/categories/[id] - Update category
  */
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const adminAuth = await checkAdminPermissions(request);
+  if (!adminAuth.success) {
+    return NextResponse.json({ error: adminAuth.error }, { status: 401 });
+  }
+
   try {
     const { id: categoryId } = await params;
     if (!categoryId) {
@@ -71,16 +83,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json(response);
   } catch (error) {
     console.error('Category PUT error:', error);
-    
-    if (error instanceof Error) {
+    const validationMessage = categoryValidationMessage(error);
+    if (validationMessage) {
       return NextResponse.json({
         error: 'Validation failed',
-        message: error.message
+        message: validationMessage
       }, { status: 400 });
     }
-    
+
     return NextResponse.json(
-      { error: 'Failed to update category' },
+      { error: 'Failed to update category', ...errorDetails(error) },
       { status: 500 }
     );
   }
@@ -90,6 +102,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
  * DELETE /api/categories/[id] - Delete category (soft delete)
  */
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const adminAuth = await checkAdminPermissions(request);
+  if (!adminAuth.success) {
+    return NextResponse.json({ error: adminAuth.error }, { status: 401 });
+  }
+
   try {
     const { id: categoryId } = await params;
     if (!categoryId) {

@@ -35,6 +35,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createPaymentIntent, formatAmountForStripe } from '@/lib/stripe';
 import { Money, type StoredMoney } from '@/lib/money';
 import type { Address } from '@/lib/types';
+import { enforceRateLimit, getClientIp } from '@/lib/rate-limit';
+import { isBoundedString, isPlainRecord } from '@/lib/public-request-validation';
 
 interface PaymentIntentRequest {
   amount: StoredMoney;
@@ -46,13 +48,40 @@ interface PaymentIntentRequest {
 
 export async function POST(req: NextRequest) {
   try {
+    const limited = await enforceRateLimit(
+      'PUBLIC_RATE_LIMITER',
+      `payment-intent:${getClientIp(req)}`
+    );
+    if (limited) return limited;
+
+    const body: unknown = await req.json();
+    if (!isPlainRecord(body)) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+
     const {
       amount,
       taxAmount,
       shippingAddress,
       orderId,
       description,
-    }: PaymentIntentRequest = await req.json();
+    } = body as unknown as PaymentIntentRequest;
+
+    if (
+      !isPlainRecord(shippingAddress) ||
+      !isBoundedString(orderId, 128) ||
+      (description !== undefined && !isBoundedString(description, 500, { allowEmpty: true })) ||
+      !isBoundedString(shippingAddress.line1, 256) ||
+      (shippingAddress.line2 !== undefined &&
+        !isBoundedString(shippingAddress.line2, 256, { allowEmpty: true })) ||
+      !isBoundedString(shippingAddress.city, 128) ||
+      !isBoundedString(shippingAddress.region, 128) ||
+      !isBoundedString(shippingAddress.postal_code, 32) ||
+      (shippingAddress.recipient !== undefined &&
+        !isBoundedString(shippingAddress.recipient, 256, { allowEmpty: true }))
+    ) {
+      return NextResponse.json({ error: 'Invalid payment details' }, { status: 400 });
+    }
 
     let totalMoney: Money;
     let taxMoney: Money;
@@ -70,20 +99,6 @@ export async function POST(req: NextRequest) {
     if (!totalMoney.gt(Money.zero(totalMoney.currency))) {
       return NextResponse.json(
         { error: 'Valid amount is required' },
-        { status: 400 }
-      );
-    }
-
-    if (!shippingAddress) {
-      return NextResponse.json(
-        { error: 'Shipping address is required' },
-        { status: 400 }
-      );
-    }
-
-    if (!orderId) {
-      return NextResponse.json(
-        { error: 'Order ID is required' },
         { status: 400 }
       );
     }

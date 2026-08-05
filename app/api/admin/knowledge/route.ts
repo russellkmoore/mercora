@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
+import { normalizeKnowledgeFilename } from "@/lib/utils/safe-filename";
+import { errorDetails } from "@/lib/utils/error-response";
 
 export async function GET(request: NextRequest) {
   try {
@@ -76,11 +78,10 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error("Error fetching knowledge articles:", error);
-    console.error("Error details:", error instanceof Error ? error.message : String(error));
     return NextResponse.json(
       { 
         error: "Failed to fetch knowledge articles",
-        details: error instanceof Error ? error.message : String(error)
+        ...errorDetails(error),
       },
       { status: 500 }
     );
@@ -104,14 +105,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body: any = await request.json();
-    const { filename, title, content } = body;
+    const { filename: requestedFilename, title, content } = body;
+    const mdFilename = normalizeKnowledgeFilename(requestedFilename, true);
 
-    if (!filename || !content) {
-      return NextResponse.json({ error: "Filename and content are required" }, { status: 400 });
+    if (!mdFilename || !content) {
+      return NextResponse.json({ error: "A safe filename and content are required" }, { status: 400 });
     }
 
-    // Ensure filename ends with .md
-    const mdFilename = filename.endsWith('.md') ? filename : `${filename}.md`;
     const key = `knowledge_md/${mdFilename}`;
 
     // Add title as first heading if not present
@@ -142,10 +142,12 @@ export async function POST(request: NextRequest) {
         console.warn("ADMIN_VECTORIZE_TOKEN not configured, skipping vectorization");
       } else {
         const vectorizeUrl = new URL('/api/admin/vectorize', request.url);
-        vectorizeUrl.searchParams.set('token', adminToken);
-        
+
         await fetch(vectorizeUrl.toString(), {
-          method: 'GET'
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${adminToken}`
+          }
         });
       }
     } catch (vectorError) {
@@ -185,10 +187,10 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const filename = searchParams.get('filename');
+    const filename = normalizeKnowledgeFilename(searchParams.get('filename'));
 
     if (!filename) {
-      return NextResponse.json({ error: "Filename is required" }, { status: 400 });
+      return NextResponse.json({ error: "A safe filename is required" }, { status: 400 });
     }
 
     const key = `knowledge_md/${filename}`;
@@ -205,10 +207,12 @@ export async function DELETE(request: NextRequest) {
         console.warn("ADMIN_VECTORIZE_TOKEN not configured, skipping vectorization");
       } else {
         const vectorizeUrl = new URL('/api/admin/vectorize', request.url);
-        vectorizeUrl.searchParams.set('token', adminToken);
-        
+
         await fetch(vectorizeUrl.toString(), {
-          method: 'GET'
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${adminToken}`
+          }
         });
       }
     } catch (vectorError) {

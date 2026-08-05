@@ -7,6 +7,8 @@
 
 import { desc, eq, and, or, isNull, count, like, inArray } from "drizzle-orm";
 import { getDbAsync } from "@/lib/db";
+import { getStoreConfig } from "@/lib/store-config";
+import { sanitizePageHtmlServer } from "@/lib/utils/sanitize-html-server";
 import { 
   pages, 
   page_versions, 
@@ -170,6 +172,13 @@ export async function createPage(data: Omit<PageInsert, 'id' | 'created_at' | 'u
     const existingSlugs = await getExistingSlugs();
     data.slug = generatePageSlug(data.title, existingSlugs);
   }
+
+  data.content = sanitizePageHtmlServer(data.content, {
+    allowedImageOrigin: getStoreConfig().urls.imageCdn,
+  });
+  if (!data.content.trim()) {
+    throw new Error("Content is required after sanitization");
+  }
   
   // Set timestamps
   const now = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
@@ -240,9 +249,18 @@ export async function updatePage(
       const existingSlugs = await getExistingSlugs();
       cleanData.slug = generatePageSlug(cleanData.title, existingSlugs);
     }
+
+    if (cleanData.content !== undefined) {
+      cleanData.content = sanitizePageHtmlServer(cleanData.content, {
+        allowedImageOrigin: getStoreConfig().urls.imageCdn,
+      });
+      if (!cleanData.content.trim()) {
+        throw new Error("Content is required after sanitization");
+      }
+    }
     
     // Increment version if content changed
-    const contentChanged = cleanData.content && cleanData.content !== currentPage.content;
+    const contentChanged = cleanData.content !== undefined && cleanData.content !== currentPage.content;
     const newVersion = contentChanged ? currentPage.version + 1 : currentPage.version;
     
     // Update page

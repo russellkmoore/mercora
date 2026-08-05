@@ -117,8 +117,8 @@ export default function ProductDisplay({
   const onSale = compareAt && compareAt > price;
 
   // Stock logic (MACH: inventory is on variant)
-  const quantityInStock = selectedVariant?.inventory?.quantity ?? 0;
-  const available = quantityInStock > 0;
+  const available = selectedVariant?.available_for_sale ??
+    (selectedVariant?.inventory?.quantity ?? 0) > 0;
 
   const ratingSummary = useMemo(() => normalizeProductRating(product.rating), [product.rating]);
   const productDescription = useMemo(() => stringifyDescription(product.description), [product.description]);
@@ -284,9 +284,9 @@ export default function ProductDisplay({
               <p className="text-lg font-semibold text-white sm:text-xl">{Money.fromMinor(price).format()}</p>
             )}
 
-            {selectedVariant?.inventory && (
+            {selectedVariant && (
               <p className="text-xs text-gray-500">
-                {quantityInStock > 0 ? `${quantityInStock} in stock` : "Backordered"}
+                {available ? "In stock" : "Currently unavailable"}
               </p>
             )}
 
