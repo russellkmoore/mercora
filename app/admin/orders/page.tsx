@@ -62,6 +62,10 @@ import {
   RotateCcw, ChevronLeft, ChevronsLeft, ChevronsRight
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  formatMachMajorCurrency,
+  formatStoredOrderCurrency,
+} from '@/lib/admin/order-money';
 
 interface Order {
   id: string;
@@ -124,9 +128,6 @@ export default function AdminOrdersPage() {
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [editingOrder, setEditingOrder] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
-    status: "",
-    tracking_number: "",
-    carrier: "",
     notes: ""
   });
   // Pagination state
@@ -169,7 +170,7 @@ export default function AdminOrdersPage() {
     fetchOrders(page);
   };
 
-  const updateOrderStatus = async (orderId: string, updates: Partial<Order>) => {
+  const updateOrderNotes = async (orderId: string, notes: string) => {
     try {
       const response = await fetch("/api/orders", {
         method: "PUT",
@@ -178,7 +179,7 @@ export default function AdminOrdersPage() {
         },
         body: JSON.stringify({
           orderId,
-          ...updates
+          notes
         }),
       });
 
@@ -188,7 +189,7 @@ export default function AdminOrdersPage() {
           order.id === orderId ? updatedData.data : order
         ));
         setEditingOrder(null);
-        setEditForm({ status: "", tracking_number: "", carrier: "", notes: "" });
+        setEditForm({ notes: "" });
       } else {
         alert("Failed to update order");
       }
@@ -199,32 +200,7 @@ export default function AdminOrdersPage() {
   };
 
   const handleEditSubmit = (orderId: string) => {
-    const updates: any = {};
-    if (editForm.status) updates.status = editForm.status;
-    if (editForm.tracking_number) updates.tracking_number = editForm.tracking_number;
-    if (editForm.notes) updates.notes = editForm.notes;
-    
-    // Handle carrier information in extensions
-    if (editForm.carrier || editForm.tracking_number) {
-      const currentOrder = orders.find(o => o.id === orderId);
-      const currentExtensions = currentOrder?.extensions || {};
-      updates.extensions = {
-        ...currentExtensions,
-        ...(editForm.carrier && { carrier: editForm.carrier }),
-        ...(editForm.tracking_number && editForm.carrier && { 
-          trackingUrl: generateTrackingUrl(editForm.tracking_number, editForm.carrier) 
-        })
-      };
-    }
-    
-    if (editForm.status === "shipped") {
-      updates.shipped_at = new Date().toISOString();
-    }
-    if (editForm.status === "delivered") {
-      updates.delivered_at = new Date().toISOString();
-    }
-
-    updateOrderStatus(orderId, updates);
+    updateOrderNotes(orderId, editForm.notes);
   };
 
   const toggleOrderExpansion = (orderId: string) => {
@@ -255,12 +231,8 @@ export default function AdminOrdersPage() {
   const pendingOrdersCount = orders.filter(o => o.status === 'pending').length; // This is just for current page
   const shippedOrdersCount = orders.filter(o => o.status === 'shipped').length; // This is just for current page
 
-  const formatCurrency = (amount: number, currency: string = "USD") => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency,
-    }).format(amount / 100);
-  };
+  const formatCurrency = formatMachMajorCurrency;
+  const formatStoredCurrency = formatStoredOrderCurrency;
 
   const generateTrackingUrl = (trackingNumber: string, carrier?: string) => {
     if (!trackingNumber) return null;
@@ -422,6 +394,11 @@ export default function AdminOrdersPage() {
             {filteredOrders.map((order) => {
               const isExpanded = expandedOrders.has(order.id);
               const isEditing = editingOrder === order.id;
+              const extensions = order.extensions ?? {};
+              const breakdownSubtotal = extensions.checkout_catalog_subtotal ?? extensions.subtotal;
+              const breakdownShipping = extensions.checkout_shipping_before_discount ?? extensions.shippingCost;
+              const breakdownTax = extensions.checkout_tax ?? extensions.taxAmount;
+              const breakdownDiscount = extensions.checkout_discount ?? extensions.discountAmount;
               
               return (
                 <div key={order.id} className="p-4">
@@ -481,13 +458,10 @@ export default function AdminOrdersPage() {
                           onClick={() => {
                             if (isEditing) {
                               setEditingOrder(null);
-                              setEditForm({ status: "", tracking_number: "", carrier: "", notes: "" });
+                              setEditForm({ notes: "" });
                             } else {
                               setEditingOrder(order.id);
                               setEditForm({
-                                status: order.status,
-                                tracking_number: order.tracking_number || "",
-                                carrier: order.extensions?.carrier || "",
                                 notes: order.notes || ""
                               });
                             }
@@ -535,28 +509,28 @@ export default function AdminOrdersPage() {
                           
                           {/* Order Breakdown */}
                           <div className="border-t border-neutral-600 pt-3 space-y-1">
-                            {order.extensions?.subtotal && (
+                            {breakdownSubtotal !== undefined && (
                               <div className="flex justify-between text-sm">
                                 <span className="text-gray-400">Subtotal:</span>
-                                <span className="text-white">{formatCurrency(order.extensions.subtotal)}</span>
+                                <span className="text-white">{formatStoredCurrency(breakdownSubtotal, order.currency_code)}</span>
                               </div>
                             )}
-                            {order.extensions?.shippingCost && (
+                            {breakdownShipping !== undefined && (
                               <div className="flex justify-between text-sm">
                                 <span className="text-gray-400">Shipping:</span>
-                                <span className="text-white">{formatCurrency(order.extensions.shippingCost)}</span>
+                                <span className="text-white">{formatStoredCurrency(breakdownShipping, order.currency_code)}</span>
                               </div>
                             )}
-                            {order.extensions?.taxAmount && (
+                            {breakdownTax !== undefined && (
                               <div className="flex justify-between text-sm">
                                 <span className="text-gray-400">Tax:</span>
-                                <span className="text-white">{formatCurrency(order.extensions.taxAmount)}</span>
+                                <span className="text-white">{formatStoredCurrency(breakdownTax, order.currency_code)}</span>
                               </div>
                             )}
-                            {order.extensions?.discountAmount && (
+                            {breakdownDiscount !== undefined && (
                               <div className="flex justify-between text-sm">
                                 <span className="text-gray-400">Discount:</span>
-                                <span className="text-green-400">-{formatCurrency(order.extensions.discountAmount)}</span>
+                                <span className="text-green-400">-{formatStoredCurrency(breakdownDiscount, order.currency_code)}</span>
                               </div>
                             )}
                             <div className="flex justify-between text-base font-semibold border-t border-neutral-600 pt-2">
@@ -651,59 +625,20 @@ export default function AdminOrdersPage() {
                       {/* Edit Form */}
                       {isEditing && (
                         <div className="bg-neutral-700 p-4 rounded-lg space-y-4">
-                          <h4 className="text-sm font-medium text-white">Edit Order</h4>
+                          <h4 className="text-sm font-medium text-white">Edit Internal Notes</h4>
+                          <p className="text-xs text-gray-400">
+                            Status and tracking are managed by dedicated fulfillment controls.
+                          </p>
                           
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-300 mb-2">Status</label>
-                              <select
-                                value={editForm.status}
-                                onChange={(e) => setEditForm(prev => ({ ...prev, status: e.target.value }))}
-                                className="w-full px-3 py-2 bg-neutral-600 border border-neutral-500 rounded-md text-white"
-                              >
-                                <option value="pending">Pending</option>
-                                <option value="processing">Processing</option>
-                                <option value="shipped">Shipped</option>
-                                <option value="delivered">Delivered</option>
-                              </select>
-                            </div>
-                            
-                            <div>
-                              <label className="block text-sm font-medium text-gray-300 mb-2">Carrier</label>
-                              <select
-                                value={editForm.carrier}
-                                onChange={(e) => setEditForm(prev => ({ ...prev, carrier: e.target.value }))}
-                                className="w-full px-3 py-2 bg-neutral-600 border border-neutral-500 rounded-md text-white"
-                              >
-                                <option value="">Select carrier</option>
-                                <option value="UPS">UPS</option>
-                                <option value="FedEx">FedEx</option>
-                                <option value="USPS">USPS</option>
-                                <option value="DHL">DHL</option>
-                                <option value="Other">Other</option>
-                              </select>
-                            </div>
-                            
-                            <div>
-                              <label className="block text-sm font-medium text-gray-300 mb-2">Tracking Number</label>
-                              <Input
-                                value={editForm.tracking_number}
-                                onChange={(e) => setEditForm(prev => ({ ...prev, tracking_number: e.target.value }))}
-                                className="bg-neutral-600 border-neutral-500 text-white"
-                                placeholder="Enter tracking number"
-                              />
-                            </div>
-                            
-                            <div>
-                              <label className="block text-sm font-medium text-gray-300 mb-2">Notes</label>
+                          <div>
+                              <label className="block text-sm font-medium text-gray-300 mb-2">Internal Notes</label>
                               <Textarea
                                 value={editForm.notes}
                                 onChange={(e) => setEditForm(prev => ({ ...prev, notes: e.target.value }))}
                                 className="bg-neutral-600 border-neutral-500 text-white"
-                                placeholder="Add notes..."
-                                rows={2}
+                                placeholder="Add an internal order note..."
+                                rows={3}
                               />
-                            </div>
                           </div>
                           
                           <div className="flex items-center space-x-3">
@@ -718,7 +653,7 @@ export default function AdminOrdersPage() {
                               variant="outline"
                               onClick={() => {
                                 setEditingOrder(null);
-                                setEditForm({ status: "", tracking_number: "", carrier: "", notes: "" });
+                                setEditForm({ notes: "" });
                               }}
                               className="border-gray-600 text-gray-400 hover:text-white"
                             >

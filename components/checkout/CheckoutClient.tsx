@@ -34,11 +34,12 @@ import StripeProvider from './StripeProvider';
 import PaymentForm from './PaymentForm';
 import ShippingForm from './ShippingForm';
 import ShippingOptions from './ShippingOptions';
-import OrderSummary from './OrderSummary';
+import OrderSummary, { type AuthoritativeCheckoutQuote } from './OrderSummary';
 import ProgressBar from './ProgressBar';
 import OrderConfirmationModal from './OrderConfirmationModal';
 import type { Address, ShippingOption } from '@/lib/types';
-import { Money, cartSubtotal, type StoredMoney } from '@/lib/money';
+import { Money } from '@/lib/money';
+import { clearPendingCheckout, savePendingCheckout } from '@/lib/checkout/order-payload';
 
 interface CheckoutClientProps {
   userId: string | null;
@@ -56,6 +57,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
     setShippingOption,
     setTaxAmount,
     updateShippingDiscounts,
+    appliedDiscounts,
     clearCart,
   } = useCartStore();
 
@@ -74,6 +76,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
   const [clientSecret, setClientSecret] = useState<string>('');
   const [orderId, setOrderId] = useState<string>('');
+  const [authoritativeQuote, setAuthoritativeQuote] = useState<AuthoritativeCheckoutQuote>();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
 
@@ -138,27 +141,9 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
       // Update shipping discounts based on new shipping cost
       updateShippingDiscounts();
 
-      // Calculate tax with shipping address and cost
-      const taxRes = await fetch('/api/tax', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items,
-          shippingAddress,
-          shippingCost: option.cost || 0,
-        }),
-      });
-
-      if (!taxRes.ok) {
-        const err = await taxRes.json() as { error?: string };
-        throw new Error(err.error || 'Failed to calculate tax');
-      }
-
-      const taxData = await taxRes.json() as { amount: StoredMoney };
-      setTaxAmount(taxData.amount);
-
-      // Create order and payment intent
-      await createPaymentIntent(option, taxData.amount);
+      // The payment-intent endpoint performs the one authoritative tax/pricing
+      // calculation and returns the exact quote shown beside Stripe Elements.
+      await createPaymentIntent(option);
 
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -169,36 +154,22 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
 
   // Create Payment Intent with Stripe
   const createPaymentIntent = async (
-    selectedShippingOption: ShippingOption,
-    calculatedTax: StoredMoney
+    selectedShippingOption: ShippingOption
   ) => {
     try {
-      // Generate order ID
-      const timestamp = Date.now();
-      let baseId = userId ?? 'guest';
-      if (baseId.includes('@')) {
-        baseId = baseId.split('@')[0];
-      }
-      const safeUserId = baseId.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-      const newOrderId = `WEB-${safeUserId}-${timestamp}`;
-      setOrderId(newOrderId);
-
-      // Calculate total amount (subtotal + shipping + tax)
-      const subtotal = cartSubtotal(items);
-      const shipping = Money.fromStored(selectedShippingOption.cost, subtotal.currency);
-      const tax = Money.fromStored(calculatedTax, subtotal.currency);
-      const totalAmount = subtotal.add(shipping).add(tax);
-
       // Create payment intent
       const res = await fetch('/api/payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: totalAmount.toJSON(),
-          taxAmount: tax.toJSON(),
+          items: items.map((item) => ({
+            productId: item.productId,
+            variantId: item.variantId,
+            quantity: item.quantity,
+          })),
           shippingAddress,
-          orderId: newOrderId,
-          description: `${items.length} item(s) - ${items.map(i => i.name).join(', ')}`,
+          shippingMethodId: selectedShippingOption.id,
+          discountCodes: appliedDiscounts.map((discount) => discount.code),
         }),
       });
 
@@ -207,7 +178,19 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
         throw new Error(err.error || 'Failed to create payment intent');
       }
 
-      const data = await res.json() as { clientSecret: string };
+      const data = await res.json() as {
+        clientSecret: string;
+        paymentIntentId: string;
+        orderId: string;
+        quote: AuthoritativeCheckoutQuote;
+      };
+      setOrderId(data.orderId);
+      setTaxAmount(Money.fromMajor(data.quote.tax.amount, data.quote.tax.currency).toJSON());
+      setAuthoritativeQuote(data.quote);
+      savePendingCheckout({
+        orderId: data.orderId,
+        paymentIntentId: data.paymentIntentId,
+      });
       setClientSecret(data.clientSecret);
       setCurrentStep('payment');
 
@@ -219,36 +202,13 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
   // Handle successful payment
   const handlePaymentSuccess = async (paymentIntentId: string) => {
     try {
-      // Submit order with payment intent ID to unified orders endpoint
+      // Ask the server to verify and finalize its durable pending order.
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: items.map(item => ({
-            product_id: item.productId,
-            variant_id: item.variantId,
-            sku: `${item.productId}-${item.variantId || 'default'}`, // Generate a simple SKU
-            quantity: item.quantity,
-            unit_price: Money.fromStored(item.price).toJSON(),
-            total_price: Money.fromStored(item.price).times(item.quantity).toJSON(),
-            product_name: item.name, // This now includes variant info like "Vivid Mission Pack - Regular"
-          })),
-          total_amount: cartSubtotal(items)
-            .add(shippingOption ? Money.fromStored(shippingOption.cost) : Money.zero())
-            .add(taxAmount ? Money.fromStored(taxAmount) : Money.zero())
-            .toJSON(),
-          currency_code: 'USD',
-          shipping_address: shippingAddress,
-          billing_address: shippingAddress, // Use same as shipping for now
-          shipping_method: shippingOption?.label || 'standard',
-          payment_method: 'stripe',
-          payment_status: 'paid', // Payment succeeded since we reached this point
-          extensions: {
-            payment_intent_id: paymentIntentId,
-            shipping_cost: shippingOption ? Money.fromStored(shippingOption.cost).toJSON() : Money.zero().toJSON(),
-            tax_amount: taxAmount ? Money.fromStored(taxAmount).toJSON() : Money.zero().toJSON(),
-            subtotal: cartSubtotal(items).toJSON(),
-          }
+          orderId,
+          paymentIntentId,
         }),
       });
 
@@ -259,6 +219,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
 
       const orderResponse = await res.json();
       console.log('Order created successfully:', orderResponse);
+      clearPendingCheckout(paymentIntentId);
 
       // Clear cart immediately after successful order creation
       clearCart();
@@ -281,6 +242,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
   const handleBackToShipping = () => {
     setCurrentStep('shipping');
     setClientSecret(''); // Clear payment intent
+    setAuthoritativeQuote(undefined);
     setError(''); // Clear any errors
   };
 
@@ -395,7 +357,10 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
             items={items}
             shippingOption={shippingOption}
             taxAmount={taxAmount}
-            showDiscountInput={currentStep !== 'confirmation'}
+            showDiscountInput={
+              currentStep === 'shipping' && !authoritativeQuote && !clientSecret
+            }
+            authoritativeQuote={authoritativeQuote}
           />
 
           {/* Payment Form */}

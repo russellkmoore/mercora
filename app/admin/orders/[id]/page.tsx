@@ -26,11 +26,17 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { 
+import {
   ArrowLeft, Package, RotateCcw, XCircle, RefreshCw,
   DollarSign, AlertTriangle, CheckCircle, Truck,
   Calendar, User, MapPin, CreditCard
 } from "lucide-react";
+import {
+  formatLegacyShippingCostCurrency,
+  formatMachMajorCurrency,
+  formatStoredOrderCurrency,
+} from '@/lib/admin/order-money';
+import { calculatePartialReturnMinor } from '@/lib/admin/order-return-calculation';
 
 interface Order {
   id: string;
@@ -174,12 +180,8 @@ export default function OrderDetailPage() {
     }
   }, []);
 
-  const formatCurrency = (amount: number, currency: string = "USD") => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency,
-    }).format(amount / 100);
-  };
+  const formatCurrency = formatMachMajorCurrency;
+  const formatStoredCurrency = formatStoredOrderCurrency;
 
   const getStatusBadge = (status: Order["status"]) => {
     const config = statusConfig[status];
@@ -257,7 +259,7 @@ export default function OrderDetailPage() {
           orderId: order.id,
           type: 'partial',
           reason: reason.trim(),
-          amount: Math.round(returnCalculation.total * 100), // Convert to cents
+          amount: returnCalculation.total,
           items: selectedItemsArray,
           notes: `Return: ${selectedItemsArray.length} item(s) - Subtotal: $${(returnCalculation.subtotal/100).toFixed(2)}, Tax: $${(returnCalculation.tax/100).toFixed(2)}, Discount: -$${(returnCalculation.discount/100).toFixed(2)}, Shipping: $${(returnCalculation.shipping/100).toFixed(2)}${(returnCalculation.restockingFee || 0) > 0 ? `, Restocking Fee: -$${((returnCalculation.restockingFee || 0)/100).toFixed(2)}` : ''}`
         })
@@ -287,72 +289,21 @@ export default function OrderDetailPage() {
   };
 
   const calculateReturnAmount = (selectedItemIds: string[]) => {
-    if (!order) return { subtotal: 0, tax: 0, discount: 0, shipping: 0, total: 0 };
-
-    // Get order totals - handle unit conversions (some in cents, some in dollars)
-    const orderSubtotal = order.extensions?.subtotal || 0; // in cents
-    const orderTax = order.extensions?.tax_amount || 0; // in cents  
-    const orderDiscount = order.extensions?.discount_amount || 0; // in cents
-    const orderShipping = Math.round((order.extensions?.shipping_cost || 0) * 100); // convert dollars to cents
-
-    // Calculate actual order subtotal from items (as verification)
-    const calculatedOrderSubtotal = order.items.reduce((total, item) => {
-      const unitPrice = typeof item.unit_price === 'number' ? item.unit_price : item.unit_price.amount;
-      return total + (unitPrice * item.quantity);
-    }, 0);
-
-    // Use the calculated subtotal if extensions subtotal doesn't exist or doesn't match
-    const actualOrderSubtotal = orderSubtotal > 0 ? orderSubtotal : calculatedOrderSubtotal;
-
-    // Calculate item subtotal for selected items (in cents)
-    const returnItemsSubtotal = order.items
-      .filter(item => {
-        const itemKey = `${item.product_id}-${item.variant_id || 'default'}`;
-        return selectedItemIds.includes(itemKey);
-      })
-      .reduce((total, item) => {
-        const unitPrice = typeof item.unit_price === 'number' ? item.unit_price : item.unit_price.amount;
-        return total + (unitPrice * item.quantity);
-      }, 0);
-
-    // Calculate proportional amounts
-    const subtotalRatio = actualOrderSubtotal > 0 ? returnItemsSubtotal / actualOrderSubtotal : 0;
-    
-    
-    
-    const returnTax = Math.round(orderTax * subtotalRatio);
-    const returnDiscount = Math.round(orderDiscount * subtotalRatio);
-    
-    // Shipping refund based on policy
-    const isFullReturn = selectedItemIds.length === order.items.length;
-    const returnShipping = (isFullReturn && refundPolicy.refundShippingOnFullReturn) || 
-                          (!isFullReturn && refundPolicy.refundShipping) ? orderShipping : 0;
-
-    // Calculate base refund amount
-    let baseRefundAmount = returnItemsSubtotal + returnTax - returnDiscount + returnShipping;
-
-    // Apply restocking fee if configured
-    let restockingFee = 0;
-    if ((isFullReturn || refundPolicy.applyRestockingFeeOnPartialReturn) && refundPolicy.restockingFeePercent > 0) {
-      restockingFee = Math.round(baseRefundAmount * (refundPolicy.restockingFeePercent / 100));
-    }
-
-    const returnTotal = baseRefundAmount - restockingFee;
-
-    return {
-      subtotal: returnItemsSubtotal,
-      tax: returnTax,
-      discount: returnDiscount,
-      shipping: returnShipping,
-      restockingFee: restockingFee,
-      baseAmount: baseRefundAmount,
-      total: Math.max(0, returnTotal), // Ensure never negative
+    if (!order) return {
+      subtotal: 0,
+      tax: 0,
+      discount: 0,
+      shipping: 0,
+      restockingFee: 0,
+      baseAmount: 0,
+      total: 0,
       policy: {
-        shippingRefunded: returnShipping > 0,
-        restockingFeeApplied: restockingFee > 0,
-        restockingFeePercent: refundPolicy.restockingFeePercent
-      }
+        shippingRefunded: false,
+        restockingFeeApplied: false,
+        restockingFeePercent: 0,
+      },
     };
+    return calculatePartialReturnMinor(order, selectedItemIds, refundPolicy);
   };
 
   const toggleItemSelection = (productId: string, variantId?: string) => {
@@ -412,6 +363,17 @@ export default function OrderDetailPage() {
       </div>
     );
   }
+
+  const extensions = order.extensions ?? {};
+  const breakdownSubtotal = extensions.checkout_catalog_subtotal ?? extensions.subtotal;
+  const breakdownShipping = extensions.checkout_shipping_before_discount ??
+    extensions.shipping_cost ?? extensions.shippingCost;
+  const breakdownShippingIsLegacyMajor =
+    extensions.checkout_shipping_before_discount === undefined &&
+    typeof extensions.shipping_cost === 'number';
+  const breakdownTax = extensions.checkout_tax ?? extensions.tax_amount ?? extensions.taxAmount;
+  const breakdownDiscount = extensions.checkout_discount ?? extensions.discount_amount ??
+    extensions.discountAmount ?? extensions.discount ?? extensions.promotion_discount;
 
   return (
     <div className="p-6 space-y-6">
@@ -521,38 +483,37 @@ export default function OrderDetailPage() {
         <Card className="bg-neutral-800 border-neutral-700 p-6">
           <h3 className="text-lg font-semibold text-white mb-4">Order Totals</h3>
           <div className="space-y-2 text-sm">
-            {order.extensions?.subtotal && (
+            {breakdownSubtotal !== undefined && (
               <div className="flex justify-between">
                 <span className="text-gray-400">Subtotal:</span>
-                <span className="text-white">{formatCurrency(order.extensions.subtotal)}</span>
+                <span className="text-white">{formatStoredCurrency(breakdownSubtotal, order.currency_code)}</span>
               </div>
             )}
-            {order.extensions?.shipping_cost && (
+            {breakdownShipping !== undefined && (
               <div className="flex justify-between">
                 <span className="text-gray-400">Shipping:</span>
-                <span className="text-white">{formatCurrency(Math.round((order.extensions.shipping_cost || 0) * 100))}</span>
+                <span className="text-white">
+                  {breakdownShippingIsLegacyMajor
+                    ? formatLegacyShippingCostCurrency(breakdownShipping as number, order.currency_code)
+                    : formatStoredCurrency(breakdownShipping, order.currency_code)}
+                </span>
               </div>
             )}
-            {order.extensions?.tax_amount && (
+            {breakdownTax !== undefined && (
               <div className="flex justify-between">
                 <span className="text-gray-400">Tax:</span>
-                <span className="text-white">{formatCurrency(order.extensions.tax_amount)}</span>
+                <span className="text-white">{formatStoredCurrency(breakdownTax, order.currency_code)}</span>
               </div>
             )}
             {/* Try multiple discount field names */}
             {(() => {
-              const extensions = order.extensions || {};
-              const discountAmount = extensions.discount_amount || 
-                                   extensions.discountAmount || 
-                                   extensions.discount || 
-                                   extensions.promotion_discount ||
-                                   0;
+              const discountAmount = breakdownDiscount;
               
-              if (discountAmount > 0) {
+              if (discountAmount !== undefined) {
                 return (
                   <div className="flex justify-between">
                     <span className="text-gray-400">Discount:</span>
-                    <span className="text-green-400">-{formatCurrency(discountAmount)}</span>
+                    <span className="text-green-400">-{formatStoredCurrency(discountAmount, order.currency_code)}</span>
                   </div>
                 );
               }

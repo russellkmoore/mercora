@@ -168,6 +168,14 @@ export class CloudflareStripe {
     return await this.request('POST', '/payment_intents', params);
   }
 
+  async retrievePaymentIntent(id: string) {
+    return await this.request('GET', `/payment_intents/${encodeURIComponent(id)}`);
+  }
+
+  async cancelPaymentIntent(id: string) {
+    return await this.request('POST', `/payment_intents/${encodeURIComponent(id)}/cancel`);
+  }
+
   async calculateTax(params: {
     currency: string;
     line_items: Array<{
@@ -253,6 +261,31 @@ export const createPaymentIntent = async (params: {
     // Use the regular Stripe SDK
     return await client.paymentIntents.create(params) as { id: string; client_secret: string | null; [key: string]: any };
   }
+};
+
+export const retrievePaymentIntent = async (id: string): Promise<{
+  id: string;
+  status: string;
+  amount: number;
+  amount_received: number;
+  currency: string;
+  metadata: Record<string, string>;
+}> => {
+  const client = getStripeClient();
+  if (client instanceof CloudflareStripe) {
+    return await client.retrievePaymentIntent(id) as any;
+  }
+  return await client.paymentIntents.retrieve(id) as any;
+};
+
+/** Best-effort cleanup when durable pending-order persistence fails. */
+export const cancelPaymentIntent = async (id: string): Promise<void> => {
+  const client = getStripeClient();
+  if (client instanceof CloudflareStripe) {
+    await client.cancelPaymentIntent(id);
+    return;
+  }
+  await client.paymentIntents.cancel(id);
 };
 
 /**

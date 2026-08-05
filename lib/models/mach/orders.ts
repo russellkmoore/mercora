@@ -4,6 +4,7 @@ import { eq, desc, and, sql } from "drizzle-orm";
 import { getDbAsync } from "@/lib/db";
 import { orders, order_webhooks } from "@/lib/db/schema/order";
 import { Order, CreateOrderRequest, Money, Address, OrderItem } from "@/lib/types";
+import { Money as MoneyValue } from '@/lib/money';
 
 /**
  * MACH Alliance Order Operations
@@ -187,20 +188,22 @@ export async function getOrdersByStatus(status: Order['status']): Promise<Order[
 // Items are always accessed via the items field on the order record (JSON array).
 
 // Utility function to convert database record to Order type
-function hydrateOrder(orderRecord: typeof orders.$inferSelect): Order {
+function parseJson<T>(value: unknown, fallback: T): T {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value !== 'string') return value as T;
+  return JSON.parse(value) as T;
+}
+
+export function hydrateOrder(orderRecord: typeof orders.$inferSelect): Order {
   return {
     id: orderRecord.id ?? undefined,
     customer_id: orderRecord.customer_id ?? undefined,
     status: orderRecord.status,
-    total_amount: JSON.parse(orderRecord.total_amount as string) as Money,
+    total_amount: MoneyValue.fromStored(orderRecord.total_amount, orderRecord.currency_code).toJSON(),
     currency_code: orderRecord.currency_code,
-    shipping_address: orderRecord.shipping_address 
-      ? JSON.parse(orderRecord.shipping_address as string) as Address
-      : undefined,
-    billing_address: orderRecord.billing_address
-      ? JSON.parse(orderRecord.billing_address as string) as Address
-      : undefined,
-    items: JSON.parse(orderRecord.items as string) as OrderItem[],
+    shipping_address: parseJson<Address | undefined>(orderRecord.shipping_address, undefined),
+    billing_address: parseJson<Address | undefined>(orderRecord.billing_address, undefined),
+    items: parseJson<OrderItem[]>(orderRecord.items, []),
     shipping_method: orderRecord.shipping_method ?? undefined,
     payment_method: orderRecord.payment_method ?? undefined,
     payment_status: orderRecord.payment_status ?? 'pending',
@@ -208,15 +211,78 @@ function hydrateOrder(orderRecord: typeof orders.$inferSelect): Order {
     shipped_at: orderRecord.shipped_at ?? undefined,
     delivered_at: orderRecord.delivered_at ?? undefined,
     notes: orderRecord.notes ?? undefined,
-    external_references: orderRecord.external_references
-      ? JSON.parse(orderRecord.external_references as string)
-      : undefined,
-    extensions: orderRecord.extensions
-      ? JSON.parse(orderRecord.extensions as string)
-      : undefined,
+    external_references: parseJson(orderRecord.external_references, undefined),
+    extensions: parseJson(orderRecord.extensions, undefined),
     created_at: orderRecord.created_at ?? undefined,
     updated_at: orderRecord.updated_at ?? undefined,
   };
+}
+
+export async function promoteOrderToPaid(args: {
+  orderId: string;
+  amountReceived: MoneyValue;
+}): Promise<{ promoted: boolean; order: Order | null }> {
+  const db = await getDbAsync();
+  const [current] = await db.select().from(orders).where(eq(orders.id, args.orderId)).limit(1);
+  if (!current) return { promoted: false, order: null };
+  if (current.payment_status === 'paid') {
+    return { promoted: false, order: hydrateOrder(current) };
+  }
+
+  const finalizedAt = new Date().toISOString();
+  const [updated] = await db
+    .update(orders)
+    .set({
+      status: 'processing',
+      payment_status: 'paid',
+      total_amount: args.amountReceived.toJSON(),
+      // Patch only the finalization marker in SQLite so a concurrent metadata
+      // merge cannot be lost between our read and guarded promotion write.
+      extensions: sql`json_set(COALESCE(extensions, '{}'), '$.finalized_at', ${finalizedAt})`,
+      updated_at: new Date().toISOString(),
+    })
+    .where(and(
+      eq(orders.id, args.orderId),
+      eq(orders.status, 'pending'),
+      eq(orders.payment_status, 'pending')
+    ))
+    .returning();
+
+  if (updated) return { promoted: true, order: hydrateOrder(updated) };
+  const [winner] = await db.select().from(orders).where(eq(orders.id, args.orderId)).limit(1);
+  return { promoted: false, order: winner ? hydrateOrder(winner) : null };
+}
+
+/** Atomically append a unique coupon code requiring paid-order reconciliation. */
+export async function recordCouponReconciliation(args: {
+  orderId: string;
+  code: string;
+}): Promise<void> {
+  const db = await getDbAsync();
+  const code = args.code.trim().toUpperCase();
+  const currentCodes = sql`CASE json_type(extensions, '$.coupon_reconciliation_codes')
+    WHEN 'array' THEN json_extract(extensions, '$.coupon_reconciliation_codes')
+    ELSE json('[]')
+  END`;
+  const [updated] = await db
+    .update(orders)
+    .set({
+      extensions: sql`json_set(
+        CASE json_type(extensions)
+          WHEN 'object' THEN extensions
+          ELSE json('{}')
+        END,
+        '$.coupon_reconciliation_codes',
+        CASE WHEN EXISTS (
+          SELECT 1 FROM json_each(${currentCodes}) WHERE value = ${code}
+        ) THEN ${currentCodes}
+        ELSE json_insert(${currentCodes}, '$[#]', ${code}) END
+      )`,
+      updated_at: new Date().toISOString(),
+    })
+    .where(and(eq(orders.id, args.orderId), eq(orders.payment_status, 'paid')))
+    .returning({ id: orders.id });
+  if (!updated) throw new Error('Paid order coupon reconciliation marker could not be persisted');
 }
 
 // Webhook operations
