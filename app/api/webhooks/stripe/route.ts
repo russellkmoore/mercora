@@ -29,7 +29,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getStripe, getWebhookSecret } from '@/lib/stripe';
+import { constructWebhookEvent } from '@/lib/stripe';
 import Stripe from 'stripe';
 import {
   finalizeOrderPayment,
@@ -56,11 +56,9 @@ export async function POST(req: NextRequest) {
 
   try {
     // Verify webhook signature for security
-    const stripe = getStripe();
-    event = stripe.webhooks.constructEvent(
+    event = await constructWebhookEvent(
       body,
-      signature,
-      getWebhookSecret()
+      signature
     );
   } catch (error) {
     console.error('Webhook signature verification failed:', error);
