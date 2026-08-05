@@ -35,6 +35,7 @@ import {
   formatMachMajorCurrency,
   formatStoredOrderCurrency,
 } from '@/lib/admin/order-money';
+import { calculatePartialReturnMinor } from '@/lib/admin/order-return-calculation';
 
 interface Order {
   id: string;
@@ -257,7 +258,7 @@ export default function OrderDetailPage() {
           orderId: order.id,
           type: 'partial',
           reason: reason.trim(),
-          amount: Math.round(returnCalculation.total * 100), // Convert to cents
+          amount: returnCalculation.total,
           items: selectedItemsArray,
           notes: `Return: ${selectedItemsArray.length} item(s) - Subtotal: $${(returnCalculation.subtotal/100).toFixed(2)}, Tax: $${(returnCalculation.tax/100).toFixed(2)}, Discount: -$${(returnCalculation.discount/100).toFixed(2)}, Shipping: $${(returnCalculation.shipping/100).toFixed(2)}${(returnCalculation.restockingFee || 0) > 0 ? `, Restocking Fee: -$${((returnCalculation.restockingFee || 0)/100).toFixed(2)}` : ''}`
         })
@@ -287,72 +288,21 @@ export default function OrderDetailPage() {
   };
 
   const calculateReturnAmount = (selectedItemIds: string[]) => {
-    if (!order) return { subtotal: 0, tax: 0, discount: 0, shipping: 0, total: 0 };
-
-    // Get order totals - handle unit conversions (some in cents, some in dollars)
-    const orderSubtotal = order.extensions?.subtotal || 0; // in cents
-    const orderTax = order.extensions?.tax_amount || 0; // in cents  
-    const orderDiscount = order.extensions?.discount_amount || 0; // in cents
-    const orderShipping = Math.round((order.extensions?.shipping_cost || 0) * 100); // convert dollars to cents
-
-    // Calculate actual order subtotal from items (as verification)
-    const calculatedOrderSubtotal = order.items.reduce((total, item) => {
-      const unitPrice = typeof item.unit_price === 'number' ? item.unit_price : item.unit_price.amount;
-      return total + (unitPrice * item.quantity);
-    }, 0);
-
-    // Use the calculated subtotal if extensions subtotal doesn't exist or doesn't match
-    const actualOrderSubtotal = orderSubtotal > 0 ? orderSubtotal : calculatedOrderSubtotal;
-
-    // Calculate item subtotal for selected items (in cents)
-    const returnItemsSubtotal = order.items
-      .filter(item => {
-        const itemKey = `${item.product_id}-${item.variant_id || 'default'}`;
-        return selectedItemIds.includes(itemKey);
-      })
-      .reduce((total, item) => {
-        const unitPrice = typeof item.unit_price === 'number' ? item.unit_price : item.unit_price.amount;
-        return total + (unitPrice * item.quantity);
-      }, 0);
-
-    // Calculate proportional amounts
-    const subtotalRatio = actualOrderSubtotal > 0 ? returnItemsSubtotal / actualOrderSubtotal : 0;
-    
-    
-    
-    const returnTax = Math.round(orderTax * subtotalRatio);
-    const returnDiscount = Math.round(orderDiscount * subtotalRatio);
-    
-    // Shipping refund based on policy
-    const isFullReturn = selectedItemIds.length === order.items.length;
-    const returnShipping = (isFullReturn && refundPolicy.refundShippingOnFullReturn) || 
-                          (!isFullReturn && refundPolicy.refundShipping) ? orderShipping : 0;
-
-    // Calculate base refund amount
-    let baseRefundAmount = returnItemsSubtotal + returnTax - returnDiscount + returnShipping;
-
-    // Apply restocking fee if configured
-    let restockingFee = 0;
-    if ((isFullReturn || refundPolicy.applyRestockingFeeOnPartialReturn) && refundPolicy.restockingFeePercent > 0) {
-      restockingFee = Math.round(baseRefundAmount * (refundPolicy.restockingFeePercent / 100));
-    }
-
-    const returnTotal = baseRefundAmount - restockingFee;
-
-    return {
-      subtotal: returnItemsSubtotal,
-      tax: returnTax,
-      discount: returnDiscount,
-      shipping: returnShipping,
-      restockingFee: restockingFee,
-      baseAmount: baseRefundAmount,
-      total: Math.max(0, returnTotal), // Ensure never negative
+    if (!order) return {
+      subtotal: 0,
+      tax: 0,
+      discount: 0,
+      shipping: 0,
+      restockingFee: 0,
+      baseAmount: 0,
+      total: 0,
       policy: {
-        shippingRefunded: returnShipping > 0,
-        restockingFeeApplied: restockingFee > 0,
-        restockingFeePercent: refundPolicy.restockingFeePercent
-      }
+        shippingRefunded: false,
+        restockingFeeApplied: false,
+        restockingFeePercent: 0,
+      },
     };
+    return calculatePartialReturnMinor(order, selectedItemIds, refundPolicy);
   };
 
   const toggleItemSelection = (productId: string, variantId?: string) => {

@@ -26,4 +26,11 @@ describe('admin order quick-edit contract', () => {
       expect(source).toContain('formatStoredCurrency');
     }
   });
+
+  it('posts the minor-unit partial-return calculation without another factor of 100', () => {
+    const source = readFileSync('app/admin/orders/[id]/page.tsx', 'utf8');
+    expect(source).toContain('amount: returnCalculation.total');
+    expect(source).not.toContain('returnCalculation.total * 100');
+    expect(source).toContain('calculatePartialReturnMinor(order, selectedItemIds, refundPolicy)');
+  });
 });
