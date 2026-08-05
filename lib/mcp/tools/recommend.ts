@@ -3,7 +3,7 @@ import { RecommendRequest, MCPToolResponse } from '../types';
 import { enhanceUserContext } from '../context';
 import { Product } from '../../types';
 import { Money } from '../../money';
-import { toWireProduct, type WireProduct } from '../../models/mach/product-serializer';
+import { toPublicProduct, toWireProduct, type WireProduct } from '../../models/mach/product-serializer';
 
 export async function getRecommendations(
   request: RecommendRequest,
@@ -62,7 +62,9 @@ export async function getRecommendations(
     
     return {
       success: true,
-      data: recommendations.map(toWireProduct),
+      data: recommendations
+        .filter((product) => product.status === 'active')
+        .map((product) => toWireProduct(toPublicProduct(product))),
       context: {
         session_id: sessionId,
         agent_id: request.agent_context?.agentId || 'unknown',

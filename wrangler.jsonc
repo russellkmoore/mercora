@@ -6,7 +6,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "mercora",
   "main": ".open-next/worker.js",
-  "compatibility_date": "2024-12-01",
+  "compatibility_date": "2026-08-01",
   "compatibility_flags": [
     "nodejs_compat",
     "nodejs_compat_populate_process_env",
@@ -45,6 +45,24 @@
   "ai": {
     "binding": "AI"
   },
+  "ratelimits": [
+    {
+      "name": "AI_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": {
+        "limit": 20,
+        "period": 60
+      }
+    },
+    {
+      "name": "PUBLIC_RATE_LIMITER",
+      "namespace_id": "1002",
+      "simple": {
+        "limit": 60,
+        "period": 60
+      }
+    }
+  ],
   "durable_objects": {
     "bindings": []
   },

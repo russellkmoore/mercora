@@ -83,7 +83,7 @@ Update your `wrangler.jsonc` with the created resource IDs:
 ```json
 {
   "name": "mercora-production",
-  "compatibility_date": "2024-01-01",
+  "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [
     {
@@ -107,11 +107,28 @@ Update your `wrangler.jsonc` with the created resource IDs:
   "ai": {
     "binding": "AI"
   },
+  "ratelimits": [
+    {
+      "name": "AI_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 20, "period": 60 }
+    },
+    {
+      "name": "PUBLIC_RATE_LIMITER",
+      "namespace_id": "1002",
+      "simple": { "limit": 60, "period": 60 }
+    }
+  ],
   "vars": {
     "NODE_ENV": "production"
   }
 }
 ```
+
+`AI_RATE_LIMITER` allows 20 requests per 60 seconds in namespace `1001`.
+`PUBLIC_RATE_LIMITER` allows 60 requests per 60 seconds in namespace `1002`.
+Runtime checks fail open when a binding is unavailable or the rate-limit service
+returns an error, so the request continues instead of being rejected.
 
 ---
 

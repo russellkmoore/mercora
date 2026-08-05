@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listCategories, createCategory, updateCategory, listCategoriesWithRealTimeCounts } from "@/lib/models";
 import type { ApiResponse, Category } from "@/lib/types";
+import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
+import { errorDetails } from "@/lib/utils/error-response";
+
+function categoryValidationMessage(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  return error.message.startsWith('Category validation failed:') ? error.message : undefined;
+}
 
 /**
  * GET /api/categories - List categories
@@ -71,6 +78,11 @@ export async function GET(request: NextRequest) {
  * POST /api/categories - Create category
  */
 export async function POST(request: NextRequest) {
+  const adminAuth = await checkAdminPermissions(request);
+  if (!adminAuth.success) {
+    return NextResponse.json({ error: adminAuth.error }, { status: 401 });
+  }
+
   try {
     const body = await request.json() as any;
     if (!body.name) {
@@ -90,14 +102,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(response, { status: 201 });
   } catch (error) {
     console.error('Categories API error:', error);
-    if (error instanceof Error) {
+    const validationMessage = categoryValidationMessage(error);
+    if (validationMessage) {
       return NextResponse.json({
         error: 'Validation failed',
-        message: error.message
+        message: validationMessage
       }, { status: 400 });
     }
     return NextResponse.json(
-      { error: 'Failed to create category' },
+      { error: 'Failed to create category', ...errorDetails(error) },
       { status: 500 }
     );
   }

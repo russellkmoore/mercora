@@ -11,12 +11,14 @@ import Link from "next/link";
 import { useEffect } from "react";
 import { PageSelect } from "@/lib/db/schema/pages";
 import { Calendar, User } from "lucide-react";
+import { sanitizePageHtml } from "@/lib/utils/sanitize-html";
 
 interface PageRendererProps {
   page: PageSelect;
+  allowedImageOrigin?: string;
 }
 
-export default function PageRenderer({ page }: PageRendererProps) {
+export default function PageRenderer({ page, allowedImageOrigin }: PageRendererProps) {
   // Inject custom CSS and JS if present
   useEffect(() => {
     // Handle custom CSS
@@ -82,6 +84,7 @@ export default function PageRenderer({ page }: PageRendererProps) {
   };
 
   const templateClasses = getTemplateClasses(page.template || 'default');
+  const sanitizedContent = sanitizePageHtml(page.content, { allowedImageOrigin });
 
   return (
     <>
@@ -132,7 +135,7 @@ export default function PageRenderer({ page }: PageRendererProps) {
             {/* Page Content */}
             <div 
               className={templateClasses.content}
-              dangerouslySetInnerHTML={{ __html: page.content }}
+              dangerouslySetInnerHTML={{ __html: sanitizedContent }}
             />
 
             {/* Page Footer */}

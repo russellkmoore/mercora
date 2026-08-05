@@ -10,6 +10,7 @@ import { notFound, redirect } from "next/navigation";
 import { getPageBySlug } from "@/lib/models/pages";
 import PageRenderer from "./PageRenderer";
 import { auth } from "@clerk/nextjs/server";
+import { getStoreConfig } from "@/lib/store-config";
 
 interface PageProps {
   params: Promise<{
@@ -92,7 +93,8 @@ export default async function PublicPage({ params }: PageProps) {
       }
     }
 
-    return <PageRenderer page={page} />;
+    const store = getStoreConfig();
+    return <PageRenderer page={page} allowedImageOrigin={store.urls.imageCdn} />;
     
   } catch (error) {
     console.error("Error loading page:", error);
