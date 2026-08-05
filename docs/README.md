@@ -14,6 +14,7 @@ This directory contains comprehensive documentation for all aspects of the Merco
 ### 🏗️ **Technical Architecture**
 - **[System Architecture](architecture.md)** - Complete system design with Mermaid diagrams
 - **[API Architecture](api-architecture.md)** - RESTful API specifications and flows
+- **[Order and Checkout Trust Boundary](checkout-trust-boundary.md)** - Server-owned pricing, pending orders, and verified finalization
 - **[AI Processing Pipeline](ai-pipeline.md)** - Deep dive into AI workflows and anti-hallucination
 - **[Development Context](CLAUDE.md)** - Essential context for developers and AI assistants
 

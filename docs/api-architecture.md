@@ -98,20 +98,19 @@ graph TB
 ### **Core Resources**
 ```
 ├── /api/orders              # UNIFIED order management
-│   ├── GET    - List orders (with filtering)
-│   ├── POST   - Create new orders  
-│   └── PUT    - Update order status
+│   ├── GET    - List orders (with owner/admin authorization)
+│   ├── POST   - Verify Stripe and finalize a pending order
+│   └── PUT    - Update allowlisted metadata with optimistic concurrency
 ├── /api/orders/[id]         # Specific order operations
-│   ├── GET    - Get order details
-│   └── PUT    - Update specific order
+│   └── GET    - Get owner/admin-authorized order details
 ```
 
 ### **Payment & Tax (Stripe Integration)**
 ```
 ├── /api/payment-intent      # Stripe payment creation
-│   └── POST   - Create payment intent (requires pre-calculated tax)
-├── /api/tax                 # Tax calculation (Stripe Tax)
-│   └── POST   - Calculate tax based on address + items
+│   └── POST   - Price lines, persist pending order, create bound intent
+├── /api/tax                 # Standalone tax estimate (not checkout authority)
+│   └── POST   - Estimate tax based on address + items
 ├── /api/webhooks/stripe     # Payment status updates
 │   └── POST   - Handle Stripe webhook events
 ├── /api/validate-discount   # Discount validation
@@ -184,28 +183,28 @@ graph TB
 The unified checkout process follows this clear separation of concerns:
 
 ```javascript
-// 1. Calculate tax
-const taxResponse = await fetch('/api/tax', {
-  method: 'POST',
-  body: JSON.stringify({ items, shippingAddress, shippingCost })
-});
-
-// 2. Create payment intent
+// 1. The server prices catalog lines, shipping, discounts, and tax. It persists
+// the pending order before releasing the client secret.
 const paymentResponse = await fetch('/api/payment-intent', {
   method: 'POST', 
   body: JSON.stringify({ 
-    amount: total, 
-    taxAmount: tax, 
-    shippingAddress, 
-    orderId 
+    items: cart.map(({ productId, variantId, quantity }) => ({
+      productId, variantId, quantity
+    })),
+    shippingAddress,
+    shippingMethodId,
+    discountCodes
   })
 });
 
-// 3. Process payment (Stripe handles)
-// 4. Create order after payment success
-const orderResponse = await fetch('/api/orders', {
+// 2. Render payment-step totals from paymentResponse.quote and confirm Stripe.
+// 3. Finalize the existing order; the server retrieves and verifies Stripe.
+const finalizationResponse = await fetch('/api/orders', {
   method: 'POST',
-  body: JSON.stringify({ items, shipping_address, tax_amount, payment_intent_id })
+  body: JSON.stringify({
+    orderId: paymentResponse.orderId,
+    paymentIntentId: paymentResponse.paymentIntentId
+  })
 });
 ```
 

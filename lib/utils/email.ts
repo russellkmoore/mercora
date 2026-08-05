@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { Money, type StoredMoney } from '@/lib/money';
+import { escapeHtmlText } from '@/lib/utils/maintenance-html';
 
 let resend: Resend | null = null;
 
@@ -24,6 +25,8 @@ export interface OrderData {
   subtotal: StoredMoney;
   shipping: StoredMoney;
   tax: StoredMoney;
+  discount?: StoredMoney;
+  tender?: StoredMoney;
   total: StoredMoney;
   shippingAddress: {
     street: string;
@@ -92,32 +95,45 @@ export async function sendOrderConfirmationEmail(orderData: OrderData): Promise<
   }
 }
 
-function generateOrderConfirmationHTML(orderData: OrderData): string {
+export function generateOrderConfirmationHTML(orderData: OrderData): string {
   // Helper function to ensure absolute URLs for images using Cloudflare Image service
   const getAbsoluteImageUrl = (imageUrl: string | undefined): string | undefined => {
     if (!imageUrl) return undefined;
     if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-      return imageUrl;
+      try {
+        const parsed = new URL(imageUrl);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+          ? parsed.toString()
+          : undefined;
+      } catch {
+        return undefined;
+      }
     }
     
-    // Normalize the path (remove leading slash if present)
-    const normalizedPath = imageUrl.startsWith('/') ? imageUrl.slice(1) : imageUrl;
-    
-    // Use Cloudflare Image service for optimized delivery in emails
-    // Set width to 100px for email images and quality to 80 for good balance
-    return `https://voltique-images.russellkmoore.me/cdn-cgi/image/width=100,quality=80,format=auto/${normalizedPath}`;
+    // Resolve relative catalog paths under the trusted image service. URL
+    // serialization percent-encodes quotes/spaces before HTML attribute escaping.
+    try {
+      const normalizedPath = imageUrl.startsWith('/') ? imageUrl.slice(1) : imageUrl;
+      return new URL(
+        `/cdn-cgi/image/width=100,quality=80,format=auto/${normalizedPath}`,
+        'https://voltique-images.russellkmoore.me'
+      ).href;
+    } catch {
+      return undefined;
+    }
   };
 
   const itemsHTML = orderData.items.map(item => {
     const absoluteImageUrl = getAbsoluteImageUrl(item.imageUrl);
+    const safeName = escapeHtmlText(item.name);
     return `
     <tr style="border-bottom: 1px solid #e2e8f0;">
       <td style="padding: 12px 0; vertical-align: top; width: 60px;">
-        ${absoluteImageUrl ? `<img src="${absoluteImageUrl}" alt="${item.name}" style="width: 50px; height: 50px; border-radius: 4px; object-fit: cover; display: block;">` : `<div style="width: 50px; height: 50px; background-color: #f1f5f9; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 12px; text-align: center;">No Image</div>`}
+        ${absoluteImageUrl ? `<img src="${escapeHtmlText(absoluteImageUrl)}" alt="${safeName}" style="width: 50px; height: 50px; border-radius: 4px; object-fit: cover; display: block;">` : `<div style="width: 50px; height: 50px; background-color: #f1f5f9; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 12px; text-align: center;">No Image</div>`}
       </td>
       <td style="padding: 12px 0 12px 16px; vertical-align: top;">
-        <div style="color: #1e293b; font-size: 16px; font-weight: bold; margin: 0 0 4px;">${item.name}</div>
-        <div style="color: #64748b; font-size: 14px; margin: 0;">Quantity: ${item.quantity} × ${Money.fromStored(item.price).format()}</div>
+        <div style="color: #1e293b; font-size: 16px; font-weight: bold; margin: 0 0 4px;">${safeName}</div>
+        <div style="color: #64748b; font-size: 14px; margin: 0;">Quantity: ${escapeHtmlText(String(item.quantity))} × ${Money.fromStored(item.price).format()}</div>
       </td>
       <td style="padding: 12px 0; text-align: right; vertical-align: top;">
         <div style="color: #1e293b; font-size: 16px; font-weight: bold; margin: 0;">${Money.fromStored(item.price).times(item.quantity).format()}</div>
@@ -146,12 +162,12 @@ function generateOrderConfirmationHTML(orderData: OrderData): string {
         <!-- Order Confirmation -->
         <div style="padding: 24px 32px;">
           <h2 style="color: #1e293b; font-size: 24px; font-weight: bold; margin: 0 0 16px;">Order Confirmed!</h2>
-          <p style="color: #64748b; font-size: 16px; line-height: 24px; margin: 0 0 16px;">Hi ${orderData.customerName},</p>
+          <p style="color: #64748b; font-size: 16px; line-height: 24px; margin: 0 0 16px;">Hi ${escapeHtmlText(orderData.customerName)},</p>
           <p style="color: #64748b; font-size: 16px; line-height: 24px; margin: 0 0 16px;">Thank you for your order! Your gear is being prepared and will be shipped soon.</p>
           
           <div style="background-color: #f1f5f9; border-radius: 8px; padding: 16px; margin: 16px 0;">
-            <p style="color: #1e293b; font-size: 18px; font-weight: bold; margin: 0 0 8px;">Order #${orderData.orderNumber}</p>
-            ${orderData.estimatedDelivery ? `<p style="color: #64748b; font-size: 14px; margin: 0;">Estimated delivery: ${orderData.estimatedDelivery}</p>` : ''}
+            <p style="color: #1e293b; font-size: 18px; font-weight: bold; margin: 0 0 8px;">Order #${escapeHtmlText(orderData.orderNumber)}</p>
+            ${orderData.estimatedDelivery ? `<p style="color: #64748b; font-size: 14px; margin: 0;">Estimated delivery: ${escapeHtmlText(orderData.estimatedDelivery)}</p>` : ''}
           </div>
         </div>
 
@@ -174,10 +190,20 @@ function generateOrderConfirmationHTML(orderData: OrderData): string {
               <td style="color: #64748b; font-size: 14px;">Shipping:</td>
               <td style="text-align: right; color: #1e293b; font-size: 14px;">${Money.fromStored(orderData.shipping).format()}</td>
             </tr>
+            ${orderData.discount && !Money.fromStored(orderData.discount).isZero() ? `
+            <tr style="padding: 4px 0;">
+              <td style="color: #64748b; font-size: 14px;">Discount:</td>
+              <td style="text-align: right; color: #1e293b; font-size: 14px;">${Money.fromStored(orderData.discount).negate().format()}</td>
+            </tr>` : ''}
             <tr style="padding: 4px 0;">
               <td style="color: #64748b; font-size: 14px;">Tax:</td>
               <td style="text-align: right; color: #1e293b; font-size: 14px;">${Money.fromStored(orderData.tax).format()}</td>
             </tr>
+            ${orderData.tender && !Money.fromStored(orderData.tender).isZero() ? `
+            <tr style="padding: 4px 0;">
+              <td style="color: #64748b; font-size: 14px;">Other tender:</td>
+              <td style="text-align: right; color: #1e293b; font-size: 14px;">${Money.fromStored(orderData.tender).negate().format()}</td>
+            </tr>` : ''}
             <tr style="border-top: 2px solid #e2e8f0; padding: 12px 0 0; margin: 12px 0 0;">
               <td style="color: #1e293b; font-size: 16px; font-weight: bold; padding-top: 12px;">Total:</td>
               <td style="text-align: right; color: #f97316; font-size: 18px; font-weight: bold; padding-top: 12px;">${Money.fromStored(orderData.total).format()}</td>
@@ -189,9 +215,9 @@ function generateOrderConfirmationHTML(orderData: OrderData): string {
         <div style="padding: 24px 32px;">
           <h3 style="color: #1e293b; font-size: 18px; font-weight: bold; margin: 0 0 12px;">Shipping Address</h3>
           <p style="color: #64748b; font-size: 14px; line-height: 20px; margin: 0;">
-            ${orderData.shippingAddress.street}<br>
-            ${orderData.shippingAddress.city}, ${orderData.shippingAddress.state} ${orderData.shippingAddress.zipCode}<br>
-            ${orderData.shippingAddress.country}
+            ${escapeHtmlText(orderData.shippingAddress.street)}<br>
+            ${escapeHtmlText(orderData.shippingAddress.city)}, ${escapeHtmlText(orderData.shippingAddress.state)} ${escapeHtmlText(orderData.shippingAddress.zipCode)}<br>
+            ${escapeHtmlText(orderData.shippingAddress.country)}
           </p>
         </div>
 

@@ -2,32 +2,30 @@
  * MACH-Compliant Orders API - Unified Order Management
  * 
  * This endpoint consolidates all order functionality:
- * - GET: List orders (replaces user-orders) 
- * - POST: Create orders (replaces submit-order)
- * - PUT: Update orders (replaces update-order)
+ * - GET: List owner-scoped or authorized admin orders
+ * - POST: Verify payment and finalize a durable pending order
+ * - PUT: Update non-lifecycle metadata with optimistic concurrency
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 import { getDbAsync } from "@/lib/db";
 import { orders } from "@/lib/db/schema/order";
-import { 
-  getOrdersByCustomer, 
-  getOrderById, 
-  createOrder, 
-  updateOrderStatus,
-  updateOrderShipping 
-} from "@/lib/models/mach/orders";
-import { 
-  getOrdersByCustomerId, 
-  insertOrder
-} from "@/lib/models/order";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, isNull, sql } from "drizzle-orm";
 import { authenticateRequest, PERMISSIONS } from "@/lib/auth/unified-auth";
-import { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail, type OrderData } from "@/lib/utils/email";
-import type { Order, CreateOrderRequest, UpdateOrderRequest } from "@/lib/types/order";
-import { getCustomer, createCustomer } from "@/lib/models/mach/customer";
-import { Money, toWireMoney, type MachMoney } from "@/lib/money";
+import type { Order } from "@/lib/types/order";
+import { Money } from "@/lib/money";
+import {
+  mergeOrderExtensions,
+  mergeOrderExternalReferences,
+  validateOrderMetadataUpdate,
+} from '@/lib/utils/order-update-guards';
+import {
+  finalizeOrderPayment,
+  PaymentVerificationError,
+} from '@/lib/services/order-finalization';
+import { enforceRateLimit, getClientIp } from '@/lib/rate-limit';
+import { toAdminOrder, toCustomerOrder } from '@/lib/models/mach/order-serializer';
 
 
 
@@ -39,8 +37,16 @@ export async function GET(request: NextRequest) {
     const { userId } = await auth();
     const url = new URL(request.url);
     
-    const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100);
-    const offset = parseInt(url.searchParams.get('offset') || '0');
+    const rawLimit = url.searchParams.get('limit');
+    const rawOffset = url.searchParams.get('offset');
+    const limit = rawLimit === null ? 50 : Number(rawLimit);
+    const offset = rawOffset === null ? 0 : Number(rawOffset);
+    if (
+      !Number.isSafeInteger(limit) || limit < 1 || limit > 100 ||
+      !Number.isSafeInteger(offset) || offset < 0
+    ) {
+      return NextResponse.json({ error: 'Invalid pagination parameters' }, { status: 400 });
+    }
     const status = url.searchParams.get('status');
     const requestedUserId = url.searchParams.get('userId');
     const orderId = url.searchParams.get('orderId');
@@ -70,27 +76,28 @@ export async function GET(request: NextRequest) {
       );
     }
 
-  let query = db.select().from(orders).orderBy(desc(orders.created_at));
-    const allOrders = await query;
-    let filteredOrders = allOrders;
-    
-    // Apply filters based on MACH schema
-    if (!isAdminRequest && requestedUserId) {
-      filteredOrders = filteredOrders.filter(order => order.customer_id === requestedUserId);
-    }
-    if (orderId) {
-      filteredOrders = filteredOrders.filter(order => order.id === orderId);
-    }
+    const predicates = [];
+    if (!isAdminRequest && requestedUserId) predicates.push(eq(orders.customer_id, requestedUserId));
+    if (orderId) predicates.push(eq(orders.id, orderId));
     if (status) {
-      filteredOrders = filteredOrders.filter(order => order.status === status);
+      const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'] as const;
+      if (!validStatuses.includes(status as (typeof validStatuses)[number])) {
+        return NextResponse.json({ error: 'Invalid order status' }, { status: 400 });
+      }
+      predicates.push(eq(orders.status, status as (typeof validStatuses)[number]));
     }
-    
+
+    const filteredOrders = await db
+      .select()
+      .from(orders)
+      .where(predicates.length ? and(...predicates) : undefined)
+      .orderBy(desc(orders.created_at));
     const total = filteredOrders.length;
     const paginatedOrders = filteredOrders.slice(offset, offset + limit);
     const hydratedOrders = paginatedOrders.map(hydrateOrder);
     
     const response = {
-      data: hydratedOrders.map(toWireOrder),
+      data: hydratedOrders.map(isAdminRequest ? toAdminOrder : toCustomerOrder),
       meta: {
         total,
         limit,
@@ -106,7 +113,7 @@ export async function GET(request: NextRequest) {
         ...(offset > 0 && {
           prev: `/api/orders?limit=${limit}&offset=${Math.max(0, offset - limit)}`
         }),
-        last: `/api/orders?limit=${limit}&offset=${Math.floor(total / limit) * limit}`
+        last: `/api/orders?limit=${limit}&offset=${Math.max(0, Math.floor((total - 1) / limit) * limit)}`
       }
     };
     return NextResponse.json(response);
@@ -121,175 +128,93 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * POST /api/orders - Create order (consolidates submit-order functionality)
+ * POST /api/orders - Finalize the durable pending order created at checkout.
+ * Client item names, prices, totals, ownership and paid state are ignored.
  */
 export async function POST(request: NextRequest) {
   try {
+    const limited = await enforceRateLimit(
+      'PUBLIC_RATE_LIMITER',
+      `order-finalize:${getClientIp(request)}`
+    );
+    if (limited) return limited;
+
     const { userId } = await auth();
-    const body = await request.json() as CreateOrderRequest;
-    
-    // Validate required fields
-
-    // Validate MACH-compliant order fields
-    if (!body.items || !Array.isArray(body.items) || body.items.length === 0) {
-      return NextResponse.json({
-        error: 'Validation failed',
-        details: ['items array is required and must not be empty']
-      }, { status: 400 });
+    const body: unknown = await request.json();
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
-    if (!body.total_amount || !Number.isSafeInteger(body.total_amount.amount)) {
-      return NextResponse.json({
-        error: 'Validation failed',
-        details: ['total_amount is required and must be a Money object']
-      }, { status: 400 });
+    const input = body as Record<string, unknown>;
+    const extensions = input.extensions && typeof input.extensions === 'object'
+      ? input.extensions as Record<string, unknown>
+      : {};
+    const paymentIntentId = typeof input.paymentIntentId === 'string'
+      ? input.paymentIntentId
+      : typeof extensions.payment_intent_id === 'string'
+        ? extensions.payment_intent_id
+        : undefined;
+    let orderId = typeof input.orderId === 'string'
+      ? input.orderId
+      : typeof input.order_id === 'string'
+        ? input.order_id
+        : undefined;
+    if (!paymentIntentId) {
+      return NextResponse.json({ error: 'paymentIntentId is required' }, { status: 400 });
     }
-    if (!body.currency_code) {
-      return NextResponse.json({
-        error: 'Validation failed',
-        details: ['currency_code is required']
-      }, { status: 400 });
+    if (!/^pi_[A-Za-z0-9_]+$/.test(paymentIntentId) || paymentIntentId.length > 255) {
+      return NextResponse.json({ error: 'Invalid paymentIntentId' }, { status: 400 });
     }
-
-    // Generate order ID
-    const now = Date.now();
-    let baseId = userId ?? "guest";
-    if (baseId.includes("@")) baseId = baseId.split("@")[0];
-    const safeUserId = baseId.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-    const orderId = `WEB-${safeUserId}-${now}`;
-
-    const db = await getDbAsync();
-    
-    // Handle customer_id - ensure there's a valid customer record or null for guest orders
-    let customerId = userId || body.customer_id || null;
-    if (customerId === "guest") {
-      customerId = null;
-    }
-    
-    // If we have a customer ID, make sure the customer exists in the database
-    if (customerId) {
-      try {
-        let customer = await getCustomer(customerId);
-        if (!customer) {
-          // Create a customer record if it doesn't exist
-          const user = await currentUser();
-          customer = await createCustomer({
-            id: customerId,
-            type: "person",
-            person: {
-              email: user?.emailAddresses?.[0]?.emailAddress || body.extensions?.email || '',
-              first_name: user?.firstName || '',
-              last_name: user?.lastName || '',
-              full_name: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '',
-            }
-          });
-        }
-      } catch (error) {
-        console.error('Error handling customer record:', error);
-        // If customer creation fails, proceed as guest order
-        customerId = null;
-      }
+    if (
+      orderId !== undefined &&
+      (orderId.length > 200 || !/^WEB-[A-Z0-9]+-\d+(?:-[A-Z0-9]+)?$/.test(orderId))
+    ) {
+      return NextResponse.json({ error: 'Invalid orderId' }, { status: 400 });
     }
 
-    const machOrder: any = {
-      id: orderId,
-      customer_id: customerId,
-      status: 'pending',
-      total_amount: Money.fromStored(body.total_amount, body.currency_code).toJSON(),
-      currency_code: body.currency_code,
-      shipping_address: body.shipping_address ? JSON.stringify(body.shipping_address) : null,
-      billing_address: body.billing_address ? JSON.stringify(body.billing_address) : null,
-      items: JSON.stringify(body.items),
-      shipping_method: body.shipping_method || null,
-      payment_method: body.payment_method || null,
-      payment_status: 'pending',
-      notes: body.notes || null,
-      external_references: body.external_references ? JSON.stringify(body.external_references) : null,
-      extensions: body.extensions ? JSON.stringify(body.extensions) : null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-
-    // Create the order
-    const [newOrder] = await db.insert(orders).values(machOrder).returning();
-
-
-    // Send order confirmation email (MACH-compliant)
-    try {
-      const user = await currentUser();
-      const shippingAddr = body.shipping_address;
-      let customerName = 'Valued Customer';
-      if (user?.firstName && user?.lastName) {
-        customerName = `${user.firstName} ${user.lastName}`;
-      } else if (shippingAddr?.recipient) {
-        customerName = shippingAddr.recipient;
-      } else if (shippingAddr?.company) {
-        customerName = shippingAddr.company;
-      }
-      const customerEmail = body.extensions?.email || shippingAddr?.email || '';
-      const orderData: OrderData = {
-        orderNumber: orderId,
-        customerName,
-        customerEmail,
-        items: body.items.map(item => ({
-          productId: item.product_id,
-          name: item.product_name,
-          price: Money.fromStored(item.unit_price, body.currency_code).toJSON(),
-          quantity: item.quantity,
-          imageUrl: (item as any).imageUrl || '',
-        })),
-        subtotal: Money.fromStored(body.extensions?.subtotal ?? 0, body.currency_code).toJSON(),
-        shipping: Money.fromStored(body.extensions?.shipping_cost ?? 0, body.currency_code).toJSON(),
-        tax: Money.fromStored(body.extensions?.tax_amount ?? 0, body.currency_code).toJSON(),
-        total: Money.fromStored(body.total_amount, body.currency_code).toJSON(),
-        shippingAddress: shippingAddr ? {
-          street: [shippingAddr.line1, shippingAddr.line2].filter(Boolean).join(', '),
-          city: typeof shippingAddr.city === 'string' ? shippingAddr.city : (shippingAddr.city ? Object.values(shippingAddr.city)[0] : ''),
-          state: shippingAddr.region || '',
-          zipCode: shippingAddr.postal_code || '',
-          country: shippingAddr.country || 'US',
-        } : {
-          street: '', city: '', state: '', zipCode: '', country: ''
-        },
-        estimatedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-      };
-      const emailResult = await sendOrderConfirmationEmail(orderData);
-      if (emailResult.success) {
-        console.log('Order confirmation email sent successfully:', emailResult.id);
-      } else {
-        console.error('Failed to send confirmation email:', emailResult.error);
-      }
-    } catch (emailError) {
-      console.error('Email preparation failed:', emailError);
+    // Compatibility for inline clients that know the PI but did not yet retain
+    // the new server-returned order id. This still proves the immutable binding.
+    if (!orderId) {
+      const db = await getDbAsync();
+      const [bound] = await db.select({ id: orders.id }).from(orders).where(and(
+        sql`json_extract(${orders.extensions}, '$.payment_intent_id') = ${paymentIntentId}`,
+        sql`json_extract(${orders.external_references}, '$.payment_intent_id') = ${paymentIntentId}`
+      )).limit(1);
+      orderId = bound?.id;
     }
-    
+    if (!orderId) {
+      return NextResponse.json({ error: 'Pending order not found' }, { status: 404 });
+    }
 
-    const response = {
-      data: toWireOrder(hydrateOrder(newOrder)),
-      meta: {
-        schema: "mach:order"
-      }
-    };
-    return NextResponse.json(response, { status: 201 });
+    const result = await finalizeOrderPayment({
+      orderId,
+      paymentIntentId,
+      customerId: userId ?? undefined,
+      enforceOwnership: true,
+      sendEmail: true,
+    });
+    return NextResponse.json({
+      data: { id: result.order.id },
+      meta: { schema: 'mach:order', idempotent: !result.promoted },
+    });
 
   } catch (error) {
-    console.error('Orders API error:', error);
-    
-    if (error instanceof Error) {
-      return NextResponse.json({
-        error: 'Validation failed',
-        message: error.message
-      }, { status: 400 });
+    if (error instanceof PaymentVerificationError) {
+      console.warn('Order payment verification rejected:', error.message);
+      return NextResponse.json(
+        { error: 'Payment could not be verified for this order' },
+        { status: 409 }
+      );
     }
-    
-    return NextResponse.json(
-      { error: 'Failed to create order' },
-      { status: 500 }
-    );
+    console.error('Order finalization failed:', error);
+    return NextResponse.json({ error: 'Failed to finalize order' }, { status: 500 });
   }
 }
 
 /**
- * PUT /api/orders - Update order status (consolidates update-order functionality)
+ * PUT /api/orders - Update non-authoritative order metadata.
+ *
+ * Lifecycle, fulfillment, customer linkage, totals and payment state each have
+ * a dedicated server-owned path and are rejected here.
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -299,30 +224,21 @@ export async function PUT(request: NextRequest) {
       return authResult.response!;
     }
 
-    const body = await request.json() as UpdateOrderRequest;
-
-    const { status, payment_status, shipping_method, tracking_number, shipped_at, delivered_at, notes, external_references, extensions } = body;
-    const orderId = (body as any).orderId;
-    if (!orderId) {
+    const body: unknown = await request.json();
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Request body must be a JSON object' }, { status: 400 });
+    }
+    const input = body as Record<string, unknown>;
+    const orderId = input.orderId;
+    if (typeof orderId !== 'string' || !orderId) {
       return NextResponse.json({
         error: 'Validation failed',
         details: ['orderId is required in the request body']
       }, { status: 400 });
     }
-
-    if (!status) {
-      return NextResponse.json({
-        error: 'Validation failed', 
-        details: ['status is required']
-      }, { status: 400 });
-    }
-
-    // Validate status value (must match schema)
-    const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
-    if (!validStatuses.includes(status)) {
-      return NextResponse.json({
-        error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
-      }, { status: 400 });
+    const validation = validateOrderMetadataUpdate(input);
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.error }, { status: validation.status });
     }
 
     const db = await getDbAsync();
@@ -336,52 +252,54 @@ export async function PUT(request: NextRequest) {
     }
 
     const currentOrder = existingOrder[0];
-    
+    const updateData: Partial<typeof orders.$inferInsert> = {};
 
-    // Build update data (MACH-compliant)
-    const updateData: any = {
-      ...(status && { status }),
-      ...(payment_status && { payment_status }),
-      ...(shipping_method && { shipping_method }),
-      ...(tracking_number && { tracking_number }),
-      ...(shipped_at && { shipped_at }),
-      ...(delivered_at && { delivered_at }),
-      ...(notes && { notes }),
-      ...(external_references && { external_references: JSON.stringify(external_references) }),
-      ...(extensions && { extensions: JSON.stringify(extensions) }),
-      updated_at: new Date().toISOString()
-    };
+    if ('notes' in validation.value) {
+      const notes = validation.value.notes;
+      if (notes !== null && typeof notes !== 'string') {
+        return NextResponse.json({ error: 'notes must be a string or null' }, { status: 400 });
+      }
+      updateData.notes = notes;
+    }
+    if ('extensions' in validation.value) {
+      const merged = mergeOrderExtensions(validation.value.extensions, currentOrder.extensions);
+      if (!merged.ok) {
+        return NextResponse.json({ error: merged.error }, { status: merged.status });
+      }
+      updateData.extensions = merged.value;
+    }
+    if ('external_references' in validation.value) {
+      const merged = mergeOrderExternalReferences(
+        validation.value.external_references,
+        currentOrder.external_references
+      );
+      if (!merged.ok) {
+        return NextResponse.json({ error: merged.error }, { status: merged.status });
+      }
+      updateData.external_references = merged.value;
+    }
+    const updatedAt = new Date().toISOString();
+    updateData.updated_at = updatedAt;
 
     // Update the order
     const [updatedOrder] = await db.update(orders)
       .set(updateData)
-      .where(eq(orders.id, orderId))
+      .where(and(
+        eq(orders.id, orderId),
+        currentOrder.updated_at === null
+          ? isNull(orders.updated_at)
+          : eq(orders.updated_at, currentOrder.updated_at)
+      ))
       .returning();
-
-    // Send email notification for status changes
-    const emailStatuses = ['processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
-    if (emailStatuses.includes(status) && currentOrder.status !== status) {
-      try {
-        const orderData = transformOrderForEmail(updatedOrder);
-        await sendOrderStatusUpdateEmail(orderData);
-        console.log(`Status update email sent for order ${orderId}: ${status}`);
-      } catch (emailError) {
-        console.error(`Failed to send status update email for order ${orderId}:`, emailError);
-      }
+    if (!updatedOrder) {
+      return NextResponse.json(
+        { error: 'Order changed while it was being updated; retry with fresh data' },
+        { status: 409 }
+      );
     }
 
-    // TODO: Re-implement webhook audit trail in MACH orders model
-    // Create webhook record for audit trail
-    console.log('Order status update:', {
-      orderId,
-      previousStatus: currentOrder.status,
-      newStatus: status,
-      updatedBy: authResult.tokenInfo?.tokenName || 'unknown',
-      timestamp: new Date().toISOString(),
-    });
-
     const response = {
-      data: toWireOrder(hydrateOrder(updatedOrder)),
+      data: toAdminOrder(hydrateOrder(updatedOrder)),
       meta: {
         schema: "mach:order"
       }
@@ -421,70 +339,5 @@ function hydrateOrder(dbOrder: typeof orders.$inferSelect): Order {
     extensions: dbOrder.extensions ? (typeof dbOrder.extensions === 'string' ? JSON.parse(dbOrder.extensions) : dbOrder.extensions) : undefined,
     created_at: dbOrder.created_at ?? undefined,
     updated_at: dbOrder.updated_at ?? undefined
-  };
-}
-
-type WireOrderItem = Omit<Order['items'][number], 'unit_price' | 'total_price'> & {
-  unit_price: MachMoney;
-  total_price: MachMoney;
-};
-type WireOrder = Omit<Order, 'total_amount' | 'items'> & { total_amount: MachMoney; items: WireOrderItem[] };
-
-/** Apply decimal MACH serialization last, after all internal minor-unit work. */
-function toWireOrder(order: Order): WireOrder {
-  return {
-    ...order,
-    total_amount: toWireMoney(order.total_amount),
-    items: order.items.map((item) => ({
-      ...item,
-      unit_price: toWireMoney(item.unit_price),
-      total_price: toWireMoney(item.total_price),
-    })),
-  };
-}
-
-/**
- * Transform order data for email notification
- */
-function transformOrderForEmail(order: any): any {
-  // Use MACH-compliant fields
-  const items = order.items ? (typeof order.items === 'string' ? JSON.parse(order.items) : order.items) : [];
-  const shippingAddr = order.shipping_address ? (typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : order.shipping_address) : {};
-  const extensions = order.extensions ? (typeof order.extensions === 'string' ? JSON.parse(order.extensions) : order.extensions) : {};
-
-  // MACHAddress: line1, line2, city, region, postal_code, country, recipient, company
-  let customerName = '';
-  if (shippingAddr.recipient) {
-    customerName = shippingAddr.recipient;
-  } else if (shippingAddr.company) {
-    customerName = shippingAddr.company;
-  } else {
-    customerName = 'Valued Customer';
-  }
-
-  return {
-    orderNumber: order.id,
-    customerName,
-    customerEmail: extensions.email || shippingAddr.email || '',
-    status: order.status,
-    carrier: extensions.carrier,
-    trackingNumber: order.tracking_number,
-    trackingUrl: extensions.trackingUrl,
-    notes: order.notes,
-    cancellationReason: extensions.cancellationReason,
-    items: items.map((item: any) => ({
-      productId: item.product_id || item.id,
-      name: item.product_name || item.name || item.title,
-      price: Money.fromStored(item.unit_price ?? item.price ?? 0, order.currency_code).toJSON(),
-      quantity: item.quantity || 1,
-      imageUrl: item.imageUrl || '',
-    })),
-    shippingAddress: {
-      street: [shippingAddr.line1, shippingAddr.line2].filter(Boolean).join(', '),
-      city: shippingAddr.city || '',
-      state: shippingAddr.region || '',
-      zipCode: shippingAddr.postal_code || '',
-      country: shippingAddr.country || 'US',
-    },
   };
 }

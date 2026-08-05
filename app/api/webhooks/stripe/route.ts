@@ -31,6 +31,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe, getWebhookSecret } from '@/lib/stripe';
 import Stripe from 'stripe';
+import {
+  finalizeOrderPayment,
+  PaymentVerificationError,
+} from '@/lib/services/order-finalization';
 
 /**
  * POST handler for Stripe webhook events
@@ -114,37 +118,20 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   }
 
   try {
-    // Update order status using unified orders endpoint
-    try {
-      const updateRes = await fetch(`${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/api/orders`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-API-Key': process.env.STRIPE_WEBHOOK_SECRET || '', // Use webhook secret as internal API key
-        },
-        body: JSON.stringify({
-          orderId,
-          status: 'processing', // Move to processing after successful payment
-          payment_status: 'paid', // Ensure payment status is updated
-          notes: `Payment completed via Stripe - Payment Intent: ${paymentIntent.id}`,
-        }),
-      });
-
-      if (!updateRes.ok) {
-        console.error('Failed to update order status:', await updateRes.text());
-      }
-    } catch (updateError) {
-      console.error('Error updating order status:', updateError);
-    }
-    
-    // You can add additional logic here:
-    // - Send confirmation emails
-    // - Update inventory
-    // - Trigger fulfillment process
-    // - Analytics tracking
-    
+    await finalizeOrderPayment({
+      orderId,
+      paymentIntentId: paymentIntent.id,
+      enforceOwnership: false,
+      sendEmail: true,
+    });
   } catch (error) {
-    console.error('Error updating order after payment:', error);
+    if (error instanceof PaymentVerificationError) {
+      console.error(`Payment verification rejected for order ${orderId}:`, error.message);
+      return;
+    }
+    // Transient D1/Stripe failures must reach POST's 500 response so Stripe
+    // retries the signed event instead of recording a false success.
+    throw error;
   }
 }
 
