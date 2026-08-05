@@ -11,6 +11,31 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { Product, Category } from "@/lib/types";
+import {
+  fromWireProduct,
+  type WireProduct,
+} from "@/lib/models/mach/product-serializer";
+
+async function fetchAllProducts(initialUrl: string): Promise<Product[]> {
+  const products: Product[] = [];
+  let nextUrl: string | undefined = initialUrl;
+  let pages = 0;
+
+  while (nextUrl && pages < 100) {
+    const response = await fetch(nextUrl);
+    if (!response.ok) throw new Error(`Product request failed with ${response.status}`);
+    const result = await response.json() as {
+      data?: WireProduct[];
+      links?: { next?: string };
+    };
+    products.push(...(result.data ?? []).map(fromWireProduct));
+    nextUrl = result.links?.next;
+    pages += 1;
+  }
+
+  if (nextUrl) throw new Error("Product pagination exceeded the safety limit");
+  return products;
+}
 
 interface CategoryDetailProps {
   categoryId: string;
@@ -38,18 +63,12 @@ export default function CategoryDetail({ categoryId }: CategoryDetailProps) {
       }
 
       // Fetch products in this category
-      const categoryProductsResponse = await fetch(`/api/products?category=${categoryId}`);
-      if (categoryProductsResponse.ok) {
-        const productsResult: any = await categoryProductsResponse.json();
-        setCategoryProducts(productsResult.data || []);
-      }
+      setCategoryProducts(
+        await fetchAllProducts(`/api/products?category=${encodeURIComponent(categoryId)}&limit=100`)
+      );
 
       // Fetch all products for adding functionality
-      const allProductsResponse = await fetch("/api/products?limit=100");
-      if (allProductsResponse.ok) {
-        const allResult: any = await allProductsResponse.json();
-        setAllProducts(allResult.data || []);
-      }
+      setAllProducts(await fetchAllProducts("/api/products?limit=100"));
     } catch (error) {
       console.error("Error fetching category data:", error);
     } finally {

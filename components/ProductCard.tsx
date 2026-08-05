@@ -83,8 +83,9 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
   const onSale = compareAt && compareAt > (price ?? 0);
 
   // Availability logic
-  const quantityInStock = defaultVariant?.inventory?.quantity ?? 0;
-  const availability = quantityInStock > 0 ? "available" : "coming_soon";
+  const isAvailable = defaultVariant?.available_for_sale ??
+    (defaultVariant?.inventory?.quantity ?? 0) > 0;
+  const availability = isAvailable ? "available" : "coming_soon";
 
   // Name/description/slug logic
   const name =

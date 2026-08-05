@@ -56,6 +56,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { marked } from "marked";
+import { sanitizeRichHtml } from "@/lib/utils/sanitize-html";
 
 interface DashboardStats {
   totalProducts: number;
@@ -453,7 +454,9 @@ export default function AdminDashboard() {
                   <div
                     className="text-gray-300 text-sm prose prose-sm prose-invert max-w-none"
                     dangerouslySetInnerHTML={{
-                      __html: aiAnalytics.insights ? marked(aiAnalytics.insights) : ''
+                      __html: aiAnalytics.insights
+                        ? sanitizeRichHtml(marked(aiAnalytics.insights) as string)
+                        : ''
                     }}
                   />
                 </div>

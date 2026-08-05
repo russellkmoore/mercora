@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getProduct, updateProduct, deleteProduct } from "@/lib/models/mach/products";
 import type { Product } from "@/lib/types";
-import { toWireProduct } from "@/lib/models/mach/product-serializer";
+import { toPublicProduct, toWireProduct } from "@/lib/models/mach/product-serializer";
+import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
+import { errorDetails } from "@/lib/utils/error-response";
 
 /**
  * GET /api/products/[id] - Get a specific product
@@ -13,10 +15,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
     }
     const product = await getProduct(productId);
-    if (!product) {
+    const adminAuth = await checkAdminPermissions(request);
+    if (!product || (!adminAuth.success && product.status !== 'active')) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
-    return NextResponse.json({ data: toWireProduct(product), meta: { schema: "mach:product" } });
+    const visibleProduct = adminAuth.success ? product : toPublicProduct(product);
+    return NextResponse.json({ data: toWireProduct(visibleProduct), meta: { schema: "mach:product" } });
   } catch (error) {
     console.error("Product GET error:", error);
     return NextResponse.json({ error: "Failed to retrieve product" }, { status: 500 });
@@ -27,6 +31,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
  * PUT /api/products/[id] - Update a specific product
  */
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const adminAuth = await checkAdminPermissions(request);
+  if (!adminAuth.success) {
+    return NextResponse.json({ error: adminAuth.error }, { status: 401 });
+  }
+
   try {
     const { id: productId } = await params;
     if (!productId) {
@@ -58,15 +67,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
   } catch (error) {
     console.error("Product PUT error:", error);
-    
-    if (error instanceof Error) {
-      return NextResponse.json({
-        error: 'Update failed',
-        message: error.message
-      }, { status: 400 });
-    }
-    
-    return NextResponse.json({ error: "Failed to update product" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to update product", ...errorDetails(error) },
+      { status: 500 }
+    );
   }
 }
 
@@ -74,6 +78,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
  * DELETE /api/products/[id] - Delete a specific product
  */
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const adminAuth = await checkAdminPermissions(request);
+  if (!adminAuth.success) {
+    return NextResponse.json({ error: adminAuth.error }, { status: 401 });
+  }
+
   try {
     const { id: productId } = await params;
     if (!productId) {

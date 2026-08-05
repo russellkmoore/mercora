@@ -12,6 +12,7 @@ import { getDbAsync } from '@/lib/db';
 import { promotions } from '@/lib/db/schema/promotions';
 import { eq } from 'drizzle-orm';
 import type { Promotion, CouponInstance } from '@/lib/types';
+import { checkAdminPermissions } from '@/lib/auth/admin-middleware';
 
 type InsertPromotion = typeof promotions.$inferInsert;
 
@@ -197,6 +198,11 @@ function convertFromAdminFormat(admin: Partial<AdminPromotion>): { promotion: Pa
  * GET /api/promotions - List all promotions
  */
 export async function GET(request: NextRequest) {
+  const adminAuth = await checkAdminPermissions(request);
+  if (!adminAuth.success) {
+    return NextResponse.json({ error: adminAuth.error }, { status: 401 });
+  }
+
   try {
     const promotions = await listPromotions();
     const couponInstances = await listCouponInstances();
@@ -221,6 +227,11 @@ export async function GET(request: NextRequest) {
  * POST /api/promotions - Create a new promotion
  */
 export async function POST(request: NextRequest) {
+  const adminAuth = await checkAdminPermissions(request);
+  if (!adminAuth.success) {
+    return NextResponse.json({ error: adminAuth.error }, { status: 401 });
+  }
+
   try {
     const adminPromotion: Partial<AdminPromotion> = await request.json();
     
@@ -302,6 +313,11 @@ export async function POST(request: NextRequest) {
  * PUT /api/promotions - Update a promotion
  */
 export async function PUT(request: NextRequest) {
+  const adminAuth = await checkAdminPermissions(request);
+  if (!adminAuth.success) {
+    return NextResponse.json({ error: adminAuth.error }, { status: 401 });
+  }
+
   try {
     const adminPromotion: AdminPromotion = await request.json();
     
@@ -391,6 +407,11 @@ export async function PUT(request: NextRequest) {
  * DELETE /api/promotions - Delete a promotion
  */
 export async function DELETE(request: NextRequest) {
+  const adminAuth = await checkAdminPermissions(request);
+  if (!adminAuth.success) {
+    return NextResponse.json({ error: adminAuth.error }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

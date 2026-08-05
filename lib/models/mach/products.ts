@@ -10,6 +10,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
   // Get the product first
   const results = await db.select().from(products);
   const match = results.find((p: any) => {
+    if (p.status !== 'active') return false;
     if (!p.slug) return false;
     if (typeof p.slug === 'string') return p.slug === slug;
     if (typeof p.slug === 'object' && p.slug !== null) {
@@ -21,7 +22,15 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
   if (!match) return null;
   
   // Get the product variants
-  const variants = await db.select().from(product_variants).where(eq(product_variants.product_id, match.id));
+  const variants = await db
+    .select()
+    .from(product_variants)
+    .where(
+      and(
+        eq(product_variants.product_id, match.id),
+        eq(product_variants.status, 'active')
+      )
+    );
   
   // Deserialize the product and include variants
   const product = deserializeProduct(match);
@@ -582,7 +591,7 @@ export async function deleteProductVariant(id: string): Promise<boolean> {
 export async function searchProducts(searchTerm: string): Promise<Product[]> {
     const results = await (await getDb()).select()
     .from(products)
-    .where(like(products.name, `%${searchTerm}%`));
+    .where(and(like(products.name, `%${searchTerm}%`), eq(products.status, 'active')));
   return results.map(deserializeProduct);
 }
 
