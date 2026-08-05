@@ -5,7 +5,11 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "mercora",
-  "main": ".open-next/worker.js",
+  "main": "worker.ts",
+  "triggers": {
+    // Regenerate the Admin BI dashboard cache every 6 hours.
+    "crons": ["0 */6 * * *"]
+  },
   "compatibility_date": "2024-12-01",
   "compatibility_flags": [
     "nodejs_compat",
