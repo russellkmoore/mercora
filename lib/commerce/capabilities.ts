@@ -20,6 +20,7 @@ export interface GiftCardCheckoutCapability {
 
 export interface SubscriptionCheckoutCapability {
   validateCheckout(args: { productIds: string[]; customerId?: string }): Promise<void>;
+  /** Idempotently apply paid-order subscription effects, keyed by order id. */
   orderPaid(order: Order): Promise<void>;
 }
 

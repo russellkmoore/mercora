@@ -62,6 +62,10 @@ import {
   RotateCcw, ChevronLeft, ChevronsLeft, ChevronsRight
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  formatMachMajorCurrency,
+  formatStoredOrderCurrency,
+} from '@/lib/admin/order-money';
 
 interface Order {
   id: string;
@@ -227,12 +231,8 @@ export default function AdminOrdersPage() {
   const pendingOrdersCount = orders.filter(o => o.status === 'pending').length; // This is just for current page
   const shippedOrdersCount = orders.filter(o => o.status === 'shipped').length; // This is just for current page
 
-  const formatCurrency = (amount: number, currency: string = "USD") => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency,
-    }).format(amount / 100);
-  };
+  const formatCurrency = formatMachMajorCurrency;
+  const formatStoredCurrency = formatStoredOrderCurrency;
 
   const generateTrackingUrl = (trackingNumber: string, carrier?: string) => {
     if (!trackingNumber) return null;
@@ -394,6 +394,11 @@ export default function AdminOrdersPage() {
             {filteredOrders.map((order) => {
               const isExpanded = expandedOrders.has(order.id);
               const isEditing = editingOrder === order.id;
+              const extensions = order.extensions ?? {};
+              const breakdownSubtotal = extensions.checkout_catalog_subtotal ?? extensions.subtotal;
+              const breakdownShipping = extensions.checkout_shipping_before_discount ?? extensions.shippingCost;
+              const breakdownTax = extensions.checkout_tax ?? extensions.taxAmount;
+              const breakdownDiscount = extensions.checkout_discount ?? extensions.discountAmount;
               
               return (
                 <div key={order.id} className="p-4">
@@ -504,28 +509,28 @@ export default function AdminOrdersPage() {
                           
                           {/* Order Breakdown */}
                           <div className="border-t border-neutral-600 pt-3 space-y-1">
-                            {order.extensions?.subtotal && (
+                            {breakdownSubtotal !== undefined && (
                               <div className="flex justify-between text-sm">
                                 <span className="text-gray-400">Subtotal:</span>
-                                <span className="text-white">{formatCurrency(order.extensions.subtotal)}</span>
+                                <span className="text-white">{formatStoredCurrency(breakdownSubtotal, order.currency_code)}</span>
                               </div>
                             )}
-                            {order.extensions?.shippingCost && (
+                            {breakdownShipping !== undefined && (
                               <div className="flex justify-between text-sm">
                                 <span className="text-gray-400">Shipping:</span>
-                                <span className="text-white">{formatCurrency(order.extensions.shippingCost)}</span>
+                                <span className="text-white">{formatStoredCurrency(breakdownShipping, order.currency_code)}</span>
                               </div>
                             )}
-                            {order.extensions?.taxAmount && (
+                            {breakdownTax !== undefined && (
                               <div className="flex justify-between text-sm">
                                 <span className="text-gray-400">Tax:</span>
-                                <span className="text-white">{formatCurrency(order.extensions.taxAmount)}</span>
+                                <span className="text-white">{formatStoredCurrency(breakdownTax, order.currency_code)}</span>
                               </div>
                             )}
-                            {order.extensions?.discountAmount && (
+                            {breakdownDiscount !== undefined && (
                               <div className="flex justify-between text-sm">
                                 <span className="text-gray-400">Discount:</span>
-                                <span className="text-green-400">-{formatCurrency(order.extensions.discountAmount)}</span>
+                                <span className="text-green-400">-{formatStoredCurrency(breakdownDiscount, order.currency_code)}</span>
                               </div>
                             )}
                             <div className="flex justify-between text-base font-semibold border-t border-neutral-600 pt-2">

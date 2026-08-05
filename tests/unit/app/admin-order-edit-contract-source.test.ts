@@ -15,4 +15,15 @@ describe('admin order quick-edit contract', () => {
     expect(updateSection).not.toContain('delivered_at');
     expect(updateSection).not.toContain('updates.status');
   });
+
+  it('prefers canonical stored checkout breakdown fields in both admin views', () => {
+    for (const path of ['app/admin/orders/page.tsx', 'app/admin/orders/[id]/page.tsx']) {
+      const source = readFileSync(path, 'utf8');
+      expect(source).toContain('checkout_catalog_subtotal');
+      expect(source).toContain('checkout_shipping_before_discount');
+      expect(source).toContain('checkout_tax');
+      expect(source).toContain('checkout_discount');
+      expect(source).toContain('formatStoredCurrency');
+    }
+  });
 });

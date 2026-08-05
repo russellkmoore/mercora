@@ -58,6 +58,56 @@ describe('server-authoritative checkout pricing', () => {
     expect(quote.total).toEqual({ amount: 4_700, currency: 'USD' });
   });
 
+  it('uses the shared enabled shipping defaults on a fresh install', async () => {
+    const quote = await priceCheckout({
+      items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],
+      shippingAddress: address,
+      shippingMethodId: 'standard',
+    }, {
+      dependencies: dependencies({
+        getSettings: vi.fn(async (category: string) => category === 'shipping'
+          ? {}
+          : { 'store.tax_rate': 10 }),
+      }) as any,
+    });
+
+    expect(quote.shippingMethod.label).toBe('Standard (5–7 days)');
+    expect(quote.shipping).toEqual({ amount: 599, currency: 'USD' });
+  });
+
+  it('enforces the configured destination allowlist at authoritative pricing', async () => {
+    await expect(priceCheckout({
+      items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],
+      shippingAddress: { ...address, country: 'CA' },
+      shippingMethodId: 'standard',
+    }, { dependencies: dependencies() as any })).rejects.toThrow('not available for CA');
+
+    await expect(priceCheckout({
+      items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],
+      shippingAddress: { ...address, country: 'CA' },
+      shippingMethodId: 'standard',
+    }, {
+      dependencies: dependencies({
+        getSettings: vi.fn(async (category: string) => category === 'shipping'
+          ? {
+              'shipping.allowed_countries': ['CA'],
+              'shipping.methods': [{ id: 'standard', label: 'Canada', cost: 8, enabled: true }],
+            }
+          : { 'store.tax_rate': 10 }),
+      }) as any,
+    })).resolves.toMatchObject({ shippingMethod: { label: 'Canada' } });
+  });
+
+  it('rejects oversized public catalog identifiers before lookup', async () => {
+    const deps = dependencies();
+    await expect(priceCheckout({
+      items: [{ productId: 'p'.repeat(129), variantId: 'var_1', quantity: 1 }],
+      shippingAddress: address,
+      shippingMethodId: 'standard',
+    }, { dependencies: deps as any })).rejects.toThrow('line 0 is invalid');
+    expect(deps.getProduct).not.toHaveBeenCalled();
+  });
+
   it('fails closed when an exact variant belongs to another product', async () => {
     await expect(priceCheckout({
       items: [{ productId: 'prod_1', variantId: 'var_other', quantity: 1 }],

@@ -72,7 +72,8 @@ function request() {
       items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],
       shippingAddress: {
         line1: '1 Main', city: 'Denver', region: 'CO', postal_code: '80202', country: 'us',
-        company: 'Buyer LLC', attributes: { injected: 'must be discarded' },
+        company: 'Buyer LLC', email: ' buyer@example.com ',
+        attributes: { injected: 'must be discarded' },
       },
       description: 'attacker-controlled product and order text',
       shippingMethodId: 'standard',
@@ -107,6 +108,7 @@ describe('payment-intent durable authority boundary', () => {
       items: quote.items,
       shipping_address: expect.objectContaining({
         company: 'Buyer LLC',
+        email: 'buyer@example.com',
         country: 'US',
         type: 'shipping',
         status: 'unverified',
@@ -133,5 +135,25 @@ describe('payment-intent durable authority boundary', () => {
     expect(response.status).toBe(503);
     expect(mocks.cancelPaymentIntent).toHaveBeenCalledWith('pi_authoritative');
     expect(await response.json()).not.toHaveProperty('clientSecret');
+  });
+
+  it('rejects a syntactically invalid optional checkout email', async () => {
+    const invalid = new NextRequest('http://localhost/api/payment-intent', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],
+        shippingAddress: {
+          line1: '1 Main', city: 'Denver', region: 'CO', postal_code: '80202',
+          country: 'US', email: 'victim@example.com\r\nBcc: attacker@example.com',
+        },
+        shippingMethodId: 'standard',
+      }),
+    });
+
+    const response = await POST(invalid);
+
+    expect(response.status).toBe(400);
+    expect(mocks.createPaymentIntent).not.toHaveBeenCalled();
   });
 });

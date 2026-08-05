@@ -253,6 +253,38 @@ export async function promoteOrderToPaid(args: {
   return { promoted: false, order: winner ? hydrateOrder(winner) : null };
 }
 
+/** Atomically append a unique coupon code requiring paid-order reconciliation. */
+export async function recordCouponReconciliation(args: {
+  orderId: string;
+  code: string;
+}): Promise<void> {
+  const db = await getDbAsync();
+  const code = args.code.trim().toUpperCase();
+  const currentCodes = sql`CASE json_type(extensions, '$.coupon_reconciliation_codes')
+    WHEN 'array' THEN json_extract(extensions, '$.coupon_reconciliation_codes')
+    ELSE json('[]')
+  END`;
+  const [updated] = await db
+    .update(orders)
+    .set({
+      extensions: sql`json_set(
+        CASE json_type(extensions)
+          WHEN 'object' THEN extensions
+          ELSE json('{}')
+        END,
+        '$.coupon_reconciliation_codes',
+        CASE WHEN EXISTS (
+          SELECT 1 FROM json_each(${currentCodes}) WHERE value = ${code}
+        ) THEN ${currentCodes}
+        ELSE json_insert(${currentCodes}, '$[#]', ${code}) END
+      )`,
+      updated_at: new Date().toISOString(),
+    })
+    .where(and(eq(orders.id, args.orderId), eq(orders.payment_status, 'paid')))
+    .returning({ id: orders.id });
+  if (!updated) throw new Error('Paid order coupon reconciliation marker could not be persisted');
+}
+
 // Webhook operations
 export async function createOrderWebhook(
   orderId: string,

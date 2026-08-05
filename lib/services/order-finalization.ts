@@ -2,7 +2,11 @@ import { getDbAsync } from '@/lib/db';
 import { orders } from '@/lib/db/schema/order';
 import { eq } from 'drizzle-orm';
 import { Money } from '@/lib/money';
-import { hydrateOrder, promoteOrderToPaid } from '@/lib/models/mach/orders';
+import {
+  hydrateOrder,
+  promoteOrderToPaid,
+  recordCouponReconciliation,
+} from '@/lib/models/mach/orders';
 import { redeemCoupon } from '@/lib/models/mach/couponInstance';
 import { retrievePaymentIntent } from '@/lib/stripe';
 import { sendOrderConfirmationEmail } from '@/lib/utils/email';
@@ -141,32 +145,15 @@ export async function finalizeOrderPayment(args: {
     extensions.checkout_tender ?? 0,
     order.currency_code
   );
-  // A non-cash tender must still be authoritatively reserved at finalization.
-  // Failure occurs before the paid CAS, so core never accepts underfunded goods.
-  await capabilities.giftCards.verifyReservedTender({
-    order,
-    state: extensions.checkout_tender_state,
-    expectedTender,
-  });
-
-  const discountCodes = Array.isArray(extensions.discount_codes)
-    ? extensions.discount_codes.filter((value): value is string => typeof value === 'string')
-    : [];
-  for (const code of discountCodes) {
-    const redemption = await redeemCoupon(code, {
-      orderId: order.id!,
-      customerId: order.customer_id,
-      channel: 'web',
-      discountAmount: discountCodes.length === 1
-        ? Money.fromStored(extensions.checkout_discount ?? 0, order.currency_code).toMach()
-        : undefined,
+  if (order.payment_status !== 'paid') {
+    // A pending order's non-cash tender must still be authoritatively reserved
+    // before the paid CAS. Already-paid retries recover settlement by order id
+    // without requiring the original reservation to remain open.
+    await capabilities.giftCards.verifyReservedTender({
+      order,
+      state: extensions.checkout_tender_state,
+      expectedTender,
     });
-    if (!redemption.redeemed && !redemption.alreadyRedeemed) {
-      // The customer has already been charged against this persisted quote.
-      // A last-use race needs reconciliation, but must not strand captured
-      // money in pending. Thrown/transient storage failures still propagate.
-      console.error(`[checkout] Applied coupon ${code} needs reconciliation for order ${order.id}`);
-    }
   }
 
   const amountReceived = Money.fromMinor(paymentIntent.amount_received, receivedCurrency);
@@ -175,27 +162,50 @@ export async function finalizeOrderPayment(args: {
     throw new Error('Order payment promotion lost without a paid winner');
   }
 
-  if (promotion.promoted) {
-    const finalOrder = promotion.order;
-    const finalExtensions = finalOrder.extensions ?? {};
-
-    try {
-      await capabilities.giftCards.applyTender({
-        order: finalOrder,
-        state: finalExtensions.checkout_tender_state,
-      });
-      await capabilities.subscriptions.orderPaid(finalOrder);
-    } catch (error) {
-      console.error(`[checkout] Optional paid-order capability failed for ${finalOrder.id}:`, error);
+  // Coupon usage is a paid-order effect, but is independently order-idempotent.
+  // Run it for both the CAS winner and already-paid convergence so a transient
+  // failure can be recovered by the next signed webhook/finalization retry.
+  const paidOrder = promotion.order;
+  const paidExtensions = paidOrder.extensions ?? {};
+  const discountCodes = Array.isArray(paidExtensions.discount_codes)
+    ? paidExtensions.discount_codes.filter((value): value is string => typeof value === 'string')
+    : [];
+  for (const code of discountCodes) {
+    const redemption = await redeemCoupon(code, {
+      orderId: paidOrder.id!,
+      customerId: paidOrder.customer_id,
+      channel: 'web',
+      discountAmount: discountCodes.length === 1
+        ? Money.fromStored(paidExtensions.checkout_discount ?? 0, paidOrder.currency_code).toMach()
+        : undefined,
+    });
+    if (!redemption.redeemed && !redemption.alreadyRedeemed) {
+      // Captured money is already durably paid. A last-use race needs
+      // reconciliation, but cannot roll back or strand the paid order.
+      await recordCouponReconciliation({ orderId: paidOrder.id!, code });
+      console.error(`[checkout] Applied coupon ${code} needs reconciliation for order ${paidOrder.id}`);
     }
+  }
 
+  // Tender settlement is keyed by order and must be idempotent. Run it on both
+  // the CAS winner and already-paid convergence; transient failures propagate
+  // to the webhook so a later delivery can recover settlement.
+  await capabilities.giftCards.applyTender({
+    order: paidOrder,
+    state: paidExtensions.checkout_tender_state,
+  });
+  // Subscription activation follows the same order-idempotent recovery
+  // contract and must surface transient failures for webhook retry.
+  await capabilities.subscriptions.orderPaid(paidOrder);
+
+  if (promotion.promoted) {
     if (args.sendEmail !== false) {
       try {
-        await sendConfirmation(finalOrder);
+        await sendConfirmation(paidOrder);
       } catch (error) {
         // Paid is already durable. Email is a best-effort post-paid effect until
         // a later webhook/effect-ledger phase can provide retry and dedup state.
-        console.error(`[checkout] Confirmation email failed for order ${finalOrder.id}:`, error);
+        console.error(`[checkout] Confirmation email failed for order ${paidOrder.id}:`, error);
       }
     }
   }

@@ -26,11 +26,15 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { 
+import {
   ArrowLeft, Package, RotateCcw, XCircle, RefreshCw,
   DollarSign, AlertTriangle, CheckCircle, Truck,
   Calendar, User, MapPin, CreditCard
 } from "lucide-react";
+import {
+  formatMachMajorCurrency,
+  formatStoredOrderCurrency,
+} from '@/lib/admin/order-money';
 
 interface Order {
   id: string;
@@ -174,12 +178,8 @@ export default function OrderDetailPage() {
     }
   }, []);
 
-  const formatCurrency = (amount: number, currency: string = "USD") => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency,
-    }).format(amount / 100);
-  };
+  const formatCurrency = formatMachMajorCurrency;
+  const formatStoredCurrency = formatStoredOrderCurrency;
 
   const getStatusBadge = (status: Order["status"]) => {
     const config = statusConfig[status];
@@ -413,6 +413,14 @@ export default function OrderDetailPage() {
     );
   }
 
+  const extensions = order.extensions ?? {};
+  const breakdownSubtotal = extensions.checkout_catalog_subtotal ?? extensions.subtotal;
+  const breakdownShipping = extensions.checkout_shipping_before_discount ??
+    extensions.shipping_cost ?? extensions.shippingCost;
+  const breakdownTax = extensions.checkout_tax ?? extensions.tax_amount ?? extensions.taxAmount;
+  const breakdownDiscount = extensions.checkout_discount ?? extensions.discount_amount ??
+    extensions.discountAmount ?? extensions.discount ?? extensions.promotion_discount;
+
   return (
     <div className="p-6 space-y-6">
       {/* Debug Information - Remove after fixing */}
@@ -521,38 +529,33 @@ export default function OrderDetailPage() {
         <Card className="bg-neutral-800 border-neutral-700 p-6">
           <h3 className="text-lg font-semibold text-white mb-4">Order Totals</h3>
           <div className="space-y-2 text-sm">
-            {order.extensions?.subtotal && (
+            {breakdownSubtotal !== undefined && (
               <div className="flex justify-between">
                 <span className="text-gray-400">Subtotal:</span>
-                <span className="text-white">{formatCurrency(order.extensions.subtotal)}</span>
+                <span className="text-white">{formatStoredCurrency(breakdownSubtotal, order.currency_code)}</span>
               </div>
             )}
-            {order.extensions?.shipping_cost && (
+            {breakdownShipping !== undefined && (
               <div className="flex justify-between">
                 <span className="text-gray-400">Shipping:</span>
-                <span className="text-white">{formatCurrency(Math.round((order.extensions.shipping_cost || 0) * 100))}</span>
+                <span className="text-white">{formatStoredCurrency(breakdownShipping, order.currency_code)}</span>
               </div>
             )}
-            {order.extensions?.tax_amount && (
+            {breakdownTax !== undefined && (
               <div className="flex justify-between">
                 <span className="text-gray-400">Tax:</span>
-                <span className="text-white">{formatCurrency(order.extensions.tax_amount)}</span>
+                <span className="text-white">{formatStoredCurrency(breakdownTax, order.currency_code)}</span>
               </div>
             )}
             {/* Try multiple discount field names */}
             {(() => {
-              const extensions = order.extensions || {};
-              const discountAmount = extensions.discount_amount || 
-                                   extensions.discountAmount || 
-                                   extensions.discount || 
-                                   extensions.promotion_discount ||
-                                   0;
+              const discountAmount = breakdownDiscount;
               
-              if (discountAmount > 0) {
+              if (discountAmount !== undefined) {
                 return (
                   <div className="flex justify-between">
                     <span className="text-gray-400">Discount:</span>
-                    <span className="text-green-400">-{formatCurrency(discountAmount)}</span>
+                    <span className="text-green-400">-{formatStoredCurrency(discountAmount, order.currency_code)}</span>
                   </div>
                 );
               }
