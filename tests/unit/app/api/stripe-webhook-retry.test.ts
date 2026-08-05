@@ -2,13 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mocks = vi.hoisted(() => ({
-  constructEvent: vi.fn(),
+  constructWebhookEvent: vi.fn(),
   finalizeOrderPayment: vi.fn(),
 }));
 
 vi.mock('@/lib/stripe', () => ({
-  getStripe: () => ({ webhooks: { constructEvent: mocks.constructEvent } }),
-  getWebhookSecret: () => 'whsec_test',
+  constructWebhookEvent: mocks.constructWebhookEvent,
 }));
 
 vi.mock('@/lib/services/order-finalization', () => {
@@ -31,7 +30,7 @@ function webhookRequest() {
 }
 
 beforeEach(() => {
-  mocks.constructEvent.mockReturnValue({
+  mocks.constructWebhookEvent.mockResolvedValue({
     type: 'payment_intent.succeeded',
     data: { object: { id: 'pi_1', metadata: { orderId: 'WEB-1' } } },
   });
