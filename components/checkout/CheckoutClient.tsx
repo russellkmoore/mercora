@@ -38,7 +38,7 @@ import OrderSummary, { type AuthoritativeCheckoutQuote } from './OrderSummary';
 import ProgressBar from './ProgressBar';
 import OrderConfirmationModal from './OrderConfirmationModal';
 import type { Address, ShippingOption } from '@/lib/types';
-import { Money, type StoredMoney } from '@/lib/money';
+import { Money } from '@/lib/money';
 import { clearPendingCheckout, savePendingCheckout } from '@/lib/checkout/order-payload';
 
 interface CheckoutClientProps {
@@ -141,26 +141,8 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
       // Update shipping discounts based on new shipping cost
       updateShippingDiscounts();
 
-      // Calculate tax with shipping address and cost
-      const taxRes = await fetch('/api/tax', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items,
-          shippingAddress,
-          shippingCost: option.cost || 0,
-        }),
-      });
-
-      if (!taxRes.ok) {
-        const err = await taxRes.json() as { error?: string };
-        throw new Error(err.error || 'Failed to calculate tax');
-      }
-
-      const taxData = await taxRes.json() as { amount: StoredMoney };
-      setTaxAmount(taxData.amount);
-
-      // Create order and payment intent
+      // The payment-intent endpoint performs the one authoritative tax/pricing
+      // calculation and returns the exact quote shown beside Stripe Elements.
       await createPaymentIntent(option);
 
     } catch (err: unknown) {
@@ -188,7 +170,6 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
           shippingAddress,
           shippingMethodId: selectedShippingOption.id,
           discountCodes: appliedDiscounts.map((discount) => discount.code),
-          description: `${items.length} item(s) - ${items.map(i => i.name).join(', ')}`,
         }),
       });
 

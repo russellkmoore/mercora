@@ -2,9 +2,9 @@
  * MACH-Compliant Orders API - Unified Order Management
  * 
  * This endpoint consolidates all order functionality:
- * - GET: List orders (replaces user-orders) 
- * - POST: Create orders (replaces submit-order)
- * - PUT: Update orders (replaces update-order)
+ * - GET: List owner-scoped or authorized admin orders
+ * - POST: Verify payment and finalize a durable pending order
+ * - PUT: Update non-lifecycle metadata with optimistic concurrency
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -14,7 +14,7 @@ import { orders } from "@/lib/db/schema/order";
 import { eq, desc, and, isNull, sql } from "drizzle-orm";
 import { authenticateRequest, PERMISSIONS } from "@/lib/auth/unified-auth";
 import type { Order } from "@/lib/types/order";
-import { Money, toWireMoney, type MachMoney } from "@/lib/money";
+import { Money } from "@/lib/money";
 import {
   mergeOrderExtensions,
   mergeOrderExternalReferences,
@@ -25,6 +25,7 @@ import {
   PaymentVerificationError,
 } from '@/lib/services/order-finalization';
 import { enforceRateLimit, getClientIp } from '@/lib/rate-limit';
+import { toAdminOrder, toCustomerOrder } from '@/lib/models/mach/order-serializer';
 
 
 
@@ -36,8 +37,16 @@ export async function GET(request: NextRequest) {
     const { userId } = await auth();
     const url = new URL(request.url);
     
-    const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100);
-    const offset = parseInt(url.searchParams.get('offset') || '0');
+    const rawLimit = url.searchParams.get('limit');
+    const rawOffset = url.searchParams.get('offset');
+    const limit = rawLimit === null ? 50 : Number(rawLimit);
+    const offset = rawOffset === null ? 0 : Number(rawOffset);
+    if (
+      !Number.isSafeInteger(limit) || limit < 1 || limit > 100 ||
+      !Number.isSafeInteger(offset) || offset < 0
+    ) {
+      return NextResponse.json({ error: 'Invalid pagination parameters' }, { status: 400 });
+    }
     const status = url.searchParams.get('status');
     const requestedUserId = url.searchParams.get('userId');
     const orderId = url.searchParams.get('orderId');
@@ -88,7 +97,7 @@ export async function GET(request: NextRequest) {
     const hydratedOrders = paginatedOrders.map(hydrateOrder);
     
     const response = {
-      data: hydratedOrders.map(toWireOrder),
+      data: hydratedOrders.map(isAdminRequest ? toAdminOrder : toCustomerOrder),
       meta: {
         total,
         limit,
@@ -104,7 +113,7 @@ export async function GET(request: NextRequest) {
         ...(offset > 0 && {
           prev: `/api/orders?limit=${limit}&offset=${Math.max(0, offset - limit)}`
         }),
-        last: `/api/orders?limit=${limit}&offset=${Math.floor(total / limit) * limit}`
+        last: `/api/orders?limit=${limit}&offset=${Math.max(0, Math.floor((total - 1) / limit) * limit)}`
       }
     };
     return NextResponse.json(response);
@@ -290,7 +299,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const response = {
-      data: toWireOrder(hydrateOrder(updatedOrder)),
+      data: toAdminOrder(hydrateOrder(updatedOrder)),
       meta: {
         schema: "mach:order"
       }
@@ -330,24 +339,5 @@ function hydrateOrder(dbOrder: typeof orders.$inferSelect): Order {
     extensions: dbOrder.extensions ? (typeof dbOrder.extensions === 'string' ? JSON.parse(dbOrder.extensions) : dbOrder.extensions) : undefined,
     created_at: dbOrder.created_at ?? undefined,
     updated_at: dbOrder.updated_at ?? undefined
-  };
-}
-
-type WireOrderItem = Omit<Order['items'][number], 'unit_price' | 'total_price'> & {
-  unit_price: MachMoney;
-  total_price: MachMoney;
-};
-type WireOrder = Omit<Order, 'total_amount' | 'items'> & { total_amount: MachMoney; items: WireOrderItem[] };
-
-/** Apply decimal MACH serialization last, after all internal minor-unit work. */
-function toWireOrder(order: Order): WireOrder {
-  return {
-    ...order,
-    total_amount: toWireMoney(order.total_amount),
-    items: order.items.map((item) => ({
-      ...item,
-      unit_price: toWireMoney(item.unit_price),
-      total_price: toWireMoney(item.total_price),
-    })),
   };
 }

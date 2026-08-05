@@ -634,6 +634,7 @@ export async function useCoupon(code: string, customerId: string, orderId?: stri
 
 export interface RedeemCouponResult {
   redeemed: boolean;
+  alreadyRedeemed?: boolean;
   usageCount?: number;
   status?: string;
 }
@@ -668,18 +669,24 @@ export async function redeemCoupon(
   const updated = await db
     .update(couponInstances)
     .set({
-      usageCount: sql`usage_count + 1`,
+      usageCount: sql`COALESCE(usage_count, 0) + 1`,
       status: sql`CASE WHEN type = 'single_use' OR type IS NULL
-                         OR (usage_limit IS NOT NULL AND usage_count + 1 >= usage_limit)
+                         OR (usage_limit IS NOT NULL AND COALESCE(usage_count, 0) + 1 >= usage_limit)
                        THEN 'used' ELSE status END`,
       lastUsedAt: now,
       lastUsedBy: options.customerId ?? null,
       updatedAt: now,
       extensions: sql`json_set(
-        COALESCE(extensions, '{}'),
+        CASE json_type(extensions)
+          WHEN 'object' THEN extensions
+          ELSE json('{}')
+        END,
         '$.usage_records',
         json_insert(
-          COALESCE(json_extract(extensions, '$.usage_records'), '[]'),
+          CASE json_type(extensions, '$.usage_records')
+            WHEN 'array' THEN json_extract(extensions, '$.usage_records')
+            ELSE json('[]')
+          END,
           '$[#]',
           json(${usageRecordJson})
         )
@@ -688,7 +695,7 @@ export async function redeemCoupon(
     .where(and(
       eq(couponInstances.code, normalized),
       or(eq(couponInstances.status, 'active'), isNull(couponInstances.status)),
-      sql`(usage_limit IS NULL OR usage_count < usage_limit)`,
+      sql`(usage_limit IS NULL OR COALESCE(usage_count, 0) < usage_limit)`,
       sql`NOT EXISTS (
         SELECT 1
         FROM json_each(COALESCE(json_extract(extensions, '$.usage_records'), '[]'))
@@ -700,7 +707,23 @@ export async function redeemCoupon(
       status: couponInstances.status,
     });
 
-  if (!updated[0]) return { redeemed: false };
+  if (!updated[0]) {
+    const [current] = await db
+      .select({ extensions: couponInstances.extensions })
+      .from(couponInstances)
+      .where(eq(couponInstances.code, normalized))
+      .limit(1);
+    const extensions = current?.extensions && typeof current.extensions === 'object'
+      ? current.extensions
+      : {};
+    const records = Array.isArray(extensions.usage_records) ? extensions.usage_records : [];
+    const alreadyRedeemed = records.some((record) =>
+      record &&
+      typeof record === 'object' &&
+      (record as { order_id?: unknown }).order_id === options.orderId
+    );
+    return { redeemed: false, alreadyRedeemed };
+  }
   return {
     redeemed: true,
     usageCount: updated[0].usageCount,

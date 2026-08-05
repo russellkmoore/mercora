@@ -116,10 +116,18 @@ export async function finalizeOrderPayment(args: {
   if (paymentIntent.metadata?.orderId !== args.orderId) {
     throw new PaymentVerificationError('PaymentIntent order binding is invalid');
   }
-  const expected = Money.fromStored(order.total_amount, order.currency_code);
+  // checkout_total remains the immutable authorized amount after paid
+  // promotion replaces total_amount with the actual captured receipt amount.
+  const expected = Money.fromStored(
+    extensions.checkout_total ?? order.total_amount,
+    order.currency_code
+  );
   const receivedCurrency = String(paymentIntent.currency).toUpperCase();
   if (receivedCurrency !== expected.currency) {
     throw new PaymentVerificationError('Payment currency does not match the order');
+  }
+  if (!Number.isSafeInteger(paymentIntent.amount) || paymentIntent.amount !== expected.toMinorUnits()) {
+    throw new PaymentVerificationError('PaymentIntent amount does not match the server quote');
   }
   if (
     !Number.isSafeInteger(paymentIntent.amount_received) ||
@@ -141,6 +149,26 @@ export async function finalizeOrderPayment(args: {
     expectedTender,
   });
 
+  const discountCodes = Array.isArray(extensions.discount_codes)
+    ? extensions.discount_codes.filter((value): value is string => typeof value === 'string')
+    : [];
+  for (const code of discountCodes) {
+    const redemption = await redeemCoupon(code, {
+      orderId: order.id!,
+      customerId: order.customer_id,
+      channel: 'web',
+      discountAmount: discountCodes.length === 1
+        ? Money.fromStored(extensions.checkout_discount ?? 0, order.currency_code).toMach()
+        : undefined,
+    });
+    if (!redemption.redeemed && !redemption.alreadyRedeemed) {
+      // The customer has already been charged against this persisted quote.
+      // A last-use race needs reconciliation, but must not strand captured
+      // money in pending. Thrown/transient storage failures still propagate.
+      console.error(`[checkout] Applied coupon ${code} needs reconciliation for order ${order.id}`);
+    }
+  }
+
   const amountReceived = Money.fromMinor(paymentIntent.amount_received, receivedCurrency);
   const promotion = await promoteOrderToPaid({ orderId: args.orderId, amountReceived });
   if (!promotion.order || promotion.order.payment_status !== 'paid') {
@@ -150,26 +178,6 @@ export async function finalizeOrderPayment(args: {
   if (promotion.promoted) {
     const finalOrder = promotion.order;
     const finalExtensions = finalOrder.extensions ?? {};
-
-    // These effects are owned only by the pending→paid CAS winner. Coupon
-    // redemption is additionally order-key idempotent in case an operator
-    // explicitly re-drives it after an interrupted effect.
-    for (const code of Array.isArray(finalExtensions.discount_codes)
-      ? finalExtensions.discount_codes.filter((value): value is string => typeof value === 'string')
-      : []) {
-      try {
-        await redeemCoupon(code, {
-          orderId: finalOrder.id!,
-          customerId: finalOrder.customer_id,
-          channel: 'web',
-          discountAmount: finalExtensions.discount_codes.length === 1
-            ? Money.fromStored(finalExtensions.checkout_discount ?? 0, finalOrder.currency_code).toMach()
-            : undefined,
-        });
-      } catch (error) {
-        console.error(`[checkout] Coupon redemption failed for order ${finalOrder.id}:`, error);
-      }
-    }
 
     try {
       await capabilities.giftCards.applyTender({
@@ -181,7 +189,15 @@ export async function finalizeOrderPayment(args: {
       console.error(`[checkout] Optional paid-order capability failed for ${finalOrder.id}:`, error);
     }
 
-    if (args.sendEmail !== false) await sendConfirmation(finalOrder);
+    if (args.sendEmail !== false) {
+      try {
+        await sendConfirmation(finalOrder);
+      } catch (error) {
+        // Paid is already durable. Email is a best-effort post-paid effect until
+        // a later webhook/effect-ledger phase can provide retry and dedup state.
+        console.error(`[checkout] Confirmation email failed for order ${finalOrder.id}:`, error);
+      }
+    }
   }
 
   return { paid: true, promoted: promotion.promoted, order: promotion.order };

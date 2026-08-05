@@ -69,7 +69,7 @@ export const loadStripe = (): Promise<Stripe | null> => {
  */
 export const stripe = secretKey 
   ? new StripeServer(secretKey, {
-      apiVersion: '2026-06-24.dahlia',
+      apiVersion: '2026-07-29.dahlia',
       typescript: true,
     })
   : null;

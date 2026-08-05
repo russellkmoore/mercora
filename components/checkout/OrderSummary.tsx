@@ -6,12 +6,22 @@ import { useCartStore } from "@/lib/stores/cart-store";
 import { Money, cartSubtotal, type MachMoney } from "@/lib/money";
 
 export interface AuthoritativeCheckoutQuote {
+  items: AuthoritativeCheckoutLine[];
   subtotal: MachMoney;
   discount: MachMoney;
   shipping: MachMoney;
   tax: MachMoney;
   tender: MachMoney;
   total: MachMoney;
+}
+
+export interface AuthoritativeCheckoutLine {
+  productId: string;
+  variantId?: string;
+  name: string;
+  quantity: number;
+  unitPrice: MachMoney;
+  lineTotal: MachMoney;
 }
 
 interface Props {
@@ -60,9 +70,23 @@ export default function OrderSummary({
       <h2 className="text-lg font-semibold mb-4">Order Summary</h2>
 
       <div className="space-y-1">
-        {items.map((item, idx) => (
-          <OrderItemCard key={idx} item={item} />
-        ))}
+        {authoritativeQuote
+          ? authoritativeQuote.items.map((line, idx) => {
+              const item = items.find((candidate) =>
+                candidate.productId === line.productId &&
+                candidate.variantId === line.variantId
+              );
+              return (
+                <OrderItemCard
+                  key={`${line.productId}:${line.variantId ?? ''}:${idx}`}
+                  item={item}
+                  authoritativeLine={line}
+                />
+              );
+            })
+          : items.map((item, idx) => (
+              <OrderItemCard key={idx} item={item} />
+            ))}
       </div>
 
       {showDiscountInput && (

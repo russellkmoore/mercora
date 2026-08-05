@@ -112,11 +112,46 @@ type PricedCatalogLine = {
   lineTotal: Money;
 };
 
+interface EligibilityContext {
+  customerId?: string;
+  region?: string;
+  country: string;
+}
+
+function eligibilityMatches(promotion: Promotion, context: EligibilityContext): boolean {
+  const eligibility = promotion.eligibility;
+  if (!eligibility) return true;
+  if (eligibility.channels?.length && !eligibility.channels.includes('web')) return false;
+  if (
+    eligibility.regions?.length &&
+    !eligibility.regions.includes(context.region ?? '') &&
+    !eligibility.regions.includes(context.country)
+  ) return false;
+  if (
+    eligibility.exclude_regions?.includes(context.region ?? '') ||
+    eligibility.exclude_regions?.includes(context.country)
+  ) return false;
+  if (eligibility.payment_methods?.length && !eligibility.payment_methods.includes('stripe')) {
+    return false;
+  }
+  if (eligibility.requires_account && !context.customerId) return false;
+  if (
+    eligibility.customer_segments?.length ||
+    eligibility.customer_types?.some((type) => type !== 'all')
+  ) {
+    // Core checkout has no authoritative segment/customer-type resolver.
+    return false;
+  }
+  return true;
+}
+
 function eligibleLineIndexes(
   promotion: Promotion,
   subtotal: Money,
-  catalog: PricedCatalogLine[]
+  catalog: PricedCatalogLine[],
+  context: EligibilityContext
 ): number[] | null {
+  if (!eligibilityMatches(promotion, context)) return null;
   let eligible = catalog.map((_, index) => index);
   for (const condition of promotion.rules.conditions ?? []) {
     if (condition.type === 'cart_minimum' || condition.type === 'cart_subtotal') {
@@ -213,24 +248,24 @@ async function resolveDiscounts(
   subtotal: Money,
   shipping: Money,
   catalog: PricedCatalogLine[],
-  customerId: string | undefined,
+  context: EligibilityContext,
   deps: PricingDependencies
 ): Promise<{ merchandise: Money; shipping: Money; perLine: Money[]; appliedCodes: string[] }> {
   const promotionIds = new Set<string>();
   const candidates: Array<{ code: string; promotion: Promotion; eligible: number[] }> = [];
   for (const code of codes) {
-    const validation = await deps.validateCouponCode(code, customerId);
+    const validation = await deps.validateCouponCode(code, context.customerId);
     const coupon = validation.coupon;
     if (
       !coupon ||
       !validation.canBeUsed ||
-      (coupon.assigned_to && coupon.assigned_to !== customerId) ||
+      (coupon.assigned_to && coupon.assigned_to !== context.customerId) ||
       promotionIds.has(coupon.promotion_id)
     ) {
       continue;
     }
     const promotion = await deps.getPromotionById(coupon.promotion_id);
-    const eligible = promotion ? eligibleLineIndexes(promotion, subtotal, catalog) : null;
+    const eligible = promotion ? eligibleLineIndexes(promotion, subtotal, catalog, context) : null;
     if (
       !promotion ||
       promotion.status !== 'active' ||
@@ -404,7 +439,11 @@ export async function priceCheckout(
     subtotal,
     shipping,
     pricedCatalog,
-    input.customerId,
+    {
+      customerId: input.customerId,
+      region: input.shippingAddress.region,
+      country: input.shippingAddress.country,
+    },
     deps
   );
   const discount = discounts.merchandise.add(discounts.shipping);
@@ -420,7 +459,7 @@ export async function priceCheckout(
     if (
       (requireTaxCategory && !variant.tax_category && !product.tax_category) ||
       typeof code !== 'string' ||
-      !/^txcd_\d+$/.test(code)
+      !/^txcd_\d{8}$/.test(code)
     ) {
       throw new Error(`Checkout line ${index} has no valid tax classification`);
     }

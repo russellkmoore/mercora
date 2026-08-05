@@ -99,30 +99,50 @@ STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
 ## API Endpoints
 
 ### POST /api/payment-intent
-Creates a Payment Intent for secure payment processing.
+Authoritatively prices catalog lines, shipping, discounts, and tax; creates a
+Payment Intent bound to a server order id; then persists the pending order
+before releasing the client secret. If persistence fails, Mercora attempts to
+cancel the intent and withholds the secret. Client prices, tax totals,
+descriptions, and order IDs are not accepted as authority.
 
 **Request:**
 ```json
 {
-  "amount": number,        // Total amount including tax
-  "taxAmount": number,     // Tax amount (from /api/tax)
+  "items": [
+    { "productId": "string", "variantId": "string", "quantity": 1 }
+  ],
   "shippingAddress": Address,
-  "orderId": string,
-  "description"?: string
+  "shippingMethodId": "string",
+  "discountCodes": ["string"]
 }
 ```
 
 **Response:**
 ```json
 {
-  "clientSecret": string,
-  "paymentIntentId": string,
-  "amount": number
+  "clientSecret": "string",
+  "paymentIntentId": "string",
+  "orderId": "string",
+  "amount": Money,
+  "quote": {
+    "items": "canonical priced lines",
+    "subtotal": Money,
+    "discount": Money,
+    "shipping": Money,
+    "tax": Money,
+    "tender": Money,
+    "total": Money
+  }
 }
 ```
 
+The client renders the returned quote beside Stripe Elements. After Stripe
+succeeds, `POST /api/orders` receives only `orderId` and `paymentIntentId`; the
+server retrieves Stripe state and finalizes the durable pending order.
+
 ### POST /api/tax
-Calculates tax using Stripe Tax with fallback to fixed rate.
+Calculates a standalone tax estimate. Checkout does not use this response as a
+charge authority; `/api/payment-intent` performs its own authoritative tax pass.
 
 **Request:**
 ```json
