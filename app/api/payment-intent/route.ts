@@ -1,145 +1,232 @@
-/**
- * === Payment Intent Creation ===
- *
- * Creates Stripe Payment Intents for secure payment processing.
- * Tax calculation should be done via /api/tax before calling this endpoint.
- *
- * === Features ===
- * - **Payment Intent Creation**: Secure payment setup with Stripe
- * - **Order Metadata**: Links payments to order records
- * - **Address Handling**: Shipping and billing address attachment
- * - **Error Handling**: Comprehensive error management and logging
- *
- * === Request Format ===
- * ```json
- * {
- *   "amount": number,        // Total amount including tax
- *   "taxAmount": number,     // Tax amount (from /api/tax)
- *   "shippingAddress": Address,
- *   "orderId": string,
- *   "description"?: string
- * }
- * ```
- *
- * === Response Format ===
- * ```json
- * {
- *   "clientSecret": string,
- *   "paymentIntentId": string,
- *   "amount": number
- * }
- * ```
- */
-
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { createPaymentIntent, formatAmountForStripe } from '@/lib/stripe';
-import { Money, type StoredMoney } from '@/lib/money';
+import { getDbAsync } from '@/lib/db';
+import { orders } from '@/lib/db/schema/order';
+import { Money, toWireMoney } from '@/lib/money';
+import { priceCheckout, type CheckoutLineInput } from '@/lib/services/checkout-pricing';
+import { cancelPaymentIntent, createPaymentIntent } from '@/lib/stripe';
 import type { Address } from '@/lib/types';
 import { enforceRateLimit, getClientIp } from '@/lib/rate-limit';
 import { isBoundedString, isPlainRecord } from '@/lib/public-request-validation';
+import { createCustomer, getCustomer } from '@/lib/models/mach/customer';
 
 interface PaymentIntentRequest {
-  amount: StoredMoney;
-  taxAmount: StoredMoney;
+  items: CheckoutLineInput[];
   shippingAddress: Address;
-  orderId: string;
+  shippingMethodId: string;
+  discountCodes?: string[];
+  giftCardToken?: string;
   description?: string;
 }
 
-export async function POST(req: NextRequest) {
+function validAddress(value: unknown): value is Address {
+  if (!isPlainRecord(value)) return false;
+  return (
+    isBoundedString(value.line1, 256) &&
+    isBoundedString(value.city, 128) &&
+    isBoundedString(value.country, 2) &&
+    isBoundedString(value.region, 128) &&
+    isBoundedString(value.postal_code, 32) &&
+    (value.line2 === undefined || isBoundedString(value.line2, 256, { allowEmpty: true })) &&
+    (value.recipient === undefined || isBoundedString(value.recipient, 256, { allowEmpty: true })) &&
+    (value.email === undefined || isBoundedString(value.email, 320, { allowEmpty: true }))
+  );
+}
+
+function newOrderId(userId: string | null): string {
+  const owner = (userId ?? 'guest').replace(/[^a-zA-Z0-9]/g, '').toUpperCase() || 'GUEST';
+  return `WEB-${owner}-${Date.now()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+}
+
+export async function POST(request: NextRequest) {
+  const limited = await enforceRateLimit(
+    'PUBLIC_RATE_LIMITER',
+    `payment-intent:${getClientIp(request)}`
+  );
+  if (limited) return limited;
+
+  let body: unknown;
   try {
-    const limited = await enforceRateLimit(
-      'PUBLIC_RATE_LIMITER',
-      `payment-intent:${getClientIp(req)}`
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON request body' }, { status: 400 });
+  }
+  if (!isPlainRecord(body)) {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  }
+  const input = body as unknown as PaymentIntentRequest;
+  if (
+    !validAddress(input.shippingAddress) ||
+    !isBoundedString(input.shippingMethodId, 128) ||
+    (input.description !== undefined && !isBoundedString(input.description, 500, { allowEmpty: true })) ||
+    (input.giftCardToken !== undefined && !isBoundedString(input.giftCardToken, 512))
+  ) {
+    return NextResponse.json({ error: 'Invalid checkout details' }, { status: 400 });
+  }
+
+  const { userId } = await auth();
+  let quote;
+  try {
+    quote = await priceCheckout({
+      items: input.items,
+      shippingAddress: input.shippingAddress,
+      shippingMethodId: input.shippingMethodId,
+      discountCodes: input.discountCodes,
+      giftCardToken: input.giftCardToken,
+      customerId: userId ?? undefined,
+    });
+  } catch (error) {
+    console.error('[checkout] Server-authoritative pricing failed:', error);
+    return NextResponse.json(
+      { error: 'Checkout details are invalid or unavailable' },
+      { status: 400 }
     );
-    if (limited) return limited;
+  }
 
-    const body: unknown = await req.json();
-    if (!isPlainRecord(body)) {
-      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
-    }
+  const total = Money.fromStored(quote.total);
+  if (!total.gt(Money.zero(total.currency))) {
+    return NextResponse.json(
+      { error: 'This checkout requires a positive payment amount' },
+      { status: 400 }
+    );
+  }
 
-    const {
-      amount,
-      taxAmount,
-      shippingAddress,
-      orderId,
-      description,
-    } = body as unknown as PaymentIntentRequest;
-
-    if (
-      !isPlainRecord(shippingAddress) ||
-      !isBoundedString(orderId, 128) ||
-      (description !== undefined && !isBoundedString(description, 500, { allowEmpty: true })) ||
-      !isBoundedString(shippingAddress.line1, 256) ||
-      (shippingAddress.line2 !== undefined &&
-        !isBoundedString(shippingAddress.line2, 256, { allowEmpty: true })) ||
-      !isBoundedString(shippingAddress.city, 128) ||
-      !isBoundedString(shippingAddress.region, 128) ||
-      !isBoundedString(shippingAddress.postal_code, 32) ||
-      (shippingAddress.recipient !== undefined &&
-        !isBoundedString(shippingAddress.recipient, 256, { allowEmpty: true }))
-    ) {
-      return NextResponse.json({ error: 'Invalid payment details' }, { status: 400 });
-    }
-
-    let totalMoney: Money;
-    let taxMoney: Money;
+  // Preserve the authenticated customer→order FK before creating any payment
+  // object. Failure is not downgraded to a guest order.
+  if (userId) {
     try {
-      totalMoney = Money.fromStored(amount);
-      taxMoney = Money.fromStored(taxAmount, totalMoney.currency);
-    } catch {
-      return NextResponse.json(
-        { error: 'Amounts must be valid integer minor-unit Money values' },
-        { status: 400 }
-      );
+      const existingCustomer = await getCustomer(userId);
+      if (!existingCustomer) {
+        const user = await currentUser();
+        await createCustomer({
+          id: userId,
+          type: 'person',
+          person: {
+            email: user?.emailAddresses[0]?.emailAddress || input.shippingAddress.email || '',
+            first_name: user?.firstName || '',
+            last_name: user?.lastName || '',
+            full_name: [user?.firstName, user?.lastName].filter(Boolean).join(' '),
+          },
+        });
+      }
+    } catch (error) {
+      console.error(`[checkout] Could not ensure customer ${userId}:`, error);
+      return NextResponse.json({ error: 'Could not prepare authenticated checkout' }, { status: 503 });
     }
+  }
 
-    // Validate required fields
-    if (!totalMoney.gt(Money.zero(totalMoney.currency))) {
-      return NextResponse.json(
-        { error: 'Valid amount is required' },
-        { status: 400 }
-      );
-    }
-
-    // Create Payment Intent
-    const paymentIntent = await createPaymentIntent({
-      amount: formatAmountForStripe(totalMoney.toJSON()),
-      currency: 'usd',
-      automatic_payment_methods: {
-        enabled: true,
-      },
+  const orderId = newOrderId(userId);
+  let paymentIntent: Awaited<ReturnType<typeof createPaymentIntent>>;
+  try {
+    paymentIntent = await createPaymentIntent({
+      amount: total.toMinorUnits(),
+      currency: total.currency.toLowerCase(),
+      automatic_payment_methods: { enabled: true },
       metadata: {
         orderId,
-        taxAmount: String(taxMoney.toMinorUnits()),
-        totalAmount: String(totalMoney.toMinorUnits()),
+        expectedAmount: String(total.toMinorUnits()),
+        currency: total.currency,
       },
       shipping: {
         address: {
-          line1: String(shippingAddress.line1),
-          line2: shippingAddress.line2 ? String(shippingAddress.line2) : undefined,
-          city: String(shippingAddress.city),
-          state: String(shippingAddress.region),
-          postal_code: String(shippingAddress.postal_code),
-          country: 'US',
+          line1: String(input.shippingAddress.line1),
+          line2: input.shippingAddress.line2 ? String(input.shippingAddress.line2) : undefined,
+          city: String(input.shippingAddress.city),
+          state: input.shippingAddress.region,
+          postal_code: input.shippingAddress.postal_code,
+          country: input.shippingAddress.country,
         },
-        name: String(shippingAddress.recipient || 'Customer'),
+        name: input.shippingAddress.recipient || 'Customer',
       },
-      description: description || `Order ${orderId}`,
+      description: input.description || `Order ${orderId}`,
     });
-
-    return NextResponse.json({
-      clientSecret: (paymentIntent as any).client_secret,
-      paymentIntentId: (paymentIntent as any).id,
-      amount,
-    });
-
   } catch (error) {
-    console.error('Error creating payment intent:', error);
+    console.error('[checkout] PaymentIntent creation failed:', error);
+    return NextResponse.json({ error: 'Payment provider is unavailable' }, { status: 503 });
+  }
+
+  const providerAmount = Number(paymentIntent.amount);
+  const providerCurrency = String(paymentIntent.currency || '').toUpperCase();
+  if (
+    !Number.isSafeInteger(providerAmount) ||
+    providerAmount !== total.toMinorUnits() ||
+    providerCurrency !== total.currency ||
+    !paymentIntent.client_secret
+  ) {
+    await cancelPaymentIntent(paymentIntent.id).catch((error) =>
+      console.error(`[checkout] Failed to cancel invalid PaymentIntent ${paymentIntent.id}:`, error)
+    );
+    return NextResponse.json({ error: 'Payment provider returned an invalid intent' }, { status: 502 });
+  }
+
+  const catalogSubtotal = Money.fromStored(quote.subtotal);
+  const merchandiseDiscount = Money.fromStored(quote.merchandiseDiscount, quote.currency);
+  const baseShipping = Money.fromStored(quote.shipping, quote.currency);
+  const shippingDiscount = Money.fromStored(quote.shippingDiscount, quote.currency);
+  const extensions = {
+    email: input.shippingAddress.email,
+    payment_intent_id: paymentIntent.id,
+    checkout_catalog_subtotal: catalogSubtotal.toJSON(),
+    checkout_subtotal: catalogSubtotal.subtract(merchandiseDiscount).toJSON(),
+    checkout_discount: quote.discount,
+    checkout_merchandise_discount: quote.merchandiseDiscount,
+    checkout_shipping_before_discount: baseShipping.toJSON(),
+    checkout_shipping_discount: quote.shippingDiscount,
+    checkout_shipping: baseShipping.subtract(shippingDiscount).toJSON(),
+    checkout_tax: quote.tax,
+    checkout_tender: quote.tender,
+    checkout_tender_state: quote.tenderState,
+    checkout_total: Money.fromMinor(providerAmount, providerCurrency).toJSON(),
+    discount_codes: quote.discountCodes,
+    tax_source: quote.taxSource,
+  };
+
+  try {
+    const db = await getDbAsync();
+    await db.insert(orders).values({
+      id: orderId,
+      customer_id: userId,
+      status: 'pending',
+      total_amount: Money.fromMinor(providerAmount, providerCurrency).toJSON(),
+      currency_code: providerCurrency,
+      shipping_address: input.shippingAddress,
+      billing_address: input.shippingAddress,
+      items: quote.items,
+      shipping_method: quote.shippingMethod.label,
+      payment_method: 'stripe',
+      payment_status: 'pending',
+      external_references: { payment_intent_id: paymentIntent.id },
+      extensions,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error(`[checkout] Pending order ${orderId} could not be persisted:`, error);
+    await cancelPaymentIntent(paymentIntent.id).catch((cancelError) =>
+      console.error(`[checkout] Failed to cancel orphaned PaymentIntent ${paymentIntent.id}:`, cancelError)
+    );
+    // The client secret is deliberately withheld: without a durable, immutable
+    // order binding the intent must never be confirmable by this checkout.
     return NextResponse.json(
-      { error: 'Failed to create payment intent' },
-      { status: 500 }
+      { error: 'Could not reserve the order; no payment was accepted' },
+      { status: 503 }
     );
   }
+
+  return NextResponse.json({
+    clientSecret: paymentIntent.client_secret,
+    paymentIntentId: paymentIntent.id,
+    orderId,
+    amount: toWireMoney(Money.fromMinor(providerAmount, providerCurrency).toJSON()),
+    quote: {
+      subtotal: toWireMoney(quote.subtotal),
+      discount: toWireMoney(quote.discount),
+      shipping: toWireMoney(quote.shipping),
+      tax: toWireMoney(quote.tax),
+      tender: toWireMoney(quote.tender),
+      total: toWireMoney(Money.fromMinor(providerAmount, providerCurrency).toJSON()),
+      currency: providerCurrency,
+      taxSource: quote.taxSource,
+    },
+  });
 }

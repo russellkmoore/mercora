@@ -3,13 +3,23 @@ import type { CartItem } from "@/lib/types/cartitem";
 import OrderItemCard from "./OrderItemCard";
 import DiscountCodeInput from "./DiscountCodeInput";
 import { useCartStore } from "@/lib/stores/cart-store";
-import { Money, cartSubtotal } from "@/lib/money";
+import { Money, cartSubtotal, type MachMoney } from "@/lib/money";
+
+export interface AuthoritativeCheckoutQuote {
+  subtotal: MachMoney;
+  discount: MachMoney;
+  shipping: MachMoney;
+  tax: MachMoney;
+  tender: MachMoney;
+  total: MachMoney;
+}
 
 interface Props {
   items: CartItem[];
   shippingOption?: ShippingOption;
   taxAmount?: { amount: number; currency: string };
   showDiscountInput?: boolean;
+  authoritativeQuote?: AuthoritativeCheckoutQuote;
 }
 
 export default function OrderSummary({
@@ -17,6 +27,7 @@ export default function OrderSummary({
   shippingOption,
   taxAmount,
   showDiscountInput = false,
+  authoritativeQuote,
 }: Props) {
   const { appliedDiscounts } = useCartStore();
   
@@ -35,6 +46,14 @@ export default function OrderSummary({
   const discountedShipping = shippingCost.lte(shippingDiscountAmount) ? Money.zero(subtotal.currency) : shippingCost.subtract(shippingDiscountAmount);
   const tax = taxAmount ? Money.fromStored(taxAmount, subtotal.currency) : Money.zero(subtotal.currency);
   const total = discountedSubtotal.add(discountedShipping).add(tax);
+  const authoritative = authoritativeQuote ? {
+    subtotal: Money.fromMajor(authoritativeQuote.subtotal.amount, authoritativeQuote.subtotal.currency),
+    discount: Money.fromMajor(authoritativeQuote.discount.amount, authoritativeQuote.discount.currency),
+    shipping: Money.fromMajor(authoritativeQuote.shipping.amount, authoritativeQuote.shipping.currency),
+    tax: Money.fromMajor(authoritativeQuote.tax.amount, authoritativeQuote.tax.currency),
+    tender: Money.fromMajor(authoritativeQuote.tender.amount, authoritativeQuote.tender.currency),
+    total: Money.fromMajor(authoritativeQuote.total.amount, authoritativeQuote.total.currency),
+  } : null;
 
   return (
     <div className="bg-white text-black p-6 rounded-xl">
@@ -57,24 +76,30 @@ export default function OrderSummary({
 
       <div className="flex justify-between text-sm">
         <span>Subtotal</span>
-        <span>{subtotal.format()}</span>
+        <span>{(authoritative?.subtotal ?? subtotal).format()}</span>
       </div>
       
       {/* Cart Discounts */}
-      {cartDiscounts.map((discount) => (
+      {!authoritative && cartDiscounts.map((discount) => (
         <div key={discount.promotionId} className="flex justify-between text-sm text-green-600">
           <span>{discount.displayName}</span>
           <span>-{Money.fromStored(discount.amount).format()}</span>
         </div>
       ))}
+      {authoritative && !authoritative.discount.isZero() && (
+        <div className="flex justify-between text-sm text-green-600">
+          <span>Discount</span>
+          <span>-{authoritative.discount.format()}</span>
+        </div>
+      )}
       
       <div className="flex justify-between text-sm">
         <span>Shipping</span>
-        <span>{shippingCost.format()}</span>
+        <span>{(authoritative?.shipping ?? shippingCost).format()}</span>
       </div>
       
       {/* Shipping Discounts */}
-      {shippingDiscounts.map((discount) => (
+      {!authoritative && shippingDiscounts.map((discount) => (
         <div key={discount.promotionId} className="flex justify-between text-sm text-green-600">
           <span>{discount.displayName}</span>
           <span>-{Money.fromStored(discount.amount).format()}</span>
@@ -83,14 +108,21 @@ export default function OrderSummary({
       
       <div className="flex justify-between text-sm">
         <span>Tax</span>
-        <span>{tax.format()}</span>
+        <span>{(authoritative?.tax ?? tax).format()}</span>
       </div>
+
+      {authoritative && !authoritative.tender.isZero() && (
+        <div className="flex justify-between text-sm text-green-600">
+          <span>Other tender</span>
+          <span>-{authoritative.tender.format()}</span>
+        </div>
+      )}
 
       <hr className="my-2" />
 
       <div className="flex justify-between font-semibold">
         <span>Total</span>
-        <span>{total.format()}</span>
+        <span>{(authoritative?.total ?? total).format()}</span>
       </div>
     </div>
   );

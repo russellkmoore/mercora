@@ -24,6 +24,8 @@ export interface OrderData {
   subtotal: StoredMoney;
   shipping: StoredMoney;
   tax: StoredMoney;
+  discount?: StoredMoney;
+  tender?: StoredMoney;
   total: StoredMoney;
   shippingAddress: {
     street: string;
@@ -174,10 +176,20 @@ function generateOrderConfirmationHTML(orderData: OrderData): string {
               <td style="color: #64748b; font-size: 14px;">Shipping:</td>
               <td style="text-align: right; color: #1e293b; font-size: 14px;">${Money.fromStored(orderData.shipping).format()}</td>
             </tr>
+            ${orderData.discount && !Money.fromStored(orderData.discount).isZero() ? `
+            <tr style="padding: 4px 0;">
+              <td style="color: #64748b; font-size: 14px;">Discount:</td>
+              <td style="text-align: right; color: #1e293b; font-size: 14px;">${Money.fromStored(orderData.discount).negate().format()}</td>
+            </tr>` : ''}
             <tr style="padding: 4px 0;">
               <td style="color: #64748b; font-size: 14px;">Tax:</td>
               <td style="text-align: right; color: #1e293b; font-size: 14px;">${Money.fromStored(orderData.tax).format()}</td>
             </tr>
+            ${orderData.tender && !Money.fromStored(orderData.tender).isZero() ? `
+            <tr style="padding: 4px 0;">
+              <td style="color: #64748b; font-size: 14px;">Other tender:</td>
+              <td style="text-align: right; color: #1e293b; font-size: 14px;">${Money.fromStored(orderData.tender).negate().format()}</td>
+            </tr>` : ''}
             <tr style="border-top: 2px solid #e2e8f0; padding: 12px 0 0; margin: 12px 0 0;">
               <td style="color: #1e293b; font-size: 16px; font-weight: bold; padding-top: 12px;">Total:</td>
               <td style="text-align: right; color: #f97316; font-size: 18px; font-weight: bold; padding-top: 12px;">${Money.fromStored(orderData.total).format()}</td>
