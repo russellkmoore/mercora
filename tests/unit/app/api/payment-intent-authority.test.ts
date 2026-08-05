@@ -71,8 +71,10 @@ function request() {
       taxAmount: { amount: 0, currency: 'USD' },
       items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],
       shippingAddress: {
-        line1: '1 Main', city: 'Denver', region: 'CO', postal_code: '80202', country: 'US',
+        line1: '1 Main', city: 'Denver', region: 'CO', postal_code: '80202', country: 'us',
+        company: 'Buyer LLC', attributes: { injected: 'must be discarded' },
       },
+      description: 'attacker-controlled product and order text',
       shippingMethodId: 'standard',
     }),
   });
@@ -95,15 +97,33 @@ describe('payment-intent durable authority boundary', () => {
     const response = await POST(request());
     expect(response.status).toBe(200);
     expect(mocks.createPaymentIntent).toHaveBeenCalledWith(expect.objectContaining({ amount: 2_600 }));
+    expect(mocks.createPaymentIntent).toHaveBeenCalledWith(expect.objectContaining({
+      description: expect.stringMatching(/^Order WEB-GUEST-/),
+    }));
     expect(mocks.insertValues).toHaveBeenCalledWith(expect.objectContaining({
       payment_status: 'pending',
       status: 'pending',
       total_amount: { amount: 2_600, currency: 'USD' },
       items: quote.items,
+      shipping_address: expect.objectContaining({
+        company: 'Buyer LLC',
+        country: 'US',
+        type: 'shipping',
+        status: 'unverified',
+      }),
     }));
+    expect(mocks.insertValues.mock.calls[0][0].shipping_address).not.toHaveProperty('attributes');
     const body = await response.json() as any;
     expect(body.clientSecret).toBe('pi_authoritative_secret_x');
     expect(body.quote.total).toMatchObject({ amount: 26, currency: 'USD' });
+    expect(body.quote.items).toMatchObject([{
+      productId: 'prod_1',
+      variantId: 'var_1',
+      name: 'Catalog name',
+      quantity: 1,
+      unitPrice: { amount: 20, currency: 'USD' },
+      lineTotal: { amount: 20, currency: 'USD' },
+    }]);
     expect(JSON.stringify(body)).not.toContain('tenderState');
   });
 

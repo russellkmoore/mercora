@@ -12,25 +12,38 @@ import { createCustomer, getCustomer } from '@/lib/models/mach/customer';
 
 interface PaymentIntentRequest {
   items: CheckoutLineInput[];
-  shippingAddress: Address;
+  shippingAddress: unknown;
   shippingMethodId: string;
   discountCodes?: string[];
   giftCardToken?: string;
-  description?: string;
 }
 
-function validAddress(value: unknown): value is Address {
-  if (!isPlainRecord(value)) return false;
-  return (
+function normalizeAddress(value: unknown): Address | null {
+  if (!isPlainRecord(value)) return null;
+  if (!(
     isBoundedString(value.line1, 256) &&
     isBoundedString(value.city, 128) &&
-    isBoundedString(value.country, 2) &&
+    isBoundedString(value.country, 2) && /^[A-Za-z]{2}$/.test(value.country) &&
     isBoundedString(value.region, 128) &&
     isBoundedString(value.postal_code, 32) &&
     (value.line2 === undefined || isBoundedString(value.line2, 256, { allowEmpty: true })) &&
+    (value.company === undefined || isBoundedString(value.company, 256, { allowEmpty: true })) &&
     (value.recipient === undefined || isBoundedString(value.recipient, 256, { allowEmpty: true })) &&
     (value.email === undefined || isBoundedString(value.email, 320, { allowEmpty: true }))
-  );
+  )) return null;
+  return {
+    line1: value.line1,
+    ...(value.line2 !== undefined ? { line2: value.line2 } : {}),
+    city: value.city,
+    region: value.region,
+    postal_code: value.postal_code,
+    country: value.country.trim().toUpperCase(),
+    ...(value.company !== undefined ? { company: value.company } : {}),
+    ...(value.recipient !== undefined ? { recipient: value.recipient } : {}),
+    ...(value.email !== undefined ? { email: value.email } : {}),
+    type: 'shipping',
+    status: 'unverified',
+  };
 }
 
 function newOrderId(userId: string | null): string {
@@ -55,10 +68,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
   const input = body as unknown as PaymentIntentRequest;
+  const shippingAddress = normalizeAddress(input.shippingAddress);
   if (
-    !validAddress(input.shippingAddress) ||
+    !shippingAddress ||
     !isBoundedString(input.shippingMethodId, 128) ||
-    (input.description !== undefined && !isBoundedString(input.description, 500, { allowEmpty: true })) ||
     (input.giftCardToken !== undefined && !isBoundedString(input.giftCardToken, 512))
   ) {
     return NextResponse.json({ error: 'Invalid checkout details' }, { status: 400 });
@@ -69,7 +82,7 @@ export async function POST(request: NextRequest) {
   try {
     quote = await priceCheckout({
       items: input.items,
-      shippingAddress: input.shippingAddress,
+      shippingAddress,
       shippingMethodId: input.shippingMethodId,
       discountCodes: input.discountCodes,
       giftCardToken: input.giftCardToken,
@@ -102,7 +115,7 @@ export async function POST(request: NextRequest) {
           id: userId,
           type: 'person',
           person: {
-            email: user?.emailAddresses[0]?.emailAddress || input.shippingAddress.email || '',
+            email: user?.emailAddresses[0]?.emailAddress || shippingAddress.email || '',
             first_name: user?.firstName || '',
             last_name: user?.lastName || '',
             full_name: [user?.firstName, user?.lastName].filter(Boolean).join(' '),
@@ -129,16 +142,16 @@ export async function POST(request: NextRequest) {
       },
       shipping: {
         address: {
-          line1: String(input.shippingAddress.line1),
-          line2: input.shippingAddress.line2 ? String(input.shippingAddress.line2) : undefined,
-          city: String(input.shippingAddress.city),
-          state: input.shippingAddress.region,
-          postal_code: input.shippingAddress.postal_code,
-          country: input.shippingAddress.country,
+          line1: String(shippingAddress.line1),
+          line2: shippingAddress.line2 ? String(shippingAddress.line2) : undefined,
+          city: String(shippingAddress.city),
+          state: shippingAddress.region,
+          postal_code: shippingAddress.postal_code,
+          country: shippingAddress.country,
         },
-        name: input.shippingAddress.recipient || 'Customer',
+        name: shippingAddress.recipient || 'Customer',
       },
-      description: input.description || `Order ${orderId}`,
+      description: `Order ${orderId}`,
     });
   } catch (error) {
     console.error('[checkout] PaymentIntent creation failed:', error);
@@ -164,7 +177,7 @@ export async function POST(request: NextRequest) {
   const baseShipping = Money.fromStored(quote.shipping, quote.currency);
   const shippingDiscount = Money.fromStored(quote.shippingDiscount, quote.currency);
   const extensions = {
-    email: input.shippingAddress.email,
+    email: shippingAddress.email,
     payment_intent_id: paymentIntent.id,
     checkout_catalog_subtotal: catalogSubtotal.toJSON(),
     checkout_subtotal: catalogSubtotal.subtract(merchandiseDiscount).toJSON(),
@@ -189,8 +202,8 @@ export async function POST(request: NextRequest) {
       status: 'pending',
       total_amount: Money.fromMinor(providerAmount, providerCurrency).toJSON(),
       currency_code: providerCurrency,
-      shipping_address: input.shippingAddress,
-      billing_address: input.shippingAddress,
+      shipping_address: shippingAddress,
+      billing_address: shippingAddress,
       items: quote.items,
       shipping_method: quote.shippingMethod.label,
       payment_method: 'stripe',
@@ -219,6 +232,14 @@ export async function POST(request: NextRequest) {
     orderId,
     amount: toWireMoney(Money.fromMinor(providerAmount, providerCurrency).toJSON()),
     quote: {
+      items: quote.items.map((item) => ({
+        productId: item.product_id,
+        variantId: item.variant_id,
+        name: item.product_name,
+        quantity: item.quantity,
+        unitPrice: toWireMoney(item.unit_price, providerCurrency),
+        lineTotal: toWireMoney(item.total_price, providerCurrency),
+      })),
       subtotal: toWireMoney(quote.subtotal),
       discount: toWireMoney(quote.discount),
       shipping: toWireMoney(quote.shipping),

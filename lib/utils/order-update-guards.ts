@@ -35,6 +35,7 @@ export const SERVER_OWNED_ORDER_EXTENSION_KEYS = [
   'checkout_tender',
   'checkout_tender_state',
   'checkout_total',
+  'tax_source',
   'discount_codes',
   'finalized_at',
 ] as const;

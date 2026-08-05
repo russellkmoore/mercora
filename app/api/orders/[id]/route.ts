@@ -5,7 +5,8 @@ import { orders } from "@/lib/db/schema/order";
 import { eq } from "drizzle-orm";
 import type { Order } from "@/lib/types/order";
 import { authenticateRequest, PERMISSIONS } from '@/lib/auth/unified-auth';
-import { Money, toWireMoney } from '@/lib/money';
+import { Money } from '@/lib/money';
+import { toAdminOrder, toCustomerOrder } from '@/lib/models/mach/order-serializer';
 
 function parseJson<T>(value: unknown, fallback: T): T {
   if (value === null || value === undefined) return fallback;
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
     const order = hydrateOrder(result[0]);
+    let isAdmin = false;
     if (!userId || order.customer_id !== userId) {
       const admin = await authenticateRequest(request, PERMISSIONS.ORDERS_READ, {
         updateLastUsed: false,
@@ -58,17 +60,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         // The order id alone is not a guest receipt credential.
         return admin.response!;
       }
+      isAdmin = true;
     }
     return NextResponse.json({
-      data: {
-        ...order,
-        total_amount: toWireMoney(order.total_amount),
-        items: order.items.map((item) => ({
-          ...item,
-          unit_price: toWireMoney(item.unit_price),
-          total_price: toWireMoney(item.total_price),
-        })),
-      },
+      data: isAdmin ? toAdminOrder(order) : toCustomerOrder(order),
       meta: { schema: "mach:order" },
     });
   } catch (error) {

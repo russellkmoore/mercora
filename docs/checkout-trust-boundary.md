@@ -16,11 +16,13 @@ client-created paid order.
    client secret.
 4. Inline completion, redirect return, and the signed Stripe webhook all call
    the same finalizer. It retrieves the PaymentIntent server-side and requires
-   `succeeded`, matching metadata/order ids, matching currency, and an
-   `amount_received` at or above the persisted server charge floor.
-5. A guarded `pending`/`pending` to `processing`/`paid` update chooses one winner.
-   Only that winner consumes promotion usage, applies optional capability
-   effects, and sends the confirmation email.
+   `succeeded`, matching metadata/order ids, matching currency, an exact
+   authorized amount, and an `amount_received` at or above the persisted server
+   charge floor. The paid order records the actual captured receipt amount.
+5. Promotion usage is atomically audited by order before the paid transition;
+   retries can prove an existing redemption. A guarded `pending`/`pending` to
+   `processing`/`paid` update chooses one winner for optional capability effects
+   and the best-effort confirmation email.
 
 The browser cannot assert an order owner, paid status, item display data,
 prices, totals, discounts, tax, or shipping. It receives the authoritative

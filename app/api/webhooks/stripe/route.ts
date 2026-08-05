@@ -118,30 +118,20 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   }
 
   try {
-    try {
-      await finalizeOrderPayment({
-        orderId,
-        paymentIntentId: paymentIntent.id,
-        enforceOwnership: false,
-        sendEmail: true,
-      });
-    } catch (updateError) {
-      if (updateError instanceof PaymentVerificationError) {
-        console.error(`Payment verification rejected for order ${orderId}:`, updateError.message);
-        return;
-      }
-      console.error('Error updating order status:', updateError);
-      throw updateError;
-    }
-    
-    // You can add additional logic here:
-    // - Send confirmation emails
-    // - Update inventory
-    // - Trigger fulfillment process
-    // - Analytics tracking
-    
+    await finalizeOrderPayment({
+      orderId,
+      paymentIntentId: paymentIntent.id,
+      enforceOwnership: false,
+      sendEmail: true,
+    });
   } catch (error) {
-    console.error('Error updating order after payment:', error);
+    if (error instanceof PaymentVerificationError) {
+      console.error(`Payment verification rejected for order ${orderId}:`, error.message);
+      return;
+    }
+    // Transient D1/Stripe failures must reach POST's 500 response so Stripe
+    // retries the signed event instead of recording a false success.
+    throw error;
   }
 }
 

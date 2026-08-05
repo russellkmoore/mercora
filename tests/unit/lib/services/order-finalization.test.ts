@@ -56,6 +56,7 @@ function orderRecord() {
       checkout_tax: { amount: 200, currency: 'USD' },
       checkout_tender: { amount: 0, currency: 'USD' },
       checkout_discount: { amount: 100, currency: 'USD' },
+      checkout_total: { amount: 2_500, currency: 'USD' },
       discount_codes: ['SAVE'],
     },
     created_at: '2026-08-05T00:00:00Z',
@@ -85,6 +86,7 @@ beforeEach(() => {
       items: [], payment_status: 'paid', extensions: { ...mocks.record.extensions, email: 'a@example.com' },
     },
   });
+  mocks.redeemCoupon.mockResolvedValue({ redeemed: true });
   mocks.sendOrderConfirmationEmail.mockResolvedValue({ success: true });
 });
 
@@ -123,6 +125,18 @@ describe('verified paid-order finalization', () => {
     })).rejects.toBeInstanceOf(PaymentVerificationError);
   });
 
+  it('requires the authorized PI amount to equal the immutable server quote', async () => {
+    mocks.retrievePaymentIntent.mockResolvedValue({
+      id: 'pi_bound', status: 'succeeded', amount: 2_499, amount_received: 2_500,
+      currency: 'usd', metadata: { orderId: mocks.record.id },
+    });
+    await expect(finalizeOrderPayment({
+      orderId: mocks.record.id,
+      paymentIntentId: 'pi_bound',
+    })).rejects.toBeInstanceOf(PaymentVerificationError);
+    expect(mocks.promoteOrderToPaid).not.toHaveBeenCalled();
+  });
+
   it('runs paid effects only for the CAS winner', async () => {
     const first = await finalizeOrderPayment({
       orderId: mocks.record.id,
@@ -131,6 +145,10 @@ describe('verified paid-order finalization', () => {
       enforceOwnership: true,
     });
     expect(first.promoted).toBe(true);
+    expect(mocks.promoteOrderToPaid).toHaveBeenCalledOnce();
+    const promotionArgs = mocks.promoteOrderToPaid.mock.calls[0][0];
+    expect(promotionArgs.orderId).toBe(mocks.record.id);
+    expect(promotionArgs.amountReceived.toJSON()).toEqual({ amount: 2_500, currency: 'USD' });
     expect(mocks.sendOrderConfirmationEmail).toHaveBeenCalledTimes(1);
     expect(mocks.redeemCoupon).toHaveBeenCalledTimes(1);
 
@@ -138,6 +156,7 @@ describe('verified paid-order finalization', () => {
       promoted: false,
       order: { ...first.order, payment_status: 'paid' },
     });
+    mocks.redeemCoupon.mockResolvedValue({ redeemed: false, alreadyRedeemed: true });
     await finalizeOrderPayment({
       orderId: mocks.record.id,
       paymentIntentId: 'pi_bound',
@@ -145,7 +164,60 @@ describe('verified paid-order finalization', () => {
       enforceOwnership: true,
     });
     expect(mocks.sendOrderConfirmationEmail).toHaveBeenCalledTimes(1);
-    expect(mocks.redeemCoupon).toHaveBeenCalledTimes(1);
+    expect(mocks.redeemCoupon).toHaveBeenCalledTimes(2);
+  });
+
+  it('promotes captured money when a coupon race requires reconciliation', async () => {
+    mocks.redeemCoupon.mockResolvedValue({ redeemed: false, alreadyRedeemed: false });
+
+    await expect(finalizeOrderPayment({
+      orderId: mocks.record.id,
+      paymentIntentId: 'pi_bound',
+    })).resolves.toMatchObject({ paid: true, promoted: true });
+
+    expect(mocks.promoteOrderToPaid).toHaveBeenCalledOnce();
+  });
+
+  it('propagates transient coupon persistence errors before paid promotion', async () => {
+    mocks.redeemCoupon.mockRejectedValue(new Error('D1 unavailable'));
+
+    await expect(finalizeOrderPayment({
+      orderId: mocks.record.id,
+      paymentIntentId: 'pi_bound',
+    })).rejects.toThrow('D1 unavailable');
+
+    expect(mocks.promoteOrderToPaid).not.toHaveBeenCalled();
+  });
+
+  it('allows recovery when coupon audit proves the order already redeemed it', async () => {
+    mocks.redeemCoupon.mockResolvedValue({ redeemed: false, alreadyRedeemed: true });
+
+    await expect(finalizeOrderPayment({
+      orderId: mocks.record.id,
+      paymentIntentId: 'pi_bound',
+    })).resolves.toMatchObject({ paid: true, promoted: true });
+
+    expect(mocks.promoteOrderToPaid).toHaveBeenCalledOnce();
+  });
+
+  it('re-verifies the immutable quote after final total records a larger captured receipt', async () => {
+    mocks.record.payment_status = 'paid';
+    mocks.record.status = 'processing';
+    mocks.record.total_amount = { amount: 2_600, currency: 'USD' };
+    mocks.retrievePaymentIntent.mockResolvedValue({
+      id: 'pi_bound', status: 'succeeded', amount: 2_500, amount_received: 2_600,
+      currency: 'usd', metadata: { orderId: mocks.record.id },
+    });
+    mocks.redeemCoupon.mockResolvedValue({ redeemed: false, alreadyRedeemed: true });
+    mocks.promoteOrderToPaid.mockResolvedValue({
+      promoted: false,
+      order: { ...mocks.record, payment_status: 'paid' },
+    });
+
+    await expect(finalizeOrderPayment({
+      orderId: mocks.record.id,
+      paymentIntentId: 'pi_bound',
+    })).resolves.toMatchObject({ paid: true, promoted: false });
   });
 
   it('verifies non-cash tender before paid promotion', async () => {
@@ -164,5 +236,14 @@ describe('verified paid-order finalization', () => {
       capabilities,
     })).rejects.toThrow('reservation expired');
     expect(mocks.promoteOrderToPaid).not.toHaveBeenCalled();
+  });
+
+  it('does not report failure after paid CAS when confirmation email fails', async () => {
+    mocks.sendOrderConfirmationEmail.mockRejectedValue(new Error('email unavailable'));
+
+    await expect(finalizeOrderPayment({
+      orderId: mocks.record.id,
+      paymentIntentId: 'pi_bound',
+    })).resolves.toMatchObject({ paid: true, promoted: true });
   });
 });

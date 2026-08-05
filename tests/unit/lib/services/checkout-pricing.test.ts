@@ -117,4 +117,30 @@ describe('server-authoritative checkout pricing', () => {
     }, { dependencies: deps as any });
     expect(quote.discountCodes).toEqual([]);
   });
+
+  it('fails closed when promotion eligibility cannot be proven', async () => {
+    const deps = dependencies({
+      validateCouponCode: vi.fn(async () => ({
+        canBeUsed: true,
+        coupon: { promotion_id: 'promo_vip', code: 'VIP' },
+      })),
+      getPromotionById: vi.fn(async () => ({
+        id: 'promo_vip',
+        name: 'VIP only',
+        type: 'cart',
+        status: 'active',
+        stackable: true,
+        eligibility: { requires_account: true, customer_segments: ['vip'] },
+        rules: { actions: [{ type: 'fixed_discount', value: 500 }] },
+      })),
+    });
+    const quote = await priceCheckout({
+      items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],
+      shippingAddress: address,
+      shippingMethodId: 'standard',
+      discountCodes: ['VIP'],
+    }, { dependencies: deps as any });
+    expect(quote.discount).toEqual({ amount: 0, currency: 'USD' });
+    expect(quote.discountCodes).toEqual([]);
+  });
 });
