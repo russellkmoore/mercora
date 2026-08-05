@@ -37,6 +37,10 @@ export default function CheckoutSuccessPage() {
         const pending = loadPendingCheckout(paymentIntent.id);
 
         if (paymentIntent.status === 'processing') {
+          // Stripe owns the in-flight payment. Lock the purchased cart now so
+          // the customer cannot create a duplicate checkout while the webhook
+          // retains the durable pending-order recovery path.
+          useCartStore.getState().clearCart();
           setPhase('processing');
           return;
         }

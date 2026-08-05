@@ -20,6 +20,7 @@ interface PaymentIntentRequest {
 
 function normalizeAddress(value: unknown): Address | null {
   if (!isPlainRecord(value)) return null;
+  const normalizedEmail = typeof value.email === 'string' ? value.email.trim() : undefined;
   if (!(
     isBoundedString(value.line1, 256) &&
     isBoundedString(value.city, 128) &&
@@ -29,7 +30,10 @@ function normalizeAddress(value: unknown): Address | null {
     (value.line2 === undefined || isBoundedString(value.line2, 256, { allowEmpty: true })) &&
     (value.company === undefined || isBoundedString(value.company, 256, { allowEmpty: true })) &&
     (value.recipient === undefined || isBoundedString(value.recipient, 256, { allowEmpty: true })) &&
-    (value.email === undefined || isBoundedString(value.email, 320, { allowEmpty: true }))
+    (value.email === undefined || (
+      isBoundedString(value.email, 320, { allowEmpty: true }) &&
+      (normalizedEmail === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail ?? ''))
+    ))
   )) return null;
   return {
     line1: value.line1,
@@ -40,7 +44,7 @@ function normalizeAddress(value: unknown): Address | null {
     country: value.country.trim().toUpperCase(),
     ...(value.company !== undefined ? { company: value.company } : {}),
     ...(value.recipient !== undefined ? { recipient: value.recipient } : {}),
-    ...(value.email !== undefined ? { email: value.email } : {}),
+    ...(normalizedEmail ? { email: normalizedEmail } : {}),
     type: 'shipping',
     status: 'unverified',
   };

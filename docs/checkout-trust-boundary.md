@@ -19,14 +19,23 @@ client-created paid order.
    `succeeded`, matching metadata/order ids, matching currency, an exact
    authorized amount, and an `amount_received` at or above the persisted server
    charge floor. The paid order records the actual captured receipt amount.
-5. Promotion usage is atomically audited by order before the paid transition;
-   retries can prove an existing redemption. A guarded `pending`/`pending` to
-   `processing`/`paid` update chooses one winner for optional capability effects
-   and the best-effort confirmation email.
+5. A guarded `pending`/`pending` to `processing`/`paid` update first proves a
+   paid order. Promotion usage is then atomically audited by order on both the
+   winning call and already-paid retries, allowing transient audit failures to
+   recover without mutating coupons for cancelled or missing orders. Idempotent
+   tender settlement and subscription activation also run idempotently on the
+   winner and already-paid retries so transient failures can recover. Only the
+   transition winner runs the best-effort confirmation email.
 
 The browser cannot assert an order owner, paid status, item display data,
 prices, totals, discounts, tax, or shipping. It receives the authoritative
 quote used by Stripe so the payment screen cannot display a different total.
+
+Destination policy is configured with `shipping.allowed_countries` as ISO
+alpha-2 codes. Missing, empty, or malformed configuration fails back to
+`['US']`. The shipping estimator and authoritative pricing share this policy
+and the same enabled fresh-install methods (standard, express, and overnight),
+so enabling a destination requires one explicit shipping configuration change.
 
 ## Authorization and metadata
 
@@ -46,8 +55,18 @@ quote used by Stripe so the payment screen cannot display a different total.
 Gift cards and subscriptions implement interfaces in
 `lib/commerce/capabilities.ts`; core checkout does not import either feature.
 Defaults are no-ops. A nonzero optional tender must be authoritatively reserved
-when quoted and reverified before the paid CAS. Tender settlement is required
-to be idempotent.
+when quoted and reverified before the paid CAS. Already-paid recovery does not
+require the original reservation to remain open; tender settlement is keyed by
+order, required to be idempotent, and retried during paid convergence.
+Subscription `orderPaid` implementations have the same order-idempotent retry
+contract.
+
+When concurrent checkouts race for the last coupon use, Mercora honors each
+already-captured order's persisted server quote rather than stranding paid
+funds. A losing redemption writes the protected
+`coupon_reconciliation_codes` marker on the paid order for operational repair;
+temporary usage overage is accepted until a later reservation/effect-ledger
+schema can prevent the race before capture.
 
 ## Scope and schema
 

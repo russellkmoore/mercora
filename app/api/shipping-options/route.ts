@@ -11,6 +11,10 @@ import {
   isPlainRecord,
   isValidPublicCartItems,
 } from "@/lib/public-request-validation";
+import {
+  allowedShippingCountries,
+  enabledShippingMethods,
+} from '@/lib/shipping/allowed-countries';
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,7 +34,8 @@ export async function POST(req: NextRequest) {
     if (
       !isPlainRecord(address) ||
       !isBoundedString(address.postal_code, 32) ||
-      !isBoundedString(address.country, 2)
+      !isBoundedString(address.country, 2) ||
+      !/^[A-Za-z]{2}$/.test(address.country)
     ) {
       return NextResponse.json(
         { error: "Missing address data" },
@@ -42,26 +47,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Cart items are missing or invalid" }, { status: 400 });
     }
 
-    if (address.country !== "US") {
+    // Load shipping settings before destination policy enforcement so this
+    // estimator and authoritative checkout share the same allowlist.
+    const shippingSettings = await getSettings('shipping');
+    const destinationCountry = address.country.toUpperCase();
+    if (!allowedShippingCountries(shippingSettings).includes(destinationCountry)) {
       return NextResponse.json(
-        { error: "Shipping options only available for US addresses" },
+        { error: "Shipping options are not available for this destination" },
         { status: 400 }
       );
     }
 
     // Load shipping settings from database
-    const shippingSettings = await getSettings('shipping');
     const storeSettings = await getSettings('store');
     
     // Get configured shipping methods
-    let shippingMethods = shippingSettings['shipping.methods'] || [
-      { id: 'standard', label: 'Standard (5–7 days)', cost: 5.99, estimatedDays: 5, enabled: true },
-      { id: 'express', label: 'Express (2–3 days)', cost: 9.99, estimatedDays: 2, enabled: true },
-      { id: 'overnight', label: 'Overnight', cost: 19.99, estimatedDays: 1, enabled: true }
-    ];
-
-    // Filter to only enabled methods
-    const enabledMethods = shippingMethods.filter((method: any) => method.enabled);
+    const enabledMethods = enabledShippingMethods(shippingSettings);
 
     // Calculate order total to check for free shipping
     const orderTotal = cartSubtotal(items);

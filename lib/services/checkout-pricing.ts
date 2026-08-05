@@ -9,6 +9,10 @@ import {
   type CommerceCapabilities,
 } from '@/lib/commerce/capabilities';
 import type { Address, OrderItem, Promotion } from '@/lib/types';
+import {
+  allowedShippingCountries,
+  enabledShippingMethods,
+} from '@/lib/shipping/allowed-countries';
 
 export const MAX_CHECKOUT_LINES = 100;
 export const MAX_DISCOUNT_CODES = 25;
@@ -350,7 +354,10 @@ export async function priceCheckout(
       !line ||
       typeof line.productId !== 'string' ||
       !line.productId ||
-      (line.variantId !== undefined && (typeof line.variantId !== 'string' || !line.variantId)) ||
+      line.productId.length > 128 ||
+      (line.variantId !== undefined && (
+        typeof line.variantId !== 'string' || !line.variantId || line.variantId.length > 128
+      )) ||
       !Number.isSafeInteger(line.quantity) ||
       line.quantity <= 0 ||
       line.quantity > 1_000
@@ -402,11 +409,13 @@ export async function priceCheckout(
     deps.getSettings('shipping'),
     deps.getSettings('store'),
   ]);
-  const methods = Array.isArray(shippingSettings['shipping.methods'])
-    ? shippingSettings['shipping.methods'] as Array<Record<string, unknown>>
-    : [];
+  const destinationCountry = input.shippingAddress.country.toUpperCase();
+  if (!allowedShippingCountries(shippingSettings).includes(destinationCountry)) {
+    throw new Error(`Checkout shipping is not available for ${destinationCountry}`);
+  }
+  const methods = enabledShippingMethods(shippingSettings);
   const method = methods.find((entry) =>
-    entry.enabled !== false && entry.id === input.shippingMethodId
+    entry.id === input.shippingMethodId
   );
   if (!method || typeof method.label !== 'string') {
     throw new Error(`Shipping method ${input.shippingMethodId} is not configured`);

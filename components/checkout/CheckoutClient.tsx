@@ -357,7 +357,9 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
             items={items}
             shippingOption={shippingOption}
             taxAmount={taxAmount}
-            showDiscountInput={currentStep !== 'confirmation'}
+            showDiscountInput={
+              currentStep === 'shipping' && !authoritativeQuote && !clientSecret
+            }
             authoritativeQuote={authoritativeQuote}
           />
 
