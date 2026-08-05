@@ -11,23 +11,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { getDbAsync } from "@/lib/db";
 import { orders } from "@/lib/db/schema/order";
-import { 
-  getOrdersByCustomer, 
-  getOrderById, 
-  createOrder, 
-  updateOrderStatus,
-  updateOrderShipping 
-} from "@/lib/models/mach/orders";
-import { 
-  getOrdersByCustomerId, 
-  insertOrder
-} from "@/lib/models/order";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, isNull } from "drizzle-orm";
 import { authenticateRequest, PERMISSIONS } from "@/lib/auth/unified-auth";
-import { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail, type OrderData } from "@/lib/utils/email";
-import type { Order, CreateOrderRequest, UpdateOrderRequest } from "@/lib/types/order";
+import { sendOrderConfirmationEmail, type OrderData } from "@/lib/utils/email";
+import type { Order, CreateOrderRequest } from "@/lib/types/order";
 import { getCustomer, createCustomer } from "@/lib/models/mach/customer";
 import { Money, toWireMoney, type MachMoney } from "@/lib/money";
+import {
+  mergeOrderExtensions,
+  mergeOrderExternalReferences,
+  validateOrderMetadataUpdate,
+} from '@/lib/utils/order-update-guards';
 
 
 
@@ -70,21 +64,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-  let query = db.select().from(orders).orderBy(desc(orders.created_at));
-    const allOrders = await query;
-    let filteredOrders = allOrders;
-    
-    // Apply filters based on MACH schema
-    if (!isAdminRequest && requestedUserId) {
-      filteredOrders = filteredOrders.filter(order => order.customer_id === requestedUserId);
-    }
-    if (orderId) {
-      filteredOrders = filteredOrders.filter(order => order.id === orderId);
-    }
+    const predicates = [];
+    if (!isAdminRequest && requestedUserId) predicates.push(eq(orders.customer_id, requestedUserId));
+    if (orderId) predicates.push(eq(orders.id, orderId));
     if (status) {
-      filteredOrders = filteredOrders.filter(order => order.status === status);
+      const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'] as const;
+      if (!validStatuses.includes(status as (typeof validStatuses)[number])) {
+        return NextResponse.json({ error: 'Invalid order status' }, { status: 400 });
+      }
+      predicates.push(eq(orders.status, status as (typeof validStatuses)[number]));
     }
-    
+
+    const filteredOrders = await db
+      .select()
+      .from(orders)
+      .where(predicates.length ? and(...predicates) : undefined)
+      .orderBy(desc(orders.created_at));
     const total = filteredOrders.length;
     const paginatedOrders = filteredOrders.slice(offset, offset + limit);
     const hydratedOrders = paginatedOrders.map(hydrateOrder);
@@ -289,7 +284,10 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * PUT /api/orders - Update order status (consolidates update-order functionality)
+ * PUT /api/orders - Update non-authoritative order metadata.
+ *
+ * Lifecycle, fulfillment, customer linkage, totals and payment state each have
+ * a dedicated server-owned path and are rejected here.
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -299,30 +297,21 @@ export async function PUT(request: NextRequest) {
       return authResult.response!;
     }
 
-    const body = await request.json() as UpdateOrderRequest;
-
-    const { status, payment_status, shipping_method, tracking_number, shipped_at, delivered_at, notes, external_references, extensions } = body;
-    const orderId = (body as any).orderId;
-    if (!orderId) {
+    const body: unknown = await request.json();
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Request body must be a JSON object' }, { status: 400 });
+    }
+    const input = body as Record<string, unknown>;
+    const orderId = input.orderId;
+    if (typeof orderId !== 'string' || !orderId) {
       return NextResponse.json({
         error: 'Validation failed',
         details: ['orderId is required in the request body']
       }, { status: 400 });
     }
-
-    if (!status) {
-      return NextResponse.json({
-        error: 'Validation failed', 
-        details: ['status is required']
-      }, { status: 400 });
-    }
-
-    // Validate status value (must match schema)
-    const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
-    if (!validStatuses.includes(status)) {
-      return NextResponse.json({
-        error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
-      }, { status: 400 });
+    const validation = validateOrderMetadataUpdate(input);
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.error }, { status: validation.status });
     }
 
     const db = await getDbAsync();
@@ -336,49 +325,51 @@ export async function PUT(request: NextRequest) {
     }
 
     const currentOrder = existingOrder[0];
-    
+    const updateData: Partial<typeof orders.$inferInsert> = {};
 
-    // Build update data (MACH-compliant)
-    const updateData: any = {
-      ...(status && { status }),
-      ...(payment_status && { payment_status }),
-      ...(shipping_method && { shipping_method }),
-      ...(tracking_number && { tracking_number }),
-      ...(shipped_at && { shipped_at }),
-      ...(delivered_at && { delivered_at }),
-      ...(notes && { notes }),
-      ...(external_references && { external_references: JSON.stringify(external_references) }),
-      ...(extensions && { extensions: JSON.stringify(extensions) }),
-      updated_at: new Date().toISOString()
-    };
+    if ('notes' in validation.value) {
+      const notes = validation.value.notes;
+      if (notes !== null && typeof notes !== 'string') {
+        return NextResponse.json({ error: 'notes must be a string or null' }, { status: 400 });
+      }
+      updateData.notes = notes;
+    }
+    if ('extensions' in validation.value) {
+      const merged = mergeOrderExtensions(validation.value.extensions, currentOrder.extensions);
+      if (!merged.ok) {
+        return NextResponse.json({ error: merged.error }, { status: merged.status });
+      }
+      updateData.extensions = merged.value;
+    }
+    if ('external_references' in validation.value) {
+      const merged = mergeOrderExternalReferences(
+        validation.value.external_references,
+        currentOrder.external_references
+      );
+      if (!merged.ok) {
+        return NextResponse.json({ error: merged.error }, { status: merged.status });
+      }
+      updateData.external_references = merged.value;
+    }
+    const updatedAt = new Date().toISOString();
+    updateData.updated_at = updatedAt;
 
     // Update the order
     const [updatedOrder] = await db.update(orders)
       .set(updateData)
-      .where(eq(orders.id, orderId))
+      .where(and(
+        eq(orders.id, orderId),
+        currentOrder.updated_at === null
+          ? isNull(orders.updated_at)
+          : eq(orders.updated_at, currentOrder.updated_at)
+      ))
       .returning();
-
-    // Send email notification for status changes
-    const emailStatuses = ['processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
-    if (emailStatuses.includes(status) && currentOrder.status !== status) {
-      try {
-        const orderData = transformOrderForEmail(updatedOrder);
-        await sendOrderStatusUpdateEmail(orderData);
-        console.log(`Status update email sent for order ${orderId}: ${status}`);
-      } catch (emailError) {
-        console.error(`Failed to send status update email for order ${orderId}:`, emailError);
-      }
+    if (!updatedOrder) {
+      return NextResponse.json(
+        { error: 'Order changed while it was being updated; retry with fresh data' },
+        { status: 409 }
+      );
     }
-
-    // TODO: Re-implement webhook audit trail in MACH orders model
-    // Create webhook record for audit trail
-    console.log('Order status update:', {
-      orderId,
-      previousStatus: currentOrder.status,
-      newStatus: status,
-      updatedBy: authResult.tokenInfo?.tokenName || 'unknown',
-      timestamp: new Date().toISOString(),
-    });
 
     const response = {
       data: toWireOrder(hydrateOrder(updatedOrder)),
@@ -440,51 +431,5 @@ function toWireOrder(order: Order): WireOrder {
       unit_price: toWireMoney(item.unit_price),
       total_price: toWireMoney(item.total_price),
     })),
-  };
-}
-
-/**
- * Transform order data for email notification
- */
-function transformOrderForEmail(order: any): any {
-  // Use MACH-compliant fields
-  const items = order.items ? (typeof order.items === 'string' ? JSON.parse(order.items) : order.items) : [];
-  const shippingAddr = order.shipping_address ? (typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : order.shipping_address) : {};
-  const extensions = order.extensions ? (typeof order.extensions === 'string' ? JSON.parse(order.extensions) : order.extensions) : {};
-
-  // MACHAddress: line1, line2, city, region, postal_code, country, recipient, company
-  let customerName = '';
-  if (shippingAddr.recipient) {
-    customerName = shippingAddr.recipient;
-  } else if (shippingAddr.company) {
-    customerName = shippingAddr.company;
-  } else {
-    customerName = 'Valued Customer';
-  }
-
-  return {
-    orderNumber: order.id,
-    customerName,
-    customerEmail: extensions.email || shippingAddr.email || '',
-    status: order.status,
-    carrier: extensions.carrier,
-    trackingNumber: order.tracking_number,
-    trackingUrl: extensions.trackingUrl,
-    notes: order.notes,
-    cancellationReason: extensions.cancellationReason,
-    items: items.map((item: any) => ({
-      productId: item.product_id || item.id,
-      name: item.product_name || item.name || item.title,
-      price: Money.fromStored(item.unit_price ?? item.price ?? 0, order.currency_code).toJSON(),
-      quantity: item.quantity || 1,
-      imageUrl: item.imageUrl || '',
-    })),
-    shippingAddress: {
-      street: [shippingAddr.line1, shippingAddr.line2].filter(Boolean).join(', '),
-      city: shippingAddr.city || '',
-      state: shippingAddr.region || '',
-      zipCode: shippingAddr.postal_code || '',
-      country: shippingAddr.country || 'US',
-    },
   };
 }
