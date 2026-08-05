@@ -15,6 +15,22 @@ export const DEFAULT_SHIPPING_METHODS = [
   { id: 'overnight', label: 'Overnight', cost: 19.99, estimatedDays: 1, enabled: true },
 ] as const;
 
+export const DEFAULT_FREE_SHIPPING_THRESHOLD = 75;
+export const DEFAULT_FREE_SHIPPING_METHODS = ['standard'] as const;
+
+export function freeShippingThreshold(settings: Record<string, unknown>): number {
+  const configured = Number(settings['store.free_shipping_threshold']);
+  return Number.isFinite(configured) && configured >= 0
+    ? configured
+    : DEFAULT_FREE_SHIPPING_THRESHOLD;
+}
+
+export function freeShippingMethodIds(settings: Record<string, unknown>): string[] {
+  const configured = settings['shipping.free_methods'];
+  if (!Array.isArray(configured)) return [...DEFAULT_FREE_SHIPPING_METHODS];
+  return configured.filter((value): value is string => typeof value === 'string');
+}
+
 export function configuredShippingMethods(
   settings: Record<string, unknown>
 ): Array<Record<string, unknown>> {

@@ -12,6 +12,8 @@ import type { Address, OrderItem, Promotion } from '@/lib/types';
 import {
   allowedShippingCountries,
   enabledShippingMethods,
+  freeShippingMethodIds,
+  freeShippingThreshold,
 } from '@/lib/shipping/allowed-countries';
 
 export const MAX_CHECKOUT_LINES = 100;
@@ -425,13 +427,9 @@ export async function priceCheckout(
     throw new Error(`Shipping method ${input.shippingMethodId} has an invalid configured cost`);
   }
   let shipping = Money.fromMajor(configuredShippingCost, currency);
-  const threshold = Number(storeSettings['store.free_shipping_threshold']);
-  const freeMethods = Array.isArray(shippingSettings['shipping.free_methods'])
-    ? shippingSettings['shipping.free_methods']
-    : [];
+  const threshold = freeShippingThreshold(storeSettings);
+  const freeMethods = freeShippingMethodIds(shippingSettings);
   if (
-    Number.isFinite(threshold) &&
-    threshold >= 0 &&
     subtotal.gte(Money.fromMajor(threshold, currency)) &&
     freeMethods.includes(input.shippingMethodId)
   ) {

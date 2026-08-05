@@ -14,6 +14,8 @@ import {
 import {
   allowedShippingCountries,
   enabledShippingMethods,
+  freeShippingMethodIds,
+  freeShippingThreshold,
 } from '@/lib/shipping/allowed-countries';
 
 export async function POST(req: NextRequest) {
@@ -67,14 +69,14 @@ export async function POST(req: NextRequest) {
     // Calculate order total to check for free shipping
     const orderTotal = cartSubtotal(items);
 
-    const freeShippingThreshold = storeSettings['store.free_shipping_threshold'] || 75;
-    const freeShippingMethods = shippingSettings['shipping.free_methods'] || ['standard'];
+    const threshold = freeShippingThreshold(storeSettings);
+    const freeShippingMethods = freeShippingMethodIds(shippingSettings);
 
     // Apply free shipping logic if order meets threshold
     const shippingOptions: ShippingOption[] = enabledMethods.map((method: any) => ({
       id: method.id,
       label: method.label,
-      cost: (orderTotal.gte(Money.fromMajor(freeShippingThreshold)) && freeShippingMethods.includes(method.id))
+      cost: (orderTotal.gte(Money.fromMajor(threshold)) && freeShippingMethods.includes(method.id))
         ? Money.zero(orderTotal.currency).toJSON()
         : Money.fromMajor(method.cost, orderTotal.currency).toJSON(),
       estimatedDays: method.estimatedDays,

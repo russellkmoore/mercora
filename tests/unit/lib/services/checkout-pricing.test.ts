@@ -75,6 +75,30 @@ describe('server-authoritative checkout pricing', () => {
     expect(quote.shipping).toEqual({ amount: 599, currency: 'USD' });
   });
 
+  it('uses the same free-shipping defaults as the public estimator on a fresh install', async () => {
+    const quote = await priceCheckout({
+      items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 4 }],
+      shippingAddress: address,
+      shippingMethodId: 'standard',
+    }, {
+      dependencies: dependencies({
+        getProductVariant: vi.fn(async () => ({
+          id: 'var_1',
+          product_id: 'prod_1',
+          sku: 'SKU-1',
+          status: 'active',
+          option_values: [],
+          price: Money.fromMinor(2_000).toJSON(),
+        })),
+        getSettings: vi.fn(async (category: string) => category === 'shipping'
+          ? {}
+          : { 'store.tax_rate': 10 }),
+      }) as any,
+    });
+
+    expect(quote.shipping).toEqual({ amount: 0, currency: 'USD' });
+  });
+
   it('enforces the configured destination allowlist at authoritative pricing', async () => {
     await expect(priceCheckout({
       items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],
