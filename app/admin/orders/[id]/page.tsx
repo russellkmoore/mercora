@@ -32,6 +32,7 @@ import {
   Calendar, User, MapPin, CreditCard
 } from "lucide-react";
 import {
+  formatLegacyShippingCostCurrency,
   formatMachMajorCurrency,
   formatStoredOrderCurrency,
 } from '@/lib/admin/order-money';
@@ -367,6 +368,9 @@ export default function OrderDetailPage() {
   const breakdownSubtotal = extensions.checkout_catalog_subtotal ?? extensions.subtotal;
   const breakdownShipping = extensions.checkout_shipping_before_discount ??
     extensions.shipping_cost ?? extensions.shippingCost;
+  const breakdownShippingIsLegacyMajor =
+    extensions.checkout_shipping_before_discount === undefined &&
+    typeof extensions.shipping_cost === 'number';
   const breakdownTax = extensions.checkout_tax ?? extensions.tax_amount ?? extensions.taxAmount;
   const breakdownDiscount = extensions.checkout_discount ?? extensions.discount_amount ??
     extensions.discountAmount ?? extensions.discount ?? extensions.promotion_discount;
@@ -488,7 +492,11 @@ export default function OrderDetailPage() {
             {breakdownShipping !== undefined && (
               <div className="flex justify-between">
                 <span className="text-gray-400">Shipping:</span>
-                <span className="text-white">{formatStoredCurrency(breakdownShipping, order.currency_code)}</span>
+                <span className="text-white">
+                  {breakdownShippingIsLegacyMajor
+                    ? formatLegacyShippingCostCurrency(breakdownShipping as number, order.currency_code)
+                    : formatStoredCurrency(breakdownShipping, order.currency_code)}
+                </span>
               </div>
             )}
             {breakdownTax !== undefined && (

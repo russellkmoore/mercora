@@ -9,3 +9,8 @@ export function formatMachMajorCurrency(amount: number, currency = 'USD'): strin
 export function formatStoredOrderCurrency(value: unknown, currency = 'USD'): string {
   return Money.fromStored(value, currency).format();
 }
+
+/** Historical extensions.shipping_cost values were stored as decimal-major amounts. */
+export function formatLegacyShippingCostCurrency(value: number, currency = 'USD'): string {
+  return Money.fromMajor(value, currency).format();
+}
