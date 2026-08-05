@@ -632,6 +632,82 @@ export async function useCoupon(code: string, customerId: string, orderId?: stri
   };
 }
 
+export interface RedeemCouponResult {
+  redeemed: boolean;
+  usageCount?: number;
+  status?: string;
+}
+
+/**
+ * Atomically consume a coupon and append its order-keyed audit record.
+ * The guarded statement is safe under concurrent finalizers and is idempotent
+ * for the same order id even if recovery invokes it again after a crash.
+ */
+export async function redeemCoupon(
+  code: string,
+  options: {
+    customerId?: string;
+    orderId: string;
+    discountAmount?: unknown;
+    channel?: string;
+  }
+): Promise<RedeemCouponResult> {
+  const db = await getDbAsync();
+  const normalized = code.trim().toUpperCase();
+  if (!normalized) return { redeemed: false };
+  const now = new Date().toISOString();
+  const usageRecord: MACHUsageRecord = {
+    timestamp: now,
+    customer_id: options.customerId,
+    order_id: options.orderId,
+    discount_amount: options.discountAmount as MACHUsageRecord['discount_amount'],
+    channel: options.channel,
+  };
+  const usageRecordJson = JSON.stringify(usageRecord);
+
+  const updated = await db
+    .update(couponInstances)
+    .set({
+      usageCount: sql`usage_count + 1`,
+      status: sql`CASE WHEN type = 'single_use' OR type IS NULL
+                         OR (usage_limit IS NOT NULL AND usage_count + 1 >= usage_limit)
+                       THEN 'used' ELSE status END`,
+      lastUsedAt: now,
+      lastUsedBy: options.customerId ?? null,
+      updatedAt: now,
+      extensions: sql`json_set(
+        COALESCE(extensions, '{}'),
+        '$.usage_records',
+        json_insert(
+          COALESCE(json_extract(extensions, '$.usage_records'), '[]'),
+          '$[#]',
+          json(${usageRecordJson})
+        )
+      )`,
+    })
+    .where(and(
+      eq(couponInstances.code, normalized),
+      or(eq(couponInstances.status, 'active'), isNull(couponInstances.status)),
+      sql`(usage_limit IS NULL OR usage_count < usage_limit)`,
+      sql`NOT EXISTS (
+        SELECT 1
+        FROM json_each(COALESCE(json_extract(extensions, '$.usage_records'), '[]'))
+        WHERE json_extract(value, '$.order_id') = ${options.orderId}
+      )`
+    ))
+    .returning({
+      usageCount: couponInstances.usageCount,
+      status: couponInstances.status,
+    });
+
+  if (!updated[0]) return { redeemed: false };
+  return {
+    redeemed: true,
+    usageCount: updated[0].usageCount,
+    status: updated[0].status ?? undefined,
+  };
+}
+
 /**
  * Generate bulk coupon instances
  */
