@@ -8,20 +8,23 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 import { getDbAsync } from "@/lib/db";
 import { orders } from "@/lib/db/schema/order";
-import { eq, desc, and, isNull } from "drizzle-orm";
+import { eq, desc, and, isNull, sql } from "drizzle-orm";
 import { authenticateRequest, PERMISSIONS } from "@/lib/auth/unified-auth";
-import { sendOrderConfirmationEmail, type OrderData } from "@/lib/utils/email";
-import type { Order, CreateOrderRequest } from "@/lib/types/order";
-import { getCustomer, createCustomer } from "@/lib/models/mach/customer";
+import type { Order } from "@/lib/types/order";
 import { Money, toWireMoney, type MachMoney } from "@/lib/money";
 import {
   mergeOrderExtensions,
   mergeOrderExternalReferences,
   validateOrderMetadataUpdate,
 } from '@/lib/utils/order-update-guards';
+import {
+  finalizeOrderPayment,
+  PaymentVerificationError,
+} from '@/lib/services/order-finalization';
+import { enforceRateLimit, getClientIp } from '@/lib/rate-limit';
 
 
 
@@ -116,170 +119,85 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * POST /api/orders - Create order (consolidates submit-order functionality)
+ * POST /api/orders - Finalize the durable pending order created at checkout.
+ * Client item names, prices, totals, ownership and paid state are ignored.
  */
 export async function POST(request: NextRequest) {
   try {
+    const limited = await enforceRateLimit(
+      'PUBLIC_RATE_LIMITER',
+      `order-finalize:${getClientIp(request)}`
+    );
+    if (limited) return limited;
+
     const { userId } = await auth();
-    const body = await request.json() as CreateOrderRequest;
-    
-    // Validate required fields
-
-    // Validate MACH-compliant order fields
-    if (!body.items || !Array.isArray(body.items) || body.items.length === 0) {
-      return NextResponse.json({
-        error: 'Validation failed',
-        details: ['items array is required and must not be empty']
-      }, { status: 400 });
+    const body: unknown = await request.json();
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
-    if (!body.total_amount || !Number.isSafeInteger(body.total_amount.amount)) {
-      return NextResponse.json({
-        error: 'Validation failed',
-        details: ['total_amount is required and must be a Money object']
-      }, { status: 400 });
+    const input = body as Record<string, unknown>;
+    const extensions = input.extensions && typeof input.extensions === 'object'
+      ? input.extensions as Record<string, unknown>
+      : {};
+    const paymentIntentId = typeof input.paymentIntentId === 'string'
+      ? input.paymentIntentId
+      : typeof extensions.payment_intent_id === 'string'
+        ? extensions.payment_intent_id
+        : undefined;
+    let orderId = typeof input.orderId === 'string'
+      ? input.orderId
+      : typeof input.order_id === 'string'
+        ? input.order_id
+        : undefined;
+    if (!paymentIntentId) {
+      return NextResponse.json({ error: 'paymentIntentId is required' }, { status: 400 });
     }
-    if (!body.currency_code) {
-      return NextResponse.json({
-        error: 'Validation failed',
-        details: ['currency_code is required']
-      }, { status: 400 });
+    if (!/^pi_[A-Za-z0-9_]+$/.test(paymentIntentId) || paymentIntentId.length > 255) {
+      return NextResponse.json({ error: 'Invalid paymentIntentId' }, { status: 400 });
     }
-
-    // Generate order ID
-    const now = Date.now();
-    let baseId = userId ?? "guest";
-    if (baseId.includes("@")) baseId = baseId.split("@")[0];
-    const safeUserId = baseId.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-    const orderId = `WEB-${safeUserId}-${now}`;
-
-    const db = await getDbAsync();
-    
-    // Handle customer_id - ensure there's a valid customer record or null for guest orders
-    let customerId = userId || body.customer_id || null;
-    if (customerId === "guest") {
-      customerId = null;
-    }
-    
-    // If we have a customer ID, make sure the customer exists in the database
-    if (customerId) {
-      try {
-        let customer = await getCustomer(customerId);
-        if (!customer) {
-          // Create a customer record if it doesn't exist
-          const user = await currentUser();
-          customer = await createCustomer({
-            id: customerId,
-            type: "person",
-            person: {
-              email: user?.emailAddresses?.[0]?.emailAddress || body.extensions?.email || '',
-              first_name: user?.firstName || '',
-              last_name: user?.lastName || '',
-              full_name: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '',
-            }
-          });
-        }
-      } catch (error) {
-        console.error('Error handling customer record:', error);
-        // If customer creation fails, proceed as guest order
-        customerId = null;
-      }
+    if (
+      orderId !== undefined &&
+      (orderId.length > 200 || !/^WEB-[A-Z0-9]+-\d+(?:-[A-Z0-9]+)?$/.test(orderId))
+    ) {
+      return NextResponse.json({ error: 'Invalid orderId' }, { status: 400 });
     }
 
-    const machOrder: any = {
-      id: orderId,
-      customer_id: customerId,
-      status: 'pending',
-      total_amount: Money.fromStored(body.total_amount, body.currency_code).toJSON(),
-      currency_code: body.currency_code,
-      shipping_address: body.shipping_address ? JSON.stringify(body.shipping_address) : null,
-      billing_address: body.billing_address ? JSON.stringify(body.billing_address) : null,
-      items: JSON.stringify(body.items),
-      shipping_method: body.shipping_method || null,
-      payment_method: body.payment_method || null,
-      payment_status: 'pending',
-      notes: body.notes || null,
-      external_references: body.external_references ? JSON.stringify(body.external_references) : null,
-      extensions: body.extensions ? JSON.stringify(body.extensions) : null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-
-    // Create the order
-    const [newOrder] = await db.insert(orders).values(machOrder).returning();
-
-
-    // Send order confirmation email (MACH-compliant)
-    try {
-      const user = await currentUser();
-      const shippingAddr = body.shipping_address;
-      let customerName = 'Valued Customer';
-      if (user?.firstName && user?.lastName) {
-        customerName = `${user.firstName} ${user.lastName}`;
-      } else if (shippingAddr?.recipient) {
-        customerName = shippingAddr.recipient;
-      } else if (shippingAddr?.company) {
-        customerName = shippingAddr.company;
-      }
-      const customerEmail = body.extensions?.email || shippingAddr?.email || '';
-      const orderData: OrderData = {
-        orderNumber: orderId,
-        customerName,
-        customerEmail,
-        items: body.items.map(item => ({
-          productId: item.product_id,
-          name: item.product_name,
-          price: Money.fromStored(item.unit_price, body.currency_code).toJSON(),
-          quantity: item.quantity,
-          imageUrl: (item as any).imageUrl || '',
-        })),
-        subtotal: Money.fromStored(body.extensions?.subtotal ?? 0, body.currency_code).toJSON(),
-        shipping: Money.fromStored(body.extensions?.shipping_cost ?? 0, body.currency_code).toJSON(),
-        tax: Money.fromStored(body.extensions?.tax_amount ?? 0, body.currency_code).toJSON(),
-        total: Money.fromStored(body.total_amount, body.currency_code).toJSON(),
-        shippingAddress: shippingAddr ? {
-          street: [shippingAddr.line1, shippingAddr.line2].filter(Boolean).join(', '),
-          city: typeof shippingAddr.city === 'string' ? shippingAddr.city : (shippingAddr.city ? Object.values(shippingAddr.city)[0] : ''),
-          state: shippingAddr.region || '',
-          zipCode: shippingAddr.postal_code || '',
-          country: shippingAddr.country || 'US',
-        } : {
-          street: '', city: '', state: '', zipCode: '', country: ''
-        },
-        estimatedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-      };
-      const emailResult = await sendOrderConfirmationEmail(orderData);
-      if (emailResult.success) {
-        console.log('Order confirmation email sent successfully:', emailResult.id);
-      } else {
-        console.error('Failed to send confirmation email:', emailResult.error);
-      }
-    } catch (emailError) {
-      console.error('Email preparation failed:', emailError);
+    // Compatibility for inline clients that know the PI but did not yet retain
+    // the new server-returned order id. This still proves the immutable binding.
+    if (!orderId) {
+      const db = await getDbAsync();
+      const [bound] = await db.select({ id: orders.id }).from(orders).where(and(
+        sql`json_extract(${orders.extensions}, '$.payment_intent_id') = ${paymentIntentId}`,
+        sql`json_extract(${orders.external_references}, '$.payment_intent_id') = ${paymentIntentId}`
+      )).limit(1);
+      orderId = bound?.id;
     }
-    
+    if (!orderId) {
+      return NextResponse.json({ error: 'Pending order not found' }, { status: 404 });
+    }
 
-    const response = {
-      data: toWireOrder(hydrateOrder(newOrder)),
-      meta: {
-        schema: "mach:order"
-      }
-    };
-    return NextResponse.json(response, { status: 201 });
+    const result = await finalizeOrderPayment({
+      orderId,
+      paymentIntentId,
+      customerId: userId ?? undefined,
+      enforceOwnership: true,
+      sendEmail: true,
+    });
+    return NextResponse.json({
+      data: { id: result.order.id },
+      meta: { schema: 'mach:order', idempotent: !result.promoted },
+    });
 
   } catch (error) {
-    console.error('Orders API error:', error);
-    
-    if (error instanceof Error) {
-      return NextResponse.json({
-        error: 'Validation failed',
-        message: error.message
-      }, { status: 400 });
+    if (error instanceof PaymentVerificationError) {
+      console.warn('Order payment verification rejected:', error.message);
+      return NextResponse.json(
+        { error: 'Payment could not be verified for this order' },
+        { status: 409 }
+      );
     }
-    
-    return NextResponse.json(
-      { error: 'Failed to create order' },
-      { status: 500 }
-    );
+    console.error('Order finalization failed:', error);
+    return NextResponse.json({ error: 'Failed to finalize order' }, { status: 500 });
   }
 }
 
