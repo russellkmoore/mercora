@@ -112,3 +112,6 @@ export * from "./reviews";
 
 // Analytics cache schema (Admin BI dashboard, application-specific)
 export * from "./analytics";
+
+// Durable Stripe webhook claim state (application-specific)
+export * from "./webhook-events";

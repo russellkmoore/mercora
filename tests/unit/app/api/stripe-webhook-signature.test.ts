@@ -4,6 +4,9 @@ import { NextRequest } from 'next/server';
 const mocks = vi.hoisted(() => ({
   constructWebhookEvent: vi.fn(),
   finalizeOrderPayment: vi.fn(),
+  claimWebhookEvent: vi.fn(),
+  completeWebhookEvent: vi.fn(),
+  failWebhookEvent: vi.fn(),
 }));
 
 vi.mock('@/lib/stripe', () => ({
@@ -13,6 +16,12 @@ vi.mock('@/lib/stripe', () => ({
 vi.mock('@/lib/services/order-finalization', () => ({
   PaymentVerificationError: class PaymentVerificationError extends Error {},
   finalizeOrderPayment: mocks.finalizeOrderPayment,
+}));
+
+vi.mock('@/lib/webhooks/processed-events', () => ({
+  claimWebhookEvent: mocks.claimWebhookEvent,
+  completeWebhookEvent: mocks.completeWebhookEvent,
+  failWebhookEvent: mocks.failWebhookEvent,
 }));
 
 import { POST } from '@/app/api/webhooks/stripe/route';
@@ -31,6 +40,9 @@ beforeEach(() => {
     type: 'unhandled.test',
     data: { object: {} },
   });
+  mocks.claimWebhookEvent.mockResolvedValue({ state: 'acquired', claimToken: 'claim_1' });
+  mocks.completeWebhookEvent.mockResolvedValue(true);
+  mocks.failWebhookEvent.mockResolvedValue(true);
 });
 
 describe('Stripe webhook signature verification', () => {
@@ -39,6 +51,7 @@ describe('Stripe webhook signature verification', () => {
 
     expect(response.status).toBe(400);
     expect(mocks.constructWebhookEvent).not.toHaveBeenCalled();
+    expect(mocks.claimWebhookEvent).not.toHaveBeenCalled();
   });
 
   it('passes the exact raw body and signature to async verification', async () => {
@@ -47,6 +60,15 @@ describe('Stripe webhook signature verification', () => {
 
     expect(response.status).toBe(200);
     expect(mocks.constructWebhookEvent).toHaveBeenCalledWith(rawBody, 't=1,v1=signed');
+    expect(mocks.claimWebhookEvent).toHaveBeenCalledWith({
+      eventId: 'evt_valid',
+      eventType: 'unhandled.test',
+    });
+    expect(mocks.completeWebhookEvent).toHaveBeenCalledWith({
+      eventId: 'evt_valid',
+      claimToken: 'claim_1',
+      outcome: 'ignored',
+    });
   });
 
   it('rejects verification failures without dispatching', async () => {
@@ -56,5 +78,6 @@ describe('Stripe webhook signature verification', () => {
 
     expect(response.status).toBe(400);
     expect(mocks.finalizeOrderPayment).not.toHaveBeenCalled();
+    expect(mocks.claimWebhookEvent).not.toHaveBeenCalled();
   });
 });

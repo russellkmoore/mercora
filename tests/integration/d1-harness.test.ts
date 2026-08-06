@@ -20,6 +20,7 @@ describe('real D1 Workers harness', () => {
       '0005_add_reviews_tables.sql',
       '0006_add_review_reminders.sql',
       '0007_add_analytics_cache.sql',
+      '0008_add_processed_webhook_events.sql',
     ]);
   });
 
