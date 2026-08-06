@@ -95,6 +95,7 @@ interface RefundSettings {
   restocking_fee_percent: number;
   return_window_days: number;
   minimum_refund_amount: number;
+  external_full_restock_enabled: boolean;
 }
 
 interface PromotionSettings {
@@ -152,7 +153,8 @@ export default function AdminSettingsPage() {
     shipping_refunded_full: false,
     restocking_fee_percent: 0,
     return_window_days: 30,
-    minimum_refund_amount: 500
+    minimum_refund_amount: 500,
+    external_full_restock_enabled: false
   });
 
   const [promotionSettings, setPromotionSettings] = useState<PromotionSettings>({
@@ -217,6 +219,7 @@ export default function AdminSettingsPage() {
             if (setting.key === 'refund.restocking_fee_percent') setRefundSettings(prev => ({ ...prev, restocking_fee_percent: value }));
             if (setting.key === 'refund.return_window_days') setRefundSettings(prev => ({ ...prev, return_window_days: value }));
             if (setting.key === 'refund.minimum_refund_amount') setRefundSettings(prev => ({ ...prev, minimum_refund_amount: value }));
+            if (setting.key === 'refund.external_full_restock_enabled') setRefundSettings(prev => ({ ...prev, external_full_restock_enabled: value }));
           } else if (setting.category === 'promotions') {
             if (setting.key === 'promotions.site_wide_discount_percent') setPromotionSettings(prev => ({ ...prev, site_wide_discount_percent: value }));
             if (setting.key === 'promotions.banner_enabled') setPromotionSettings(prev => ({ ...prev, banner_enabled: value }));
@@ -358,6 +361,7 @@ export default function AdminSettingsPage() {
         { key: 'refund.restocking_fee_percent', value: refundSettings.restocking_fee_percent, category: 'refund' },
         { key: 'refund.return_window_days', value: refundSettings.return_window_days, category: 'refund' },
         { key: 'refund.minimum_refund_amount', value: refundSettings.minimum_refund_amount, category: 'refund' },
+        { key: 'refund.external_full_restock_enabled', value: refundSettings.external_full_restock_enabled, category: 'refund' },
         
         // Promotion settings
         { key: 'promotions.site_wide_discount_percent', value: promotionSettings.site_wide_discount_percent, category: 'promotions' },
@@ -509,7 +513,7 @@ export default function AdminSettingsPage() {
                   onCheckedChange={(checked) => setSystemSettings(prev => ({ ...prev, maintenance_mode: checked }))}
                 />
               </div>
-              
+
               {systemSettings.maintenance_mode && (
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">Maintenance Message</label>
@@ -809,6 +813,19 @@ export default function AdminSettingsPage() {
                 <Switch
                   checked={refundSettings.shipping_refunded_partial}
                   onCheckedChange={(checked) => setRefundSettings(prev => ({ ...prev, shipping_refunded_partial: checked }))}
+                />
+              </div>
+
+              <div className="flex items-center justify-between border-t border-neutral-700 pt-4">
+                <div className="pr-4">
+                  <label className="text-sm font-medium text-gray-300">Restock Full Dashboard Refunds</label>
+                  <p className="text-xs text-gray-500">
+                    Restock all outstanding lines when Stripe reports a full external refund
+                  </p>
+                </div>
+                <Switch
+                  checked={refundSettings.external_full_restock_enabled}
+                  onCheckedChange={(checked) => setRefundSettings(prev => ({ ...prev, external_full_restock_enabled: checked }))}
                 />
               </div>
               

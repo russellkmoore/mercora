@@ -11,6 +11,9 @@
  * - **invoice.payment_succeeded**: Subscription/recurring payment succeeded
  * - **customer.subscription.updated**: Subscription changes
  * - **checkout.session.completed**: Checkout session completed
+ * - **charge.refunded**: Authoritative cumulative refund reconciliation
+ * - **refund.updated/refund.failed**: Delayed refund lifecycle reconciliation
+ * - **charge.refund.updated**: Legacy delayed-refund compatibility event
  *
  * === Security ===
  * - Webhook signature verification with Stripe secret
@@ -24,17 +27,34 @@
  *
  * === Usage ===
  * Configure this endpoint in your Stripe Dashboard webhook settings:
- * - URL: https://yourdomain.com/api/stripe/webhooks
+ * - URL: https://yourdomain.com/api/webhooks/stripe
  * - Events: Select the events you want to handle
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getStripe, getWebhookSecret } from '@/lib/stripe';
+import { constructWebhookEvent } from '@/lib/stripe';
 import Stripe from 'stripe';
 import {
   finalizeOrderPayment,
   PaymentVerificationError,
 } from '@/lib/services/order-finalization';
+import {
+  claimWebhookEvent,
+  completeWebhookEvent,
+  failWebhookEvent,
+  type WebhookEventOutcome,
+} from '@/lib/webhooks/processed-events';
+import {
+  handleChargeRefunded,
+  handleRefundLifecycle,
+} from '@/app/api/webhooks/stripe/handlers/refund-handlers';
+
+function retryableResponse(message: string) {
+  return NextResponse.json(
+    { error: message },
+    { status: 503, headers: { 'Retry-After': '5' } }
+  );
+}
 
 /**
  * POST handler for Stripe webhook events
@@ -56,11 +76,9 @@ export async function POST(req: NextRequest) {
 
   try {
     // Verify webhook signature for security
-    const stripe = getStripe();
-    event = stripe.webhooks.constructEvent(
+    event = await constructWebhookEvent(
       body,
-      signature,
-      getWebhookSecret()
+      signature
     );
   } catch (error) {
     console.error('Webhook signature verification failed:', error);
@@ -70,32 +88,91 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  let claim;
   try {
+    claim = await claimWebhookEvent({
+      eventId: event.id,
+      eventType: event.type,
+    });
+  } catch (error) {
+    console.error(`Could not claim Stripe webhook ${event.id}:`, error);
+    return NextResponse.json(
+      { error: 'Webhook claim failed' },
+      { status: 500 }
+    );
+  }
+
+  if (claim.state === 'completed') {
+    return NextResponse.json({ received: true, duplicate: true });
+  }
+  if (claim.state === 'busy') {
+    return retryableResponse('Webhook is already being processed');
+  }
+
+  try {
+    let outcome: WebhookEventOutcome;
+
     // Handle different event types
     switch (event.type) {
       case 'payment_intent.succeeded':
-        await handlePaymentSucceeded(event.data.object as Stripe.PaymentIntent);
+        outcome = await handlePaymentSucceeded(event.data.object as Stripe.PaymentIntent);
         break;
 
       case 'payment_intent.payment_failed':
         await handlePaymentFailed(event.data.object as Stripe.PaymentIntent);
+        outcome = 'ignored';
         break;
 
       case 'checkout.session.completed':
         await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+        outcome = 'ignored';
         break;
 
       case 'invoice.payment_succeeded':
         await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice);
+        outcome = 'ignored';
+        break;
+
+      case 'charge.refunded':
+        outcome = await handleChargeRefunded(event.data.object as Stripe.Charge);
+        break;
+
+      case 'refund.updated':
+      case 'refund.failed':
+      case 'charge.refund.updated':
+        outcome = await handleRefundLifecycle(event.data.object as Stripe.Refund);
         break;
 
       default:
         console.log(`Unhandled event type: ${event.type}`);
+        outcome = 'ignored';
+    }
+
+    const completed = await completeWebhookEvent({
+      eventId: event.id,
+      claimToken: claim.claimToken,
+      outcome,
+    });
+    if (!completed) {
+      console.error(`Lost ownership before completing Stripe webhook ${event.id}`);
+      return retryableResponse('Webhook ownership expired before completion');
     }
 
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error('Error processing webhook:', error);
+    try {
+      const failed = await failWebhookEvent({
+        eventId: event.id,
+        claimToken: claim.claimToken,
+        error,
+      });
+      if (!failed) {
+        console.error(`Lost ownership before failing Stripe webhook ${event.id}`);
+      }
+    } catch (claimError) {
+      console.error(`Could not record failure for Stripe webhook ${event.id}:`, claimError);
+    }
     return NextResponse.json(
       { error: 'Webhook processing failed' },
       { status: 500 }
@@ -107,14 +184,16 @@ export async function POST(req: NextRequest) {
  * Handle successful payment intent
  * Updates order status and triggers post-payment actions
  */
-async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
+async function handlePaymentSucceeded(
+  paymentIntent: Stripe.PaymentIntent
+): Promise<WebhookEventOutcome> {
   console.log('Payment succeeded:', paymentIntent.id);
   
   const orderId = paymentIntent.metadata.orderId;
   
   if (!orderId) {
     console.error('No orderId in payment intent metadata');
-    return;
+    return 'permanent_rejection';
   }
 
   try {
@@ -124,10 +203,11 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
       enforceOwnership: false,
       sendEmail: true,
     });
+    return 'handled';
   } catch (error) {
     if (error instanceof PaymentVerificationError) {
       console.error(`Payment verification rejected for order ${orderId}:`, error.message);
-      return;
+      return 'permanent_rejection';
     }
     // Transient D1/Stripe failures must reach POST's 500 response so Stripe
     // retries the signed event instead of recording a false success.

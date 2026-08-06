@@ -1,6 +1,7 @@
 import { Money } from '@/lib/money';
 
 interface ReturnItem {
+  id?: string;
   product_id: string;
   variant_id?: string;
   quantity: number;
@@ -29,6 +30,7 @@ export interface ReturnCalculation {
   restockingFee: number;
   baseAmount: number;
   total: number;
+  allocationMethod: 'exact_snapshot' | 'legacy_proportional' | 'legacy_full_order';
   policy: {
     shippingRefunded: boolean;
     restockingFeeApplied: boolean;
@@ -46,6 +48,94 @@ function storedMinor(value: unknown, currency: string): number {
   return value === undefined || value === null
     ? 0
     : Money.fromStored(value, currency).toMinorUnits();
+}
+
+interface ParsedLineAllocation {
+  lineId: string;
+  productId: string;
+  variantId: string;
+  quantity: number;
+  catalogSubtotal: number;
+  merchandiseDiscount: number;
+  netMerchandise: number;
+  tax: number;
+}
+
+function lineSelectionKey(item: ReturnItem): string {
+  return item.id ?? `${item.product_id}-${item.variant_id || 'default'}`;
+}
+
+function exactAllocations(order: ReturnOrder): ParsedLineAllocation[] | null {
+  const raw = order.extensions?.checkout_line_allocations;
+  if (raw === undefined) return null;
+  if (!Array.isArray(raw) || raw.length !== order.items.length) {
+    throw new Error('Stored checkout line allocations are corrupt');
+  }
+
+  const seen = new Set<string>();
+  const parsed = raw.map((value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new Error('Stored checkout line allocations are corrupt');
+    }
+    const entry = value as Record<string, unknown>;
+    if (
+      typeof entry.lineId !== 'string' || !entry.lineId || seen.has(entry.lineId) ||
+      typeof entry.productId !== 'string' || !entry.productId ||
+      typeof entry.variantId !== 'string' || !entry.variantId ||
+      !Number.isSafeInteger(entry.quantity) || Number(entry.quantity) <= 0
+    ) {
+      throw new Error('Stored checkout line allocations are corrupt');
+    }
+    seen.add(entry.lineId);
+    const catalogSubtotal = storedMinor(entry.catalogSubtotal, order.currency_code);
+    const merchandiseDiscount = storedMinor(entry.merchandiseDiscount, order.currency_code);
+    const netMerchandise = storedMinor(entry.netMerchandise, order.currency_code);
+    const tax = storedMinor(entry.tax, order.currency_code);
+    if (
+      catalogSubtotal < 0 || merchandiseDiscount < 0 || tax < 0 ||
+      merchandiseDiscount > catalogSubtotal ||
+      netMerchandise !== catalogSubtotal - merchandiseDiscount ||
+      tax > netMerchandise
+    ) {
+      throw new Error('Stored checkout line allocations are corrupt');
+    }
+    return {
+      lineId: entry.lineId,
+      productId: entry.productId,
+      variantId: entry.variantId,
+      quantity: Number(entry.quantity),
+      catalogSubtotal,
+      merchandiseDiscount,
+      netMerchandise,
+      tax,
+    };
+  });
+
+  const byId = new Map(parsed.map((allocation) => [allocation.lineId, allocation]));
+  for (const item of order.items) {
+    if (!item.id) throw new Error('Stored checkout line allocations do not match order lines');
+    const allocation = byId.get(item.id);
+    if (
+      !allocation || allocation.productId !== item.product_id ||
+      allocation.variantId !== item.variant_id || allocation.quantity !== item.quantity
+    ) {
+      throw new Error('Stored checkout line allocations do not match order lines');
+    }
+  }
+
+  const extensions = order.extensions ?? {};
+  const snapshotSubtotal = storedMinor(extensions.checkout_catalog_subtotal, order.currency_code);
+  const snapshotDiscount = storedMinor(extensions.checkout_merchandise_discount, order.currency_code);
+  const snapshotTax = storedMinor(extensions.checkout_tax, order.currency_code);
+  const shippingTax = storedMinor(extensions.checkout_shipping_tax, order.currency_code);
+  if (
+    parsed.reduce((sum, line) => sum + line.catalogSubtotal, 0) !== snapshotSubtotal ||
+    parsed.reduce((sum, line) => sum + line.merchandiseDiscount, 0) !== snapshotDiscount ||
+    parsed.reduce((sum, line) => sum + line.tax, 0) + shippingTax !== snapshotTax
+  ) {
+    throw new Error('Stored checkout allocation totals are corrupt');
+  }
+  return parsed;
 }
 
 /** Calculate a partial return entirely in integer minor units. */
@@ -94,20 +184,41 @@ export function calculatePartialReturnMinor(
   }
 
   const selected = new Set(selectedItemIds);
-  const returnItemsSubtotal = order.items
-    .filter((item) => selected.has(`${item.product_id}-${item.variant_id || 'default'}`))
-    .reduce(
-      (total, item) => total + wireMajorToMinor(item.unit_price, order.currency_code) * item.quantity,
-      0
-    );
-  const subtotalRatio = orderSubtotal > 0 ? returnItemsSubtotal / orderSubtotal : 0;
-  const returnTax = Math.round(orderTax * subtotalRatio);
-  const returnDiscount = Math.round(orderDiscount * subtotalRatio);
-  const isFullReturn = selectedItemIds.length === order.items.length;
+  const isFullReturn = order.items.length > 0 &&
+    order.items.every((item) => selected.has(lineSelectionKey(item)));
   const returnShipping = (
     (isFullReturn && policy.refundShippingOnFullReturn) ||
     (!isFullReturn && policy.refundShipping)
   ) ? orderShipping : 0;
+  const allocations = exactAllocations(order);
+  let returnItemsSubtotal: number;
+  let returnTax: number;
+  let returnDiscount: number;
+  let allocationMethod: ReturnCalculation['allocationMethod'];
+  if (allocations) {
+    const selectedAllocations = allocations.filter((line) => selected.has(line.lineId));
+    returnItemsSubtotal = selectedAllocations.reduce((sum, line) => sum + line.catalogSubtotal, 0);
+    returnDiscount = selectedAllocations.reduce(
+      (sum, line) => sum + line.merchandiseDiscount,
+      0
+    );
+    returnTax = selectedAllocations.reduce((sum, line) => sum + line.tax, 0) +
+      (returnShipping > 0
+        ? storedMinor(extensions.checkout_shipping_tax, order.currency_code)
+        : 0);
+    allocationMethod = 'exact_snapshot';
+  } else {
+    returnItemsSubtotal = order.items
+      .filter((item) => selected.has(lineSelectionKey(item)))
+      .reduce(
+        (total, item) => total + wireMajorToMinor(item.unit_price, order.currency_code) * item.quantity,
+        0
+      );
+    const subtotalRatio = orderSubtotal > 0 ? returnItemsSubtotal / orderSubtotal : 0;
+    returnTax = isFullReturn ? orderTax : Math.round(orderTax * subtotalRatio);
+    returnDiscount = isFullReturn ? orderDiscount : Math.round(orderDiscount * subtotalRatio);
+    allocationMethod = isFullReturn ? 'legacy_full_order' : 'legacy_proportional';
+  }
   const baseAmount = returnItemsSubtotal + returnTax - returnDiscount + returnShipping;
   const restockingFee = (
     (isFullReturn || policy.applyRestockingFeeOnPartialReturn) &&
@@ -122,6 +233,7 @@ export function calculatePartialReturnMinor(
     restockingFee,
     baseAmount,
     total: Math.max(0, baseAmount - restockingFee),
+    allocationMethod,
     policy: {
       shippingRefunded: returnShipping > 0,
       restockingFeeApplied: restockingFee > 0,

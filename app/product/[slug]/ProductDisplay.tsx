@@ -42,6 +42,7 @@ import { Money } from "@/lib/money";
 import { normalizeProductRating } from "@/lib/utils/ratings";
 import { toast } from "sonner";
 import type { Product, Review, ProductReviewEligibility } from "@/lib/types";
+import { isVariantAvailable } from "@/lib/inventory/availability";
 import {
   Select,
   SelectContent,
@@ -118,7 +119,7 @@ export default function ProductDisplay({
 
   // Stock logic (MACH: inventory is on variant)
   const available = selectedVariant?.available_for_sale ??
-    (selectedVariant?.inventory?.quantity ?? 0) > 0;
+    (selectedVariant ? isVariantAvailable(selectedVariant) : false);
 
   const ratingSummary = useMemo(() => normalizeProductRating(product.rating), [product.rating]);
   const productDescription = useMemo(() => stringifyDescription(product.description), [product.description]);

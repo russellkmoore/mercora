@@ -63,244 +63,67 @@ export const loadStripe = (): Promise<Stripe | null> => {
   return stripePromise;
 };
 
-/**
- * Server-side Stripe instance
- * Configured with secret key for server operations
- */
-export const stripe = secretKey 
-  ? new StripeServer(secretKey, {
-      apiVersion: '2026-07-29.dahlia',
-      typescript: true,
-    })
-  : null;
+let stripeClient: StripeServer | null = null;
 
 /**
  * Get Stripe instance with proper error handling
  * Throws an error if Stripe is not properly configured
  */
 export const getStripe = (): StripeServer => {
-  if (!stripe) {
+  if (!secretKey) {
     throw new Error('Stripe is not properly configured - missing secret key');
   }
-  return stripe;
-};
-
-/**
- * Cloudflare Workers-compatible Stripe API client
- * Uses fetch instead of Node.js https module
- */
-export class CloudflareStripe {
-  private apiKey: string;
-  private apiVersion = '2020-08-27';
-
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
-  }
-
-  private async request(
-    method: 'GET' | 'POST',
-    endpoint: string,
-    data?: Record<string, any>
-  ) {
-    const url = `https://api.stripe.com/v1${endpoint}`;
-    const headers: Record<string, string> = {
-      'Authorization': `Bearer ${this.apiKey}`,
-      'Stripe-Version': this.apiVersion,
-    };
-
-    let body: string | undefined;
-    if (data && method === 'POST') {
-      // Convert to URL-encoded string for Stripe API
-      headers['Content-Type'] = 'application/x-www-form-urlencoded';
-      
-      const encodeValue = (obj: any, prefix = ''): string[] => {
-        const params: string[] = [];
-        
-        for (const key in obj) {
-          if (obj[key] !== null && obj[key] !== undefined) {
-            const value = obj[key];
-            const fieldName = prefix ? `${prefix}[${key}]` : key;
-            
-            if (typeof value === 'object' && !Array.isArray(value)) {
-              params.push(...encodeValue(value, fieldName));
-            } else if (Array.isArray(value)) {
-              value.forEach((item, index) => {
-                if (typeof item === 'object') {
-                  params.push(...encodeValue(item, `${fieldName}[${index}]`));
-                } else {
-                  params.push(`${encodeURIComponent(`${fieldName}[${index}]`)}=${encodeURIComponent(String(item))}`);
-                }
-              });
-            } else {
-              params.push(`${encodeURIComponent(fieldName)}=${encodeURIComponent(String(value))}`);
-            }
-          }
-        }
-        
-        return params;
-      };
-      
-      body = encodeValue(data).join('&');
-    }
-
-    const response = await fetch(url, {
-      method,
-      headers,
-      body,
+  if (!stripeClient) {
+    stripeClient = new StripeServer(secretKey, {
+      apiVersion: '2026-07-29.dahlia',
+      typescript: true,
+      httpClient: StripeServer.createFetchHttpClient(),
     });
-
-    if (!response.ok) {
-      const errorData = await response.json() as any;
-      throw new Error(`Stripe API Error: ${errorData.error?.message || response.statusText}`);
-    }
-
-    return await response.json();
   }
-
-  async createPaymentIntent(params: {
-    amount: number;
-    currency: string;
-    automatic_payment_methods?: { enabled: boolean };
-    metadata?: Record<string, string>;
-    shipping?: any;
-    description?: string;
-  }) {
-    return await this.request('POST', '/payment_intents', params);
-  }
-
-  async retrievePaymentIntent(id: string) {
-    return await this.request('GET', `/payment_intents/${encodeURIComponent(id)}`);
-  }
-
-  async cancelPaymentIntent(id: string) {
-    return await this.request('POST', `/payment_intents/${encodeURIComponent(id)}/cancel`);
-  }
-
-  async calculateTax(params: {
-    currency: string;
-    line_items: Array<{
-      amount: number;
-      reference: string;
-      tax_behavior?: string;
-      tax_code?: string;
-    }>;
-    customer_details: {
-      address: {
-        line1: string;
-        city: string;
-        state: string;
-        postal_code: string;
-        country: string;
-      };
-      address_source: string;
-    };
-  }) {
-    return await this.request('POST', '/tax/calculations', params);
-  }
-
-  webhooks = {
-    constructEvent: (payload: string, signature: string, secret: string) => {
-      // Basic webhook verification - in production, you'd want more robust verification
-      // For now, just parse the payload
-      try {
-        return JSON.parse(payload);
-      } catch (error) {
-        throw new Error('Invalid webhook payload');
-      }
-    }
-  };
-}
-
-/**
- * Get Cloudflare Workers-compatible Stripe client
- */
-export const getCloudflareStripe = (): CloudflareStripe => {
-  if (!secretKey) {
-    throw new Error('Stripe secret key not configured for Cloudflare Workers');
-  }
-  return new CloudflareStripe(secretKey);
+  return stripeClient;
 };
 
-/**
- * Get the appropriate Stripe client based on the runtime environment
- */
-export const getStripeClient = (): StripeServer | CloudflareStripe => {
-  // Detect if we're running in Cloudflare Workers
-  const isCloudflareWorkers = typeof globalThis !== 'undefined' && 
-    globalThis.navigator?.userAgent?.includes('Cloudflare-Workers');
-  
-  // Also check for specific Cloudflare Workers globals
-  const hasWorkersGlobals = typeof caches !== 'undefined' && 
-    typeof Request !== 'undefined' && 
-    typeof Response !== 'undefined' && 
-    typeof globalThis.fetch === 'function';
-
-  if (isCloudflareWorkers || hasWorkersGlobals || process.env.NODE_ENV === 'production') {
-    return getCloudflareStripe();
-  } else {
-    return getStripe();
-  }
-};
+/** One SDK client is used in Node.js and Cloudflare Workers. */
+export const getStripeClient = getStripe;
 
 /**
  * Create a payment intent using the appropriate Stripe client
  */
-export const createPaymentIntent = async (params: {
-  amount: number;
-  currency: string;
-  automatic_payment_methods?: { enabled: boolean };
-  metadata?: Record<string, string>;
-  shipping?: any;
-  description?: string;
-}): Promise<{ id: string; client_secret: string | null; [key: string]: any }> => {
-  const client = getStripeClient();
-  
-  if (client instanceof CloudflareStripe) {
-    return await client.createPaymentIntent(params) as { id: string; client_secret: string | null; [key: string]: any };
-  } else {
-    // Use the regular Stripe SDK
-    return await client.paymentIntents.create(params) as { id: string; client_secret: string | null; [key: string]: any };
-  }
-};
+export const createPaymentIntent = async (
+  params: StripeServer.PaymentIntentCreateParams
+): Promise<StripeServer.PaymentIntent> => getStripe().paymentIntents.create(params);
 
-export const retrievePaymentIntent = async (id: string): Promise<{
-  id: string;
-  status: string;
-  amount: number;
-  amount_received: number;
-  currency: string;
-  metadata: Record<string, string>;
-}> => {
-  const client = getStripeClient();
-  if (client instanceof CloudflareStripe) {
-    return await client.retrievePaymentIntent(id) as any;
-  }
-  return await client.paymentIntents.retrieve(id) as any;
-};
+export const retrievePaymentIntent = async (
+  id: string
+): Promise<StripeServer.PaymentIntent> => getStripe().paymentIntents.retrieve(id);
 
 /** Best-effort cleanup when durable pending-order persistence fails. */
 export const cancelPaymentIntent = async (id: string): Promise<void> => {
-  const client = getStripeClient();
-  if (client instanceof CloudflareStripe) {
-    await client.cancelPaymentIntent(id);
-    return;
-  }
-  await client.paymentIntents.cancel(id);
+  await getStripe().paymentIntents.cancel(id);
 };
 
 /**
  * Calculate tax using the appropriate Stripe client
  */
-export const calculateTax = async (params: any): Promise<any> => {
-  const client = getStripeClient();
-  
-  if (client instanceof CloudflareStripe) {
-    return await client.calculateTax(params);
-  } else {
-    // Use the regular Stripe SDK
-    return await client.tax.calculations.create(params);
-  }
-};
+export const calculateTax = async (
+  params: StripeServer.Tax.CalculationCreateParams
+): Promise<StripeServer.Tax.Calculation> => getStripe().tax.calculations.create(params);
+
+/**
+ * Verify a Stripe webhook with Web Crypto so signature checking works in
+ * Cloudflare Workers as well as Node.js.
+ */
+export const constructWebhookEvent = async (
+  payload: string | Uint8Array,
+  signature: string,
+  secret = getWebhookSecret()
+): Promise<StripeServer.Event> => getStripe().webhooks.constructEventAsync(
+  payload,
+  signature,
+  secret,
+  undefined,
+  StripeServer.createSubtleCryptoProvider()
+);
 
 /**
  * Stripe Tax configuration

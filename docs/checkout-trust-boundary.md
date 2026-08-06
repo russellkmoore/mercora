@@ -9,7 +9,9 @@ client-created paid order.
    shipping-method id, and optional promotion codes to `POST /api/payment-intent`.
 2. Mercora resolves the active catalog entities and recomputes canonical line
    names, SKUs, prices, discounts, taxable line bases, tax, shipping, optional
-   reserved tender, and the final cash charge with `Money`.
+   reserved tender, and the final cash charge with `Money`. It persists exact
+   discount and tax allocation by stable line id and verifies authoritative
+   variant availability before creating the PaymentIntent.
 3. Mercora creates the PaymentIntent, then persists a `pending` order containing
    the provider-reported amount and immutable PaymentIntent binding. If the D1
    insert fails, Mercora attempts to cancel the intent and never returns its
@@ -19,13 +21,12 @@ client-created paid order.
    `succeeded`, matching metadata/order ids, matching currency, an exact
    authorized amount, and an `amount_received` at or above the persisted server
    charge floor. The paid order records the actual captured receipt amount.
-5. A guarded `pending`/`pending` to `processing`/`paid` update first proves a
-   paid order. Promotion usage is then atomically audited by order on both the
-   winning call and already-paid retries, allowing transient audit failures to
-   recover without mutating coupons for cancelled or missing orders. Idempotent
-   tender settlement and subscription activation also run idempotently on the
-   winner and already-paid retries so transient failures can recover. Only the
-   transition winner runs the best-effort confirmation email.
+5. Deterministic order-effect rows are staged before a guarded
+   `pending`/`pending` to `processing`/`paid` update. They remain dormant until
+   that update proves the order paid. The winner and already-paid retries drain
+   the same durable effects for inventory, promotion audit, optional tender and
+   subscription capabilities, and confirmation email. The five-minute cron
+   recovers transient failures and expired leases.
 
 The browser cannot assert an order owner, paid status, item display data,
 prices, totals, discounts, tax, or shipping. It receives the authoritative
@@ -68,12 +69,40 @@ funds. A losing redemption writes the protected
 temporary usage overage is accepted until a later reservation/effect-ledger
 schema can prevent the race before capture.
 
+## Inventory and refund authority
+
+`product_variants.inventory` is the checkout and storefront authority. Tracked,
+non-backorderable variants must have sufficient integer quantity before Stripe
+is called. Paid decrements are keyed by order and variant in
+`inventory_adjustments`; the quantity mutation and terminal adjustment marker
+commit in one D1 batch.
+
+Refunds require the immutable PaymentIntent binding in both protected order JSON
+columns. Mercora reserves cumulative refundable balance before calling Stripe,
+uses a deterministic provider idempotency key, and reconciles delayed or
+Dashboard refunds from signed Stripe events. Exact local returned lines stage
+deterministic restocks. Dashboard partial refunds never guess line attribution,
+and full Dashboard restocking is an explicit default-off operator policy.
+
+See [Webhooks, refunds, and inventory operations](./webhooks-refunds-inventory.md)
+for event subscriptions, retries, repair queries, and migration order.
+
+## Fulfillment boundary
+
+Mercora still has no shipment command. The future atomic shipment transition
+must include `SHIPMENT_NO_UNSETTLED_REFUNDS_SQL` so a `pending` or
+`requires_action` refund reservation cannot race a transition to `shipped`.
+The accompanying real-D1 contract test covers malformed and legacy JSON shapes;
+U13 must replace that contract-only coverage with an end-to-end shipment CAS
+test.
+
 ## Scope and schema
 
-This boundary does not consume inventory, execute refunds, implement webhook
-deduplication, expose MCP operations, or start fulfillment.
+This boundary does not expose trusted MCP payment operations or start
+fulfillment. MCP checkout remains outside the paid inventory boundary until it
+performs the same PaymentIntent verification.
 
-No database migration is required. The existing `orders` columns already hold
-the durable pending state, canonical line snapshot, Money values, and guarded
-extension metadata. Promotion consumption uses an atomic JSON audit append in
-the existing `coupon_instances.extensions` column.
+The existing `orders` columns hold pending state, canonical line and Money
+snapshots, immutable provider bindings, and the versioned refund ledger. U09
+adds migrations `0008` through `0011` for webhook claims, paid effects,
+inventory adjustments, and the external full-refund restock setting.

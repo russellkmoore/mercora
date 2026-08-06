@@ -17,6 +17,7 @@ import type {
   Rating,
   ProductInventory
 } from '@/lib/types';
+import { isVariantAvailable as hasAvailableInventory } from '@/lib/inventory/availability';
 
 // Main products table
 export const products = sqliteTable('products', {
@@ -216,12 +217,7 @@ export function getAvailableOptionValues(
 }
 
 export function isVariantAvailable(variant: ProductVariant): boolean {
-  return (
-    variant.status === 'active' &&
-    (!variant.inventory?.track_inventory || 
-     (variant.inventory.quantity && variant.inventory.quantity > 0) ||
-     Boolean(variant.inventory.allow_backorder))
-  );
+  return hasAvailableInventory(variant);
 }
 
 export function getVariantInventoryLevel(variant: ProductVariant): number {

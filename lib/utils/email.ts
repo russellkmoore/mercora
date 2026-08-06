@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import { Money, type StoredMoney } from '@/lib/money';
 import { escapeHtmlText } from '@/lib/utils/maintenance-html';
+import { getStoreConfig } from '@/lib/store-config';
 
 let resend: Resend | null = null;
 
@@ -70,17 +71,21 @@ export interface OrderStatusUpdateData {
   };
 }
 
-export async function sendOrderConfirmationEmail(orderData: OrderData): Promise<EmailResult> {
+export async function sendOrderConfirmationEmail(
+  orderData: OrderData,
+  options: { idempotencyKey?: string } = {}
+): Promise<EmailResult> {
   try {
     const emailHtml = generateOrderConfirmationHTML(orderData);
     const resendClient = getResendClient();
+    const store = getStoreConfig();
     
     const { data, error } = await resendClient.emails.send({
-      from: 'Volt at Voltique<volt@russellkmoore.me>',
+      from: store.contact.senderEmail,
       to: [orderData.customerEmail],
-      subject: `Order Confirmation #${orderData.orderNumber} - Voltique`,
+      subject: `Order Confirmation #${orderData.orderNumber} - ${store.identity.name}`,
       html: emailHtml,
-    });
+    }, options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : undefined);
 
     if (error) {
       console.error('Email sending error:', error);
@@ -96,6 +101,10 @@ export async function sendOrderConfirmationEmail(orderData: OrderData): Promise<
 }
 
 export function generateOrderConfirmationHTML(orderData: OrderData): string {
+  const store = getStoreConfig();
+  const safeStoreName = escapeHtmlText(store.identity.name);
+  const safeTagline = escapeHtmlText(store.identity.tagline);
+
   // Helper function to ensure absolute URLs for images using Cloudflare Image service
   const getAbsoluteImageUrl = (imageUrl: string | undefined): string | undefined => {
     if (!imageUrl) return undefined;
@@ -110,14 +119,15 @@ export function generateOrderConfirmationHTML(orderData: OrderData): string {
       }
     }
     
-    // Resolve relative catalog paths under the trusted image service. URL
-    // serialization percent-encodes quotes/spaces before HTML attribute escaping.
+    // Resolve relative catalog paths under the configured store/image origin.
+    // URL serialization percent-encodes quotes/spaces before HTML escaping.
     try {
       const normalizedPath = imageUrl.startsWith('/') ? imageUrl.slice(1) : imageUrl;
-      return new URL(
-        `/cdn-cgi/image/width=100,quality=80,format=auto/${normalizedPath}`,
-        'https://voltique-images.russellkmoore.me'
-      ).href;
+      const transform = store.urls.imageCdn && store.deployment.imageTransformsEnabled;
+      const path = transform
+        ? `/cdn-cgi/image/width=100,quality=80,format=auto/${normalizedPath}`
+        : `/${normalizedPath}`;
+      return new URL(path, store.urls.imageCdn ?? store.urls.site).href;
     } catch {
       return undefined;
     }
@@ -148,22 +158,22 @@ export function generateOrderConfirmationHTML(orderData: OrderData): string {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Order Confirmation - Voltique</title>
+      <title>Order Confirmation - ${safeStoreName}</title>
     </head>
     <body style="margin: 0; padding: 0; background-color: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Ubuntu, sans-serif;">
       <div style="background-color: #ffffff; margin: 0 auto; padding: 20px 0 48px; margin-bottom: 64px; max-width: 600px;">
         
         <!-- Header -->
         <div style="text-align: center; padding: 32px 0; border-bottom: 1px solid #e6ebf1;">
-          <h1 style="color: #f97316; font-size: 32px; font-weight: bold; margin: 0; padding: 0;">Voltique</h1>
-          <p style="color: #64748b; font-size: 14px; margin: 8px 0 0;">Premium Outdoor Gear</p>
+          <h1 style="color: #f97316; font-size: 32px; font-weight: bold; margin: 0; padding: 0;">${safeStoreName}</h1>
+          <p style="color: #64748b; font-size: 14px; margin: 8px 0 0;">${safeTagline}</p>
         </div>
 
         <!-- Order Confirmation -->
         <div style="padding: 24px 32px;">
           <h2 style="color: #1e293b; font-size: 24px; font-weight: bold; margin: 0 0 16px;">Order Confirmed!</h2>
           <p style="color: #64748b; font-size: 16px; line-height: 24px; margin: 0 0 16px;">Hi ${escapeHtmlText(orderData.customerName)},</p>
-          <p style="color: #64748b; font-size: 16px; line-height: 24px; margin: 0 0 16px;">Thank you for your order! Your gear is being prepared and will be shipped soon.</p>
+          <p style="color: #64748b; font-size: 16px; line-height: 24px; margin: 0 0 16px;">Thank you for your order! It is being prepared and will be shipped soon.</p>
           
           <div style="background-color: #f1f5f9; border-radius: 8px; padding: 16px; margin: 16px 0;">
             <p style="color: #1e293b; font-size: 18px; font-weight: bold; margin: 0 0 8px;">Order #${escapeHtmlText(orderData.orderNumber)}</p>
@@ -224,7 +234,7 @@ export function generateOrderConfirmationHTML(orderData: OrderData): string {
         <!-- Footer -->
         <div style="text-align: center; padding: 32px 32px 0; border-top: 1px solid #e6ebf1;">
           <p style="color: #64748b; font-size: 12px; line-height: 16px; margin: 0 0 8px;">Questions about your order? Reply to this email or contact our support team.</p>
-          <p style="color: #64748b; font-size: 12px; line-height: 16px; margin: 0 0 8px;">Thank you for choosing Voltique!</p>
+          <p style="color: #64748b; font-size: 12px; line-height: 16px; margin: 0 0 8px;">Thank you for choosing ${safeStoreName}!</p>
         </div>
 
       </div>

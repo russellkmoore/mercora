@@ -8,7 +8,7 @@ import {
   noOpCommerceCapabilities,
   type CommerceCapabilities,
 } from '@/lib/commerce/capabilities';
-import type { Address, OrderItem, Promotion } from '@/lib/types';
+import type { Address, CheckoutLineAllocation, OrderItem, Promotion } from '@/lib/types';
 import {
   allowedShippingCountries,
   enabledShippingMethods,
@@ -43,6 +43,8 @@ export interface CheckoutQuote {
   shippingDiscount: StoredMoney;
   shipping: StoredMoney;
   tax: StoredMoney;
+  shippingTax: StoredMoney;
+  lineAllocations: CheckoutLineAllocation[];
   tender: StoredMoney;
   total: StoredMoney;
   discountCodes: string[];
@@ -59,6 +61,19 @@ interface PricingDependencies {
   getPromotionById: typeof getPromotionById;
   getSettings: typeof getSettings;
   calculateTax: typeof calculateTax;
+}
+
+type TaxCalculation = Awaited<ReturnType<typeof calculateTax>>;
+
+interface ExpectedTaxLine {
+  lineId: string;
+  amount: number;
+}
+
+export interface TaxAllocationResult {
+  lineTaxById: Map<string, number>;
+  shippingTax: number;
+  totalTax: number;
 }
 
 const defaultDependencies: PricingDependencies = {
@@ -256,7 +271,13 @@ async function resolveDiscounts(
   catalog: PricedCatalogLine[],
   context: EligibilityContext,
   deps: PricingDependencies
-): Promise<{ merchandise: Money; shipping: Money; perLine: Money[]; appliedCodes: string[] }> {
+): Promise<{
+  merchandise: Money;
+  shipping: Money;
+  perLine: Money[];
+  promotionCodesByLine: string[][];
+  appliedCodes: string[];
+}> {
   const promotionIds = new Set<string>();
   const candidates: Array<{ code: string; promotion: Promotion; eligible: number[] }> = [];
   for (const code of codes) {
@@ -292,6 +313,7 @@ async function resolveDiscounts(
     : candidates;
 
   const perLine = catalog.map(() => Money.zero(subtotal.currency));
+  const promotionCodesByLine = catalog.map(() => [] as string[]);
   let shippingDiscount = Money.zero(subtotal.currency);
   const appliedCodes: string[] = [];
   for (const { code, promotion, eligible } of selected) {
@@ -309,12 +331,18 @@ async function resolveDiscounts(
       Money.zero(subtotal.currency)
     );
     const before = perLine.reduce((sum, amount) => sum.add(amount), Money.zero(subtotal.currency));
+    const lineBefore = perLine.map((amount) => amount.toMinorUnits());
     allocateDiscount(
       actionDiscount(promotion, currentEligibleTotal),
       eligible,
       catalog.map(({ lineTotal }) => lineTotal),
       perLine
     );
+    perLine.forEach((amount, index) => {
+      if (amount.toMinorUnits() > lineBefore[index]) {
+        promotionCodesByLine[index].push(code);
+      }
+    });
     const after = perLine.reduce((sum, amount) => sum.add(amount), Money.zero(subtotal.currency));
     if (after.gt(before)) appliedCodes.push(code);
   }
@@ -327,6 +355,7 @@ async function resolveDiscounts(
     merchandise,
     shipping: shippingDiscount,
     perLine,
+    promotionCodesByLine,
     appliedCodes,
   };
 }
@@ -336,6 +365,103 @@ function configuredRate(value: unknown): number | null {
   return Number.isFinite(percentage) && percentage >= 0 && percentage <= 100
     ? percentage / 100
     : null;
+}
+
+/** Validate Stripe's expanded response before accepting any per-line tax data. */
+export function mapProviderTaxAllocations(
+  calculation: TaxCalculation,
+  expectedLines: ExpectedTaxLine[],
+  expectedShippingAmount: number
+): TaxAllocationResult {
+  const providerLines = calculation.line_items;
+  if (!providerLines || providerLines.has_more || providerLines.data.length !== expectedLines.length) {
+    throw new Error('Tax provider returned an incomplete line allocation');
+  }
+
+  const expectedByReference = new Map<string, ExpectedTaxLine>(
+    expectedLines.map((line) => [`line:${line.lineId}`, line] as const)
+  );
+  if (expectedByReference.size !== expectedLines.length) {
+    throw new Error('Checkout contains duplicate line identifiers');
+  }
+
+  const lineTaxById = new Map<string, number>();
+  let allocatedTax = 0;
+  for (const providerLine of providerLines.data) {
+    const expected = expectedByReference.get(providerLine.reference);
+    if (!expected || lineTaxById.has(expected.lineId)) {
+      throw new Error('Tax provider returned an unknown or duplicate line reference');
+    }
+    if (
+      !Number.isSafeInteger(providerLine.amount) ||
+      providerLine.amount !== expected.amount ||
+      !Number.isSafeInteger(providerLine.amount_tax) ||
+      providerLine.amount_tax < 0 ||
+      providerLine.amount_tax > expected.amount
+    ) {
+      throw new Error('Tax provider returned an invalid line allocation');
+    }
+    lineTaxById.set(expected.lineId, providerLine.amount_tax);
+    allocatedTax += providerLine.amount_tax;
+  }
+
+  const shipping = calculation.shipping_cost;
+  let shippingTax = 0;
+  if (expectedShippingAmount > 0) {
+    if (
+      !shipping ||
+      shipping.amount !== expectedShippingAmount ||
+      !Number.isSafeInteger(shipping.amount_tax) ||
+      shipping.amount_tax < 0 ||
+      shipping.amount_tax > expectedShippingAmount
+    ) {
+      throw new Error('Tax provider returned an invalid shipping allocation');
+    }
+    shippingTax = shipping.amount_tax;
+  } else if (shipping && (shipping.amount !== 0 || shipping.amount_tax !== 0)) {
+    throw new Error('Tax provider returned unexpected shipping tax');
+  }
+
+  const totalTax = calculation.tax_amount_exclusive;
+  if (
+    !Number.isSafeInteger(totalTax) ||
+    totalTax < 0 ||
+    allocatedTax + shippingTax !== totalTax
+  ) {
+    throw new Error('Tax provider allocations do not match its aggregate tax');
+  }
+  return { lineTaxById, shippingTax, totalTax };
+}
+
+function allocateLargestRemainder(total: number, weights: number[]): number[] {
+  if (!Number.isSafeInteger(total) || total < 0 || weights.some((weight) =>
+    !Number.isSafeInteger(weight) || weight < 0
+  )) {
+    throw new Error('Tax fallback allocation requires nonnegative integer minor units');
+  }
+  const weightTotal = weights.reduce((sum, weight) => sum + weight, 0);
+  if (weightTotal === 0) {
+    if (total !== 0) throw new Error('Cannot allocate tax across zero-value lines');
+    return weights.map(() => 0);
+  }
+
+  const denominator = BigInt(weightTotal);
+  const shares = weights.map((weight, index) => {
+    const numerator = BigInt(total) * BigInt(weight);
+    return {
+      index,
+      amount: Number(numerator / denominator),
+      remainder: numerator % denominator,
+    };
+  });
+  let remaining = total - shares.reduce((sum, share) => sum + share.amount, 0);
+  const ranked = [...shares].sort((a, b) =>
+    a.remainder === b.remainder ? a.index - b.index : (a.remainder > b.remainder ? -1 : 1)
+  );
+  for (let index = 0; index < remaining; index += 1) {
+    ranked[index].amount += 1;
+  }
+  return shares.sort((a, b) => a.index - b.index).map((share) => share.amount);
 }
 
 export async function priceCheckout(
@@ -388,6 +514,7 @@ export async function priceCheckout(
     const totalPrice = unitPrice.times(line.quantity);
     subtotal = subtotal.add(totalPrice);
     return {
+      id: `line_${crypto.randomUUID()}`,
       product_id: product.id,
       variant_id: variant.id,
       sku: variant.sku,
@@ -474,15 +601,22 @@ export async function priceCheckout(
   });
 
   let tax: Money;
+  let shippingTax: Money;
+  let lineTaxes: Money[];
   let taxSource: CheckoutQuote['taxSource'] = 'provider';
   try {
+    const expectedTaxLines = orderItems.map((item, index) => ({
+      lineId: item.id!,
+      amount: pricedCatalog[index].lineTotal.subtract(discounts.perLine[index]).toMinorUnits(),
+    }));
     const calculation = await deps.calculateTax({
       currency: currency.toLowerCase(),
-      line_items: pricedCatalog.map(({ lineTotal }, index) => ({
-        amount: lineTotal.subtract(discounts.perLine[index]).toMinorUnits(),
-        reference: `checkout_line_${index}`,
+      line_items: expectedTaxLines.map((line, index) => ({
+        amount: line.amount,
+        reference: `line:${line.lineId}`,
         tax_code: taxCodes[index],
       })),
+      expand: ['line_items'],
       customer_details: {
         address: {
           line1: String(input.shippingAddress.line1),
@@ -497,22 +631,47 @@ export async function priceCheckout(
         shipping_cost: { amount: chargedShipping.toMinorUnits(), tax_code: 'txcd_92010001' },
       }),
     });
-    const amount = Number((calculation as { tax_amount_exclusive?: unknown }).tax_amount_exclusive);
-    if (!Number.isSafeInteger(amount) || amount < 0) throw new Error('Invalid tax provider response');
-    tax = Money.fromMinor(amount, currency);
+    const allocation = mapProviderTaxAllocations(
+      calculation,
+      expectedTaxLines,
+      chargedShipping.toMinorUnits()
+    );
+    lineTaxes = orderItems.map((item) =>
+      Money.fromMinor(allocation.lineTaxById.get(item.id!)!, currency)
+    );
+    shippingTax = Money.fromMinor(allocation.shippingTax, currency);
+    tax = Money.fromMinor(allocation.totalTax, currency);
   } catch {
     taxSource = 'configured_fallback';
     const fallbackRate = configuredRate(storeSettings['store.tax_rate']);
     if (fallbackRate === null) {
       throw new Error('Tax provider failed and store.tax_rate is not a valid configured fallback');
     }
-    const taxableShipping = storeSettings['store.tax_shipping'] === true
-      ? chargedShipping
+    const netLineMinor = pricedCatalog.map(({ lineTotal }, index) =>
+      lineTotal.subtract(discounts.perLine[index]).toMinorUnits()
+    );
+    const merchandiseTax = discountedMerchandise.applyRate(fallbackRate);
+    lineTaxes = allocateLargestRemainder(
+      merchandiseTax.toMinorUnits(),
+      netLineMinor
+    ).map((amount) => Money.fromMinor(amount, currency));
+    shippingTax = storeSettings['store.tax_shipping'] === true
+      ? chargedShipping.applyRate(fallbackRate)
       : Money.zero(currency);
-    tax = discountedMerchandise
-      .add(taxableShipping)
-      .applyRate(fallbackRate);
+    tax = merchandiseTax.add(shippingTax);
   }
+
+  const lineAllocations: CheckoutLineAllocation[] = orderItems.map((item, index) => ({
+    lineId: item.id!,
+    productId: item.product_id,
+    variantId: item.variant_id!,
+    quantity: item.quantity,
+    catalogSubtotal: pricedCatalog[index].lineTotal.toJSON(),
+    merchandiseDiscount: discounts.perLine[index].toJSON(),
+    netMerchandise: pricedCatalog[index].lineTotal.subtract(discounts.perLine[index]).toJSON(),
+    tax: lineTaxes[index].toJSON(),
+    promotionCodes: discounts.promotionCodesByLine[index],
+  }));
 
   const beforeTender = discountedMerchandise.add(chargedShipping).add(tax);
   const tenderResolution = await capabilities.giftCards.resolveTender({
@@ -543,6 +702,8 @@ export async function priceCheckout(
     shippingDiscount: discounts.shipping.toJSON(),
     shipping: shipping.toJSON(),
     tax: tax.toJSON(),
+    shippingTax: shippingTax.toJSON(),
+    lineAllocations,
     tender: tender.toJSON(),
     total: total.toJSON(),
     discountCodes: discounts.appliedCodes,

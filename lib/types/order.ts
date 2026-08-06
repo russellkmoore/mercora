@@ -22,6 +22,22 @@ export interface OrderItem {
   created_at?: string;
 }
 
+/**
+ * Immutable server-authored money attribution for one checkout line. These
+ * snapshots are the refund authority for orders created by the web checkout.
+ */
+export interface CheckoutLineAllocation {
+  lineId: string;
+  productId: string;
+  variantId: string;
+  quantity: number;
+  catalogSubtotal: Money;
+  merchandiseDiscount: Money;
+  netMerchandise: Money;
+  tax: Money;
+  promotionCodes: string[];
+}
+
 // Order status enumeration
 export type OrderStatus = "pending" | "processing" | "shipped" | "delivered" | "cancelled" | "refunded";
 

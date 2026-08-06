@@ -5,16 +5,17 @@ import { Money } from '@/lib/money';
 import {
   hydrateOrder,
   promoteOrderToPaid,
-  recordCouponReconciliation,
 } from '@/lib/models/mach/orders';
-import { redeemCoupon } from '@/lib/models/mach/couponInstance';
 import { retrievePaymentIntent } from '@/lib/stripe';
-import { sendOrderConfirmationEmail } from '@/lib/utils/email';
 import {
   noOpCommerceCapabilities,
   type CommerceCapabilities,
 } from '@/lib/commerce/capabilities';
 import type { Order } from '@/lib/types/order';
+import {
+  drainOrderEffects,
+  stagePaidOrderEffects,
+} from '@/lib/services/order-effects';
 
 export class PaymentVerificationError extends Error {}
 
@@ -26,56 +27,6 @@ function asObject(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {};
-}
-
-function text(value: unknown): string {
-  if (typeof value === 'string') return value;
-  if (value && typeof value === 'object') {
-    const values = value as Record<string, unknown>;
-    const localized = values.en ?? Object.values(values)[0];
-    if (typeof localized === 'string') return localized;
-  }
-  return '';
-}
-
-async function sendConfirmation(order: Order): Promise<void> {
-  const address = order.shipping_address;
-  const extensions = order.extensions ?? {};
-  const email = typeof extensions.email === 'string'
-    ? extensions.email
-    : address?.email;
-  if (!email || !address) return;
-
-  await sendOrderConfirmationEmail({
-    orderNumber: order.id!,
-    customerName: address.recipient || address.company || 'Customer',
-    customerEmail: email,
-    items: order.items.map((item) => ({
-      productId: item.product_id,
-      name: item.product_name,
-      price: Money.fromStored(item.unit_price, order.currency_code).toJSON(),
-      quantity: item.quantity,
-    })),
-    subtotal: Money.fromStored(
-      extensions.checkout_catalog_subtotal ?? extensions.checkout_subtotal ?? 0,
-      order.currency_code
-    ).toJSON(),
-    shipping: Money.fromStored(
-      extensions.checkout_shipping_before_discount ?? extensions.checkout_shipping ?? 0,
-      order.currency_code
-    ).toJSON(),
-    tax: Money.fromStored(extensions.checkout_tax ?? 0, order.currency_code).toJSON(),
-    discount: Money.fromStored(extensions.checkout_discount ?? 0, order.currency_code).toJSON(),
-    tender: Money.fromStored(extensions.checkout_tender ?? 0, order.currency_code).toJSON(),
-    total: Money.fromStored(order.total_amount, order.currency_code).toJSON(),
-    shippingAddress: {
-      street: [text(address.line1), text(address.line2)].filter(Boolean).join(', '),
-      city: text(address.city),
-      state: address.region || '',
-      zipCode: address.postal_code || '',
-      country: address.country,
-    },
-  });
 }
 
 export interface FinalizeOrderResult {
@@ -156,58 +107,34 @@ export async function finalizeOrderPayment(args: {
     });
   }
 
+  // Stage deterministic, dormant effect rows before the paid CAS. A crash
+  // after promotion can then be recovered by another request or the scheduler.
+  await stagePaidOrderEffects(order, { includeEmail: args.sendEmail !== false });
+
   const amountReceived = Money.fromMinor(paymentIntent.amount_received, receivedCurrency);
   const promotion = await promoteOrderToPaid({ orderId: args.orderId, amountReceived });
   if (!promotion.order || promotion.order.payment_status !== 'paid') {
     throw new Error('Order payment promotion lost without a paid winner');
   }
 
-  // Coupon usage is a paid-order effect, but is independently order-idempotent.
-  // Run it for both the CAS winner and already-paid convergence so a transient
-  // failure can be recovered by the next signed webhook/finalization retry.
   const paidOrder = promotion.order;
-  const paidExtensions = paidOrder.extensions ?? {};
-  const discountCodes = Array.isArray(paidExtensions.discount_codes)
-    ? paidExtensions.discount_codes.filter((value): value is string => typeof value === 'string')
-    : [];
-  for (const code of discountCodes) {
-    const redemption = await redeemCoupon(code, {
+  // Ensure repairs legacy/already-paid convergence. Inline draining is an
+  // optimization; every failure remains durable for scheduled retry.
+  await stagePaidOrderEffects(paidOrder, { includeEmail: args.sendEmail !== false });
+  try {
+    const effects = await drainOrderEffects({
       orderId: paidOrder.id!,
-      customerId: paidOrder.customer_id,
-      channel: 'web',
-      discountAmount: discountCodes.length === 1
-        ? Money.fromStored(paidExtensions.checkout_discount ?? 0, paidOrder.currency_code).toMach()
-        : undefined,
+      capabilities,
+      limit: 25,
     });
-    if (!redemption.redeemed && !redemption.alreadyRedeemed) {
-      // Captured money is already durably paid. A last-use race needs
-      // reconciliation, but cannot roll back or strand the paid order.
-      await recordCouponReconciliation({ orderId: paidOrder.id!, code });
-      console.error(`[checkout] Applied coupon ${code} needs reconciliation for order ${paidOrder.id}`);
+    if (effects.failed > 0) {
+      console.error(`[checkout] ${effects.failed} paid effect(s) queued for retry on order ${paidOrder.id}`);
     }
-  }
-
-  // Tender settlement is keyed by order and must be idempotent. Run it on both
-  // the CAS winner and already-paid convergence; transient failures propagate
-  // to the webhook so a later delivery can recover settlement.
-  await capabilities.giftCards.applyTender({
-    order: paidOrder,
-    state: paidExtensions.checkout_tender_state,
-  });
-  // Subscription activation follows the same order-idempotent recovery
-  // contract and must surface transient failures for webhook retry.
-  await capabilities.subscriptions.orderPaid(paidOrder);
-
-  if (promotion.promoted) {
-    if (args.sendEmail !== false) {
-      try {
-        await sendConfirmation(paidOrder);
-      } catch (error) {
-        // Paid is already durable. Email is a best-effort post-paid effect until
-        // a later webhook/effect-ledger phase can provide retry and dedup state.
-        console.error(`[checkout] Confirmation email failed for order ${paidOrder.id}:`, error);
-      }
-    }
+  } catch (error) {
+    // Paid state and deterministic effect rows are already durable. The
+    // scheduled runner owns recovery even if this opportunistic drain cannot
+    // reach D1 after the payment transition.
+    console.error(`[checkout] Paid effects queued for retry on order ${paidOrder.id}:`, error);
   }
 
   return { paid: true, promoted: promotion.promoted, order: promotion.order };

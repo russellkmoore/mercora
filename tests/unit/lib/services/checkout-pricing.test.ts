@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { priceCheckout } from '@/lib/services/checkout-pricing';
+import { mapProviderTaxAllocations, priceCheckout } from '@/lib/services/checkout-pricing';
 import { Money } from '@/lib/money';
 
 const address = {
@@ -36,7 +36,19 @@ function dependencies(overrides: Record<string, unknown> = {}) {
           'shipping.free_methods': [],
         }
       : { 'store.tax_rate': 10 }),
-    calculateTax: vi.fn(async () => ({ tax_amount_exclusive: 200 })),
+    calculateTax: vi.fn(async (params: any) => ({
+      tax_amount_exclusive: 200,
+      line_items: {
+        data: params.line_items.map((line: any, index: number) => ({
+          ...line,
+          amount_tax: index === 0 ? 200 : 0,
+        })),
+        has_more: false,
+      },
+      shipping_cost: params.shipping_cost
+        ? { amount: params.shipping_cost.amount, amount_tax: 0 }
+        : null,
+    })),
     ...overrides,
   };
 }
@@ -50,12 +62,19 @@ describe('server-authoritative checkout pricing', () => {
     }, { dependencies: dependencies() as any });
 
     expect(quote.items[0]).toMatchObject({
+      id: expect.stringMatching(/^line_[0-9a-f-]{36}$/),
       product_name: 'Catalog name',
       sku: 'SKU-1',
       unit_price: { amount: 2_000, currency: 'USD' },
       total_price: { amount: 4_000, currency: 'USD' },
     });
     expect(quote.total).toEqual({ amount: 4_700, currency: 'USD' });
+    expect(quote.lineAllocations).toEqual([expect.objectContaining({
+      lineId: quote.items[0].id,
+      catalogSubtotal: { amount: 4_000, currency: 'USD' },
+      merchandiseDiscount: { amount: 0, currency: 'USD' },
+      tax: { amount: 200, currency: 'USD' },
+    })]);
   });
 
   it('uses the shared enabled shipping defaults on a fresh install', async () => {
@@ -190,6 +209,171 @@ describe('server-authoritative checkout pricing', () => {
       discountCodes: ['NOOP'],
     }, { dependencies: deps as any });
     expect(quote.discountCodes).toEqual([]);
+  });
+
+  it('persists targeted promotion contribution and out-of-order provider tax by stable line id', async () => {
+    const calculateTax = vi.fn(async (params: any) => ({
+      tax_amount_exclusive: 155,
+      line_items: {
+        has_more: false,
+        data: [
+          { ...params.line_items[1], amount_tax: 100 },
+          { ...params.line_items[0], amount_tax: 50 },
+        ],
+      },
+      shipping_cost: { amount: 500, amount_tax: 5 },
+    }));
+    const deps = dependencies({
+      getProduct: vi.fn(async (id: string) => ({
+        id,
+        name: id,
+        status: 'active',
+        categories: id === 'prod_target' ? ['target'] : ['other'],
+        default_variant_id: `var_${id}`,
+        tax_category: 'txcd_99999999',
+      })),
+      getProductVariant: vi.fn(async (id: string) => ({
+        id,
+        product_id: id.replace(/^var_/, ''),
+        sku: id,
+        status: 'active',
+        option_values: [],
+        price: Money.fromMinor(1_000).toJSON(),
+      })),
+      validateCouponCode: vi.fn(async () => ({
+        canBeUsed: true,
+        coupon: { promotion_id: 'promo_target', code: 'TARGET' },
+      })),
+      getPromotionById: vi.fn(async () => ({
+        id: 'promo_target',
+        name: 'Targeted',
+        type: 'cart',
+        status: 'active',
+        stackable: true,
+        rules: {
+          conditions: [{ type: 'product_category', operator: 'in', value: ['target'] }],
+          actions: [{ type: 'fixed_discount', value: 500 }],
+        },
+      })),
+      calculateTax,
+    });
+
+    const quote = await priceCheckout({
+      items: [
+        { productId: 'prod_target', quantity: 1 },
+        { productId: 'prod_other', quantity: 1 },
+      ],
+      shippingAddress: address,
+      shippingMethodId: 'standard',
+      discountCodes: ['TARGET'],
+    }, { dependencies: deps as any });
+
+    expect(calculateTax).toHaveBeenCalledWith(expect.objectContaining({
+      expand: ['line_items'],
+      line_items: [
+        expect.objectContaining({ amount: 500, reference: `line:${quote.items[0].id}` }),
+        expect.objectContaining({ amount: 1_000, reference: `line:${quote.items[1].id}` }),
+      ],
+    }));
+    expect(quote.lineAllocations).toEqual([
+      expect.objectContaining({
+        lineId: quote.items[0].id,
+        merchandiseDiscount: { amount: 500, currency: 'USD' },
+        netMerchandise: { amount: 500, currency: 'USD' },
+        tax: { amount: 50, currency: 'USD' },
+        promotionCodes: ['TARGET'],
+      }),
+      expect.objectContaining({
+        lineId: quote.items[1].id,
+        merchandiseDiscount: { amount: 0, currency: 'USD' },
+        tax: { amount: 100, currency: 'USD' },
+        promotionCodes: [],
+      }),
+    ]);
+    expect(quote.shippingTax).toEqual({ amount: 5, currency: 'USD' });
+    expect(quote.lineAllocations.reduce((sum, line) => sum + line.tax.amount, 0) +
+      quote.shippingTax.amount).toBe(quote.tax.amount);
+  });
+
+  it.each([
+    ['missing lines', { line_items: undefined }],
+    ['paginated lines', { line_items: { has_more: true, data: [] } }],
+    ['missing count', { line_items: { has_more: false, data: [] } }],
+    ['unknown reference', {
+      line_items: { has_more: false, data: [{ reference: 'line:other', amount: 100, amount_tax: 5 }] },
+    }],
+    ['amount mismatch', {
+      line_items: { has_more: false, data: [{ reference: 'line:a', amount: 99, amount_tax: 5 }] },
+    }],
+    ['aggregate mismatch', {
+      line_items: { has_more: false, data: [{ reference: 'line:a', amount: 100, amount_tax: 5 }] },
+      tax_amount_exclusive: 6,
+    }],
+    ['shipping mismatch', {
+      line_items: { has_more: false, data: [{ reference: 'line:a', amount: 100, amount_tax: 5 }] },
+      shipping_cost: { amount: 49, amount_tax: 5 },
+      tax_amount_exclusive: 10,
+    }],
+  ])('rejects provider allocation mismatch: %s', (_name, override) => {
+    const valid = Object.assign({
+      line_items: {
+        has_more: false,
+        data: [{ reference: 'line:a', amount: 100, amount_tax: 5 }],
+      },
+      shipping_cost: { amount: 50, amount_tax: 5 },
+      tax_amount_exclusive: 10,
+    }, override);
+    expect(() => mapProviderTaxAllocations(valid as any, [{ lineId: 'a', amount: 100 }], 50))
+      .toThrow();
+  });
+
+  it('rejects duplicate provider references even when the line count matches', () => {
+    const calculation = {
+      line_items: {
+        has_more: false,
+        data: [
+          { reference: 'line:a', amount: 100, amount_tax: 5 },
+          { reference: 'line:a', amount: 100, amount_tax: 5 },
+        ],
+      },
+      shipping_cost: null,
+      tax_amount_exclusive: 10,
+    };
+    expect(() => mapProviderTaxAllocations(calculation as any, [
+      { lineId: 'a', amount: 100 },
+      { lineId: 'b', amount: 100 },
+    ], 0)).toThrow('duplicate');
+  });
+
+  it('uses largest remainders so fallback line taxes remain integer and sum exactly', async () => {
+    const deps = dependencies({
+      getProductVariant: vi.fn(async (id: string) => ({
+        id,
+        product_id: 'prod_1',
+        sku: id,
+        status: 'active',
+        option_values: [],
+        price: Money.fromMinor(1).toJSON(),
+      })),
+      getSettings: vi.fn(async (category: string) => category === 'shipping'
+        ? { 'shipping.methods': [{ id: 'standard', label: 'Standard', cost: 0, enabled: true }] }
+        : { 'store.tax_rate': 50 }),
+      calculateTax: vi.fn(async () => { throw new Error('offline'); }),
+    });
+    const quote = await priceCheckout({
+      items: [
+        { productId: 'prod_1', variantId: 'v1', quantity: 1 },
+        { productId: 'prod_1', variantId: 'v2', quantity: 1 },
+        { productId: 'prod_1', variantId: 'v3', quantity: 1 },
+      ],
+      shippingAddress: address,
+      shippingMethodId: 'standard',
+    }, { dependencies: deps as any });
+
+    const taxes = quote.lineAllocations.map((line) => line.tax.amount);
+    expect(taxes).toEqual([1, 1, 0]);
+    expect(taxes.every((amount) => Number.isSafeInteger(amount) && amount >= 0)).toBe(true);
+    expect(taxes.reduce((sum, amount) => sum + amount, 0)).toBe(quote.tax.amount);
   });
 
   it('fails closed when promotion eligibility cannot be proven', async () => {
