@@ -44,6 +44,7 @@ import { getDarkBlurPlaceholder } from "@/lib/utils/image-placeholders";
 import { normalizeProductRating } from "@/lib/utils/ratings";
 import { StarRating } from "@/components/reviews/StarRating";
 import { Money } from "@/lib/money";
+import { isVariantAvailable } from "@/lib/inventory/availability";
 
 /**
  * Props interface for ProductCard component
@@ -84,7 +85,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
 
   // Availability logic
   const isAvailable = defaultVariant?.available_for_sale ??
-    (defaultVariant?.inventory?.quantity ?? 0) > 0;
+    (defaultVariant ? isVariantAvailable(defaultVariant) : false);
   const availability = isAvailable ? "available" : "coming_soon";
 
   // Name/description/slug logic

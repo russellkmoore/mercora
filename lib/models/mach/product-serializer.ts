@@ -1,5 +1,6 @@
 import type { Product, ProductVariant } from '@/lib/types';
 import { Money, toWireMoney, type MachMoney } from '@/lib/money';
+import { isVariantAvailable } from '@/lib/inventory/availability';
 
 export type WireVariant = Omit<ProductVariant, 'price' | 'compare_at_price' | 'cost'> & {
   price: MachMoney;
@@ -38,7 +39,7 @@ function toPublicVariant(variant: ProductVariant): ProductVariant {
 
   return {
     ...publicVariant,
-    available_for_sale: (variant.inventory?.quantity ?? 0) > 0,
+    available_for_sale: isVariantAvailable(variant),
     ...(publicVariant.media
       ? { media: publicVariant.media.map(toPublicMedia) }
       : {}),

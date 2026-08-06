@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   createPaymentIntent: vi.fn(),
   cancelPaymentIntent: vi.fn(),
   priceCheckout: vi.fn(),
+  assertCheckoutInventoryAvailable: vi.fn(),
 }));
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -28,6 +29,17 @@ vi.mock('@/lib/stripe', () => ({
   createPaymentIntent: mocks.createPaymentIntent,
   cancelPaymentIntent: mocks.cancelPaymentIntent,
 }));
+vi.mock('@/lib/services/inventory-adjustments', () => {
+  class InventoryUnavailableError extends Error {
+    constructor(public readonly variantIds: string[]) {
+      super('inventory unavailable');
+    }
+  }
+  return {
+    InventoryUnavailableError,
+    assertCheckoutInventoryAvailable: mocks.assertCheckoutInventoryAvailable,
+  };
+});
 vi.mock('@/lib/db', () => ({
   getDbAsync: vi.fn(async () => ({
     insert: () => ({
@@ -94,6 +106,7 @@ beforeEach(() => {
   mocks.insertFails = false;
   mocks.cancelPaymentIntent.mockResolvedValue(undefined);
   mocks.priceCheckout.mockResolvedValue(quote);
+  mocks.assertCheckoutInventoryAvailable.mockResolvedValue(undefined);
   mocks.createPaymentIntent.mockResolvedValue({
     id: 'pi_authoritative',
     client_secret: 'pi_authoritative_secret_x',
@@ -148,6 +161,20 @@ describe('payment-intent durable authority boundary', () => {
     expect(response.status).toBe(503);
     expect(mocks.cancelPaymentIntent).toHaveBeenCalledWith('pi_authoritative');
     expect(await response.json()).not.toHaveProperty('clientSecret');
+  });
+
+  it('returns 409 before creating a PaymentIntent when aggregate stock is unavailable', async () => {
+    const { InventoryUnavailableError } = await import('@/lib/services/inventory-adjustments');
+    mocks.assertCheckoutInventoryAvailable.mockRejectedValue(
+      new InventoryUnavailableError(['var_1'])
+    );
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(409);
+    expect(mocks.assertCheckoutInventoryAvailable).toHaveBeenCalledWith(quote.items);
+    expect(mocks.createPaymentIntent).not.toHaveBeenCalled();
+    expect(mocks.insertValues).not.toHaveBeenCalled();
   });
 
   it('rejects a syntactically invalid optional checkout email', async () => {

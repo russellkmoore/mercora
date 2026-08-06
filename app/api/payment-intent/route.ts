@@ -9,6 +9,10 @@ import type { Address } from '@/lib/types';
 import { enforceRateLimit, getClientIp } from '@/lib/rate-limit';
 import { isBoundedString, isPlainRecord } from '@/lib/public-request-validation';
 import { createCustomer, getCustomer } from '@/lib/models/mach/customer';
+import {
+  assertCheckoutInventoryAvailable,
+  InventoryUnavailableError,
+} from '@/lib/services/inventory-adjustments';
 
 interface PaymentIntentRequest {
   items: CheckoutLineInput[];
@@ -106,6 +110,19 @@ export async function POST(request: NextRequest) {
       { error: 'This checkout requires a positive payment amount' },
       { status: 400 }
     );
+  }
+
+  try {
+    await assertCheckoutInventoryAvailable(quote.items);
+  } catch (error) {
+    if (error instanceof InventoryUnavailableError) {
+      return NextResponse.json(
+        { error: 'One or more items are no longer available in the requested quantity' },
+        { status: 409 }
+      );
+    }
+    console.error('[checkout] Authoritative inventory check failed:', error);
+    return NextResponse.json({ error: 'Inventory is temporarily unavailable' }, { status: 503 });
   }
 
   // Preserve the authenticated customer→order FK before creating any payment

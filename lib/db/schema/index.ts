@@ -118,3 +118,6 @@ export * from "./webhook-events";
 
 // Durable post-payment recovery state (application-specific)
 export * from "./order-effects";
+
+// Durable authoritative variant-inventory mutations (application-specific)
+export * from "./inventory-adjustments";
