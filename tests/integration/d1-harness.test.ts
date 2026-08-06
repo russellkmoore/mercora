@@ -22,6 +22,7 @@ describe('real D1 Workers harness', () => {
       '0007_add_analytics_cache.sql',
       '0008_add_processed_webhook_events.sql',
       '0009_add_order_effects.sql',
+      '0010_add_inventory_adjustments.sql',
     ]);
   });
 

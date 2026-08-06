@@ -266,7 +266,7 @@ SET status = 'processing', attempt_count = 99, claim_token = 'owner-old',
     expect(statuses.results).toEqual([{ status: 'succeeded' }]);
   });
 
-  it('records coupon reconciliation and keeps inventory/email failures durably retryable', async () => {
+  it('records coupon reconciliation, queues email retry, and terminals missing inventory for review', async () => {
     const paid = order('paid');
     paid.extensions!.discount_codes = ['SAVE'];
     await insertOrder(paid);
@@ -285,7 +285,7 @@ SET status = 'processing', attempt_count = 99, claim_token = 'owner-old',
       limit: 10,
     });
 
-    expect(result).toEqual({ claimed: 3, succeeded: 1, failed: 2 });
+    expect(result).toEqual({ claimed: 3, succeeded: 2, failed: 1 });
     expect(reconcile).toHaveBeenCalledWith({ orderId: paid.id, code: 'SAVE' });
     const rows = await env.DB.prepare(`
 SELECT effect_type, status, next_attempt_at, last_error
@@ -299,7 +299,15 @@ FROM order_effects ORDER BY effect_type
     expect(rows.results).toEqual([
       { effect_type: 'confirmation_email', status: 'failed', next_attempt_at: new Date(start.getTime() + 300_000).toISOString(), last_error: 'provider unavailable' },
       { effect_type: 'coupon', status: 'succeeded', next_attempt_at: null, last_error: null },
-      { effect_type: 'inventory', status: 'failed', next_attempt_at: new Date(start.getTime() + 300_000).toISOString(), last_error: 'Inventory effect handler is not configured' },
+      { effect_type: 'inventory', status: 'succeeded', next_attempt_at: null, last_error: null },
     ]);
+    const adjustment = await env.DB.prepare(`
+SELECT status, result FROM inventory_adjustments WHERE order_id = ?
+`).bind(paid.id).first<{ status: string; result: string }>();
+    expect(adjustment).toMatchObject({ status: 'needs_review' });
+    expect(JSON.parse(adjustment!.result)).toMatchObject({
+      outcome: 'needs_review',
+      variantId: 'variant-1',
+    });
   });
 });

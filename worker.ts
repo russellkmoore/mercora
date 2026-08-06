@@ -16,6 +16,7 @@
 import { default as handler } from "./.open-next/worker.js";
 import { regenerateAnalytics } from "@/lib/analytics/generate-insights";
 import { drainOrderEffects } from "@/lib/services/order-effects";
+import { drainInventoryAdjustments } from "@/lib/services/inventory-adjustments";
 
 export default {
   fetch: handler.fetch,
@@ -27,9 +28,14 @@ export default {
   ) {
     if (controller.cron === "*/5 * * * *") {
       ctx.waitUntil(
-        drainOrderEffects({ database: env.DB, limit: 25 })
-          .then((result) => console.log("[cron] paid order effects drained", result))
-          .catch((err) => console.error("[cron] paid order effect drain failed:", err))
+        Promise.all([
+          drainOrderEffects({ database: env.DB, limit: 25 }),
+          drainInventoryAdjustments({ database: env.DB, limit: 25 }),
+        ])
+          .then(([effects, inventory]) =>
+            console.log("[cron] recovery queues drained", { effects, inventory })
+          )
+          .catch((err) => console.error("[cron] recovery queue drain failed:", err))
       );
       return;
     }

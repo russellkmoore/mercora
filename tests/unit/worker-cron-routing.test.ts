@@ -9,6 +9,8 @@ describe('Worker scheduled routing contract', () => {
     expect(config).toContain('"crons": ["*/5 * * * *", "0 */6 * * *"]');
     expect(source).toContain('controller.cron === "*/5 * * * *"');
     expect(source).toContain('drainOrderEffects({ database: env.DB, limit: 25 })');
+    expect(source).toContain('drainInventoryAdjustments({ database: env.DB, limit: 25 })');
+    expect(source).toContain('Promise.all([');
     expect(source).toContain('controller.cron !== "0 */6 * * *"');
     expect(source).toContain('ignoring unknown scheduled trigger');
     expect(source.indexOf('controller.cron !== "0 */6 * * *"'))

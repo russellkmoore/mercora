@@ -12,6 +12,7 @@ import {
 } from '@/lib/commerce/capabilities';
 import type { Order } from '@/lib/types/order';
 import { sendOrderConfirmation } from '@/lib/services/order-confirmation';
+import { runPaidOrderInventoryEffect } from '@/lib/services/inventory-adjustments';
 
 const EFFECT_LEASE_MS = 5 * 60 * 1000;
 const MAX_EFFECT_ERROR = 2_000;
@@ -195,10 +196,12 @@ async function executeEffect(
   const extensions = order.extensions ?? {};
   switch (effect.effect_type) {
     case 'inventory':
-      if (!runtime.runInventory) {
-        throw new Error('Inventory effect handler is not configured');
-      }
-      return runtime.runInventory(order, effect);
+      return runtime.runInventory
+        ? runtime.runInventory(order, effect)
+        : runPaidOrderInventoryEffect(order, {
+            database: runtime.database,
+            now: runtime.now,
+          });
     case 'coupon': {
       const code = findCoupon(order, effect.effect_key);
       const codes = normalizedCodes(order);
