@@ -122,6 +122,13 @@ export const defaultSettings = [
     description: 'Minimum refund amount in cents ($5.00)',
     data_type: 'number'
   },
+  {
+    key: 'refund.external_full_restock_enabled',
+    value: JSON.stringify(false),
+    category: 'refund',
+    description: 'Restock every outstanding line after a full Stripe Dashboard refund',
+    data_type: 'boolean'
+  },
   
   // Promotions & Banners
   {
