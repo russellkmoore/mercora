@@ -41,6 +41,10 @@ import {
   failWebhookEvent,
   type WebhookEventOutcome,
 } from '@/lib/webhooks/processed-events';
+import {
+  handleChargeRefunded,
+  handleRefundLifecycle,
+} from '@/app/api/webhooks/stripe/handlers/refund-handlers';
 
 function retryableResponse(message: string) {
   return NextResponse.json(
@@ -124,6 +128,16 @@ export async function POST(req: NextRequest) {
       case 'invoice.payment_succeeded':
         await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice);
         outcome = 'ignored';
+        break;
+
+      case 'charge.refunded':
+        outcome = await handleChargeRefunded(event.data.object as Stripe.Charge);
+        break;
+
+      case 'refund.updated':
+      case 'refund.failed':
+      case 'charge.refund.updated':
+        outcome = await handleRefundLifecycle(event.data.object as Stripe.Refund);
         break;
 
       default:

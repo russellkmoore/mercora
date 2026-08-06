@@ -56,11 +56,13 @@ export async function getRefundPolicy() {
   const refundSettings = await getSettings('refund');
   
   return {
-    refundShipping: refundSettings['refund.shipping_refunded'] || false,
-    refundShippingOnFullReturn: refundSettings['refund.shipping_refunded_on_full_return'] || false,
+    refundShipping: refundSettings['refund.shipping_refunded_partial'] === true,
+    refundShippingOnFullReturn: refundSettings['refund.shipping_refunded_full'] === true,
     restockingFeePercent: refundSettings['refund.restocking_fee_percent'] || 0,
     minimumRefundAmount: refundSettings['refund.minimum_refund_amount'] || 0,
-    applyRestockingFeeOnPartialReturn: refundSettings['refund.apply_restocking_fee_on_partial'] !== false
+    applyRestockingFeeOnPartialReturn: refundSettings['refund.apply_restocking_fee_on_partial'] !== false,
+    externalFullRestockEnabled:
+      refundSettings['refund.external_full_restock_enabled'] === true,
   };
 }
 
@@ -115,4 +117,5 @@ export interface RefundPolicy {
   restockingFeePercent: number;
   minimumRefundAmount: number;
   applyRestockingFeeOnPartialReturn: boolean;
+  externalFullRestockEnabled: boolean;
 }

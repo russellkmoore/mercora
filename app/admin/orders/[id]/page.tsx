@@ -897,23 +897,37 @@ export default function OrderDetailPage() {
                     <Badge className={refund.type === 'full' ? 'bg-red-600' : 'bg-orange-600'}>
                       {refund.type === 'full' ? 'Full Refund' : 'Partial Refund'}
                     </Badge>
+                    <Badge className={
+                      refund.status === 'succeeded' ? 'bg-green-700' :
+                      refund.status === 'failed' || refund.status === 'canceled' ? 'bg-red-700' :
+                      'bg-yellow-700'
+                    }>
+                      {refund.status || 'legacy settled'}
+                    </Badge>
                     <span className="text-white font-semibold">
                       ${(refund.amount / 100).toFixed(2)}
                     </span>
                   </div>
                   <span className="text-xs text-gray-400">
-                    {new Date(refund.processed_at).toLocaleDateString()}
+                    {refund.processed_at || refund.requested_at
+                      ? new Date(refund.processed_at || refund.requested_at).toLocaleDateString()
+                      : 'Legacy record'}
                   </span>
                 </div>
                 <div className="text-sm text-gray-300 space-y-1">
-                  <p><strong>Reason:</strong> {refund.reason}</p>
+                  {refund.reason && <p><strong>Reason:</strong> {refund.reason}</p>}
                   {refund.notes && <p><strong>Notes:</strong> {refund.notes}</p>}
                   {refund.items && refund.items.length > 0 && (
                     <p><strong>Items:</strong> {refund.items.length} item(s)</p>
                   )}
-                  <p className="text-xs text-gray-400">
-                    <strong>Stripe Refund ID:</strong> {refund.stripe_refund_id}
-                  </p>
+                  {refund.source === 'stripe_dashboard' && (
+                    <p className="text-xs text-blue-300">Recorded from Stripe Dashboard</p>
+                  )}
+                  {refund.stripe_refund_id && (
+                    <p className="text-xs text-gray-400">
+                      <strong>Stripe Refund ID:</strong> {refund.stripe_refund_id}
+                    </p>
+                  )}
                 </div>
               </div>
             ))}
