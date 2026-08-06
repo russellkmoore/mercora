@@ -115,3 +115,6 @@ export * from "./analytics";
 
 // Durable Stripe webhook claim state (application-specific)
 export * from "./webhook-events";
+
+// Durable post-payment recovery state (application-specific)
+export * from "./order-effects";

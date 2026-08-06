@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   recordCouponReconciliation: vi.fn(),
   redeemCoupon: vi.fn(),
   sendOrderConfirmationEmail: vi.fn(),
+  stagePaidOrderEffects: vi.fn(),
+  drainOrderEffects: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -21,6 +23,10 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/stripe', () => ({ retrievePaymentIntent: mocks.retrievePaymentIntent }));
 vi.mock('@/lib/models/mach/couponInstance', () => ({ redeemCoupon: mocks.redeemCoupon }));
 vi.mock('@/lib/utils/email', () => ({ sendOrderConfirmationEmail: mocks.sendOrderConfirmationEmail }));
+vi.mock('@/lib/services/order-effects', () => ({
+  stagePaidOrderEffects: mocks.stagePaidOrderEffects,
+  drainOrderEffects: mocks.drainOrderEffects,
+}));
 vi.mock('@/lib/models/mach/orders', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/models/mach/orders')>();
   return {
@@ -94,6 +100,8 @@ beforeEach(() => {
   mocks.redeemCoupon.mockResolvedValue({ redeemed: true });
   mocks.recordCouponReconciliation.mockResolvedValue(undefined);
   mocks.sendOrderConfirmationEmail.mockResolvedValue({ success: true });
+  mocks.stagePaidOrderEffects.mockResolvedValue(undefined);
+  mocks.drainOrderEffects.mockResolvedValue({ claimed: 5, succeeded: 4, failed: 1 });
 });
 
 describe('verified paid-order finalization', () => {
@@ -143,7 +151,7 @@ describe('verified paid-order finalization', () => {
     expect(mocks.promoteOrderToPaid).not.toHaveBeenCalled();
   });
 
-  it('runs paid effects only for the CAS winner', async () => {
+  it('stages before promotion and drains for winner and already-paid convergence', async () => {
     const first = await finalizeOrderPayment({
       orderId: mocks.record.id,
       paymentIntentId: 'pi_bound',
@@ -155,50 +163,51 @@ describe('verified paid-order finalization', () => {
     const promotionArgs = mocks.promoteOrderToPaid.mock.calls[0][0];
     expect(promotionArgs.orderId).toBe(mocks.record.id);
     expect(promotionArgs.amountReceived.toJSON()).toEqual({ amount: 2_500, currency: 'USD' });
-    expect(mocks.sendOrderConfirmationEmail).toHaveBeenCalledTimes(1);
-    expect(mocks.redeemCoupon).toHaveBeenCalledTimes(1);
+    expect(mocks.stagePaidOrderEffects).toHaveBeenCalledTimes(2);
+    expect(mocks.stagePaidOrderEffects.mock.invocationCallOrder[0])
+      .toBeLessThan(mocks.promoteOrderToPaid.mock.invocationCallOrder[0]);
+    expect(mocks.drainOrderEffects).toHaveBeenCalledWith(expect.objectContaining({
+      orderId: mocks.record.id,
+      limit: 25,
+    }));
 
     mocks.promoteOrderToPaid.mockResolvedValue({
       promoted: false,
       order: { ...first.order, payment_status: 'paid' },
     });
-    mocks.redeemCoupon.mockResolvedValue({ redeemed: false, alreadyRedeemed: true });
     await finalizeOrderPayment({
       orderId: mocks.record.id,
       paymentIntentId: 'pi_bound',
       customerId: 'user_1',
       enforceOwnership: true,
     });
-    expect(mocks.sendOrderConfirmationEmail).toHaveBeenCalledTimes(1);
-    expect(mocks.redeemCoupon).toHaveBeenCalledTimes(2);
+    expect(mocks.stagePaidOrderEffects).toHaveBeenCalledTimes(4);
+    expect(mocks.drainOrderEffects).toHaveBeenCalledTimes(2);
   });
 
-  it('promotes captured money when a coupon race requires reconciliation', async () => {
-    mocks.redeemCoupon.mockResolvedValue({ redeemed: false, alreadyRedeemed: false });
-
+  it('repairs deterministic rows after paid promotion before inline draining', async () => {
     await expect(finalizeOrderPayment({
       orderId: mocks.record.id,
       paymentIntentId: 'pi_bound',
     })).resolves.toMatchObject({ paid: true, promoted: true });
 
     expect(mocks.promoteOrderToPaid).toHaveBeenCalledOnce();
-    expect(mocks.recordCouponReconciliation).toHaveBeenCalledWith({
-      orderId: mocks.record.id,
-      code: 'SAVE',
-    });
     expect(mocks.promoteOrderToPaid.mock.invocationCallOrder[0])
-      .toBeLessThan(mocks.redeemCoupon.mock.invocationCallOrder[0]);
+      .toBeLessThan(mocks.stagePaidOrderEffects.mock.invocationCallOrder[1]);
+    expect(mocks.stagePaidOrderEffects.mock.invocationCallOrder[1])
+      .toBeLessThan(mocks.drainOrderEffects.mock.invocationCallOrder[0]);
   });
 
-  it('propagates transient coupon persistence errors after durable paid promotion', async () => {
-    mocks.redeemCoupon.mockRejectedValue(new Error('D1 unavailable'));
+  it('blocks paid promotion when pre-CAS effect staging fails', async () => {
+    mocks.stagePaidOrderEffects.mockRejectedValueOnce(new Error('effect staging unavailable'));
 
     await expect(finalizeOrderPayment({
       orderId: mocks.record.id,
       paymentIntentId: 'pi_bound',
-    })).rejects.toThrow('D1 unavailable');
+    })).rejects.toThrow('effect staging unavailable');
 
-    expect(mocks.promoteOrderToPaid).toHaveBeenCalledOnce();
+    expect(mocks.promoteOrderToPaid).not.toHaveBeenCalled();
+    expect(mocks.drainOrderEffects).not.toHaveBeenCalled();
   });
 
   it('does not consume coupons unless promotion proves the order is paid', async () => {
@@ -212,7 +221,7 @@ describe('verified paid-order finalization', () => {
       paymentIntentId: 'pi_bound',
     })).rejects.toThrow('without a paid winner');
 
-    expect(mocks.redeemCoupon).not.toHaveBeenCalled();
+    expect(mocks.drainOrderEffects).not.toHaveBeenCalled();
   });
 
   it('allows recovery when coupon audit proves the order already redeemed it', async () => {
@@ -246,7 +255,7 @@ describe('verified paid-order finalization', () => {
     })).resolves.toMatchObject({ paid: true, promoted: false });
   });
 
-  it('re-applies idempotent tender on paid retry without requiring an open reservation', async () => {
+  it('passes idempotent capabilities to each drain without re-verifying paid tender', async () => {
     const verifyReservedTender = vi.fn(async () => undefined);
     const applyTender = vi.fn(async () => undefined);
     const orderPaid = vi.fn(async () => undefined);
@@ -266,8 +275,6 @@ describe('verified paid-order finalization', () => {
       promoted: false,
       order: { ...first.order, payment_status: 'paid' },
     });
-    mocks.redeemCoupon.mockResolvedValue({ redeemed: false, alreadyRedeemed: true });
-
     await finalizeOrderPayment({
       orderId: mocks.record.id,
       paymentIntentId: 'pi_bound',
@@ -275,11 +282,12 @@ describe('verified paid-order finalization', () => {
     });
 
     expect(verifyReservedTender).toHaveBeenCalledTimes(1);
-    expect(applyTender).toHaveBeenCalledTimes(2);
-    expect(orderPaid).toHaveBeenCalledTimes(2);
+    expect(mocks.drainOrderEffects).toHaveBeenCalledTimes(2);
+    expect(mocks.drainOrderEffects).toHaveBeenNthCalledWith(1, expect.objectContaining({ capabilities }));
+    expect(mocks.drainOrderEffects).toHaveBeenNthCalledWith(2, expect.objectContaining({ capabilities }));
   });
 
-  it('propagates transient tender settlement failure after durable paid promotion', async () => {
+  it('acknowledges paid durability when an inline effect is queued for retry', async () => {
     const capabilities = {
       giftCards: {
         resolveTender: vi.fn(),
@@ -289,17 +297,18 @@ describe('verified paid-order finalization', () => {
       subscriptions: { validateCheckout: vi.fn(), orderPaid: vi.fn() },
     };
 
+    mocks.drainOrderEffects.mockResolvedValue({ claimed: 5, succeeded: 4, failed: 1 });
     await expect(finalizeOrderPayment({
       orderId: mocks.record.id,
       paymentIntentId: 'pi_bound',
       capabilities,
-    })).rejects.toThrow('tender store unavailable');
+    })).resolves.toMatchObject({ paid: true, promoted: true });
 
     expect(mocks.promoteOrderToPaid).toHaveBeenCalledOnce();
-    expect(mocks.sendOrderConfirmationEmail).not.toHaveBeenCalled();
+    expect(mocks.drainOrderEffects).toHaveBeenCalledWith(expect.objectContaining({ capabilities }));
   });
 
-  it('propagates transient subscription activation failure after durable paid promotion', async () => {
+  it('acknowledges paid state when inline drain infrastructure defers to scheduled recovery', async () => {
     const capabilities = {
       giftCards: {
         resolveTender: vi.fn(),
@@ -312,14 +321,21 @@ describe('verified paid-order finalization', () => {
       },
     };
 
+    const error = new Error('effect claim unavailable');
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mocks.drainOrderEffects.mockRejectedValue(error);
     await expect(finalizeOrderPayment({
       orderId: mocks.record.id,
       paymentIntentId: 'pi_bound',
       capabilities,
-    })).rejects.toThrow('subscription store unavailable');
+    })).resolves.toMatchObject({ paid: true, promoted: true });
 
     expect(mocks.promoteOrderToPaid).toHaveBeenCalledOnce();
-    expect(mocks.sendOrderConfirmationEmail).not.toHaveBeenCalled();
+    expect(errorLog).toHaveBeenCalledWith(
+      `[checkout] Paid effects queued for retry on order ${mocks.record.id}:`,
+      error
+    );
+    errorLog.mockRestore();
   });
 
   it('verifies non-cash tender before paid promotion', async () => {
@@ -341,7 +357,7 @@ describe('verified paid-order finalization', () => {
   });
 
   it('does not report failure after paid CAS when confirmation email fails', async () => {
-    mocks.sendOrderConfirmationEmail.mockRejectedValue(new Error('email unavailable'));
+    mocks.drainOrderEffects.mockResolvedValue({ claimed: 5, succeeded: 4, failed: 1 });
 
     await expect(finalizeOrderPayment({
       orderId: mocks.record.id,

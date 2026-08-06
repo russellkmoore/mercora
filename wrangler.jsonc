@@ -7,8 +7,8 @@
   "name": "mercora",
   "main": "worker.ts",
   "triggers": {
-    // Regenerate the Admin BI dashboard cache every 6 hours.
-    "crons": ["0 */6 * * *"]
+    // Retry paid-order effects every five minutes and regenerate Admin BI every six hours.
+    "crons": ["*/5 * * * *", "0 */6 * * *"]
   },
   "compatibility_date": "2026-08-01",
   "compatibility_flags": [
