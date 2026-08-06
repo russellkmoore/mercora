@@ -11,6 +11,9 @@
  * - **invoice.payment_succeeded**: Subscription/recurring payment succeeded
  * - **customer.subscription.updated**: Subscription changes
  * - **checkout.session.completed**: Checkout session completed
+ * - **charge.refunded**: Authoritative cumulative refund reconciliation
+ * - **refund.updated/refund.failed**: Delayed refund lifecycle reconciliation
+ * - **charge.refund.updated**: Legacy delayed-refund compatibility event
  *
  * === Security ===
  * - Webhook signature verification with Stripe secret
@@ -24,7 +27,7 @@
  *
  * === Usage ===
  * Configure this endpoint in your Stripe Dashboard webhook settings:
- * - URL: https://yourdomain.com/api/stripe/webhooks
+ * - URL: https://yourdomain.com/api/webhooks/stripe
  * - Events: Select the events you want to handle
  */
 
