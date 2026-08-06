@@ -1,239 +1,435 @@
-/**
- * === Order Refund API ===
- *
- * Handles Stripe refunds for order cancellations and returns.
- * Processes both full refunds (cancellations) and partial refunds (returns).
- *
- * === Features ===
- * - **Full Refunds**: Complete order cancellation with full amount refund
- * - **Partial Refunds**: Item-level returns with calculated partial amounts
- * - **Stripe Integration**: Direct Stripe refund processing
- * - **Order Updates**: Automatic order status and payment status updates
- * - **Audit Trail**: Comprehensive logging and reason tracking
- *
- * === Security ===
- * - Admin API key authentication required
- * - Payment intent validation
- * - Refund amount verification
- *
- * === Request Format ===
- * ```json
- * {
- *   "orderId": "WEB-USER-123456",
- *   "type": "full" | "partial",
- *   "reason": "requested_by_customer",
- *   "amount"?: number, // Required for partial refunds (in cents)
- *   "items"?: string[], // Required for partial refunds - product IDs
- *   "notes"?: string
- * }
- * ```
- */
-
 import { NextRequest, NextResponse } from 'next/server';
-import { getStripeClient } from '@/lib/stripe';
-import { getDbAsync } from '@/lib/db';
-import { orders } from '@/lib/db/schema/order';
-import { eq } from 'drizzle-orm';
+import type Stripe from 'stripe';
 import { authenticateRequest, PERMISSIONS } from '@/lib/auth/unified-auth';
+import { getDbAsync } from '@/lib/db';
+import { Money } from '@/lib/money';
+import { getStripeClient } from '@/lib/stripe';
+import { isBoundedArray, isBoundedString, isPlainRecord } from '@/lib/public-request-validation';
+import { normalizeRefundLineIds } from '@/lib/payments/refund-idempotency';
+import { decideRefundLedgerAction } from '@/lib/payments/refund-ledger';
+import {
+  mutateRefundLedger,
+  parseRefundExtensions,
+  type RefundLedgerContext,
+} from '@/lib/payments/refund-ledger-store';
+import {
+  classifyRefundStatus,
+  computeRefundedTotal,
+  type RefundRecord,
+} from '@/lib/utils/refund-validation';
 
 interface RefundRequest {
   orderId: string;
   type: 'full' | 'partial';
   reason: string;
-  amount?: number; // For partial refunds (in cents)
-  items?: string[]; // For partial refunds - product IDs
-  notes?: string;
+  amount?: number;
+  lineIds: string[];
+  notes: string;
+}
+
+interface Reservation {
+  idempotencyKey: string;
+  requestFingerprint: string;
+  refundAmount: number;
+  entryIndex: number;
+  stripeRefundId?: string;
+  requestedAt?: string;
+}
+
+const MAX_UNRESOLVED_CREATE_RETRY_MS = 23 * 60 * 60 * 1000;
+
+function parseRequest(value: unknown): RefundRequest | null {
+  if (!isPlainRecord(value)) return null;
+  if (!isBoundedString(value.orderId, 128) ||
+      (value.type !== 'full' && value.type !== 'partial') ||
+      !isBoundedString(value.reason, 256) ||
+      (value.notes !== undefined && !isBoundedString(value.notes, 1_000, { allowEmpty: true }))) {
+    return null;
+  }
+  const rawItems = value.items ?? [];
+  if (!isBoundedArray(rawItems, 100) ||
+      !rawItems.every((item) => isBoundedString(item, 128))) {
+    return null;
+  }
+  let lineIds: string[];
+  try {
+    lineIds = normalizeRefundLineIds(rawItems as string[]);
+  } catch {
+    return null;
+  }
+  if (value.type === 'partial') {
+    if (!Number.isSafeInteger(value.amount) || Number(value.amount) <= 0 || lineIds.length === 0) {
+      return null;
+    }
+  } else if (value.amount !== undefined || lineIds.length > 0) {
+    return null;
+  }
+  return {
+    orderId: value.orderId,
+    type: value.type,
+    reason: value.reason.trim(),
+    ...(value.type === 'partial' ? { amount: Number(value.amount) } : {}),
+    lineIds,
+    notes: typeof value.notes === 'string' ? value.notes : '',
+  };
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return parseRefundExtensions(value) ?? {};
+}
+
+function orderLineIds(context: RefundLedgerContext): string[] | null {
+  const rawItems = context.order.items;
+  const items = Array.isArray(rawItems) ? rawItems : [];
+  const ids: string[] = [];
+  for (const raw of items) {
+    if (!isPlainRecord(raw)) return null;
+    const id = typeof raw.id === 'string' && raw.id
+      ? raw.id
+      : `${String(raw.product_id ?? '')}-${String(raw.variant_id ?? 'default')}`;
+    if (!id || id.length > 128 || ids.includes(id)) return null;
+    ids.push(id);
+  }
+  return ids;
+}
+
+function responseForStoreFailure(reason: string) {
+  if (reason === 'not_found') {
+    return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+  }
+  if (reason === 'invalid_ledger') {
+    return NextResponse.json({ error: 'Order refund history requires reconciliation' }, { status: 409 });
+  }
+  return NextResponse.json({ error: 'Refund reservation conflicted; retry the request' }, { status: 503 });
 }
 
 export async function POST(request: NextRequest) {
+  const authResult = await authenticateRequest(request, PERMISSIONS.ORDERS_UPDATE);
+  if (!authResult.success) return authResult.response!;
+
+  let body: unknown;
   try {
-    // Authenticate with admin permissions
-    const authResult = await authenticateRequest(request, PERMISSIONS.ORDERS_UPDATE);
-    if (!authResult.success) {
-      return authResult.response!;
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON request body' }, { status: 400 });
+  }
+  const input = parseRequest(body);
+  if (!input) return NextResponse.json({ error: 'Invalid refund request' }, { status: 400 });
+
+  const db = await getDbAsync();
+  const actor = typeof authResult.tokenInfo?.tokenName === 'string'
+    ? authResult.tokenInfo.tokenName.slice(0, 128)
+    : 'authenticated-admin';
+  const state: {
+    reservation?: Reservation;
+    completed?: {
+      refundAmount: number;
+      stripeRefundId: string;
+      providerStatus: string;
+    };
+    rejection?: { status: number; error: string };
+    bindingError?: string;
+  } = {};
+
+  const reserved = await mutateRefundLedger(db, input.orderId, async (context) => {
+    delete state.reservation;
+    delete state.completed;
+    delete state.rejection;
+    delete state.bindingError;
+    const lineIds = orderLineIds(context);
+    if (input.type === 'partial' &&
+        (!lineIds || input.lineIds.some((lineId) => !lineIds.includes(lineId)))) {
+      state.rejection = { status: 400, error: 'Refund contains an unknown or ambiguous order line' };
+      return { action: 'skip' };
+    }
+    const external = asRecord(context.order.external_references);
+    const extensionPaymentIntent = context.extensions.payment_intent_id;
+    const externalPaymentIntent = external.payment_intent_id;
+    if (typeof extensionPaymentIntent !== 'string' ||
+        typeof externalPaymentIntent !== 'string' ||
+        extensionPaymentIntent !== externalPaymentIntent) {
+      state.bindingError = 'Order PaymentIntent binding is missing or inconsistent';
+      return { action: 'skip' };
     }
 
-    const body = await request.json() as RefundRequest;
-    const { orderId, type, reason, amount, items, notes } = body;
-
-    // Validate required fields
-    if (!orderId || !type || !reason) {
-      return NextResponse.json({
-        error: 'Missing required fields: orderId, type, reason'
-      }, { status: 400 });
-    }
-
-    if (type === 'partial' && (!amount || !items || items.length === 0)) {
-      return NextResponse.json({
-        error: 'Partial refunds require amount and items'
-      }, { status: 400 });
-    }
-
-    const db = await getDbAsync();
-    
-    // Get the order
-    const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
-    if (!order) {
-      return NextResponse.json({
-        error: 'Order not found'
-      }, { status: 404 });
-    }
-
-    // Parse order data
-    const extensions = order.extensions ? (typeof order.extensions === 'string' ? JSON.parse(order.extensions) : order.extensions) : {};
-    const totalAmount = order.total_amount ? (typeof order.total_amount === 'string' ? JSON.parse(order.total_amount) : order.total_amount) : { amount: 0 };
-    
-    const paymentIntentId = extensions.payment_intent_id;
-    if (!paymentIntentId) {
-      return NextResponse.json({
-        error: 'No payment intent found for this order'
-      }, { status: 400 });
-    }
-
-    // Check if order is already cancelled or refunded
-    if (order.status === 'cancelled' || order.status === 'refunded') {
-      return NextResponse.json({
-        error: 'Order is already cancelled or refunded'
-      }, { status: 400 });
-    }
-
-    // Process Stripe refund
-    const stripe = getStripeClient();
-    let refundAmount: number;
-    let newStatus: string;
-    let newPaymentStatus: string;
-
-    if (type === 'full') {
-      // Full refund
-      refundAmount = totalAmount.amount;
-      newStatus = 'cancelled';
-      newPaymentStatus = 'refunded';
-    } else {
-      // Partial refund
-      refundAmount = amount!;
-      newStatus = order.status; // Keep same status for partial refunds
-      newPaymentStatus = 'paid'; // Still considered paid since it's partial
-      
-      // Validate partial refund amount doesn't exceed total
-      if (refundAmount > totalAmount.amount) {
-        return NextResponse.json({
-          error: 'Refund amount cannot exceed order total'
-        }, { status: 400 });
-      }
-    }
-
-    // Create Stripe refund
-    let stripeRefund;
+    let totalAmount: number;
     try {
-      // Check if we're using regular Stripe SDK or Cloudflare-compatible version
-      if ('refunds' in stripe) {
-        // Using regular Stripe SDK
-        const regularStripe = stripe as any;
-        stripeRefund = await regularStripe.refunds.create({
-          payment_intent: paymentIntentId,
-          amount: refundAmount,
-          reason: 'requested_by_customer',
-          metadata: {
-            orderId,
-            refundType: type,
-            refundReason: reason,
-            ...(items && { refundedItems: items.join(',') })
-          }
-        });
-      } else {
-        // Using Cloudflare-compatible Stripe client
-        const stripeCloudflare = stripe as any;
-        stripeRefund = await stripeCloudflare.request('POST', '/refunds', {
-          payment_intent: paymentIntentId,
-          amount: refundAmount,
-          reason: 'requested_by_customer',
-          metadata: {
-            orderId,
-            refundType: type,
-            refundReason: reason,
-            ...(items && { refundedItems: items.join(',') })
-          }
-        });
-      }
-    } catch (stripeError: any) {
-      console.error('Stripe refund failed:', stripeError);
-      return NextResponse.json({
-        error: 'Failed to process refund with Stripe',
-        details: stripeError.message
-      }, { status: 500 });
+      totalAmount = Money.fromStored(
+        context.order.total_amount,
+        context.order.currency_code
+      ).toMinorUnits();
+    } catch {
+      state.rejection = { status: 409, error: 'Order total is invalid' };
+      return { action: 'skip' };
+    }
+    const hasStripeRefundedFloor = Object.prototype.hasOwnProperty.call(
+      context.extensions,
+      'stripe_amount_refunded'
+    );
+    const rawStripeRefundedFloor = context.extensions.stripe_amount_refunded;
+    if (hasStripeRefundedFloor &&
+        (typeof rawStripeRefundedFloor !== 'number' ||
+          !Number.isSafeInteger(rawStripeRefundedFloor) ||
+          rawStripeRefundedFloor < 0)) {
+      state.rejection = { status: 409, error: 'Recorded Stripe refund total is invalid' };
+      return { action: 'skip' };
     }
 
-    // Update order in database
-    const updateData: any = {
-      status: newStatus,
-      payment_status: newPaymentStatus,
-      updated_at: new Date().toISOString()
-    };
-
-    // Add refund information to extensions
-    const updatedExtensions = {
-      ...extensions,
-      refunds: [
-        ...(extensions.refunds || []),
-        {
-          id: stripeRefund.id,
-          amount: refundAmount,
-          type,
-          reason,
-          items: items || [],
-          notes: notes || '',
-          processed_at: new Date().toISOString(),
-          stripe_refund_id: stripeRefund.id
-        }
-      ]
-    };
-    updateData.extensions = JSON.stringify(updatedExtensions);
-
-    // Add cancellation reason to notes for full cancellations
-    if (type === 'full') {
-      const currentNotes = order.notes || '';
-      const cancellationNote = `CANCELLED: ${reason}${notes ? ` - ${notes}` : ''}`;
-      updateData.notes = currentNotes ? `${currentNotes}\n\n${cancellationNote}` : cancellationNote;
-    }
-
-    // Update order
-    const [updatedOrder] = await db.update(orders)
-      .set(updateData)
-      .where(eq(orders.id, orderId))
-      .returning();
-
-    // Log the refund action
-    console.log(`${type.toUpperCase()} refund processed:`, {
-      orderId,
-      stripeRefundId: stripeRefund.id,
-      amount: refundAmount,
-      reason,
-      items,
-      admin: authResult.tokenInfo?.tokenName || 'unknown'
+    const decision = await decideRefundLedgerAction(context.refunds, {
+      orderId: input.orderId,
+      type: input.type,
+      amount: input.amount,
+      lineIds: input.lineIds,
+      totalAmount,
+      stripeRefundedFloor: hasStripeRefundedFloor
+        ? rawStripeRefundedFloor as number
+        : undefined,
     });
+    if (decision.action === 'reject') {
+      state.rejection = { status: decision.status, error: decision.error };
+      return { action: 'skip' };
+    }
+    if (decision.action === 'completed') {
+      state.completed = {
+        refundAmount: decision.refundAmount,
+        stripeRefundId: decision.stripeRefundId,
+        providerStatus: decision.providerStatus,
+      };
+      return { action: 'skip' };
+    }
+    if (decision.action === 'reconcile') {
+      state.reservation = {
+        idempotencyKey: decision.idempotencyKey,
+        requestFingerprint: decision.requestFingerprint,
+        refundAmount: decision.refundAmount,
+        entryIndex: decision.entryIndex,
+        ...(decision.stripeRefundId ? { stripeRefundId: decision.stripeRefundId } : {}),
+        ...(decision.requestedAt ? { requestedAt: decision.requestedAt } : {}),
+      };
+      return { action: 'skip' };
+    }
+    if (context.order.payment_status !== 'paid') {
+      state.rejection = { status: 409, error: 'Only paid orders can be refunded' };
+      return { action: 'skip' };
+    }
 
+    const entry: RefundRecord = {
+      id: decision.idempotencyKey,
+      idempotency_key: decision.idempotencyKey,
+      request_fingerprint: decision.requestFingerprint,
+      amount: decision.refundAmount,
+      type: input.type,
+      items: input.lineIds,
+      reason: input.reason,
+      notes: input.notes,
+      status: 'pending',
+      settled_sequence: decision.settledSequence,
+      requested_at: context.nowIso,
+      requested_by: actor,
+    };
+    const refunds = [...context.refunds, entry];
+    state.reservation = {
+      idempotencyKey: decision.idempotencyKey,
+      requestFingerprint: decision.requestFingerprint,
+      refundAmount: decision.refundAmount,
+      entryIndex: refunds.length - 1,
+    };
+    return {
+      action: 'write',
+      extensions: {
+        ...context.extensions,
+        refunds,
+        refunds_version: context.nextVersion,
+      },
+    };
+  });
+
+  if (!reserved.ok) return responseForStoreFailure(reserved.reason);
+  if (state.bindingError) return NextResponse.json({ error: state.bindingError }, { status: 409 });
+  if (state.rejection) {
+    return NextResponse.json({ error: state.rejection.error }, { status: state.rejection.status });
+  }
+  if (state.completed) {
     return NextResponse.json({
       success: true,
+      duplicate: true,
       refund: {
-        id: stripeRefund.id,
-        amount: refundAmount,
-        type,
-        reason,
-        items: items || [],
-        processed_at: new Date().toISOString()
+        id: state.completed.stripeRefundId,
+        amount: state.completed.refundAmount,
+        type: input.type,
+        reason: input.reason,
+        items: input.lineIds,
+        status: 'succeeded',
+        providerStatus: state.completed.providerStatus,
       },
       order: {
-        id: updatedOrder.id,
-        status: updatedOrder.status,
-        payment_status: updatedOrder.payment_status
-      }
+        id: input.orderId,
+        status: reserved.order.status,
+        payment_status: reserved.order.payment_status,
+      },
     });
-
-  } catch (error) {
-    console.error('Refund processing error:', error);
-    return NextResponse.json({
-      error: 'Failed to process refund',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
   }
+  const reservation = state.reservation;
+  if (!reservation) {
+    return NextResponse.json({ error: 'Refund reservation could not be established' }, { status: 503 });
+  }
+
+  const paymentIntentId = asRecord(reserved.order.external_references).payment_intent_id as string;
+  const refundParams: Stripe.RefundCreateParams = {
+    payment_intent: paymentIntentId,
+    amount: reservation.refundAmount,
+    reason: 'requested_by_customer',
+    metadata: {
+      orderId: input.orderId,
+      refundType: input.type,
+      refundReason: input.reason,
+      lineCount: String(input.lineIds.length),
+      refundRequestId: reservation.idempotencyKey,
+    },
+  };
+
+  let stripeRefund: Stripe.Refund;
+  const stripe = getStripeClient();
+  try {
+    if (reservation.stripeRefundId) {
+      stripeRefund = await stripe.refunds.retrieve(reservation.stripeRefundId);
+    } else {
+      const requestedAt = reservation.requestedAt
+        ? new Date(reservation.requestedAt).getTime()
+        : Date.now();
+      if (!Number.isFinite(requestedAt) || Date.now() - requestedAt > MAX_UNRESOLVED_CREATE_RETRY_MS) {
+        return NextResponse.json(
+          { error: 'Refund requires provider reconciliation before it can be retried' },
+          { status: 409 }
+        );
+      }
+      stripeRefund = await stripe.refunds.create(
+        refundParams,
+        { idempotencyKey: reservation.idempotencyKey }
+      );
+    }
+  } catch (error) {
+    // A transport error is ambiguous: Stripe may have accepted the request.
+    // Keep the exact reservation pending so a retry reuses the same provider key.
+    console.error(`[refund] Stripe call is unresolved for order ${input.orderId}:`, error);
+    return NextResponse.json(
+      { error: 'Refund status is unresolved; retry this same request' },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
+  }
+
+  const providerPaymentIntent = typeof stripeRefund.payment_intent === 'string'
+    ? stripeRefund.payment_intent
+    : stripeRefund.payment_intent?.id;
+  const providerResultIsConsistent =
+    stripeRefund.id.length > 0 &&
+    (!reservation.stripeRefundId || stripeRefund.id === reservation.stripeRefundId) &&
+    providerPaymentIntent === paymentIntentId &&
+    Number.isSafeInteger(stripeRefund.amount) &&
+    stripeRefund.amount === reservation.refundAmount;
+  if (!providerResultIsConsistent) {
+    // Keep the reservation pending: an inconsistent response must be reconciled,
+    // never released or settled against the wrong order or amount.
+    console.error('[refund] Stripe returned an inconsistent refund', {
+      orderId: input.orderId,
+      expectedPaymentIntentId: paymentIntentId,
+      expectedRefundId: reservation.stripeRefundId,
+      expectedAmount: reservation.refundAmount,
+      actualPaymentIntentId: providerPaymentIntent,
+      actualRefundId: stripeRefund.id,
+      actualAmount: stripeRefund.amount,
+    });
+    return NextResponse.json(
+      { error: 'Payment provider returned an inconsistent refund' },
+      { status: 502 }
+    );
+  }
+
+  const providerStatus = stripeRefund.status ?? 'unknown';
+  const providerClass = classifyRefundStatus(providerStatus);
+  const normalizedStatus = providerClass === 'settled'
+    ? 'succeeded'
+    : providerClass === 'released'
+      ? 'failed'
+      : providerStatus === 'requires_action'
+        ? 'requires_action'
+        : 'pending';
+  let settlementConflict = false;
+  const settled = await mutateRefundLedger(db, input.orderId, (context) => {
+    settlementConflict = false;
+    const entryIndex = context.refunds.findIndex(
+      (entry) => entry.idempotency_key === reservation!.idempotencyKey
+    );
+    if (entryIndex < 0) {
+      settlementConflict = true;
+      return { action: 'skip' };
+    }
+    const current = context.refunds[entryIndex];
+    if (current.status === 'succeeded' && current.stripe_refund_id === stripeRefund.id) {
+      return { action: 'skip' };
+    }
+    const refunds = context.refunds.slice();
+    refunds[entryIndex] = {
+      ...current,
+      status: normalizedStatus,
+      provider_status: providerStatus,
+      stripe_refund_id: stripeRefund.id,
+      processed_at: context.nowIso,
+    };
+    const extensions = {
+      ...context.extensions,
+      refunds,
+      refunds_version: context.nextVersion,
+    };
+    const total = Money.fromStored(
+      context.order.total_amount,
+      context.order.currency_code
+    ).toMinorUnits();
+    const fullySettled = normalizedStatus === 'succeeded' &&
+      computeRefundedTotal({ refunds }) === total;
+    return {
+      action: 'write',
+      extensions,
+      ...(fullySettled ? {
+        columns: { status: 'cancelled' as const, payment_status: 'refunded' as const },
+      } : {}),
+    };
+  });
+  if (!settled.ok) return responseForStoreFailure(settled.reason);
+  if (settlementConflict) {
+    return NextResponse.json(
+      { error: 'Refund was accepted but ledger reconciliation is pending' },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
+  }
+  if (normalizedStatus === 'failed') {
+    return NextResponse.json({ error: 'Stripe rejected the refund' }, { status: 502 });
+  }
+
+  console.log('[refund] refund request reconciled', {
+    orderId: input.orderId,
+    stripeRefundId: stripeRefund.id,
+    amount: reservation.refundAmount,
+    status: normalizedStatus,
+    actor,
+  });
+
+  return NextResponse.json({
+    success: true,
+    refund: {
+      id: stripeRefund.id,
+      amount: reservation.refundAmount,
+      type: input.type,
+      reason: input.reason,
+      items: input.lineIds,
+      status: normalizedStatus,
+      providerStatus,
+      processed_at: new Date().toISOString(),
+    },
+    order: {
+      id: input.orderId,
+      status: settled.order.status,
+      payment_status: settled.order.payment_status,
+    },
+  }, { status: normalizedStatus === 'succeeded' ? 200 : 202 });
 }
