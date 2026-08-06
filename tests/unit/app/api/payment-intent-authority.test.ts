@@ -44,6 +44,7 @@ import { POST } from '@/app/api/payment-intent/route';
 const quote = {
   currency: 'USD',
   items: [{
+    id: 'line_stable_1',
     product_id: 'prod_1', variant_id: 'var_1', sku: 'SKU-1', quantity: 1,
     unit_price: { amount: 2_000, currency: 'USD' },
     total_price: { amount: 2_000, currency: 'USD' }, product_name: 'Catalog name',
@@ -54,6 +55,14 @@ const quote = {
   discount: { amount: 100, currency: 'USD' },
   shipping: { amount: 500, currency: 'USD' },
   tax: { amount: 200, currency: 'USD' },
+  shippingTax: { amount: 20, currency: 'USD' },
+  lineAllocations: [{
+    lineId: 'line_stable_1', productId: 'prod_1', variantId: 'var_1', quantity: 1,
+    catalogSubtotal: { amount: 2_000, currency: 'USD' },
+    merchandiseDiscount: { amount: 100, currency: 'USD' },
+    netMerchandise: { amount: 1_900, currency: 'USD' },
+    tax: { amount: 180, currency: 'USD' }, promotionCodes: ['SAVE'],
+  }],
   tender: { amount: 0, currency: 'USD' },
   total: { amount: 2_600, currency: 'USD' },
   discountCodes: ['SAVE'],
@@ -106,6 +115,10 @@ describe('payment-intent durable authority boundary', () => {
       status: 'pending',
       total_amount: { amount: 2_600, currency: 'USD' },
       items: quote.items,
+      extensions: expect.objectContaining({
+        checkout_line_allocations: quote.lineAllocations,
+        checkout_shipping_tax: quote.shippingTax,
+      }),
       shipping_address: expect.objectContaining({
         company: 'Buyer LLC',
         email: 'buyer@example.com',
