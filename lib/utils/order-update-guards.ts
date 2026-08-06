@@ -32,6 +32,8 @@ export const SERVER_OWNED_ORDER_EXTENSION_KEYS = [
   'checkout_shipping_before_discount',
   'checkout_shipping_discount',
   'checkout_tax',
+  'checkout_shipping_tax',
+  'checkout_line_allocations',
   'checkout_tender',
   'checkout_tender_state',
   'checkout_total',

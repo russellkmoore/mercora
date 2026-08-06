@@ -191,6 +191,8 @@ export async function POST(request: NextRequest) {
     checkout_shipping_discount: quote.shippingDiscount,
     checkout_shipping: baseShipping.subtract(shippingDiscount).toJSON(),
     checkout_tax: quote.tax,
+    checkout_shipping_tax: quote.shippingTax,
+    checkout_line_allocations: quote.lineAllocations,
     checkout_tender: quote.tender,
     checkout_tender_state: quote.tenderState,
     checkout_total: Money.fromMinor(providerAmount, providerCurrency).toJSON(),
