@@ -56,6 +56,7 @@ interface Order {
     country?: string;
   };
   items: Array<{
+    id?: string;
     product_id: string;
     variant_id?: string;
     product_name: string;
@@ -248,6 +249,15 @@ export default function OrderDetailPage() {
         alert('No items selected or invalid refund amount');
         return;
       }
+      if (
+        returnCalculation.allocationMethod === 'legacy_proportional' &&
+        !window.confirm(
+          'This legacy order has no exact per-line tax and discount snapshot. ' +
+          'The partial refund is a proportional estimate. Confirm the amount before continuing.'
+        )
+      ) {
+        return;
+      }
 
       const response = await fetch('/api/orders/refund', {
         method: 'POST',
@@ -297,6 +307,7 @@ export default function OrderDetailPage() {
       restockingFee: 0,
       baseAmount: 0,
       total: 0,
+      allocationMethod: 'legacy_proportional' as const,
       policy: {
         shippingRefunded: false,
         restockingFeeApplied: false,
@@ -306,8 +317,7 @@ export default function OrderDetailPage() {
     return calculatePartialReturnMinor(order, selectedItemIds, refundPolicy);
   };
 
-  const toggleItemSelection = (productId: string, variantId?: string) => {
-    const itemKey = `${productId}-${variantId || 'default'}`;
+  const toggleItemSelection = (itemKey: string) => {
     setSelectedItems(prev => {
       const newSet = new Set(prev);
       if (newSet.has(itemKey)) {
@@ -320,7 +330,9 @@ export default function OrderDetailPage() {
   };
 
   const selectAllItems = () => {
-    setSelectedItems(new Set(order?.items.map(item => `${item.product_id}-${item.variant_id || 'default'}`) || []));
+    setSelectedItems(new Set(order?.items.map(item =>
+      item.id ?? `${item.product_id}-${item.variant_id || 'default'}`
+    ) || []));
   };
 
   const clearItemSelection = () => {
@@ -568,8 +580,8 @@ export default function OrderDetailPage() {
       <Card className="bg-neutral-800 border-neutral-700 p-6">
         <h3 className="text-lg font-semibold text-white mb-4">Order Items</h3>
         <div className="space-y-3">
-          {order.items.map((item, index) => {
-            const itemKey = `${item.product_id}-${item.variant_id || 'default'}`;
+          {order.items.map((item) => {
+            const itemKey = item.id ?? `${item.product_id}-${item.variant_id || 'default'}`;
             return (
               <div key={itemKey} className="flex items-center justify-between bg-neutral-700 p-4 rounded">
                 {actionType === 'return' && (
@@ -577,7 +589,7 @@ export default function OrderDetailPage() {
                     type="checkbox"
                     id={`item-${itemKey}`}
                     checked={selectedItems.has(itemKey)}
-                    onChange={() => toggleItemSelection(item.product_id, item.variant_id)}
+                    onChange={() => toggleItemSelection(itemKey)}
                     className="mr-3"
                   />
                 )}
@@ -739,7 +751,7 @@ export default function OrderDetailPage() {
                 </div>
                 <p className="text-sm text-gray-300">
                   Select individual items to return or use the buttons below to select all items.
-                  Refund amounts include proportional tax and discount calculations.
+                  New orders use their exact server-recorded tax and discount allocations.
                 </p>
               </div>
 
@@ -778,12 +790,18 @@ export default function OrderDetailPage() {
                         <span className="text-white">${(calculation.subtotal / 100).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-400">Proportional Tax:</span>
+                        <span className="text-gray-400">
+                          {calculation.allocationMethod === 'exact_snapshot' ? 'Allocated Tax:' : 'Estimated Tax:'}
+                        </span>
                         <span className="text-white">${(calculation.tax / 100).toFixed(2)}</span>
                       </div>
                       {calculation.discount > 0 && (
                         <div className="flex justify-between">
-                          <span className="text-gray-400">Proportional Discount:</span>
+                          <span className="text-gray-400">
+                            {calculation.allocationMethod === 'exact_snapshot'
+                              ? 'Allocated Discount:'
+                              : 'Estimated Discount:'}
+                          </span>
                           <span className="text-green-400">-${(calculation.discount / 100).toFixed(2)}</span>
                         </div>
                       )}
@@ -805,8 +823,10 @@ export default function OrderDetailPage() {
                       </div>
                     </div>
                     <div className="text-xs text-gray-400 mt-2 space-y-1">
-                      {calculation.discount > 0 && (
-                        <p>* Discount prorated based on returned item value</p>
+                      {calculation.allocationMethod === 'legacy_proportional' && (
+                        <p className="text-yellow-300">
+                          * Legacy estimate: exact per-line allocations were not recorded. Confirmation is required.
+                        </p>
                       )}
                       {calculation.shipping > 0 ? (
                         <p>* Shipping refund included per refund policy</p>
@@ -877,23 +897,37 @@ export default function OrderDetailPage() {
                     <Badge className={refund.type === 'full' ? 'bg-red-600' : 'bg-orange-600'}>
                       {refund.type === 'full' ? 'Full Refund' : 'Partial Refund'}
                     </Badge>
+                    <Badge className={
+                      refund.status === 'succeeded' ? 'bg-green-700' :
+                      refund.status === 'failed' || refund.status === 'canceled' ? 'bg-red-700' :
+                      'bg-yellow-700'
+                    }>
+                      {refund.status || 'legacy settled'}
+                    </Badge>
                     <span className="text-white font-semibold">
                       ${(refund.amount / 100).toFixed(2)}
                     </span>
                   </div>
                   <span className="text-xs text-gray-400">
-                    {new Date(refund.processed_at).toLocaleDateString()}
+                    {refund.processed_at || refund.requested_at
+                      ? new Date(refund.processed_at || refund.requested_at).toLocaleDateString()
+                      : 'Legacy record'}
                   </span>
                 </div>
                 <div className="text-sm text-gray-300 space-y-1">
-                  <p><strong>Reason:</strong> {refund.reason}</p>
+                  {refund.reason && <p><strong>Reason:</strong> {refund.reason}</p>}
                   {refund.notes && <p><strong>Notes:</strong> {refund.notes}</p>}
                   {refund.items && refund.items.length > 0 && (
                     <p><strong>Items:</strong> {refund.items.length} item(s)</p>
                   )}
-                  <p className="text-xs text-gray-400">
-                    <strong>Stripe Refund ID:</strong> {refund.stripe_refund_id}
-                  </p>
+                  {refund.source === 'stripe_dashboard' && (
+                    <p className="text-xs text-blue-300">Recorded from Stripe Dashboard</p>
+                  )}
+                  {refund.stripe_refund_id && (
+                    <p className="text-xs text-gray-400">
+                      <strong>Stripe Refund ID:</strong> {refund.stripe_refund_id}
+                    </p>
+                  )}
                 </div>
               </div>
             ))}

@@ -38,6 +38,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Test Workers integration
+        run: npm run test:workers
+
       - name: Build
         run: npm run build
         env:

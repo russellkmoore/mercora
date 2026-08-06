@@ -42,6 +42,7 @@ import ProductCard from "@/components/ProductCard";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import type { Product } from "@/lib/types/";
+import { isVariantAvailable } from "@/lib/inventory/availability";
 
 interface CategoryDisplayProps {
   products: Product[];
@@ -69,7 +70,7 @@ export default function CategoryDisplay({ products }: CategoryDisplayProps) {
     const variants = product.variants || [];
     const defaultVariant = variants.find((v) => v.id === product.default_variant_id) || variants[0];
     const available = defaultVariant?.available_for_sale ??
-      (defaultVariant?.inventory?.quantity ?? 0) > 0;
+      (defaultVariant ? isVariantAvailable(defaultVariant) : false);
     return available ? 1 : 0;
   };
 

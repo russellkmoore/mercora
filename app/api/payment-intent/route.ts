@@ -9,6 +9,10 @@ import type { Address } from '@/lib/types';
 import { enforceRateLimit, getClientIp } from '@/lib/rate-limit';
 import { isBoundedString, isPlainRecord } from '@/lib/public-request-validation';
 import { createCustomer, getCustomer } from '@/lib/models/mach/customer';
+import {
+  assertCheckoutInventoryAvailable,
+  InventoryUnavailableError,
+} from '@/lib/services/inventory-adjustments';
 
 interface PaymentIntentRequest {
   items: CheckoutLineInput[];
@@ -108,6 +112,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  try {
+    await assertCheckoutInventoryAvailable(quote.items);
+  } catch (error) {
+    if (error instanceof InventoryUnavailableError) {
+      return NextResponse.json(
+        { error: 'One or more items are no longer available in the requested quantity' },
+        { status: 409 }
+      );
+    }
+    console.error('[checkout] Authoritative inventory check failed:', error);
+    return NextResponse.json({ error: 'Inventory is temporarily unavailable' }, { status: 503 });
+  }
+
   // Preserve the authenticated customer→order FK before creating any payment
   // object. Failure is not downgraded to a guest order.
   if (userId) {
@@ -191,6 +208,8 @@ export async function POST(request: NextRequest) {
     checkout_shipping_discount: quote.shippingDiscount,
     checkout_shipping: baseShipping.subtract(shippingDiscount).toJSON(),
     checkout_tax: quote.tax,
+    checkout_shipping_tax: quote.shippingTax,
+    checkout_line_allocations: quote.lineAllocations,
     checkout_tender: quote.tender,
     checkout_tender_state: quote.tenderState,
     checkout_total: Money.fromMinor(providerAmount, providerCurrency).toJSON(),
