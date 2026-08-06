@@ -63,6 +63,9 @@ STRIPE_SECRET_KEY=sk_test_your_actual_key_here
    - `payment_intent.succeeded`
    - `payment_intent.payment_failed`
    - `checkout.session.completed`
+   - `charge.refunded`
+   - `refund.updated`
+   - `refund.failed`
 5. Copy the **Signing secret** and add to `.env.local`:
 ```env
 STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here

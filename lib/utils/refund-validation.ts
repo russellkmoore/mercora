@@ -35,6 +35,25 @@ export interface OrderExtensions {
   [key: string]: unknown;
 }
 
+/**
+ * SQL fragment for the future atomic shipment transition. Keep the JSON
+ * validity guard and object-element check: legacy scalar or malformed metadata
+ * must not throw or create substring false positives.
+ */
+export const SHIPMENT_NO_UNSETTLED_REFUNDS_SQL = `NOT EXISTS (
+  SELECT 1
+  FROM json_each(
+    CASE
+      WHEN json_valid(COALESCE(orders.extensions, '{}')) = 1
+        THEN COALESCE(orders.extensions, '{}')
+      ELSE '{}'
+    END,
+    '$.refunds'
+  ) AS refund
+  WHERE refund.type = 'object'
+    AND json_extract(refund.value, '$.status') IN ('pending', 'requires_action')
+)`;
+
 export function isPositiveSafeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
 }

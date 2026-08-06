@@ -206,6 +206,9 @@ From Stripe Dashboard > **Developers > API Keys**:
    - `payment_intent.succeeded`
    - `payment_intent.payment_failed`
    - `checkout.session.completed`
+   - `charge.refunded`
+   - `refund.updated`
+   - `refund.failed`
 5. Copy the **Signing secret** (starts with `whsec_`)
 
 ### **Step 5: Configure Environment Variables**
