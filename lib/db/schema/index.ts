@@ -95,6 +95,9 @@ export { getLocalizedValue as getPromotionLocalizedValue } from "./promotions";
 // Order entity schema (application-specific, not MACH Alliance)
 export * from "./order";
 
+// Append-oriented order fulfillment audit log
+export * from "./order-events";
+
 // Admin Settings schema (application-specific)
 export * from "./settings";
 
