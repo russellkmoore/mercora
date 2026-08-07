@@ -1,287 +1,226 @@
-import { createOrder } from '../../models/mach/orders';
-import { getSessionCart } from '../session';
-import { OrderRequest, OrderResponse, MCPToolResponse } from '../types';
-import { enhanceUserContext } from '../context';
-import { MACHAddress as Address } from '../../types/mach/Address';
-import { CartItem } from '../../types/cartitem';
-import { Money, cartSubtotal } from '../../money';
+import { toWireMoney } from '../../money';
+import {
+  finalizeOrderPayment,
+  PaymentVerificationError,
+} from '../../services/order-finalization';
+import type { MACHAddress as Address } from '../../types/mach/Address';
+import {
+  getOwnedMcpOrder,
+  getOwnedMcpOrderBinding,
+} from '../checkout';
+import { requireOwnedSession } from '../session';
+import type { MCPToolResponse, OrderRequest, OrderResponse } from '../types';
+
+const ZERO_TOTAL = toWireMoney(0);
+
+function orderFailure(
+  sessionId: string,
+  agentId: string,
+  startTime: number,
+  code: string,
+  message: string,
+  nextActions: string[],
+): MCPToolResponse<OrderResponse> {
+  return {
+    success: false,
+    data: { orderId: '', status: 'failed', total: ZERO_TOTAL, estimated_delivery: '' },
+    context: {
+      session_id: sessionId,
+      agent_id: agentId,
+      processing_time_ms: Date.now() - startTime,
+    },
+    error: { code, message },
+    metadata: {
+      can_fulfill_percentage: 0,
+      estimated_satisfaction: 0,
+      next_actions: nextActions,
+    },
+  };
+}
 
 export async function placeOrder(
   request: OrderRequest,
-  sessionId: string
+  sessionId: string,
+  agentId: string,
 ): Promise<MCPToolResponse<OrderResponse>> {
   const startTime = Date.now();
-  
-  try {
-    // Get current cart from session
-    const cart = await getSessionCart(sessionId);
-    
-    if (cart.length === 0) {
-      return {
-        success: false,
-        data: {
-          orderId: '',
-          status: 'failed',
-          total: 0,
-          estimated_delivery: ''
-        },
-        context: {
-          session_id: sessionId,
-          agent_id: request.agent_context?.agentId || 'unknown',
-          processing_time_ms: Date.now() - startTime
-        },
-        metadata: {
-          can_fulfill_percentage: 0,
-          estimated_satisfaction: 0,
-          next_actions: ['Add items to cart before placing order']
-        }
-      };
-    }
+  if (request.agent_context) request.agent_context.agentId = agentId;
 
-    // Enhanced user context for order
-    const userContext = enhanceUserContext(request.agent_context || null);
-    
-    // Calculate order totals
-    const subtotal = cartSubtotal(cart);
-    const shipping = calculateShipping(request.shippingAddress, subtotal);
-    const tax = calculateTax(subtotal, request.shippingAddress);
-    const total = subtotal.add(shipping).add(tax);
-
-    // Validate order limits if agent has budget constraints
-    if (userContext.budget && total.gt(Money.fromMajor(userContext.budget, total.currency))) {
-      return {
-        success: false,
-        data: {
-          orderId: '',
-          status: 'budget_exceeded',
-          total: total.toMach().amount,
-          estimated_delivery: ''
-        },
-        context: {
-          session_id: sessionId,
-          agent_id: request.agent_context?.agentId || 'unknown',
-          processing_time_ms: Date.now() - startTime
-        },
-        recommendations: {
-          cost_optimization: [
-            `Order total ${total.format()} exceeds budget $${userContext.budget}`,
-            'Consider removing items or choosing base models'
-          ]
-        },
-        metadata: {
-          can_fulfill_percentage: 100,
-          estimated_satisfaction: 30,
-          next_actions: ['Reduce cart total', 'Remove expensive items', 'Choose alternative products']
-        }
-      };
-    }
-
-    // Create order using existing order system
-    const orderData = {
-      user_id: userContext.userId || request.agent_context?.agentId || 'agent-order',
-      total_amount: total.toJSON(),
-      status: 'confirmed' as const,
-      shipping_address: request.shippingAddress,
-      billing_address: request.billingAddress || request.shippingAddress,
-      items: cart.map(item => ({
-        product_id: item.productId,
-        variant_id: item.variantId,
-        sku: item.variantId || `${item.productId}-default`,
-        quantity: item.quantity,
-        unit_price: Money.fromStored(item.price).toJSON(),
-        total_price: Money.fromStored(item.price).times(item.quantity).toJSON(),
-        product_name: item.name
-      })),
-      shipping_method: request.shippingOption || 'standard',
-      payment_method: request.paymentMethod || 'agent-processed',
-      special_instructions: request.specialInstructions,
-      // Agent-specific fields
-      agent_id: request.agent_context?.agentId,
-      agent_context: request.agent_context ? JSON.stringify(request.agent_context) : undefined,
-      currency_code: 'USD'
-    };
-
-    const order = await createOrder(orderData);
-    
-    // Calculate estimated delivery
-    const estimatedDelivery = calculateEstimatedDelivery(
-      request.shippingAddress,
-      request.shippingOption || 'standard'
+  const ownership = await requireOwnedSession(sessionId, agentId);
+  if (!ownership.ok) {
+    return orderFailure(
+      sessionId,
+      agentId,
+      startTime,
+      ownership.code,
+      ownership.message,
+      ownership.code === 'SESSION_NOT_FOUND'
+        ? ['Create a new session', 'Verify session ID']
+        : ['Use a session created by this agent'],
     );
+  }
 
-    // Generate order confirmation
-    const response: OrderResponse = {
-      orderId: order.id!.toString(),
-      status: order.status,
-      total: Money.fromStored(order.total_amount).toMach().amount,
-      tracking_number: order.tracking_number || undefined,
-      estimated_delivery: estimatedDelivery
-    };
+  const { orderId, paymentIntentId } = request;
+  if (
+    typeof orderId !== 'string' ||
+    !/^MCP-[A-Z0-9]+-\d+-[A-F0-9]{8}$/.test(orderId) ||
+    typeof paymentIntentId !== 'string' ||
+    !/^pi_[A-Za-z0-9_]+$/.test(paymentIntentId)
+  ) {
+    return orderFailure(
+      sessionId,
+      agentId,
+      startTime,
+      'PAYMENT_REQUIRED',
+      'A valid orderId and paymentIntentId from create_payment_intent are required.',
+      ['Call create_payment_intent', 'Complete payment', 'Retry place_order'],
+    );
+  }
 
-    const processingTime = Date.now() - startTime;
+  const pending = await getOwnedMcpOrderBinding({
+    orderId,
+    paymentIntentId,
+    agentId,
+    sessionId,
+  });
+  if (!pending) {
+    return orderFailure(
+      sessionId,
+      agentId,
+      startTime,
+      'PAYMENT_NOT_BOUND',
+      'The pending order and PaymentIntent are not bound to this agent and session.',
+      ['Create a new PaymentIntent for this session'],
+    );
+  }
 
+  try {
+    const result = await finalizeOrderPayment({
+      orderId,
+      paymentIntentId,
+      enforceOwnership: false,
+      sendEmail: true,
+    });
+    const order = result.order;
     return {
       success: true,
-      data: response,
+      data: {
+        orderId: order.id!,
+        status: order.status,
+        total: toWireMoney(order.total_amount, order.currency_code),
+        tracking_number: order.tracking_number,
+        estimated_delivery: calculateEstimatedDelivery(
+          order.shipping_address,
+          order.shipping_method || 'standard',
+        ),
+      },
       context: {
         session_id: sessionId,
-        agent_id: request.agent_context?.agentId || 'unknown',
-        processing_time_ms: processingTime
-      },
-      recommendations: {
-        bundling_opportunities: generatePostOrderRecommendations(cart),
-        cost_optimization: [`Order saved ${Money.fromMajor(userContext.budget || total.toMach().amount).subtract(total).format()} vs budget`]
+        agent_id: agentId,
+        processing_time_ms: Date.now() - startTime,
       },
       metadata: {
         can_fulfill_percentage: 100,
         estimated_satisfaction: 95,
-        next_actions: ['Track order status', 'Save order confirmation', 'Plan future purchases']
-      }
+        next_actions: ['Save the order confirmation', 'Use get_order_status for updates'],
+      },
     };
-
   } catch (error) {
-    const processingTime = Date.now() - startTime;
-    
-    return {
-      success: false,
-      data: {
-        orderId: '',
-        status: 'failed',
-        total: 0,
-        estimated_delivery: ''
-      },
-      context: {
-        session_id: sessionId,
-        agent_id: request.agent_context?.agentId || 'unknown',
-        processing_time_ms: processingTime
-      },
-      metadata: {
-        can_fulfill_percentage: 0,
-        estimated_satisfaction: 0,
-        next_actions: ['Check order details', 'Verify payment method', 'Retry order placement']
-      }
-    };
+    if (error instanceof PaymentVerificationError) {
+      return orderFailure(
+        sessionId,
+        agentId,
+        startTime,
+        'PAYMENT_VERIFICATION_FAILED',
+        'Payment has not been verified for this order.',
+        ['Complete payment', 'Retry place_order'],
+      );
+    }
+    console.error(`[mcp] Failed to finalize order ${orderId}:`, error);
+    return orderFailure(
+      sessionId,
+      agentId,
+      startTime,
+      'ORDER_FINALIZATION_FAILED',
+      'The order could not be finalized.',
+      ['Retry place_order; finalization is idempotent'],
+    );
   }
 }
 
 export async function getOrderStatus(
   orderId: string,
-  agentId: string
+  agentId: string,
 ): Promise<MCPToolResponse<OrderResponse>> {
   const startTime = Date.now();
-  
-  try {
-    // In a real implementation, you'd fetch from orders table
-    // For now, return a mock response
-    const response: OrderResponse = {
-      orderId,
-      status: 'confirmed',
-      total: 299.99,
-      tracking_number: `VT${Date.now()}`,
-      estimated_delivery: '3-5 business days'
-    };
+  const order = await getOwnedMcpOrder(orderId, agentId);
 
-    return {
-      success: true,
-      data: response,
-      context: {
-        session_id: 'status-check',
-        agent_id: agentId,
-        processing_time_ms: Date.now() - startTime
-      },
-      metadata: {
-        can_fulfill_percentage: 100,
-        estimated_satisfaction: 90,
-        next_actions: ['Track shipment', 'Contact customer service if needed']
-      }
-    };
-  } catch (error) {
-    return {
-      success: false,
-      data: {
-        orderId: '',
-        status: 'error',
-        total: 0,
-        estimated_delivery: ''
-      },
-      context: {
-        session_id: 'status-check',
-        agent_id: agentId,
-        processing_time_ms: Date.now() - startTime
-      },
-      metadata: {
-        can_fulfill_percentage: 0,
-        estimated_satisfaction: 0,
-        next_actions: ['Verify order ID', 'Contact support']
-      }
-    };
+  if (!order) {
+    return orderFailure(
+      'status-check',
+      agentId,
+      startTime,
+      'ORDER_NOT_FOUND',
+      'No order found for this agent with that ID.',
+      ['Verify the order ID', 'Place an order with place_order'],
+    );
   }
-}
 
-function calculateShipping(address: Address, subtotal: Money): Money {
-  // Free shipping over $100
-  if (subtotal.gte(Money.fromMajor(100, subtotal.currency))) return Money.zero(subtotal.currency);
-  
-  // Alaska/Hawaii surcharge
-  if (address.region === 'AK' || address.region === 'HI') {
-    return Money.fromMajor(19.99, subtotal.currency);
-  }
-  
-  // Standard shipping
-  return Money.fromMajor(9.99, subtotal.currency);
-}
-
-function calculateTax(subtotal: Money, address: Address): Money {
-  // Simple tax calculation - in production, use proper tax service
-  const taxRates: Record<string, number> = {
-    'CA': 0.0875, // California
-    'NY': 0.08,   // New York
-    'TX': 0.0625, // Texas
-    'FL': 0.06    // Florida
+  return {
+    success: true,
+    data: {
+      orderId: order.id!,
+      status: order.status,
+      total: toWireMoney(order.total_amount, order.currency_code),
+      tracking_number: order.tracking_number,
+      estimated_delivery: calculateEstimatedDelivery(
+        order.shipping_address,
+        order.shipping_method || 'standard',
+      ),
+    },
+    context: {
+      session_id: 'status-check',
+      agent_id: agentId,
+      processing_time_ms: Date.now() - startTime,
+    },
+    metadata: {
+      can_fulfill_percentage: 100,
+      estimated_satisfaction: 90,
+      next_actions: order.status === 'delivered'
+        ? ['Review the delivered order']
+        : ['Check back for status updates'],
+    },
   };
-  
-  const rate = taxRates[address.region || ''] || 0.05; // Default 5%
-  return subtotal.applyRate(rate);
 }
 
-function calculateEstimatedDelivery(address: Address, shippingOption: string): string {
+function calculateEstimatedDelivery(address: Address | undefined, shippingOption: string): string {
   if (shippingOption === 'expedited' || shippingOption === 'overnight') {
     return '1-2 business days';
   }
-  
-  if (address.region === 'AK' || address.region === 'HI') {
+  if (address?.region === 'AK' || address?.region === 'HI') {
     return '5-7 business days';
   }
-  
   return '3-5 business days';
 }
 
-function formatAddressForDB(address: Address): string {
-  return JSON.stringify({
-    street: address.line1,
-    street2: address.line2,
-    city: address.city,
-    state: address.region,
-    postal_code: address.postal_code,
-    country: address.country || 'US'
-  });
-}
-
-function generatePostOrderRecommendations(cart: CartItem[]): string[] {
-  const recommendations: string[] = [];
-  
-  const hasTent = cart.some(item => item.name.toLowerCase().includes('tent'));
-  const hasBackpack = cart.some(item => item.name.toLowerCase().includes('pack'));
-  
-  if (hasTent) {
-    recommendations.push('Consider tent footprint for ground protection');
-    recommendations.push('Add camping furniture for comfort');
+export function normalizeAddress(input: unknown): Address {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return { line1: '', city: '', country: 'US' };
   }
-  
-  if (hasBackpack) {
-    recommendations.push('Rain cover recommended for pack protection');
-    recommendations.push('Hydration system for longer hikes');
-  }
-  
-  return recommendations;
+  const address = input as Record<string, unknown>;
+  return {
+    ...address,
+    line1: String(address.line1 ?? address.street ?? ''),
+    line2: address.line2 === undefined && address.street2 === undefined
+      ? undefined
+      : String(address.line2 ?? address.street2),
+    city: String(address.city ?? ''),
+    region: address.region === undefined && address.state === undefined
+      ? undefined
+      : String(address.region ?? address.state),
+    postal_code: address.postal_code === undefined && address.postalCode === undefined
+      ? undefined
+      : String(address.postal_code ?? address.postalCode),
+    country: String(address.country ?? 'US'),
+  } as Address;
 }

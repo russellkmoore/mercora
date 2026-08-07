@@ -66,7 +66,7 @@ export interface SearchRequest {
     priceMin?: number;
     priceMax?: number;
     limit?: number;
-    sortBy?: 'price' | 'rating' | 'popularity';
+    sortBy?: 'price';
   };
   agent_context?: AgentContext;
 }
@@ -82,7 +82,7 @@ export interface AssessRequest {
 }
 
 export interface RecommendRequest {
-  context: {
+  context?: {
     currentProduct?: number;
     userActivity?: string;
     budget?: number;
@@ -99,10 +99,12 @@ export interface CartRequest {
 }
 
 export interface OrderRequest {
-  shippingAddress: Address;
+  orderId: string;
+  paymentIntentId: string;
+  shippingAddress?: Address;
   billingAddress?: Address;
-  paymentMethod: string;
-  shippingOption: string;
+  paymentMethod?: string;
+  shippingOption?: string;
   specialInstructions?: string;
   agent_context?: AgentContext;
 }
@@ -126,13 +128,13 @@ export interface AssessResponse {
 export interface CartResponse {
   cart: WireCartItem[];
   total_items: number;
-  estimated_total: number;
+  estimated_total: MachMoney;
 }
 
 export interface OrderResponse {
   orderId: string;
   status: string;
-  total: number;
+  total: MachMoney;
   tracking_number?: string;
   estimated_delivery: string;
 }

@@ -130,6 +130,36 @@ export async function getSessionCart(sessionId: string): Promise<CartItem[]> {
   return session?.cart || [];
 }
 
+export type SessionOwnershipResult =
+  | { ok: true; session: AgentSession }
+  | {
+      ok: false;
+      code: 'SESSION_NOT_FOUND' | 'SESSION_ACCESS_DENIED';
+      message: string;
+    };
+
+export async function requireOwnedSession(
+  sessionId: string,
+  agentId: string,
+): Promise<SessionOwnershipResult> {
+  const session = await getSession(sessionId);
+  if (!session) {
+    return {
+      ok: false,
+      code: 'SESSION_NOT_FOUND',
+      message: 'Session not found or expired',
+    };
+  }
+  if (session.agentId !== agentId) {
+    return {
+      ok: false,
+      code: 'SESSION_ACCESS_DENIED',
+      message: 'Agent does not own this session',
+    };
+  }
+  return { ok: true, session };
+}
+
 export async function updateSessionCart(sessionId: string, cart: CartItem[]): Promise<boolean> {
   return updateSession(sessionId, { cart });
 }
