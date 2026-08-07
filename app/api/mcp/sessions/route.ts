@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const agentContext = parseAgentContext(request);
+    const agentContext = parseAgentContext(request, auth.agentId);
     const session = await createSession(auth.agentId!, agentContext || undefined);
     
     const response: MCPToolResponse<AgentSession> = {

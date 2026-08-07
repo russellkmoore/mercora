@@ -2,7 +2,7 @@ import { getDbAsync } from '../../db';
 import { mcpAgents, mcpSessions } from '../../db/schema/mcp';
 import { eq, desc, count, and, gte } from 'drizzle-orm';
 import { MCPToolResponse } from '../types';
-import { createAgent as createAgentAuth } from '../auth';
+import { createAgent as createAgentAuth, hasPermission, rotateAgentApiKey } from '../auth';
 import { AuthenticationError, ValidationError, ResourceNotFoundError, DatabaseError, createErrorResponse } from '../error-handler';
 
 export interface AgentInfo {
@@ -15,6 +15,8 @@ export interface AgentInfo {
   isActive: boolean;
   createdAt: string;
   lastUsed?: string;
+  apiKeyExpiresAt?: string;
+  credentialVersion: number;
 }
 
 export interface AgentStats {
@@ -31,11 +33,13 @@ export interface CreateAgentRequest {
   permissions?: string[];
   rateLimitRpm?: number;
   rateLimitOph?: number;
+  apiKeyTtlDays?: number;
 }
 
 export interface CreateAgentResponse {
   agent: AgentInfo;
   apiKey: string;
+  expiresAt: string;
   setup_instructions: string[];
 }
 
@@ -57,21 +61,85 @@ export interface AgentDetailsResponse {
   }>;
 }
 
+function safePermissions(value: string | null): string[] {
+  try {
+    const parsed: unknown = JSON.parse(value || '[]');
+    return Array.isArray(parsed)
+      ? parsed.filter((permission): permission is string => typeof permission === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function storedPermissions(value: string | null): string[] {
+  const parsed: unknown = JSON.parse(value || '[]');
+  if (!Array.isArray(parsed) || parsed.some((permission) => typeof permission !== 'string')) {
+    throw new Error('Agent has an invalid stored permission set');
+  }
+  return parsed;
+}
+
+export function canManageAgentPermissions(
+  managerPermissions: string[],
+  targetPermissions: string[],
+): boolean {
+  return targetPermissions.every((permission) => hasPermission(managerPermissions, permission));
+}
+
+function safeCartItemCount(value: string | null): number {
+  try {
+    const parsed: unknown = JSON.parse(value || '[]');
+    return Array.isArray(parsed) ? parsed.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
 export async function createAgent(
   request: CreateAgentRequest,
   sessionId: string,
-  adminAgentId: string
+  adminAgentId: string,
+  adminPermissions: string[] = [],
 ): Promise<MCPToolResponse<CreateAgentResponse>> {
   const startTime = Date.now();
 
   try {
     // Validate input
-    if (!request.agentId || request.agentId.length < 3) {
-      throw ValidationError('agentId', 'Agent ID must be at least 3 characters long');
+    if (!request.agentId || !/^[A-Za-z0-9._-]{3,128}$/.test(request.agentId)) {
+      throw ValidationError('agentId', 'Agent ID must be 3-128 safe identifier characters');
     }
 
-    if (!request.name || request.name.length < 3) {
-      throw ValidationError('name', 'Agent name must be at least 3 characters long');
+    if (typeof request.name !== 'string' || request.name.length < 3 || request.name.length > 128) {
+      throw ValidationError('name', 'Agent name must be between 3 and 128 characters long');
+    }
+    if (
+      request.description !== undefined &&
+      (typeof request.description !== 'string' || request.description.length > 1_000)
+    ) {
+      throw ValidationError('description', 'Agent description must be a string of at most 1000 characters');
+    }
+
+    const requestedPermissions = request.permissions ?? [];
+    if (
+      !Array.isArray(requestedPermissions) ||
+      requestedPermissions.length > 50 ||
+      requestedPermissions.some((permission) =>
+        typeof permission !== 'string' || permission.length < 1 || permission.length > 128
+      )
+    ) {
+      throw ValidationError('permissions', 'Permissions must be at most 50 non-empty strings');
+    }
+    if (!canManageAgentPermissions(adminPermissions, requestedPermissions)) {
+      throw ValidationError('permissions', 'Cannot grant a permission the managing agent does not hold');
+    }
+    for (const [field, value] of [
+      ['rateLimitRpm', request.rateLimitRpm],
+      ['rateLimitOph', request.rateLimitOph],
+    ] as const) {
+      if (value !== undefined && (!Number.isSafeInteger(value) || value < 1 || value > 100_000)) {
+        throw ValidationError(field, `${field} must be an integer between 1 and 100000`);
+      }
     }
 
     // Check if agent already exists
@@ -86,13 +154,14 @@ export async function createAgent(
     }
 
     // Create the agent
-    const { apiKey } = await createAgentAuth({
+    const { apiKey, expiresAt } = await createAgentAuth({
       agentId: request.agentId,
       name: request.name,
       description: request.description,
-      permissions: request.permissions,
+      permissions: requestedPermissions,
       rateLimitRpm: request.rateLimitRpm,
-      rateLimitOph: request.rateLimitOph
+      rateLimitOph: request.rateLimitOph,
+      apiKeyTtlDays: request.apiKeyTtlDays,
     });
 
     // Get the created agent info
@@ -106,12 +175,14 @@ export async function createAgent(
       agentId: agentData.agentId,
       name: agentData.name || '',
       description: agentData.description || undefined,
-      permissions: JSON.parse(agentData.permissions || '[]'),
-      rateLimitRpm: agentData.rateLimitRpm || 100,
-      rateLimitOph: agentData.rateLimitOph || 10,
+      permissions: safePermissions(agentData.permissions),
+      rateLimitRpm: agentData.rateLimitRpm ?? 100,
+      rateLimitOph: agentData.rateLimitOph ?? 10,
       isActive: agentData.isActive || false,
       createdAt: agentData.createdAt || '',
-      lastUsed: agentData.lastUsed || undefined
+      lastUsed: agentData.lastUsed || undefined,
+      apiKeyExpiresAt: agentData.apiKeyExpiresAt || undefined,
+      credentialVersion: agentData.credentialVersion,
     };
 
     const processingTime = Date.now() - startTime;
@@ -121,6 +192,7 @@ export async function createAgent(
       data: {
         agent,
         apiKey,
+        expiresAt,
         setup_instructions: [
           'Store the API key securely - it will not be shown again',
           'Include the API key in X-Agent-API-Key header for all requests',
@@ -150,6 +222,7 @@ export async function createAgent(
       return createErrorResponse(new Error(`Validation error: ${(error as any).message}`), sessionId, adminAgentId, processingTime, {
         agent: {} as AgentInfo,
         apiKey: '',
+        expiresAt: '',
         setup_instructions: []
       });
     }
@@ -162,6 +235,7 @@ export async function createAgent(
       {
         agent: {} as AgentInfo,
         apiKey: '',
+        expiresAt: '',
         setup_instructions: []
       }
     );
@@ -177,6 +251,12 @@ export async function listAgents(
   const startTime = Date.now();
 
   try {
+    if (!Number.isSafeInteger(page) || page < 1) {
+      throw ValidationError('page', 'page must be a positive integer');
+    }
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+      throw ValidationError('limit', 'limit must be an integer between 1 and 100');
+    }
     const db = await getDbAsync();
     const offset = (page - 1) * limit;
 
@@ -192,24 +272,21 @@ export async function listAgents(
       .from(mcpAgents);
     const total = totalResult[0].count;
 
-    // Get stats for each agent
-    const agentsWithStats = await Promise.all(
-      agents.map(async (agent) => {
-        const stats = await getAgentStats(agent.agentId);
-        return {
-          agentId: agent.agentId,
-          name: agent.name || '',
-          description: agent.description || undefined,
-          permissions: JSON.parse(agent.permissions || '[]'),
-          rateLimitRpm: agent.rateLimitRpm || 100,
-          rateLimitOph: agent.rateLimitOph || 10,
-          isActive: agent.isActive || false,
-          createdAt: agent.createdAt || '',
-          lastUsed: agent.lastUsed || undefined,
-          stats
-        };
-      })
-    );
+    // Detailed stats remain available from get_agent_details. Keeping the
+    // paginated list to two aggregate queries avoids a D1 N+1 fan-out.
+    const agentsWithStats = agents.map((agent) => ({
+      agentId: agent.agentId,
+      name: agent.name || '',
+      description: agent.description || undefined,
+      permissions: safePermissions(agent.permissions),
+      rateLimitRpm: agent.rateLimitRpm ?? 100,
+      rateLimitOph: agent.rateLimitOph ?? 10,
+      isActive: agent.isActive ?? false,
+      createdAt: agent.createdAt || '',
+      lastUsed: agent.lastUsed || undefined,
+      apiKeyExpiresAt: agent.apiKeyExpiresAt || undefined,
+      credentialVersion: agent.credentialVersion,
+    }));
 
     const processingTime = Date.now() - startTime;
 
@@ -275,12 +352,14 @@ export async function getAgentDetails(
       agentId: agentData.agentId,
       name: agentData.name || '',
       description: agentData.description || undefined,
-      permissions: JSON.parse(agentData.permissions || '[]'),
-      rateLimitRpm: agentData.rateLimitRpm || 100,
-      rateLimitOph: agentData.rateLimitOph || 10,
+      permissions: safePermissions(agentData.permissions),
+      rateLimitRpm: agentData.rateLimitRpm ?? 100,
+      rateLimitOph: agentData.rateLimitOph ?? 10,
       isActive: agentData.isActive || false,
       createdAt: agentData.createdAt || '',
-      lastUsed: agentData.lastUsed || undefined
+      lastUsed: agentData.lastUsed || undefined,
+      apiKeyExpiresAt: agentData.apiKeyExpiresAt || undefined,
+      credentialVersion: agentData.credentialVersion,
     };
 
     // Get detailed stats
@@ -302,7 +381,7 @@ export async function getAgentDetails(
       sessionId: session.sessionId,
       createdAt: session.createdAt || '',
       expiresAt: session.expiresAt,
-      itemsInCart: session.cart ? JSON.parse(session.cart).length : 0
+      itemsInCart: safeCartItemCount(session.cart)
     }));
 
     const processingTime = Date.now() - startTime;
@@ -358,7 +437,8 @@ export async function updateAgentStatus(
   agentId: string,
   isActive: boolean,
   sessionId: string,
-  adminAgentId: string
+  adminAgentId: string,
+  adminPermissions: string[] = [],
 ): Promise<MCPToolResponse<{ agent: AgentInfo; previous_status: boolean }>> {
   const startTime = Date.now();
 
@@ -373,6 +453,9 @@ export async function updateAgentStatus(
 
     if (agentResult.length === 0) {
       throw ResourceNotFoundError('Agent', agentId);
+    }
+    if (!canManageAgentPermissions(adminPermissions, storedPermissions(agentResult[0].permissions))) {
+      throw ValidationError('permissions', 'Cannot change an agent with permissions the managing agent does not hold');
     }
 
     const previousStatus = agentResult[0].isActive;
@@ -393,12 +476,14 @@ export async function updateAgentStatus(
       agentId: agentData.agentId,
       name: agentData.name || '',
       description: agentData.description || undefined,
-      permissions: JSON.parse(agentData.permissions || '[]'),
-      rateLimitRpm: agentData.rateLimitRpm || 100,
-      rateLimitOph: agentData.rateLimitOph || 10,
+      permissions: safePermissions(agentData.permissions),
+      rateLimitRpm: agentData.rateLimitRpm ?? 100,
+      rateLimitOph: agentData.rateLimitOph ?? 10,
       isActive: agentData.isActive || false,
       createdAt: agentData.createdAt || '',
-      lastUsed: agentData.lastUsed || undefined
+      lastUsed: agentData.lastUsed || undefined,
+      apiKeyExpiresAt: agentData.apiKeyExpiresAt || undefined,
+      credentialVersion: agentData.credentialVersion,
     };
 
     const processingTime = Date.now() - startTime;
@@ -435,6 +520,51 @@ export async function updateAgentStatus(
         agent: {} as AgentInfo,
         previous_status: false
       }
+    );
+  }
+}
+
+export async function rotateAgentCredential(
+  agentId: string,
+  apiKeyTtlDays: number | undefined,
+  sessionId: string,
+  adminAgentId: string,
+  adminPermissions: string[] = [],
+): Promise<MCPToolResponse<{ apiKey: string; expiresAt: string }>> {
+  const startTime = Date.now();
+
+  try {
+    const db = await getDbAsync();
+    const [target] = await db.select({ permissions: mcpAgents.permissions })
+      .from(mcpAgents)
+      .where(eq(mcpAgents.agentId, agentId))
+      .limit(1);
+    if (!target) throw ResourceNotFoundError('Agent', agentId);
+    if (!canManageAgentPermissions(adminPermissions, storedPermissions(target.permissions))) {
+      throw ValidationError('permissions', 'Cannot rotate an agent with permissions the managing agent does not hold');
+    }
+    const credential = await rotateAgentApiKey(agentId, apiKeyTtlDays);
+    return {
+      success: true,
+      data: credential,
+      context: {
+        session_id: sessionId,
+        agent_id: adminAgentId,
+        processing_time_ms: Date.now() - startTime,
+      },
+      metadata: {
+        can_fulfill_percentage: 100,
+        estimated_satisfaction: 95,
+        next_actions: ['Store the new API key securely; it will not be shown again'],
+      },
+    };
+  } catch (error) {
+    return createErrorResponse(
+      error instanceof Error ? error : new Error('Failed to rotate agent credential'),
+      sessionId,
+      adminAgentId,
+      Date.now() - startTime,
+      { apiKey: '', expiresAt: '' },
     );
   }
 }

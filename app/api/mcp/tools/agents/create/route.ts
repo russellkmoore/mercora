@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateAgent } from '../../../../../../lib/mcp/auth';
-import { parseAgentContext } from '../../../../../../lib/mcp/context';
+import { authenticateAgent, hasAgentManagementPermission } from '../../../../../../lib/mcp/auth';
 import { createAgent } from '../../../../../../lib/mcp/tools/agent';
 
 export async function POST(request: NextRequest) {
@@ -13,9 +12,18 @@ export async function POST(request: NextRequest) {
     }, { status: 401 });
   }
 
+  if (!hasAgentManagementPermission(auth.permissions)) {
+    return NextResponse.json({
+      success: false,
+      error: {
+        code: 'FORBIDDEN',
+        message: 'Agent management requires admin or agents:manage permission',
+      },
+    }, { status: 403 });
+  }
+
   try {
     const body = await request.json() as any;
-    const agentContext = parseAgentContext(request);
     
     // Validate required fields
     if (!body.agentId) {
@@ -44,11 +52,12 @@ export async function POST(request: NextRequest) {
       description: body.description,
       permissions: body.permissions,
       rateLimitRpm: body.rateLimitRpm,
-      rateLimitOph: body.rateLimitOph
+      rateLimitOph: body.rateLimitOph,
+      apiKeyTtlDays: body.apiKeyTtlDays,
     };
 
     const sessionId = body.session_id || 'temp';
-    const result = await createAgent(createRequest, sessionId, auth.agentId!);
+    const result = await createAgent(createRequest, sessionId, auth.agentId!, auth.permissions);
     
     return NextResponse.json(result);
   } catch (error) {

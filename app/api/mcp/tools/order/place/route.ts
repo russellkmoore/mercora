@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateAgent } from '../../../../../../lib/mcp/auth';
+import { authenticateAgent, hasPermission, requiredScopeForTool } from '../../../../../../lib/mcp/auth';
 import { parseAgentContext } from '../../../../../../lib/mcp/context';
 import { placeOrder } from '../../../../../../lib/mcp/tools/order';
 import { OrderRequest } from '../../../../../../lib/mcp/types';
 
 export async function POST(request: NextRequest) {
-  const auth = await authenticateAgent(request);
+  const auth = await authenticateAgent(request, { isOrderOp: true });
   
   if (!auth.success) {
     return NextResponse.json({
@@ -14,9 +14,17 @@ export async function POST(request: NextRequest) {
     }, { status: 401 });
   }
 
+  const requiredScope = requiredScopeForTool('place_order')!;
+  if (!hasPermission(auth.permissions, requiredScope)) {
+    return NextResponse.json({
+      success: false,
+      error: { code: 'FORBIDDEN', message: 'This tool requires place:orders permission' },
+    }, { status: 403 });
+  }
+
   try {
     const body = await request.json() as any;
-    const agentContext = parseAgentContext(request);
+    const agentContext = parseAgentContext(request, auth.agentId);
     
     const orderRequest: OrderRequest = {
       ...body,
@@ -24,7 +32,7 @@ export async function POST(request: NextRequest) {
     };
 
     const sessionId = body.session_id || 'temp';
-    const result = await placeOrder(orderRequest, sessionId);
+    const result = await placeOrder(orderRequest, sessionId, auth.agentId!);
     
     return NextResponse.json(result);
   } catch (error) {

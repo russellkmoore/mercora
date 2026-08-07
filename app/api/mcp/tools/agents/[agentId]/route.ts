@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateAgent } from '../../../../../../lib/mcp/auth';
-import { getAgentDetails, updateAgentStatus } from '../../../../../../lib/mcp/tools/agent';
+import { authenticateAgent, hasAgentManagementPermission } from '../../../../../../lib/mcp/auth';
+import { getAgentDetails, rotateAgentCredential, updateAgentStatus } from '../../../../../../lib/mcp/tools/agent';
+
+const forbiddenResponse = {
+  success: false,
+  error: {
+    code: 'FORBIDDEN',
+    message: 'Agent management requires admin or agents:manage permission',
+  },
+} as const;
 
 export async function GET(
   request: NextRequest,
@@ -13,6 +21,10 @@ export async function GET(
       success: false,
       error: auth.error
     }, { status: 401 });
+  }
+
+  if (!hasAgentManagementPermission(auth.permissions)) {
+    return NextResponse.json(forbiddenResponse, { status: 403 });
   }
 
   try {
@@ -48,27 +60,43 @@ export async function PATCH(
     }, { status: 401 });
   }
 
+  if (!hasAgentManagementPermission(auth.permissions)) {
+    return NextResponse.json(forbiddenResponse, { status: 403 });
+  }
+
   try {
     const { agentId } = await params;
     const body = await request.json() as any;
     
-    // Currently only support status updates
+    const sessionId = body.session_id || 'temp';
+
+    if (body.rotateApiKey === true) {
+      const result = await rotateAgentCredential(
+        agentId,
+        body.apiKeyTtlDays,
+        sessionId,
+        auth.agentId!,
+        auth.permissions,
+      );
+      return NextResponse.json(result);
+    }
+
     if (typeof body.isActive !== 'boolean') {
       return NextResponse.json({
         success: false,
         error: {
           code: 'INVALID_REQUEST',
-          message: 'isActive boolean field is required'
+          message: 'isActive boolean or rotateApiKey=true is required'
         }
       }, { status: 400 });
     }
     
-    const sessionId = body.session_id || 'temp';
     const result = await updateAgentStatus(
       agentId,
       body.isActive,
       sessionId,
-      auth.agentId!
+      auth.agentId!,
+      auth.permissions,
     );
     
     return NextResponse.json(result);
