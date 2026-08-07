@@ -69,6 +69,7 @@ export interface Order {
   payment_status: PaymentStatus;
   
   // Tracking and fulfillment
+  shipping_carrier?: string;
   tracking_number?: string;
   shipped_at?: string; // ISO 8601 timestamp
   delivered_at?: string; // ISO 8601 timestamp
@@ -187,6 +188,7 @@ export function convertLegacyToMach(legacyOrder: LegacyOrder): Order {
     billing_address: legacyOrder.billingAddress,
     items: legacyOrder.items || [],
     shipping_method: legacyOrder.carrier,
+    shipping_carrier: legacyOrder.carrier,
     payment_method: "card", // Default
     payment_status: "pending", // Default
     tracking_number: legacyOrder.trackingNumber,
@@ -235,7 +237,7 @@ export function convertMachToLegacy(machOrder: Order): LegacyOrder {
     taxAmount: machOrder.extensions?.taxAmount,
     total: machOrder.total_amount.amount,
     status: machOrder.status,
-    carrier: machOrder.shipping_method,
+    carrier: machOrder.shipping_carrier ?? machOrder.shipping_method,
     trackingNumber: machOrder.tracking_number,
     trackingUrl: machOrder.extensions?.trackingUrl,
     shippedAt: machOrder.shipped_at,
