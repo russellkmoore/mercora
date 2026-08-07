@@ -31,4 +31,60 @@ describe("resolveStoreConfig", () => {
 
     expect(config.contact.senderEmail).toBe("Acme Store <help@acme.example>");
   });
+
+  it("parses a validated runtime carrier registry", () => {
+    const carriers = [
+      {
+        code: "dhl",
+        label: "DHL Express",
+        trackingUrlTemplate: "https://www.dhl.example/track/{trackingNumber}",
+        legacyAliases: ["DHL Global", "dhl-global"],
+      },
+      { code: "other", label: "Manual carrier", legacyAliases: [] },
+    ];
+
+    expect(resolveStoreConfig({ STORE_CARRIERS_JSON: JSON.stringify(carriers) }).commerce.carriers)
+      .toEqual(carriers);
+  });
+
+  it("allows equivalent aliases within one carrier definition", () => {
+    const carriers = [{
+      code: "dhl",
+      label: "DHL",
+      legacyAliases: ["DHL", "d-h-l", "DHL Global", "dhl-global"],
+    }];
+
+    expect(resolveStoreConfig({ STORE_CARRIERS_JSON: JSON.stringify(carriers) }).commerce.carriers)
+      .toEqual(carriers);
+  });
+
+  it("rejects duplicate normalized carrier definition codes", () => {
+    const carriers = [
+      { code: "dhl", label: "DHL", legacyAliases: [] },
+      { code: "DHL", label: "DHL duplicate", legacyAliases: [] },
+    ];
+
+    expect(resolveStoreConfig({ STORE_CARRIERS_JSON: JSON.stringify(carriers) }).commerce.carriers)
+      .toEqual(storeDefaults.commerce.carriers);
+  });
+
+  it.each([
+    "not-json",
+    JSON.stringify([]),
+    JSON.stringify([{ code: "DHL!", label: "DHL", legacyAliases: [] }]),
+    JSON.stringify([{ code: "dhl", label: "DHL", legacyAliases: [], trackingUrlTemplate: "http://dhl.example/{trackingNumber}" }]),
+    JSON.stringify([{ code: "dhl", label: "DHL", legacyAliases: [], trackingUrlTemplate: "https://{trackingNumber}.attacker.example/" }]),
+    JSON.stringify([{ code: "dhl", label: "DHL", legacyAliases: [], trackingUrlTemplate: "https://dhl.example/no-placeholder" }]),
+    JSON.stringify([
+      { code: "dhl", label: "DHL", legacyAliases: [] },
+      { code: "dhlx", label: "DHL X", legacyAliases: [] },
+    ]),
+    JSON.stringify([
+      { code: "alpha", label: "Alpha", legacyAliases: ["parcel"] },
+      { code: "beta", label: "Beta", legacyAliases: ["parcel express"] },
+    ]),
+  ])("falls back atomically for an unsafe carrier registry: %s", (value) => {
+    expect(resolveStoreConfig({ STORE_CARRIERS_JSON: value }).commerce.carriers)
+      .toEqual(storeDefaults.commerce.carriers);
+  });
 });

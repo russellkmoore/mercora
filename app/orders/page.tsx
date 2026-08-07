@@ -38,7 +38,9 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { getOrdersByUserId } from "@/lib/models/";
-import OrderCard from "@/components/OrderCard";
+import OrderCard, { type OrderCardOrder } from "@/components/OrderCard";
+import { getCarrierRegistry } from "@/lib/fulfillment/carrier-config";
+import { buildShipmentView } from "@/lib/fulfillment/shipment-view";
 
 /**
  * Orders page component displaying user's order history
@@ -65,19 +67,35 @@ export default async function OrdersPage() {
 
   // Fetch user's order history from database
   const orders = await getOrdersByUserId(userId);
+  const registry = getCarrierRegistry();
+  const cards = orders.map((order) => ({
+    // OrderCard is a client component. Pass a fresh allowlisted object so
+    // opaque extensions, payment references, addresses, and internal notes
+    // are not serialized into the browser's React payload.
+    order: {
+      id: order.id,
+      status: order.status,
+      total_amount: order.total_amount,
+      items: order.items,
+      created_at: order.created_at,
+      shipped_at: order.shipped_at,
+      delivered_at: order.delivered_at,
+    } satisfies OrderCardOrder,
+    shipment: buildShipmentView(order, registry),
+  }));
 
   return (
     <main className="bg-neutral-900 text-white min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
       <div className="max-w-6xl mx-auto p-4 sm:p-6">
         <h2 className="text-xl sm:text-2xl font-bold mb-6">Order History</h2>
-        {orders.length === 0 ? (
+        {cards.length === 0 ? (
           // Empty state for users with no orders
           <p className="text-gray-400">You haven&rsquo;t placed any orders yet.</p>
         ) : (
           // Order history list with proper spacing
           <div className="space-y-4 sm:space-y-6">
-            {orders.map((order) => (
-              <OrderCard key={order.id} order={order} />
+            {cards.map(({ order, shipment }) => (
+              <OrderCard key={order.id} order={order} shipment={shipment} />
             ))}
           </div>
         )}
