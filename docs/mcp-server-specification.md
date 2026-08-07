@@ -1,640 +1,162 @@
-# Voltique MCP Server - Technical Specification
+# Mercora MCP commerce API
 
-> **✅ COMPLETED - Model Context Protocol Integration for Voltique AI Assistant**
-> 
-> **Production-ready multi-agent commerce server with 17 tools**
+Mercora exposes an authenticated HTTP API for agent-assisted catalog discovery,
+session carts, checkout, and order status. The API is store-neutral: catalog,
+shipping, pricing, tax, promotion, inventory, and payment behavior comes from
+the same configuration and services used by the storefront.
 
-## 🎯 Overview
+The tool schema is available from `GET /api/mcp/schema`. Authenticated clients
+can use either the individual REST routes under `/api/mcp` or the JSON tool
+dispatcher at `POST /api/mcp`.
 
-The Voltique MCP Server enables direct integration of Volt (our AI shopping assistant) with Model Context Protocol compatible clients like Claude Desktop, Cursor, VS Code, and other AI development tools. This revolutionary approach allows users to discover, research, and purchase outdoor gear without leaving their workflow.
+## Authentication and credentials
 
-## 🚀 Vision Statement
+Send an agent credential in one of these headers:
 
-**"Shop for outdoor gear as naturally as asking a question"**
-
-Transform eCommerce from a web-based activity to a conversational experience embedded directly in users' daily tools and workflows.
-
-## 🎪 Revolutionary Use Cases
-
-### 💻 **Developer Scenarios**
-
-#### **Scenario 1: Weekend Adventure Planning**
-```
-Developer (in Claude Desktop): "I'm coding late and just realized I need camping 
-gear for this weekend. What's essential for car camping in California?"
-
-Volt: "For California car camping, you'll need:
-- 3-season sleeping bag (nights can drop to 40°F)
-- Basic tent (weather is usually good)
-- Camp chair and table
-- Headlamp for setup
-
-I recommend the Coastal Track Pack sleeping bag ($179) and the Echo Sky Kit tent ($299). 
-Want me to add these to your cart?"
-
-Developer: "Add the sleeping bag, but suggest a cheaper tent option"
-
-Volt: "Added sleeping bag! For budget tents, the Ember Crest Pack is $189 and 
-perfect for California car camping. Add it too?"
-
-Developer: "Yes, and checkout with my default shipping"
-
-Volt: "Order placed! Total $403.42. Shipping Monday, arrives Wednesday. 
-Confirmation #VP-2025-098 sent to your email."
+```http
+X-Agent-API-Key: mcp_...
 ```
 
-#### **Scenario 2: Quick Gear Research**
-```
-Developer (in VS Code): "I need a technical comparison of lightweight 
-backpacking stoves under 4oz"
-
-Volt: "Here are the top ultralight stoves:
-
-1. **Arctic Pulse Stove** (3.2oz, $89)
-   - Titanium construction, integrated igniter
-   - 10,000 BTU, boils 16oz water in 3.5 minutes
-   - Works down to 15°F
-
-2. **Quantum Ash Burner** (3.8oz, $67)  
-   - Aluminum, piezo ignition
-   - 9,500 BTU, boils 16oz water in 4.1 minutes
-   - Works down to 20°F
-
-The Arctic Pulse is worth the extra $22 for better cold weather performance."
-
-Developer: "Add the Arctic Pulse to my wishlist for later"
-
-Volt: "Added to wishlist! You now have 4 items saved."
+```http
+Authorization: Bearer mcp_...
 ```
 
-### 🏢 **Professional Use Cases**
+Query-string credentials are not accepted. New credentials are generated with
+Web Crypto, stored only as SHA-256 digests, expire after 90 days by default,
+and are returned in plaintext only when created or rotated. A manager can
+choose a lifetime from 1 through 365 days.
 
-#### **Scenario 3: Corporate Team Building**
-```
-Manager (in Claude Desktop): "I need to order outdoor gear for a company 
-retreat - 15 people, 2-day camping trip in Colorado in September"
+Migration `0012_expand_mcp_agent_credentials.sql` uses an
+expand/rotate/contract transition:
 
-Volt: "For 15 people in Colorado September weather, here's what you need:
+1. Existing plaintext credentials remain usable initially.
+2. The first successful use stores the digest, retires the plaintext value,
+   and gives the credential a 30-day rotation window.
+3. Explicit rotation immediately replaces the credential and its expiry.
+4. The legacy column can be removed in a future contract migration after no
+   version-1 credentials remain.
 
-**Per Person:**
-- 3-season sleeping bag: $179 x 15 = $2,685
-- Backpack day pack: $79 x 15 = $1,185  
-- Headlamp: $45 x 15 = $675
+The public demo credential formerly installed by a migration is removed.
+`npm run dev` applies `data/d1/seed-dev.sql` to the local D1 database only; its
+known test credential is never installed by preview or production migrations.
 
-**Group Gear:**
-- 2 large tents (8-person): $399 x 2 = $798
-- Camp stoves: $89 x 3 = $267
-- Water filtration: $149 x 2 = $298
+### Permissions
 
-**Total Estimate: $5,908**
+Permissions are deny-by-default. `admin` and `*` satisfy all scopes.
 
-I can create a bulk order with 10% corporate discount. Want me to proceed?"
+| Permission | Allows |
+| --- | --- |
+| `write:cart` | Add, update, remove, bulk-add, or clear cart lines |
+| `place:orders` | Create a bound PaymentIntent and finalize an order |
+| `agents:manage` | Create, list, inspect, disable, and rotate agents |
 
-Manager: "Yes, but let me approve items over $300 individually"
+An `agents:manage` credential cannot delegate a permission it does not hold.
+Only `admin` or `*` may delegate arbitrary permissions.
 
-Volt: "Perfect! I'll add items under $300 to cart and flag the others for approval."
-```
+Per-agent requests-per-minute limits apply to every authenticated request. The
+orders-per-hour limit applies to `place_order`. D1 stores and resets both
+counters by fixed time window.
 
-### 🎯 **Power User Scenarios**
+## Identity and session ownership
 
-#### **Scenario 4: Gear Expert Research**
-```
-Gear Reviewer (in Cursor): "I'm writing a review of ultralight shelters. 
-Give me technical specs and user feedback for shelters under 2 lbs"
+The authenticated credential is the sole source of agent identity.
+`X-Agent-Context` may carry bounded user preferences, but a client-provided
+`agentId` is always replaced with the authenticated agent ID.
 
-Volt: "Here are the top ultralight shelters with detailed specs:
+Session IDs use cryptographically random UUIDs. Every cart, shipping, payment,
+and order mutation verifies that the session belongs to the authenticated
+agent before reading or changing it. Order lookup also verifies the agent ID;
+an order identifier alone is not authorization.
 
-**Stealth Brook Shelter** (1.8 lbs, $329)
-- 20D silnylon, single-wall design
-- 84" x 30" x 42" (L x W x H)
-- Customer feedback: 4.6/5 stars (127 reviews)
-- Pros: Excellent wind resistance, quick setup
-- Cons: Condensation in humid conditions
+Create a session with:
 
-**Nova Flame Tarp-Tent** (1.5 lbs, $289)
-- 15D Dyneema composite, trekking pole setup  
-- 90" x 45" x 44" sleeping area
-- Customer feedback: 4.8/5 stars (89 reviews)
-- Pros: Spacious, bombproof in storms
-- Cons: Requires trekking poles, learning curve
-
-Would you like detailed user reviews or technical drawings for your article?"
-```
-
-## 🔧 Technical Architecture
-
-### **🛠️ MCP Server Implementation**
-
-#### **Core Infrastructure**
-```typescript
-// MCP Server Entry Point
-const server = new MCPServer({
-  name: "voltique-mcp-server",
-  version: "1.0.0",
-  capabilities: {
-    tools: true,
-    resources: false,
-    prompts: true
-  }
-});
-
-// Authentication & Rate Limiting
-interface UserContext {
-  userId: string;
-  apiKey: string;
-  permissions: string[];
-  rateLimits: RateLimitConfig;
-}
+```http
+POST /api/mcp/sessions
+X-Agent-API-Key: mcp_...
 ```
 
-### **🔍 MCP Tools Specification**
+Use the returned `sessionId` for subsequent cart and checkout tools.
 
-#### **Product Discovery Tools**
-```typescript
-// Product search and discovery
-voltique_search_products(query: string, options?: {
-  category?: string;
-  priceMin?: number;
-  priceMax?: number;
-  limit?: number;
-  sortBy?: 'price' | 'rating' | 'popularity';
-});
+## Catalog and wire data
 
-voltique_get_product_details(productId: number): Promise<ProductDetails>;
+Discovery capabilities are derived from active catalog categories, product
+prices, shipping settings, and allowed countries. No demo-store categories,
+brands, product names, or fulfillment claims are compiled into MCP responses.
 
-voltique_compare_products(productIds: number[]): Promise<ComparisonMatrix>;
+Only active products and variants cross the public MCP boundary. Internal
+costs, inventory records, barcodes, integration references, extensions, and
+media-processing metadata are removed by the shared public product serializer.
 
-voltique_get_recommendations(context: {
-  currentProduct?: number;
-  userActivity?: string;
-  budget?: number;
-  useCase?: string;
-}): Promise<Product[]>;
+Money responses use the MACH decimal wire shape:
+
+```json
+{ "amount": 31.49, "currency": "USD", "precision": 2 }
 ```
 
-#### **Shopping Cart Management**
-```typescript
-// Cart operations
-voltique_add_to_cart(productId: number, quantity?: number): Promise<CartResponse>;
-
-voltique_view_cart(): Promise<CartSummary>;
-
-voltique_update_cart_item(productId: number, quantity: number): Promise<CartResponse>;
-
-voltique_remove_from_cart(productId: number): Promise<CartResponse>;
-
-voltique_clear_cart(): Promise<void>;
-
-voltique_estimate_totals(shippingAddress?: Address): Promise<OrderTotals>;
-```
-
-#### **Order Processing Tools**
-```typescript
-// Order management
-voltique_get_shipping_options(address: Address): Promise<ShippingOption[]>;
-
-voltique_apply_discount_code(code: string): Promise<DiscountResponse>;
-
-voltique_place_order(orderData: {
-  shippingAddress: Address;
-  billingAddress?: Address;
-  paymentMethod: PaymentMethod;
-  shippingOption: string;
-  specialInstructions?: string;
-}): Promise<OrderConfirmation>;
-
-voltique_track_order(orderId: string): Promise<OrderStatus>;
-
-voltique_cancel_order(orderId: string, reason?: string): Promise<CancellationResponse>;
-```
-
-#### **User Account Tools**
-```typescript
-// Account management
-voltique_get_user_profile(): Promise<UserProfile>;
-
-voltique_get_order_history(limit?: number): Promise<Order[]>;
-
-voltique_save_address(address: Address, label: string): Promise<void>;
-
-voltique_save_payment_method(paymentData: PaymentMethodData): Promise<void>;
-
-voltique_get_wishlist(): Promise<Product[]>;
-
-voltique_add_to_wishlist(productId: number): Promise<void>;
-
-voltique_create_price_alert(productId: number, targetPrice: number): Promise<void>;
-```
-
-#### **AI Conversation Tools**
-```typescript
-// Volt AI integration
-voltique_ask_volt(question: string, context?: {
-  conversationHistory?: Message[];
-  userPreferences?: UserPreferences;
-  currentCart?: CartItem[];
-}): Promise<VoltResponse>;
-
-voltique_get_gear_advice(activity: string, conditions: {
-  season?: string;
-  location?: string;
-  duration?: string;
-  experience?: string;
-}): Promise<GearRecommendations>;
-
-voltique_explain_product(productId: number, focus?: string): Promise<ProductExplanation>;
-```
-
-### **🔐 Security & Safety Features**
-
-#### **Authentication System**
-```typescript
-interface AuthConfig {
-  apiKey: string;           // Voltique API key
-  permissions: Permission[]; // Granular permissions
-  spending_limits: {
-    daily_max?: number;
-    monthly_max?: number;
-    single_order_max?: number;
-  };
-  confirmation_required: {
-    orders_over?: number;
-    new_addresses?: boolean;
-    new_payment_methods?: boolean;
-  };
-}
-```
-
-#### **Permission Levels**
-```typescript
-enum Permission {
-  READ_PRODUCTS = "read:products",
-  READ_ORDERS = "read:orders", 
-  WRITE_CART = "write:cart",
-  PLACE_ORDERS = "place:orders",
-  MANAGE_ACCOUNT = "manage:account",
-  ADMIN_ACCESS = "admin:access"
-}
-```
-
-#### **Safety Mechanisms**
-```typescript
-interface SafetyConfig {
-  // Confirmation requirements
-  require_confirmation_over: number;        // Dollar amount
-  require_explicit_shipping: boolean;       // Must specify address
-  require_payment_method_confirmation: boolean;
-  
-  // Rate limiting
-  max_orders_per_hour: number;
-  max_api_calls_per_minute: number;
-  
-  // Spending controls
-  daily_spending_limit?: number;
-  monthly_spending_limit?: number;
-  
-  // Address validation
-  require_validated_addresses: boolean;
-  allow_new_addresses: boolean;
-}
-```
-
-### **📊 Order Flow Architecture**
-
-#### **Simple Order Flow**
-```
-1. User: "Add a headlamp to my cart"
-2. voltique_search_products("headlamp") → Show options
-3. User: "Add the $45 one"
-4. voltique_add_to_cart(productId) → Cart updated
-5. User: "Checkout with my default address"
-6. voltique_place_order(defaultConfig) → Order placed
-```
-
-#### **Complex Order Flow with Confirmation**
-```
-1. User: "I need complete camping setup for 4 people, budget $2000"
-2. voltique_ask_volt() → AI generates gear list
-3. Multiple voltique_add_to_cart() calls → Build cart
-4. voltique_estimate_totals() → Show total ($1,847)
-5. User: "Looks good, but ship to my parents' house"
-6. voltique_get_shipping_options(parentsAddress) → Show options
-7. User confirmation required (order > $1000)
-8. voltique_place_order() → Order placed with confirmation
-```
-
-## 🚀 Implementation Roadmap
-
-### **Phase 1: Foundation (Week 1-2)**
-- Basic MCP server setup and authentication
-- Core product search and discovery tools
-- Volt AI conversation integration
-- Basic cart management (add, view, remove)
-
-### **Phase 2: Shopping (Week 3-4)**
-- Complete cart management with updates
-- Shipping calculations and options
-- Order placement with safety checks
-- Order tracking and status
-
-### **Phase 3: Advanced Features (Week 5-6)**
-- User account management
-- Wishlist and price alerts
-- Bulk operations for corporate users
-- Advanced AI gear consultation
-
-### **Phase 4: Enterprise (Week 7-8)**
-- Corporate account features
-- Advanced permissions and spending controls
-- Bulk ordering and approval workflows
-- Integration with corporate procurement systems
-
-## 📈 Business Impact
-
-### **Revenue Opportunities**
-- **New Sales Channel**: Zero-marketing-cost customer acquisition
-- **Higher Order Values**: AI recommendations increase basket size
-- **Increased Frequency**: Easier ordering drives more frequent purchases
-- **Corporate Sales**: B2B opportunities through corporate integrations
-
-### **Market Differentiation**
-- **First Mover**: No competitors offer MCP commerce integration
-- **Technical Leadership**: Position as most innovative outdoor retailer
-- **Developer Community**: Build loyalty among technical users
-- **Viral Marketing**: Developers naturally share innovative tools
-
-### **Customer Experience**
-- **Zero Context Switching**: Shop without leaving workflow
-- **Natural Language**: Conversational shopping experience  
-- **Instant Expertise**: Access to Volt's outdoor knowledge
-- **Seamless Integration**: Part of existing tool ecosystem
-
-## 🎯 Success Metrics
-
-### **Adoption Metrics**
-- Number of active MCP users
-- Daily/monthly MCP sessions
-- MCP server installations
-
-### **Commerce Metrics**
-- Orders placed via MCP
-- Average order value through MCP
-- Conversion rate from MCP chat to purchase
-- Revenue attribution to MCP channel
-
-### **Engagement Metrics**
-- Messages per session
-- Session duration
-- User retention rate
-- Feature usage patterns
-
-## 🛠️ Technical Requirements
-
-### **Dependencies**
-- Model Context Protocol SDK
-- Existing Voltique APIs (agent-chat, products, orders)
-- Clerk authentication system
-- Stripe payment processing
-
-### **Infrastructure**
-- Cloudflare Workers for MCP server hosting
-- D1 database for MCP session storage
-- R2 for any MCP-specific assets
-- Existing Voltique infrastructure
-
-### **Performance Targets**
-- Sub-500ms response time for product searches
-- Sub-2s response time for AI conversations
-- 99.9% uptime for MCP server
-- Support for 1000+ concurrent MCP sessions
-
----
-
-## 🤖 Multi-Agent Commerce Architecture
-
-### **Agent Context & User Identity**
-
-**Design Philosophy**: Users don't need authentication, but agents provide rich user context for personalized commerce.
-
-```typescript
-interface AgentContext {
-  agentId: string;           // Unique agent identifier
-  userId?: string;           // User's identifier (optional)
-  userPreferences?: {        // User context from agent
-    budget?: number;
-    brands?: string[];
-    activities?: string[];
-    location?: string;
-    experience_level?: string;
-  };
-  session_context?: string;  // Agent's understanding of user needs
-}
-```
-
-### **Multi-Site Order Coordination**
-
-**Vision**: Personal shopping agents coordinate orders across specialized retailers (Voltique for camping gear, others for rations/skis).
-
-```typescript
-// Cross-site coordination tools
-voltique_get_capabilities(): Promise<{
-  categories: string[];
-  price_ranges: Record<string, {min: number, max: number}>;
-  shipping_regions: string[];
-  specialties: string[];
-}>;
-
-voltique_assess_request(requirements: {
-  items: string[];
-  budget: number;
-  timeline: string;
-  location: string;
-}): Promise<{
-  can_fulfill: string[];         // Items Voltique can provide
-  cannot_fulfill: string[];      // Items to source elsewhere
-  recommendations: Product[];    // What we recommend
-  estimated_cost: number;
-  estimated_delivery: string;
-}>;
-```
-
-### **Enhanced Tool Response Format**
-
-```typescript
-interface MCPToolResponse<T> {
-  success: boolean;
-  data: T;
-  context: {
-    session_id: string;
-    agent_id: string;
-    processing_time_ms: number;
-  };
-  recommendations?: {
-    alternative_sites?: string[];    // Suggest other sites for unfulfilled needs
-    bundling_opportunities?: string[];
-    cost_optimization?: string[];
-  };
-  metadata: {
-    can_fulfill_percentage: number;  // How much of request we can handle
-    estimated_satisfaction: number;  // How well we match user needs
-    next_actions?: string[];         // Suggested next steps
-  };
-}
-```
-
-## 🏗️ Implementation Architecture
-
-### **Code Structure**
-
-```
-app/api/mcp/                    # MCP Server endpoints
-├── route.ts                    # Main MCP server discovery/capabilities
-├── tools/
-│   ├── search/route.ts         # Product search with agent context
-│   ├── assess/route.ts         # Fulfillment assessment
-│   ├── recommend/route.ts      # AI recommendations
-│   ├── cart/
-│   │   ├── add/route.ts        # Add to agent cart
-│   │   ├── update/route.ts     # Update cart quantities
-│   │   ├── remove/route.ts     # Remove from cart
-│   │   └── estimate/route.ts   # Get totals/shipping
-│   └── order/
-│       ├── place/route.ts      # Place order with agent context
-│       ├── status/route.ts     # Order status lookup
-│       └── track/route.ts      # Shipment tracking
-└── sessions/
-    ├── route.ts                # Create/list sessions
-    └── [sessionId]/route.ts    # Get/update/delete session
-
-lib/mcp/                        # MCP-specific logic
-├── types.ts                    # MCP request/response types
-├── auth.ts                     # Agent authentication
-├── context.ts                  # Agent context parsing
-├── session.ts                  # Session management
-├── tools/                      # Tool implementations
-│   ├── search.ts              
-│   ├── assess.ts              
-│   ├── recommend.ts           
-│   ├── cart.ts                
-│   └── order.ts               
-└── server.ts                   # Core MCP server logic
-
-lib/db/schema/
-└── mcp.ts                      # MCP session/agent tables
-```
-
-### **Cloudflare Workers Adaptations**
-
-**Transport Layer**: HTTP REST instead of WebSocket
-```typescript
-// HTTP-based MCP server for Cloudflare Workers
-app.post('/api/mcp/tools/:toolName', async (request) => {
-  const context = parseAgentContext(request.headers);
-  const result = await executeTool(toolName, request.body, context);
-  return Response.json(result);
-});
-```
-
-**Response Chunking** for 128KB limit:
-```typescript
-interface ChunkedResponse {
-  chunk: number;
-  total_chunks: number;
-  data: any[];
-  next_token?: string;
-}
-```
-
-**Session State** via Cloudflare D1:
-```typescript
-interface AgentSession {
-  sessionId: string;
-  agentId: string;
-  userContext: AgentContext;
-  cart: CartItem[];
-  created_at: string;
-  expires_at: string;
-}
-```
-
-### **Authentication Architecture**
-
-**Hybrid Approach**: No user auth required, agent API keys for rate limiting
-
-```typescript
-interface MCPAuthConfig {
-  require_user_auth: false;
-  
-  agent_auth: {
-    method: 'api_key';
-    header: 'X-Agent-API-Key';
-    rate_limits: {
-      requests_per_minute: 100;
-      orders_per_hour: 10;
-    };
-  };
-  
-  user_context_validation: {
-    required_fields: [];
-    optional_fields: ['budget', 'preferences', 'location'];
-    max_context_size: 1024; // bytes
-  };
-}
-```
-
-## 🎯 Implementation Decisions (Recommendations)
-
-### **✅ Recommended Decisions**
-
-1. **Transport**: HTTP REST API (Option B) - Simpler than JSON-RPC, Cloudflare Workers compatible
-2. **Authentication**: API Keys - Required for rate limiting and agent identification  
-3. **Context**: Rich Context - Enables personalized multi-site coordination
-4. **State**: Cloudflare D1 - Leverages existing infrastructure, persistent sessions
-5. **Caching**: Product + Agent-specific - Best performance for repeated queries
-6. **Error Handling**: Graceful degradation with fallbacks - Maintains agent workflow reliability
-
-### **✅ IMPLEMENTATION COMPLETED**
-
-#### **✅ Phase 1: MCP Foundation** 
-- ✅ **HTTP-based MCP server** - `/api/mcp` endpoint with tool routing
-- ✅ **Agent context parsing** - `parseAgentContext()` with user preferences
-- ✅ **Session management** - D1-based sessions with cart persistence  
-- ✅ **Authentication** - API key system with rate limiting
-- ✅ **Basic tools**: `search_products`, `assess_request`, `get_recommendations`
-
-#### **✅ Phase 2: Commerce Core**  
-- ✅ **Cart management** - Full CRUD with bulk operations (`add_to_cart`, `bulk_add_to_cart`, `update_cart`, `remove_from_cart`, `clear_cart`, `get_cart`)
-- ✅ **Order placement** - Complete order flow with `place_order`
-- ✅ **Enhanced recommendations** - Context-aware product suggestions
-- ✅ **Order tracking** - `get_order_status` with delivery updates
-
-#### **✅ Phase 3: Multi-Agent Features**
-- ✅ **Cross-site coordination** - `assess_request` determines fulfillment capability
-- ✅ **Agent rate limiting** - Per-agent RPM/OPH limits with D1 tracking
-- ✅ **Context validation** - User preference processing and budget validation
-- ✅ **Shipping & Payment** - `get_shipping_options`, `validate_payment` tools
-
-#### **✅ Phase 4: Production Readiness**
-- ✅ **Error handling** - Comprehensive error system with retry guidance
-- ✅ **Agent management** - `create_agent`, `list_agents`, `get_agent_details`, `update_agent_status`
-- ✅ **Documentation** - Auto-generated schema at `/api/mcp/schema`
-- ✅ **Discovery** - HTML meta tags, robots.txt, sitemap integration
-
-### **🚀 PRODUCTION DEPLOYMENT STATUS**
-
-#### **✅ Completed Features (17 MCP Tools)**
-**Commerce Tools:** `search_products`, `assess_request`, `get_recommendations`  
-**Cart Management:** `add_to_cart`, `bulk_add_to_cart`, `update_cart`, `remove_from_cart`, `clear_cart`, `get_cart`  
-**Order Processing:** `get_shipping_options`, `validate_payment`, `place_order`, `get_order_status`  
-**Agent Administration:** `create_agent`, `list_agents`, `get_agent_details`, `update_agent_status`
-
-#### **🌐 Server Endpoints**
-- **Main Server**: `https://voltique.russellkmoore.me/api/mcp`
-- **Schema Docs**: `https://voltique.russellkmoore.me/api/mcp/schema`  
-- **Discovery**: HTML meta tags, robots.txt allowlist, sitemap integration
-
----
-
-**This MCP server represents a paradigm shift in eCommerce - from destination shopping to embedded, conversational commerce. By integrating shopping directly into users' daily workflows, we transform Voltique from a website into an essential tool.**
-
-**Updated**: Enhanced with multi-agent commerce architecture and Cloudflare Workers implementation planning.
+Persisted commerce values remain integer minor units. Shipping and billing
+addresses accept either legacy flat names such as `street`, `state`, and
+`postalCode` or MACH names such as `line1`, `region`, and `postal_code`; they
+are normalized before pricing or persistence.
+
+## Commerce workflow
+
+The safe purchase sequence is:
+
+1. Create a session.
+2. Search the active catalog and add product/variant IDs to the session cart.
+3. Request shipping options for that owned session and address.
+4. Call `create_payment_intent` with the session, shipping address, configured
+   shipping method, and optional discount or gift-card input.
+5. Complete the returned Stripe PaymentIntent using its client secret.
+6. Call `place_order` with the returned `orderId` and `paymentIntentId`.
+7. Poll `get_order_status` with the order ID when needed.
+
+`create_payment_intent` does not trust cart names or prices. It reloads each
+product and variant, validates inventory, applies configured shipping,
+promotions, gift cards, and tax through the shared checkout pricing service,
+then creates both:
+
+- a Stripe PaymentIntent whose amount, currency, order ID, agent ID, and
+  session ID are bound in metadata; and
+- a durable pending order containing the exact canonical quote and line
+  allocations.
+
+If Stripe returns a mismatched amount or currency, or pending-order persistence
+fails, Mercora cancels the PaymentIntent. `place_order` verifies that the
+pending order, PaymentIntent, agent, and session all match before invoking the
+shared idempotent payment finalizer. That finalizer verifies captured payment
+with Stripe and runs the same durable inventory and post-payment effects as the
+storefront.
+
+Client-supplied totals, display names, prices, cart objects, and paid flags are
+never authoritative.
+
+## Tool summary
+
+| Area | Tools |
+| --- | --- |
+| Discovery | `search_products`, `assess_request`, `get_recommendations` |
+| Cart | `add_to_cart`, `update_cart`, `remove_from_cart`, `get_cart`, `bulk_add_to_cart`, `clear_cart` |
+| Checkout | `get_shipping_options`, `validate_payment`, `create_payment_intent`, `place_order` |
+| Orders | `get_order_status` |
+| Agents | `create_agent`, `list_agents`, `get_agent_details`, `update_agent_status`, `rotate_agent_key` |
+
+Shipment-event-backed tracking remains part of Mercora's planned fulfillment
+vertical slice. Until then, order status exposes only fields backed by the
+current order record and does not fabricate carrier events.
+
+## Rotation operations
+
+Managers can rotate an agent credential through either interface:
+
+- `PATCH /api/mcp/tools/agents/{agentId}` with
+  `{ "rotateApiKey": true, "apiKeyTtlDays": 90 }`; or
+- the dispatcher tool `rotate_agent_key` with `agentId` and optional
+  `apiKeyTtlDays`.
+
+Store the returned key immediately. Rotation invalidates the previous key and
+the plaintext replacement cannot be recovered from the database.
+
+Before removing legacy credential support, operators should confirm that no
+active row remains at credential version 1 and that all required clients have
+received rotated credentials.
