@@ -329,6 +329,7 @@ function hydrateOrder(dbOrder: typeof orders.$inferSelect): Order {
     billing_address: dbOrder.billing_address ? (typeof dbOrder.billing_address === 'string' ? JSON.parse(dbOrder.billing_address) : dbOrder.billing_address) : undefined,
     items: dbOrder.items ? (typeof dbOrder.items === 'string' ? JSON.parse(dbOrder.items) : dbOrder.items) : [],
     shipping_method: dbOrder.shipping_method ?? undefined,
+    shipping_carrier: dbOrder.shipping_carrier ?? undefined,
     payment_method: dbOrder.payment_method ?? undefined,
     payment_status: dbOrder.payment_status ?? 'pending',
     tracking_number: dbOrder.tracking_number ?? undefined,

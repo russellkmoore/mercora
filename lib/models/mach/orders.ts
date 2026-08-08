@@ -22,6 +22,7 @@ export async function createOrder(orderData: CreateOrderRequest): Promise<Order>
   
   // Generate order ID
   const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+  const nowIso = new Date().toISOString();
   
   // Prepare order record
   const orderRecord = {
@@ -39,6 +40,8 @@ export async function createOrder(orderData: CreateOrderRequest): Promise<Order>
     notes: orderData.notes,
     external_references: orderData.external_references ? JSON.stringify(orderData.external_references) : null,
     extensions: orderData.extensions ? JSON.stringify(orderData.extensions) : null,
+    created_at: nowIso,
+    updated_at: nowIso,
   };
   
   const [newOrder] = await db.insert(orders).values(orderRecord).returning();
@@ -81,12 +84,13 @@ export async function getOrderById(orderId: string): Promise<Order | null> {
 // Update order status
 export async function updateOrderStatus(orderId: string, status: Order['status']): Promise<Order | null> {
   const db = await getDbAsync();
+  const nowIso = new Date().toISOString();
   
   const [updated] = await db
     .update(orders)
     .set({
       status,
-      updated_at: sql`CURRENT_TIMESTAMP`,
+      updated_at: nowIso,
     })
     .where(eq(orders.id, orderId))
     .returning();
@@ -109,9 +113,10 @@ export async function updateOrderShipping(
   }
 ): Promise<Order | null> {
   const db = await getDbAsync();
-  
-  const updateData: any = {
-    updated_at: sql`CURRENT_TIMESTAMP`,
+  const nowIso = new Date().toISOString();
+
+  const updateData: Partial<typeof orders.$inferInsert> = {
+    updated_at: nowIso,
   };
   
   if (shippingData.status) {
@@ -125,13 +130,13 @@ export async function updateOrderShipping(
   if (shippingData.shipped_at) {
     updateData.shipped_at = shippingData.shipped_at;
   } else if (shippingData.status === "shipped") {
-    updateData.shipped_at = new Date().toISOString();
+    updateData.shipped_at = nowIso;
   }
   
   if (shippingData.delivered_at) {
     updateData.delivered_at = shippingData.delivered_at;
   } else if (shippingData.status === "delivered") {
-    updateData.delivered_at = new Date().toISOString();
+    updateData.delivered_at = nowIso;
   }
   
   const [updated] = await db
@@ -154,13 +159,14 @@ export async function cancelOrder(
   notes?: string
 ): Promise<Order | null> {
   const db = await getDbAsync();
+  const nowIso = new Date().toISOString();
   
   const [updated] = await db
     .update(orders)
     .set({
       status: "cancelled",
       notes: notes || reason,
-      updated_at: sql`CURRENT_TIMESTAMP`,
+      updated_at: nowIso,
     })
     .where(eq(orders.id, orderId))
     .returning();
@@ -205,6 +211,7 @@ export function hydrateOrder(orderRecord: typeof orders.$inferSelect): Order {
     billing_address: parseJson<Address | undefined>(orderRecord.billing_address, undefined),
     items: parseJson<OrderItem[]>(orderRecord.items, []),
     shipping_method: orderRecord.shipping_method ?? undefined,
+    shipping_carrier: orderRecord.shipping_carrier ?? undefined,
     payment_method: orderRecord.payment_method ?? undefined,
     payment_status: orderRecord.payment_status ?? 'pending',
     tracking_number: orderRecord.tracking_number ?? undefined,
@@ -239,7 +246,7 @@ export async function promoteOrderToPaid(args: {
       // Patch only the finalization marker in SQLite so a concurrent metadata
       // merge cannot be lost between our read and guarded promotion write.
       extensions: sql`json_set(COALESCE(extensions, '{}'), '$.finalized_at', ${finalizedAt})`,
-      updated_at: new Date().toISOString(),
+      updated_at: finalizedAt,
     })
     .where(and(
       eq(orders.id, args.orderId),
@@ -260,6 +267,7 @@ export async function recordCouponReconciliation(args: {
 }): Promise<void> {
   const db = await getDbAsync();
   const code = args.code.trim().toUpperCase();
+  const nowIso = new Date().toISOString();
   const currentCodes = sql`CASE json_type(extensions, '$.coupon_reconciliation_codes')
     WHEN 'array' THEN json_extract(extensions, '$.coupon_reconciliation_codes')
     ELSE json('[]')
@@ -278,7 +286,7 @@ export async function recordCouponReconciliation(args: {
         ) THEN ${currentCodes}
         ELSE json_insert(${currentCodes}, '$[#]', ${code}) END
       )`,
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso,
     })
     .where(and(eq(orders.id, args.orderId), eq(orders.payment_status, 'paid')))
     .returning({ id: orders.id });

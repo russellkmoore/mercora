@@ -37,6 +37,8 @@ import {
   formatStoredOrderCurrency,
 } from '@/lib/admin/order-money';
 import { calculatePartialReturnMinor } from '@/lib/admin/order-return-calculation';
+import FulfillmentTimeline from "../FulfillmentTimeline";
+import type { FulfillmentEvent } from "../queue-model";
 
 interface Order {
   id: string;
@@ -67,6 +69,7 @@ interface Order {
   }>;
   payment_method?: string;
   payment_status?: string;
+  shipping_carrier?: string;
   tracking_number?: string;
   created_at: string;
   updated_at: string;
@@ -78,8 +81,6 @@ interface Order {
     shippingCost?: number;
     taxAmount?: number;
     discountAmount?: number;
-    carrier?: string;
-    trackingUrl?: string;
     email?: string;
     payment_intent_id?: string;
     [key: string]: any;
@@ -124,6 +125,9 @@ export default function OrderDetailPage() {
   const [actionType, setActionType] = useState<'cancel' | 'return' | 'exchange' | null>(null);
   const [reason, setReason] = useState("");
   const [returnType, setReturnType] = useState<'full' | 'partial'>('partial');
+  const [events, setEvents] = useState<FulfillmentEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [eventsError, setEventsError] = useState<string | null>(null);
 
   // Configurable refund policies - loaded from database
   const [refundPolicy, setRefundPolicy] = useState({
@@ -339,12 +343,32 @@ export default function OrderDetailPage() {
     setSelectedItems(new Set());
   };
 
+  const fetchFulfillmentEvents = useCallback(async () => {
+    setEventsLoading(true);
+    setEventsError(null);
+    try {
+      const response = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/events?limit=100`);
+      const body = (await response.json().catch(() => ({}))) as {
+        events?: FulfillmentEvent[];
+        error?: string;
+      };
+      if (!response.ok) throw new Error(body.error ?? "Could not load fulfillment history");
+      setEvents(body.events ?? []);
+    } catch (error) {
+      setEvents([]);
+      setEventsError(error instanceof Error ? error.message : "Could not load fulfillment history");
+    } finally {
+      setEventsLoading(false);
+    }
+  }, [orderId]);
+
   useEffect(() => {
     if (orderId) {
       fetchOrder();
       fetchRefundPolicy();
+      void fetchFulfillmentEvents();
     }
-  }, [orderId, fetchOrder, fetchRefundPolicy]);
+  }, [orderId, fetchOrder, fetchRefundPolicy, fetchFulfillmentEvents]);
 
 
   if (loading) {
@@ -428,7 +452,7 @@ export default function OrderDetailPage() {
           </div>
         </div>
         <Button
-          onClick={fetchOrder}
+          onClick={() => { void fetchOrder(); void fetchFulfillmentEvents(); }}
           disabled={loading}
           className="bg-orange-600 hover:bg-orange-700"
         >
@@ -480,8 +504,8 @@ export default function OrderDetailPage() {
                 <div className="mt-3 pt-3 border-t border-neutral-600">
                   <p className="text-xs text-gray-400 mb-1">Tracking</p>
                   <p className="font-medium">{order.tracking_number}</p>
-                  {order.extensions?.carrier && (
-                    <p className="text-xs text-gray-400">{order.extensions.carrier}</p>
+                  {order.shipping_carrier && (
+                    <p className="text-xs text-gray-400">{order.shipping_carrier}</p>
                   )}
                 </div>
               )}
@@ -884,6 +908,13 @@ export default function OrderDetailPage() {
           )}
         </Card>
       )}
+
+      <FulfillmentTimeline
+        events={events}
+        loading={eventsLoading}
+        error={eventsError}
+        onRetry={() => void fetchFulfillmentEvents()}
+      />
 
       {/* Refund History */}
       {order.extensions?.refunds && order.extensions.refunds.length > 0 && (
