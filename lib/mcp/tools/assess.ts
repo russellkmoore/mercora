@@ -1,9 +1,9 @@
 import { searchProducts } from '../../models/mach/products';
-import { listCategories } from '../../models/mach/category';
 import { AssessRequest, AssessResponse, MCPToolResponse } from '../types';
 import { enhanceUserContext } from '../context';
 import { Money } from '../../money';
 import { toPublicProduct, toWireProduct } from '../../models/mach/product-serializer';
+import { isBoundedString, isPlainRecord } from '../../public-request-validation';
 
 export async function assessFulfillmentCapability(
   request: AssessRequest,
@@ -12,49 +12,48 @@ export async function assessFulfillmentCapability(
   const startTime = Date.now();
   
   try {
-    const requirements = request.requirements;
+    if (!isPlainRecord(request?.requirements)) throw new Error('requirements are required');
+    const rawItems = request.requirements.items;
+    if (
+      !Array.isArray(rawItems) ||
+      rawItems.length === 0 ||
+      rawItems.length > 20 ||
+      rawItems.some((item) => !isBoundedString(item, 256))
+    ) {
+      throw new Error('requirements.items must contain 1-20 non-empty strings');
+    }
+    if (
+      request.requirements.budget !== undefined &&
+      (!Number.isFinite(request.requirements.budget) || request.requirements.budget < 0)
+    ) {
+      throw new Error('requirements.budget must be a non-negative finite number');
+    }
+    if (
+      (request.requirements.timeline !== undefined &&
+        !isBoundedString(request.requirements.timeline, 256, { allowEmpty: true })) ||
+      (request.requirements.location !== undefined &&
+        !isBoundedString(request.requirements.location, 256, { allowEmpty: true }))
+    ) {
+      throw new Error('requirements timeline and location are too long');
+    }
+    const requirements = {
+      ...request.requirements,
+      items: rawItems.map((item) => item.trim()),
+    };
     const userContext = enhanceUserContext(request.agent_context || null);
     
-    // Get our categories and capabilities
-    const categories = await listCategories();
-    const categoryNames = categories.map(cat => typeof cat.name === 'string' ? cat.name.toLowerCase() : String(cat.name || '').toLowerCase());
-    
-    // Define Voltique's core specialties
-    const ourSpecialties = [
-      'camping', 'hiking', 'backpacking', 'outdoor', 'tent', 'sleeping bag',
-      'backpack', 'headlamp', 'stove', 'gear', 'adventure', 'trail', 'mountain'
-    ];
-    
     // Assess each requested item
-    const canFulfill: string[] = [];
-    const cannotFulfill: string[] = [];
-    const assessmentResults: Array<{item: string, confidence: number, products: any[]}> = [];
-    
-    for (const item of requirements.items) {
-      const itemLower = item.toLowerCase();
-      
-      // Check if item matches our specialties
-      const isOurSpecialty = ourSpecialties.some(specialty => 
-        itemLower.includes(specialty) || specialty.includes(itemLower)
-      );
-      
-      // Search for products matching this item
-      const searchResults = await searchProducts(item);
-      
-      const confidence = calculateConfidence(itemLower, searchResults, isOurSpecialty);
-      
-      assessmentResults.push({
-        item,
-        confidence,
-        products: searchResults
-      });
-      
-      if (confidence > 0.6 || searchResults.length > 0) {
-        canFulfill.push(item);
-      } else {
-        cannotFulfill.push(item);
-      }
-    }
+    const assessmentResults: Array<{item: string, confidence: number, products: any[]}> =
+      await Promise.all(requirements.items.map(async (item) => {
+        const products = await searchProducts(item);
+        return { item, confidence: calculateConfidence(products), products };
+      }));
+    const canFulfill = assessmentResults
+      .filter((result) => result.products.length > 0)
+      .map((result) => result.item);
+    const cannotFulfill = assessmentResults
+      .filter((result) => result.products.length === 0)
+      .map((result) => result.item);
     
     // Generate recommendations from items we can fulfill
     const recommendations = assessmentResults
@@ -110,7 +109,9 @@ export async function assessFulfillmentCapability(
       success: false,
       data: {
         can_fulfill: [],
-        cannot_fulfill: request.requirements?.items || [],
+        cannot_fulfill: Array.isArray(request?.requirements?.items)
+          ? request.requirements.items.filter((item): item is string => typeof item === 'string').slice(0, 20)
+          : [],
         recommendations: [],
         estimated_cost: 0,
         estimated_delivery: 'Unknown'
@@ -129,21 +130,12 @@ export async function assessFulfillmentCapability(
   }
 }
 
-function calculateConfidence(item: string, products: any[], isOurSpecialty: boolean): number {
+function calculateConfidence(products: any[]): number {
   let confidence = 0;
   
   // Base confidence from search results
   if (products.length > 0) confidence += 0.4;
   if (products.length > 2) confidence += 0.2;
-  
-  // Boost for our specialties
-  if (isOurSpecialty) confidence += 0.3;
-  
-  // Reduce confidence for items we typically don't carry
-  const nonOutdoorItems = ['ration', 'food', 'ski', 'snow', 'electronic', 'book'];
-  if (nonOutdoorItems.some(non => item.includes(non))) {
-    confidence -= 0.3;
-  }
   
   return Math.max(0, Math.min(1, confidence));
 }
@@ -162,38 +154,13 @@ function calculateDeliveryEstimate(location?: string, timeline?: string): string
 }
 
 function generateAlternativeSiteRecommendations(cannotFulfill: string[]): string[] {
-  const suggestions: string[] = [];
-  
-  cannotFulfill.forEach(item => {
-    const itemLower = item.toLowerCase();
-    
-    if (itemLower.includes('food') || itemLower.includes('ration') || itemLower.includes('meal')) {
-      suggestions.push('Mountain House or Backpacker\'s Pantry for freeze-dried meals');
-    }
-    
-    if (itemLower.includes('ski') || itemLower.includes('snow')) {
-      suggestions.push('Backcountry.com or REI for specialized snow sports equipment');
-    }
-    
-    if (itemLower.includes('electronic') || itemLower.includes('gps')) {
-      suggestions.push('Garmin or outdoor electronics specialists');
-    }
-  });
-  
-  return [...new Set(suggestions)]; // Remove duplicates
+  return cannotFulfill.length ? ['Search another catalog for unavailable items'] : [];
 }
 
 function generateBundlingOpportunities(results: Array<{item: string, products: any[]}>): string[] {
-  const opportunities: string[] = [];
-  
-  const hasSheltier = results.some(r => r.item.toLowerCase().includes('tent') || r.item.toLowerCase().includes('shelter'));
-  const hasSleep = results.some(r => r.item.toLowerCase().includes('sleep') || r.item.toLowerCase().includes('bag'));
-  
-  if (hasSheltier && hasSleep) {
-    opportunities.push('Camping comfort bundle: tent + sleeping system discount available');
-  }
-  
-  return opportunities;
+  return results.filter((result) => result.products.length > 0).length > 1
+    ? ['Review matching products together for complementary options']
+    : [];
 }
 
 function generateCostOptimizations(results: Array<{item: string, products: any[]}>, budget?: number): string[] {
@@ -214,11 +181,12 @@ function generateCostOptimizations(results: Array<{item: string, products: any[]
 }
 
 function calculateSatisfaction(results: Array<{confidence: number}>, userContext: any): number {
+  if (results.length === 0) return 0;
   const avgConfidence = results.reduce((sum, r) => sum + r.confidence, 0) / results.length;
   
   // Boost satisfaction if we match user preferences
   let satisfactionBoost = 0;
-  if (userContext.activities?.includes('camping')) satisfactionBoost += 10;
+  if (userContext.activities?.length) satisfactionBoost += 10;
   if (userContext.experienceLevel === 'expert') satisfactionBoost += 5;
   
   return Math.min(100, (avgConfidence * 80) + satisfactionBoost);
@@ -237,7 +205,7 @@ function generateNextActions(canFulfill: string[], cannotFulfill: string[], fulf
   }
   
   if (fulfillmentPercentage > 80) {
-    actions.push('Proceed with Voltique order');
+    actions.push('Proceed with this store order');
   } else {
     actions.push('Consider splitting order across multiple retailers');
   }

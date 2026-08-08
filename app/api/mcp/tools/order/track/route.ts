@@ -1,142 +1,90 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateAgent } from '../../../../../../lib/mcp/auth';
-import { MCPToolResponse } from '../../../../../../lib/mcp/types';
+import { getOrderStatus } from '../../../../../../lib/mcp/tools/order';
+import type { MCPToolResponse } from '../../../../../../lib/mcp/types';
 
 interface TrackingResponse {
   orderId: string;
   trackingNumber?: string;
   status: string;
-  location?: string;
   estimatedDelivery: string;
-  history: Array<{
-    date: string;
-    status: string;
-    location?: string;
-    description: string;
-  }>;
+  history: Array<never>;
+}
+
+async function projectOwnedOrder(
+  orderId: string,
+  agentId: string,
+): Promise<NextResponse> {
+  const result = await getOrderStatus(orderId, agentId);
+  if (!result.success) return NextResponse.json(result, { status: 404 });
+
+  const response: MCPToolResponse<TrackingResponse> = {
+    success: true,
+    data: {
+      orderId: result.data.orderId,
+      trackingNumber: result.data.tracking_number,
+      status: result.data.status,
+      estimatedDelivery: result.data.estimated_delivery,
+      // Carrier events ship with the fulfillment vertical slice. An empty
+      // history is truthful; generated locations and events are not.
+      history: [],
+    },
+    context: result.context,
+    metadata: {
+      ...result.metadata,
+      next_actions: result.data.tracking_number
+        ? ['Use the configured carrier tracking experience']
+        : ['Check back after the order ships'],
+    },
+  };
+  return NextResponse.json(response);
 }
 
 export async function GET(request: NextRequest) {
   const auth = await authenticateAgent(request);
-  
   if (!auth.success) {
-    return NextResponse.json({
-      success: false,
-      error: auth.error
-    }, { status: 401 });
+    return NextResponse.json({ success: false, error: auth.error }, { status: 401 });
   }
 
-  try {
-    const orderId = request.nextUrl.searchParams.get('orderId');
-    const trackingNumber = request.nextUrl.searchParams.get('trackingNumber');
-    
-    if (!orderId && !trackingNumber) {
-      return NextResponse.json({
-        success: false,
-        error: {
-          code: 'MISSING_IDENTIFIER',
-          message: 'orderId or trackingNumber parameter is required'
-        }
-      }, { status: 400 });
-    }
-
-    // Mock tracking data - in production, integrate with shipping provider
-    const trackingData: TrackingResponse = {
-      orderId: orderId || 'unknown',
-      trackingNumber: trackingNumber || `VT${Date.now()}`,
-      status: 'in_transit',
-      location: 'Oakland, CA',
-      estimatedDelivery: '2 business days',
-      history: [
-        {
-          date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          status: 'order_confirmed',
-          description: 'Order confirmed and processing'
-        },
-        {
-          date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-          status: 'shipped',
-          location: 'Warehouse, CA',
-          description: 'Package shipped from warehouse'
-        },
-        {
-          date: new Date().toISOString(),
-          status: 'in_transit',
-          location: 'Oakland, CA',
-          description: 'Package in transit to destination'
-        }
-      ]
-    };
-
-    const response: MCPToolResponse<TrackingResponse> = {
-      success: true,
-      data: trackingData,
-      context: {
-        session_id: 'tracking',
-        agent_id: auth.agentId!,
-        processing_time_ms: Date.now() - Date.now()
-      },
-      metadata: {
-        can_fulfill_percentage: 100,
-        estimated_satisfaction: 95,
-        next_actions: ['Monitor delivery progress', 'Prepare for package arrival']
-      }
-    };
-    
-    return NextResponse.json(response);
-  } catch (error) {
+  const orderId = request.nextUrl.searchParams.get('orderId');
+  if (!orderId) {
     return NextResponse.json({
       success: false,
       error: {
-        code: 'TRACKING_ERROR',
-        message: 'Failed to get tracking information',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      }
-    }, { status: 500 });
+        code: 'MISSING_ORDER_ID',
+        message: 'orderId is required; tracking-number lookup awaits the fulfillment data model',
+      },
+    }, { status: 400 });
   }
+  return projectOwnedOrder(orderId, auth.agentId!);
 }
 
 export async function POST(request: NextRequest) {
-  // Alternative POST method for tracking lookup
   const auth = await authenticateAgent(request);
-  
   if (!auth.success) {
-    return NextResponse.json({
-      success: false,
-      error: auth.error
-    }, { status: 401 });
+    return NextResponse.json({ success: false, error: auth.error }, { status: 401 });
   }
 
+  let body: unknown;
   try {
-    const body = await request.json() as any;
-    const { orderId, trackingNumber } = body;
-    
-    if (!orderId && !trackingNumber) {
-      return NextResponse.json({
-        success: false,
-        error: {
-          code: 'MISSING_IDENTIFIER',
-          message: 'orderId or trackingNumber is required'
-        }
-      }, { status: 400 });
-    }
-
-    // Use the same logic as GET method
-    const url = new URL(request.url);
-    if (orderId) url.searchParams.set('orderId', orderId);
-    if (trackingNumber) url.searchParams.set('trackingNumber', trackingNumber);
-    
-    const modifiedRequest = new NextRequest(url, { method: 'GET', headers: request.headers });
-    return GET(modifiedRequest);
-    
-  } catch (error) {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({
+      success: false,
+      error: { code: 'INVALID_REQUEST', message: 'Invalid JSON body' },
+    }, { status: 400 });
+  }
+  const orderId = body && typeof body === 'object' && !Array.isArray(body)
+    ? (body as Record<string, unknown>).orderId
+    : undefined;
+  if (typeof orderId !== 'string' || !orderId) {
     return NextResponse.json({
       success: false,
       error: {
-        code: 'TRACKING_ERROR',
-        message: 'Failed to get tracking information',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      }
-    }, { status: 500 });
+        code: 'MISSING_ORDER_ID',
+        message: 'orderId is required; tracking-number lookup awaits the fulfillment data model',
+      },
+    }, { status: 400 });
   }
+  return projectOwnedOrder(orderId, auth.agentId!);
 }
