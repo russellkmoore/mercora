@@ -24,6 +24,7 @@ describe('real D1 Workers harness', () => {
       '0009_add_order_effects.sql',
       '0010_add_inventory_adjustments.sql',
       '0011_add_external_refund_restock_setting.sql',
+      '0012_expand_mcp_agent_credentials.sql',
       '0013_add_shipping_carrier.sql',
       '0014_add_order_events.sql',
       '0015_normalize_order_timestamps.sql',

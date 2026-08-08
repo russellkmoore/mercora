@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateAgent } from '../../../../../../lib/mcp/auth';
+import { authenticateAgent, hasAgentManagementPermission } from '../../../../../../lib/mcp/auth';
 import { listAgents } from '../../../../../../lib/mcp/tools/agent';
 
 export async function GET(request: NextRequest) {
@@ -12,6 +12,16 @@ export async function GET(request: NextRequest) {
     }, { status: 401 });
   }
 
+  if (!hasAgentManagementPermission(auth.permissions)) {
+    return NextResponse.json({
+      success: false,
+      error: {
+        code: 'FORBIDDEN',
+        message: 'Agent management requires admin or agents:manage permission',
+      },
+    }, { status: 403 });
+  }
+
   try {
     const { searchParams } = request.nextUrl;
     const page = parseInt(searchParams.get('page') || '1');
@@ -19,7 +29,7 @@ export async function GET(request: NextRequest) {
     const sessionId = searchParams.get('session_id') || 'temp';
     
     // Validate pagination parameters
-    if (page < 1) {
+    if (!Number.isSafeInteger(page) || page < 1) {
       return NextResponse.json({
         success: false,
         error: {
@@ -29,7 +39,7 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
     
-    if (limit < 1 || limit > 100) {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
       return NextResponse.json({
         success: false,
         error: {

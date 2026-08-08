@@ -4,6 +4,8 @@ import { enhanceUserContext } from '../context';
 import { Product } from '../../types';
 import { Money } from '../../money';
 import { toPublicProduct, toWireProduct, type WireProduct } from '../../models/mach/product-serializer';
+import { genericBundleSuggestions } from '../catalog';
+import { isBoundedString, isPlainRecord } from '../../public-request-validation';
 
 export async function getRecommendations(
   request: RecommendRequest,
@@ -12,7 +14,16 @@ export async function getRecommendations(
   const startTime = Date.now();
   
   try {
-    const { context } = request;
+    const context = isPlainRecord(request?.context) ? request.context : {};
+    if (
+      (context.useCase !== undefined && !isBoundedString(context.useCase, 256)) ||
+      (context.userActivity !== undefined && !isBoundedString(context.userActivity, 256)) ||
+      (context.budget !== undefined &&
+        (typeof context.budget !== 'number' || !Number.isFinite(context.budget) || context.budget < 0)) ||
+      (context.currentProduct !== undefined && !Number.isSafeInteger(context.currentProduct))
+    ) {
+      throw new Error('Recommendation context is invalid');
+    }
     const userContext = enhanceUserContext(request.agent_context || null);
     
     let recommendations: Product[] = [];
@@ -102,41 +113,16 @@ export async function getRecommendations(
 }
 
 async function getUseCaseRecommendations(useCase: string, userContext: any): Promise<Product[]> {
-  const useCaseLower = useCase.toLowerCase();
-  
-  if (useCaseLower.includes('camping') || useCaseLower.includes('camp')) {
-    return await searchProducts('camping tent sleeping bag');
-  }
-  
-  if (useCaseLower.includes('hiking') || useCaseLower.includes('trail')) {
-    return await searchProducts('hiking backpack boots');
-  }
-  
-  if (useCaseLower.includes('backpack')) {
-    return await searchProducts('backpacking ultralight');
-  }
-  
-  // Default to general outdoor gear
-  return await searchProducts('outdoor adventure gear');
+  return searchProducts(useCase);
 }
 
 async function getActivityRecommendations(activity: string, userContext: any): Promise<Product[]> {
-  // Map activities to product searches
-  const activityMap: Record<string, string> = {
-    'weekend_camping': 'car camping tent sleeping bag',
-    'backpacking': 'ultralight backpacking gear',
-    'day_hiking': 'day pack hiking boots',
-    'mountaineering': 'alpine climbing gear',
-    'winter_camping': 'winter tent sleeping system'
-  };
-  
-  const searchQuery = activityMap[activity] || activity;
-  return await searchProducts(searchQuery);
+  return searchProducts(activity.replace(/_/g, ' '));
 }
 
 async function getRelatedProductRecommendations(product: Product, userContext: any): Promise<Product[]> {
-  const category = (product as any).category_name || 'outdoor gear';
-  return await searchProducts(category);
+  const query = product.categories?.[0] || String(product.name || '');
+  return searchProducts(query);
 }
 
 async function getGeneralRecommendations(userContext: any): Promise<Product[]> {
@@ -146,8 +132,7 @@ async function getGeneralRecommendations(userContext: any): Promise<Product[]> {
     return await searchProducts(activity);
   }
   
-  // Default to popular outdoor essentials
-  return await searchProducts('popular outdoor gear essentials');
+  return searchProducts('');
 }
 
 function sortRecommendations(products: Product[], userContext: any): Product[] {
@@ -191,41 +176,11 @@ function sortRecommendations(products: Product[], userContext: any): Product[] {
 }
 
 function generateCrossSiteRecommendations(context: any, userContext: any): string[] {
-  const suggestions: string[] = [];
-  
-  if (context.useCase?.toLowerCase().includes('food') || context.userActivity?.includes('meal')) {
-    suggestions.push('Mountain House for freeze-dried meals and rations');
-    suggestions.push('REI for comprehensive outdoor food selection');
-  }
-  
-  if (context.useCase?.toLowerCase().includes('ski') || context.userActivity?.includes('winter')) {
-    suggestions.push('Backcountry.com for specialized winter sports equipment');
-    suggestions.push('Local ski shops for cross-country skiing gear');
-  }
-  
-  if (userContext.experienceLevel === 'expert') {
-    suggestions.push('Specialist manufacturers for high-end technical gear');
-  }
-  
-  return suggestions;
+  return [];
 }
 
 function generateBundlingRecommendations(products: Product[]): string[] {
-  const recommendations: string[] = [];
-  
-  const hasTent = products.some(p => (typeof p.name === 'string' ? p.name : String(p.name || '')).toLowerCase().includes('tent'));
-  const hasSleeping = products.some(p => (typeof p.name === 'string' ? p.name : String(p.name || '')).toLowerCase().includes('sleeping') || (typeof p.name === 'string' ? p.name : String(p.name || '')).toLowerCase().includes('bag'));
-  const hasBackpack = products.some(p => (typeof p.name === 'string' ? p.name : String(p.name || '')).toLowerCase().includes('pack') || (typeof p.name === 'string' ? p.name : String(p.name || '')).toLowerCase().includes('backpack'));
-  
-  if (hasTent && hasSleeping) {
-    recommendations.push('Complete shelter system: tent + sleeping setup bundle available');
-  }
-  
-  if (hasBackpack && hasSleeping) {
-    recommendations.push('Backpacking essentials: pack + sleeping system combo deals');
-  }
-  
-  return recommendations;
+  return genericBundleSuggestions(new Set(products.map((product) => product.id)).size);
 }
 
 function generateCostRecommendations(products: Product[], budget?: number): string[] {
@@ -238,11 +193,11 @@ function generateCostRecommendations(products: Product[], budget?: number): stri
   }, Money.zero()).toMach().amount;
   
   if (totalCost > budget * 1.2) {
-    recommendations.push('Consider base models to stay within budget');
+    recommendations.push('Consider lower-priced variants to stay within budget');
     recommendations.push('Look for seasonal sales on similar items');
   } else if (totalCost < budget * 0.8) {
     recommendations.push('Budget allows for premium upgrades');
-    recommendations.push('Consider adding complementary gear within budget');
+    recommendations.push('Consider adding complementary catalog items within budget');
   }
   
   return recommendations;

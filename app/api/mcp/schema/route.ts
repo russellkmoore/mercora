@@ -3,13 +3,13 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function GET(request: NextRequest) {
   // MCP Server Schema Documentation
   const schema = {
-    name: "voltique-mcp-server",
+    name: "mercora-mcp-server",
     version: "1.0.0",
-    description: "Voltique MCP Server for multi-agent outdoor gear commerce",
+    description: "Mercora MCP server for agent-assisted commerce",
     capabilities: {
       tools: true,
       resources: false,
-      prompts: true
+      prompts: false
     },
     tools: [
       {
@@ -25,8 +25,8 @@ export async function GET(request: NextRequest) {
                 category: { type: "string" },
                 priceMin: { type: "number" },
                 priceMax: { type: "number" },
-                limit: { type: "number", default: 10 },
-                sortBy: { type: "string", enum: ["price", "rating", "popularity"] }
+                limit: { type: "number", minimum: 1, maximum: 100, default: 10 },
+                sortBy: { type: "string", enum: ["price"] }
               }
             },
             session_id: { type: "string", description: "Agent session ID" }
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
             requirements: {
               type: "object",
               properties: {
-                items: { type: "array", items: { type: "string" } },
+                items: { type: "array", minItems: 1, maxItems: 20, items: { type: "string" } },
                 budget: { type: "number" },
                 timeline: { type: "string" },
                 location: { type: "string" }
@@ -159,41 +159,44 @@ export async function GET(request: NextRequest) {
         }
       },
       {
-        name: "place_order",
-        description: "Place order with agent context and budget validation",
+        name: "create_payment_intent",
+        description: "Create a server-priced pending order and bound Stripe PaymentIntent",
         inputSchema: {
           type: "object",
           properties: {
             shippingAddress: {
               type: "object",
               properties: {
-                street: { type: "string" },
-                street2: { type: "string" },
+                line1: { type: "string" },
+                line2: { type: "string" },
                 city: { type: "string" },
-                state: { type: "string" },
+                region: { type: "string" },
                 postal_code: { type: "string" },
-                country: { type: "string", default: "US" }
+                country: { type: "string", default: "US" },
+                recipient: { type: "string" },
+                email: { type: "string" }
               },
-              required: ["street", "city", "state", "postal_code"]
+              required: ["line1", "city", "region", "postal_code"]
             },
-            billingAddress: { 
-              type: "object",
-              description: "Optional, defaults to shipping address"
-            },
-            paymentMethod: { 
-              type: "string", 
-              default: "agent-processed",
-              description: "Payment method identifier"
-            },
-            shippingOption: { 
-              type: "string", 
-              default: "standard",
-              enum: ["standard", "expedited", "overnight"]
-            },
-            specialInstructions: { type: "string" },
+            shippingMethodId: { type: "string" },
+            discountCodes: { type: "array", items: { type: "string" } },
+            giftCardToken: { type: "string" },
             session_id: { type: "string" }
           },
-          required: ["shippingAddress", "session_id"]
+          required: ["shippingAddress", "shippingMethodId", "session_id"]
+        }
+      },
+      {
+        name: "place_order",
+        description: "Finalize a server-created pending order after verified payment",
+        inputSchema: {
+          type: "object",
+          properties: {
+            orderId: { type: "string" },
+            paymentIntentId: { type: "string" },
+            session_id: { type: "string" }
+          },
+          required: ["orderId", "paymentIntentId", "session_id"]
         }
       },
       {
@@ -216,32 +219,18 @@ export async function GET(request: NextRequest) {
             address: {
               type: "object",
               properties: {
-                street: { type: "string" },
-                street2: { type: "string" },
+                line1: { type: "string" },
+                line2: { type: "string" },
                 city: { type: "string" },
-                state: { type: "string" },
+                region: { type: "string" },
                 postal_code: { type: "string" },
                 country: { type: "string", default: "US" }
               },
-              required: ["street", "city", "state", "postal_code"]
-            },
-            cart: {
-              type: "array",
-              description: "Optional cart items (uses session cart if not provided)",
-              items: {
-                type: "object",
-                properties: {
-                  productId: { type: "number" },
-                  variantId: { type: "number" },
-                  quantity: { type: "number" },
-                  name: { type: "string" },
-                  price: { type: "number" }
-                }
-              }
+              required: ["line1", "city", "region", "postal_code"]
             },
             session_id: { type: "string" }
           },
-          required: ["address"]
+          required: ["address", "session_id"]
         }
       },
       {
@@ -252,41 +241,23 @@ export async function GET(request: NextRequest) {
           properties: {
             payment_method: {
               type: "string",
-              enum: ["agent_processed", "credit_card", "paypal", "bank_transfer"],
+              enum: ["stripe"],
               description: "Payment method to validate"
             },
             billing_address: {
               type: "object",
               properties: {
-                street: { type: "string" },
-                street2: { type: "string" },
+                line1: { type: "string" },
+                line2: { type: "string" },
                 city: { type: "string" },
-                state: { type: "string" },
+                region: { type: "string" },
                 postal_code: { type: "string" },
                 country: { type: "string", default: "US" }
               }
             },
-            cart: {
-              type: "array",
-              description: "Optional cart items (uses session cart if not provided)",
-              items: {
-                type: "object",
-                properties: {
-                  productId: { type: "number" },
-                  variantId: { type: "number" },
-                  quantity: { type: "number" },
-                  name: { type: "string" },
-                  price: { type: "number" }
-                }
-              }
-            },
-            total_amount: { 
-              type: "number",
-              description: "Total amount to validate payment for"
-            },
             session_id: { type: "string" }
           },
-          required: ["payment_method", "total_amount"]
+          required: ["payment_method", "session_id"]
         }
       },
       {
@@ -320,14 +291,34 @@ export async function GET(request: NextRequest) {
               type: "number",
               description: "Operations per hour limit (default: 10)"
             },
+            apiKeyTtlDays: {
+              type: "number",
+              minimum: 1,
+              maximum: 365,
+              default: 90,
+              description: "Credential lifetime in days"
+            },
             session_id: { type: "string" }
           },
           required: ["agentId", "name"]
         }
       },
       {
+        name: "rotate_agent_key",
+        description: "Rotate an agent API key and return the replacement once",
+        inputSchema: {
+          type: "object",
+          properties: {
+            agentId: { type: "string" },
+            apiKeyTtlDays: { type: "number", minimum: 1, maximum: 365 },
+            session_id: { type: "string" }
+          },
+          required: ["agentId"]
+        }
+      },
+      {
         name: "list_agents",
-        description: "List all MCP agents with stats and pagination",
+        description: "List MCP agents with bounded pagination",
         inputSchema: {
           type: "object",
           properties: {
@@ -374,13 +365,13 @@ export async function GET(request: NextRequest) {
             },
             session_id: { type: "string" }
           },
-          required: ["agentId", "isActive"]
+          required: ["agentId"]
         }
       }
     ],
     authentication: {
       type: "api_key",
-      description: "Agent API key required in X-Agent-API-Key header",
+      description: "Agent API key required in X-Agent-API-Key or Authorization: Bearer header",
       rate_limits: {
         requests_per_minute: 100,
         orders_per_hour: 10
@@ -391,7 +382,7 @@ export async function GET(request: NextRequest) {
       schema: {
         type: "object",
         properties: {
-          agentId: { type: "string", required: true },
+          agentId: { type: "string", description: "Ignored and replaced by authenticated identity" },
           userId: { type: "string" },
           userPreferences: {
             type: "object",
@@ -444,13 +435,14 @@ export async function GET(request: NextRequest) {
     },
     examples: {
       multi_agent_workflow: [
-        "1. assess_request - Determine what items Voltique can fulfill",
-        "2. bulk_add_to_cart - Add all Voltique items efficiently", 
+        "1. assess_request - Determine what items this store can fulfill",
+        "2. bulk_add_to_cart - Add purchasable items efficiently",
         "3. get_cart - Validate totals against budget",
         "4. get_shipping_options - Compare shipping methods and costs",
-        "5. validate_payment - Verify payment method and calculate fees",
-        "6. place_order - Complete purchase with user address",
-        "7. get_order_status - Monitor delivery progress"
+        "5. create_payment_intent - Create the authoritative quote and pending order",
+        "6. Complete the returned Stripe PaymentIntent",
+        "7. place_order - Verify payment and finalize the order",
+        "8. get_order_status - Monitor order progress"
       ]
     }
   };
