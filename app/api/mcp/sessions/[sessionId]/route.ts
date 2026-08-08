@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession, updateSession, deleteSession } from '../../../../../lib/mcp/session';
 import { authenticateAgent } from '../../../../../lib/mcp/auth';
+import { parseAgentContext } from '../../../../../lib/mcp/context';
 import { MCPToolResponse, AgentSession } from '../../../../../lib/mcp/types';
 
 export async function GET(
@@ -109,8 +110,28 @@ export async function PUT(
       }, { status: 403 });
     }
 
-    const updateData = await request.json() as any;
-    const success = await updateSession(sessionId, updateData);
+    // Session carts are changed only through scoped cart tools, which reload
+    // canonical catalog data. This endpoint updates bounded context only.
+    if (!request.headers.get('X-Agent-Context')) {
+      return NextResponse.json({
+        success: false,
+        error: {
+          code: 'INVALID_REQUEST',
+          message: 'X-Agent-Context is required for session updates'
+        }
+      }, { status: 400 });
+    }
+    const agentContext = parseAgentContext(request, auth.agentId);
+    if (!agentContext) {
+      return NextResponse.json({
+        success: false,
+        error: {
+          code: 'INVALID_REQUEST',
+          message: 'X-Agent-Context is invalid'
+        }
+      }, { status: 400 });
+    }
+    const success = await updateSession(sessionId, { userContext: agentContext });
     
     if (!success) {
       throw new Error('Failed to update session');

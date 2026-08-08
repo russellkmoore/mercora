@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateAgent } from '../../../../../../lib/mcp/auth';
+import { authenticateAgent, hasPermission, requiredScopeForTool } from '../../../../../../lib/mcp/auth';
 import { clearCart } from '../../../../../../lib/mcp/tools/cart';
 
 export async function POST(request: NextRequest) {
@@ -10,6 +10,11 @@ export async function POST(request: NextRequest) {
       success: false,
       error: auth.error
     }, { status: 401 });
+  }
+
+  const requiredScope = requiredScopeForTool('clear_cart')!;
+  if (!hasPermission(auth.permissions, requiredScope)) {
+    return NextResponse.json({ success: false, error: { code: 'FORBIDDEN', message: 'This tool requires write:cart permission' } }, { status: 403 });
   }
 
   try {

@@ -17,7 +17,12 @@ export const mcpAgents = sqliteTable('mcp_agents', {
   agentId: text('agent_id').primaryKey(),
   name: text('name'),
   description: text('description'),
-  apiKey: text('api_key').unique().notNull(),
+  // Transitional expand/rotate/contract credential shape. `legacyApiKey`
+  // remains until every deployed database has rotated its old plaintext rows.
+  legacyApiKey: text('api_key').unique().notNull(),
+  apiKeyHash: text('api_key_hash').unique(),
+  apiKeyExpiresAt: text('api_key_expires_at'),
+  credentialVersion: integer('credential_version').default(1).notNull(),
   permissions: text('permissions'), // JSON string array
   rateLimitRpm: integer('rate_limit_rpm').default(100),
   rateLimitOph: integer('rate_limit_oph').default(10),

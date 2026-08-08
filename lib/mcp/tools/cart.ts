@@ -1,28 +1,66 @@
-import { getSession, updateSessionCart, getSessionCart } from '../session';
+import { requireOwnedSession, updateSessionCart } from '../session';
 import { getProductBySlug } from '../../models/mach/products';
 import { CartRequest, CartResponse, MCPToolResponse, WireCartItem } from '../types';
 import { CartItem } from '../../types/cartitem';
 import { Money, cartSubtotal } from '../../money';
+import { genericBundleSuggestions, isPublicMcpProduct } from '../catalog';
+import { MAX_CHECKOUT_LINES } from '../../services/checkout-pricing';
+
+const ZERO_ESTIMATED_TOTAL = Money.zero('USD').toMach();
+
+function validatedQuantity(value: unknown, fallback = 1): number {
+  const quantity = value === undefined ? fallback : value;
+  if (!Number.isSafeInteger(quantity) || Number(quantity) < 1 || Number(quantity) > 1_000) {
+    throw new Error('Quantity must be an integer between 1 and 1000');
+  }
+  return Number(quantity);
+}
+
+function cartOwnershipError(
+  ownership: { code: 'SESSION_NOT_FOUND' | 'SESSION_ACCESS_DENIED'; message: string },
+  sessionId: string,
+  agentId: string,
+  processingTime: number,
+): MCPToolResponse<CartResponse> {
+  return {
+    success: false,
+    data: { cart: [], total_items: 0, estimated_total: ZERO_ESTIMATED_TOTAL },
+    context: { session_id: sessionId, agent_id: agentId, processing_time_ms: processingTime },
+    error: { code: ownership.code, message: ownership.message },
+    metadata: {
+      can_fulfill_percentage: 0,
+      estimated_satisfaction: 0,
+      next_actions: ownership.code === 'SESSION_NOT_FOUND'
+        ? ['Create a new session', 'Verify session ID']
+        : ['Use a session created by this agent'],
+    },
+  };
+}
 
 export async function addToCart(
   request: CartRequest & { sessionId: string },
-  sessionId: string
+  sessionId: string,
+  agentId: string,
 ): Promise<MCPToolResponse<CartResponse>> {
   const startTime = Date.now();
   
   try {
-    // Get current cart
-    const currentCart = await getSessionCart(sessionId);
+    const ownership = await requireOwnedSession(sessionId, agentId);
+    if (!ownership.ok) {
+      return cartOwnershipError(ownership, sessionId, agentId, Date.now() - startTime);
+    }
+    const currentCart = ownership.session.cart;
+    const quantity = validatedQuantity(request.quantity);
     
     // Get product details
     const product = await getProductBySlug(request.productId.toString());
-    if (!product) {
+    if (!product || !isPublicMcpProduct(product)) {
       throw new Error('Product not found');
     }
 
     // Find the specific variant
     const variant = product.variants?.find(v => String(v.id) === String(request.variantId));
-    if (!variant) {
+    if (!variant || (variant.status != null && variant.status !== 'active')) {
       throw new Error('Product variant not found');
     }
 
@@ -33,13 +71,18 @@ export async function addToCart(
     if (existingItemIndex >= 0) {
       // Update quantity of existing item
       updatedCart = [...currentCart];
-      updatedCart[existingItemIndex].quantity += request.quantity || 1;
+      updatedCart[existingItemIndex].quantity = validatedQuantity(
+        updatedCart[existingItemIndex].quantity + quantity,
+      );
     } else {
+      if (currentCart.length >= MAX_CHECKOUT_LINES) {
+        throw new Error(`Cart cannot exceed ${MAX_CHECKOUT_LINES} distinct items`);
+      }
       // Add new item to cart
       const newItem: CartItem = {
         productId: String(product.id!),
         variantId: String(request.variantId),
-        quantity: request.quantity || 1,
+        quantity,
         name: typeof product.name === 'string' ? product.name : String(product.name || ''),
         price: Money.fromStored(variant.price).toJSON(),
         primaryImageUrl: (product as any).image_url || ''
@@ -52,7 +95,7 @@ export async function addToCart(
     
     // Calculate totals
     const totalItems = updatedCart.reduce((sum, item) => sum + item.quantity, 0);
-    const estimatedTotal = cartSubtotal(updatedCart).toMach().amount;
+    const estimatedTotal = cartSubtotal(updatedCart).toMach();
     
     const processingTime = Date.now() - startTime;
     
@@ -65,7 +108,7 @@ export async function addToCart(
       },
       context: {
         session_id: sessionId,
-        agent_id: request.agent_context?.agentId || 'unknown',
+        agent_id: agentId,
         processing_time_ms: processingTime
       },
       recommendations: {
@@ -83,10 +126,10 @@ export async function addToCart(
     
     return {
       success: false,
-      data: { cart: [], total_items: 0, estimated_total: 0 },
+      data: { cart: [], total_items: 0, estimated_total: ZERO_ESTIMATED_TOTAL },
       context: {
         session_id: sessionId,
-        agent_id: request.agent_context?.agentId || 'unknown',
+        agent_id: agentId,
         processing_time_ms: processingTime
       },
       metadata: {
@@ -100,26 +143,39 @@ export async function addToCart(
 
 export async function bulkAddToCart(
   request: { items: CartRequest[]; sessionId: string; agent_context?: any },
-  sessionId: string
+  sessionId: string,
+  agentId: string,
 ): Promise<MCPToolResponse<CartResponse>> {
   const startTime = Date.now();
   
   try {
-    let currentCart = await getSessionCart(sessionId);
+    const ownership = await requireOwnedSession(sessionId, agentId);
+    if (!ownership.ok) {
+      return cartOwnershipError(ownership, sessionId, agentId, Date.now() - startTime);
+    }
+    if (
+      !Array.isArray(request.items) ||
+      request.items.length === 0 ||
+      request.items.length > MAX_CHECKOUT_LINES
+    ) {
+      throw new Error(`Bulk request must contain between 1 and ${MAX_CHECKOUT_LINES} items`);
+    }
+    let currentCart = ownership.session.cart;
     let addedItems = 0;
     let failedItems: string[] = [];
     
     // Process each item
     for (const item of request.items) {
       try {
+        const quantity = validatedQuantity(item.quantity);
         const product = await getProductBySlug(item.productId.toString());
-        if (!product) {
+        if (!product || !isPublicMcpProduct(product)) {
           failedItems.push(`Product ${item.productId} not found`);
           continue;
         }
 
         const variant = product.variants?.find(v => String(v.id) === String(item.variantId));
-        if (!variant) {
+        if (!variant || (variant.status != null && variant.status !== 'active')) {
           failedItems.push(`Variant ${item.variantId} not found for product ${item.productId}`);
           continue;
         }
@@ -129,13 +185,19 @@ export async function bulkAddToCart(
         
         if (existingItemIndex >= 0) {
           // Update quantity of existing item
-          currentCart[existingItemIndex].quantity += item.quantity || 1;
+          currentCart[existingItemIndex].quantity = validatedQuantity(
+            currentCart[existingItemIndex].quantity + quantity,
+          );
         } else {
+          if (currentCart.length >= MAX_CHECKOUT_LINES) {
+            failedItems.push(`Cart cannot exceed ${MAX_CHECKOUT_LINES} distinct items`);
+            continue;
+          }
           // Add new item to cart
           const newItem: CartItem = {
             productId: String(product.id!),
             variantId: String(item.variantId),
-            quantity: item.quantity || 1,
+            quantity,
             name: typeof product.name === 'string' ? product.name : String(product.name || ''),
             price: Money.fromStored(variant.price).toJSON(),
             primaryImageUrl: (product as any).image_url || ''
@@ -154,7 +216,7 @@ export async function bulkAddToCart(
     
     // Calculate totals
     const totalItems = currentCart.reduce((sum, item) => sum + item.quantity, 0);
-    const estimatedTotal = cartSubtotal(currentCart).toMach().amount;
+    const estimatedTotal = cartSubtotal(currentCart).toMach();
     
     const processingTime = Date.now() - startTime;
     const successRate = addedItems / request.items.length;
@@ -168,7 +230,7 @@ export async function bulkAddToCart(
       },
       context: {
         session_id: sessionId,
-        agent_id: request.agent_context?.agentId || 'unknown',
+        agent_id: agentId,
         processing_time_ms: processingTime
       },
       recommendations: failedItems.length > 0 ? {
@@ -191,10 +253,10 @@ export async function bulkAddToCart(
     
     return {
       success: false,
-      data: { cart: [], total_items: 0, estimated_total: 0 },
+      data: { cart: [], total_items: 0, estimated_total: ZERO_ESTIMATED_TOTAL },
       context: {
         session_id: sessionId,
-        agent_id: request.agent_context?.agentId || 'unknown',
+        agent_id: agentId,
         processing_time_ms: processingTime
       },
       metadata: {
@@ -213,6 +275,10 @@ export async function clearCart(
   const startTime = Date.now();
   
   try {
+    const ownership = await requireOwnedSession(sessionId, agentId);
+    if (!ownership.ok) {
+      return cartOwnershipError(ownership, sessionId, agentId, Date.now() - startTime);
+    }
     await updateSessionCart(sessionId, []);
     
     const processingTime = Date.now() - startTime;
@@ -222,7 +288,7 @@ export async function clearCart(
       data: {
         cart: [],
         total_items: 0,
-        estimated_total: 0
+        estimated_total: ZERO_ESTIMATED_TOTAL
       },
       context: {
         session_id: sessionId,
@@ -240,7 +306,7 @@ export async function clearCart(
     
     return {
       success: false,
-      data: { cart: [], total_items: 0, estimated_total: 0 },
+      data: { cart: [], total_items: 0, estimated_total: ZERO_ESTIMATED_TOTAL },
       context: {
         session_id: sessionId,
         agent_id: agentId,
@@ -257,12 +323,17 @@ export async function clearCart(
 
 export async function updateCart(
   request: CartRequest & { sessionId: string },
-  sessionId: string
+  sessionId: string,
+  agentId: string,
 ): Promise<MCPToolResponse<CartResponse>> {
   const startTime = Date.now();
   
   try {
-    const currentCart = await getSessionCart(sessionId);
+    const ownership = await requireOwnedSession(sessionId, agentId);
+    if (!ownership.ok) {
+      return cartOwnershipError(ownership, sessionId, agentId, Date.now() - startTime);
+    }
+    const currentCart = ownership.session.cart;
     const itemIndex = currentCart.findIndex(item => String(item.variantId) === String(request.variantId));
     
     if (itemIndex === -1) {
@@ -271,18 +342,16 @@ export async function updateCart(
     
     let updatedCart = [...currentCart];
     
-    if (request.quantity && request.quantity > 0) {
-      // Update quantity
-      updatedCart[itemIndex].quantity = request.quantity;
-    } else {
-      // Remove item if quantity is 0 or not provided
+    if (request.quantity === 0) {
       updatedCart.splice(itemIndex, 1);
+    } else {
+      updatedCart[itemIndex].quantity = validatedQuantity(request.quantity, 0);
     }
     
     await updateSessionCart(sessionId, updatedCart);
     
     const totalItems = updatedCart.reduce((sum, item) => sum + item.quantity, 0);
-    const estimatedTotal = cartSubtotal(updatedCart).toMach().amount;
+    const estimatedTotal = cartSubtotal(updatedCart).toMach();
     
     const processingTime = Date.now() - startTime;
     
@@ -295,7 +364,7 @@ export async function updateCart(
       },
       context: {
         session_id: sessionId,
-        agent_id: request.agent_context?.agentId || 'unknown',
+        agent_id: agentId,
         processing_time_ms: processingTime
       },
       metadata: {
@@ -309,10 +378,10 @@ export async function updateCart(
     
     return {
       success: false,
-      data: { cart: [], total_items: 0, estimated_total: 0 },
+      data: { cart: [], total_items: 0, estimated_total: ZERO_ESTIMATED_TOTAL },
       context: {
         session_id: sessionId,
-        agent_id: request.agent_context?.agentId || 'unknown',
+        agent_id: agentId,
         processing_time_ms: processingTime
       },
       metadata: {
@@ -326,9 +395,10 @@ export async function updateCart(
 
 export async function removeFromCart(
   request: CartRequest & { sessionId: string },
-  sessionId: string
+  sessionId: string,
+  agentId: string,
 ): Promise<MCPToolResponse<CartResponse>> {
-  return updateCart({ ...request, quantity: 0 }, sessionId);
+  return updateCart({ ...request, quantity: 0 }, sessionId, agentId);
 }
 
 export async function getCartEstimate(
@@ -338,9 +408,13 @@ export async function getCartEstimate(
   const startTime = Date.now();
   
   try {
-    const cart = await getSessionCart(sessionId);
+    const ownership = await requireOwnedSession(sessionId, agentId);
+    if (!ownership.ok) {
+      return cartOwnershipError(ownership, sessionId, agentId, Date.now() - startTime);
+    }
+    const cart = ownership.session.cart;
     const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-    const estimatedTotal = cartSubtotal(cart).toMach().amount;
+    const estimatedTotal = cartSubtotal(cart).toMach();
     
     const processingTime = Date.now() - startTime;
     
@@ -367,7 +441,7 @@ export async function getCartEstimate(
     
     return {
       success: false,
-      data: { cart: [], total_items: 0, estimated_total: 0 },
+      data: { cart: [], total_items: 0, estimated_total: ZERO_ESTIMATED_TOTAL },
       context: {
         session_id: sessionId,
         agent_id: agentId,
@@ -383,21 +457,7 @@ export async function getCartEstimate(
 }
 
 function generateCartBundlingOpportunities(cart: CartItem[]): string[] {
-  const opportunities: string[] = [];
-  
-  const hasTent = cart.some(item => item.name.toLowerCase().includes('tent'));
-  const hasSleeping = cart.some(item => item.name.toLowerCase().includes('sleeping') || item.name.toLowerCase().includes('bag'));
-  const hasBackpack = cart.some(item => item.name.toLowerCase().includes('pack'));
-  
-  if (hasTent && hasSleeping) {
-    opportunities.push('Complete camping system: add camp stove for full setup');
-  }
-  
-  if (hasBackpack && !hasSleeping) {
-    opportunities.push('Backpacking essential missing: consider adding sleeping system');
-  }
-  
-  return opportunities;
+  return genericBundleSuggestions(new Set(cart.map((item) => item.productId)).size);
 }
 
 function toWireCart(cart: CartItem[]): WireCartItem[] {
@@ -412,10 +472,10 @@ function generateCartOptimizations(cart: CartItem[], budget?: number): string[] 
   
   if (total > budget) {
     optimizations.push(`Cart total $${total} exceeds budget $${budget}`);
-    optimizations.push('Consider reducing quantities or choosing base models');
+    optimizations.push('Consider reducing quantities or choosing lower-priced variants');
   } else if (total < budget * 0.9) {
-    optimizations.push(`Budget allows for $${budget - total} in additional gear`);
-    optimizations.push('Consider premium upgrades within remaining budget');
+    optimizations.push(`Budget allows for $${budget - total} in additional products`);
+    optimizations.push('Consider additional catalog items within the remaining budget');
   }
   
   return optimizations;

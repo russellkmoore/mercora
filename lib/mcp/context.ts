@@ -1,11 +1,14 @@
 import { NextRequest } from 'next/server';
 import { AgentContext } from './types';
 
-export function parseAgentContext(request: NextRequest): AgentContext | null {
+export function parseAgentContext(
+  request: NextRequest,
+  authenticatedAgentId?: string,
+): AgentContext | null {
   try {
     const contextHeader = request.headers.get('X-Agent-Context');
     if (!contextHeader) {
-      return null;
+      return authenticatedAgentId ? { agentId: authenticatedAgentId } : null;
     }
 
     const context: AgentContext = JSON.parse(contextHeader);
@@ -26,6 +29,12 @@ export function parseAgentContext(request: NextRequest): AgentContext | null {
       throw new Error(`Agent context too large: ${contextSize} bytes (max 1024)`);
     }
 
+    // X-Agent-Context is client-controlled. Authentication, not this header,
+    // owns identity attribution.
+    if (authenticatedAgentId) {
+      context.agentId = authenticatedAgentId;
+    }
+
     return context;
   } catch (error) {
     console.error('Failed to parse agent context:', error);
@@ -36,24 +45,40 @@ export function parseAgentContext(request: NextRequest): AgentContext | null {
 function validateUserPreferences(preferences: AgentContext['userPreferences']): void {
   if (!preferences) return;
 
-  if (preferences.budget && (typeof preferences.budget !== 'number' || preferences.budget < 0)) {
-    throw new Error('budget must be a positive number');
+  if (
+    preferences.budget !== undefined &&
+    (typeof preferences.budget !== 'number' || !Number.isFinite(preferences.budget) || preferences.budget < 0)
+  ) {
+    throw new Error('budget must be a non-negative finite number');
   }
 
-  if (preferences.brands && !Array.isArray(preferences.brands)) {
-    throw new Error('brands must be an array of strings');
+  if (preferences.brands) {
+    validateStringList(preferences.brands, 'brands');
   }
 
-  if (preferences.activities && !Array.isArray(preferences.activities)) {
-    throw new Error('activities must be an array of strings');
+  if (preferences.activities) {
+    validateStringList(preferences.activities, 'activities');
   }
 
-  if (preferences.location && typeof preferences.location !== 'string') {
-    throw new Error('location must be a string');
+  if (preferences.location && (typeof preferences.location !== 'string' || preferences.location.length > 256)) {
+    throw new Error('location must be a string of at most 256 characters');
   }
 
-  if (preferences.experience_level && typeof preferences.experience_level !== 'string') {
-    throw new Error('experience_level must be a string');
+  if (
+    preferences.experience_level &&
+    (typeof preferences.experience_level !== 'string' || preferences.experience_level.length > 64)
+  ) {
+    throw new Error('experience_level must be a string of at most 64 characters');
+  }
+}
+
+function validateStringList(value: unknown, name: string): asserts value is string[] {
+  if (
+    !Array.isArray(value) ||
+    value.length > 50 ||
+    value.some((entry) => typeof entry !== 'string' || entry.length < 1 || entry.length > 128)
+  ) {
+    throw new Error(`${name} must contain at most 50 non-empty strings of at most 128 characters`);
   }
 }
 
@@ -74,5 +99,5 @@ export function enhanceUserContext(agentContext: AgentContext | null, existingUs
 }
 
 export function createAgentSessionId(agentId: string): string {
-  return `${agentId}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  return `${agentId}_${crypto.randomUUID()}`;
 }
