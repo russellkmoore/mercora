@@ -14,6 +14,7 @@ import {
   QUEUE_VIEW_LABELS,
   buildQueueQuery,
   clampOffsetAfterRemoval,
+  createPerKeyGate,
   createRequestGate,
   deriveEmailState,
   formatQueueMoney,
@@ -63,12 +64,24 @@ export default function OrdersQueueClient() {
   const [mutationBusy, setMutationBusy] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [emailStates, setEmailStates] = useState<Record<string, EmailState>>({});
-  const [emailBusy, setEmailBusy] = useState<string | null>(null);
+  const [emailBusy, setEmailBusy] = useState<Set<string>>(new Set());
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [editingOrder, setEditingOrder] = useState<string | null>(null);
   const [editNotes, setEditNotes] = useState("");
   const [notesBusy, setNotesBusy] = useState(false);
   const requestGate = useRef(createRequestGate());
+  const emailGate = useRef(createPerKeyGate());
+
+  const beginEmailAction = useCallback((orderId: string): boolean => {
+    if (!emailGate.current.start(orderId)) return false;
+    setEmailBusy(emailGate.current.snapshot());
+    return true;
+  }, []);
+
+  const finishEmailAction = useCallback((orderId: string): void => {
+    emailGate.current.finish(orderId);
+    setEmailBusy(emailGate.current.snapshot());
+  }, []);
 
   const load = useCallback(async () => {
     const request = requestGate.current.start();
@@ -100,21 +113,25 @@ export default function OrdersQueueClient() {
     return () => gate.abort();
   }, [load]);
 
+  const refreshEmailState = useCallback(async (orderId: string) => {
+    const response = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/shipping-email`);
+    const body = (await response.json().catch(() => ({}))) as { status?: ShippingEmailStatus; error?: string };
+    if (!response.ok) throw new Error(body.error ?? "Could not load shipping email status");
+    if (!body.status) throw new Error("Shipping email status was unavailable");
+    const emailStatus = body.status;
+    setEmailStates((current) => ({ ...current, [orderId]: deriveEmailState(emailStatus) }));
+  }, []);
+
   const loadEmailState = useCallback(async (orderId: string) => {
-    setEmailBusy(orderId);
+    if (!beginEmailAction(orderId)) return;
     try {
-      const response = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/shipping-email`);
-      const body = (await response.json().catch(() => ({}))) as { status?: ShippingEmailStatus; error?: string };
-      if (!response.ok) throw new Error(body.error ?? "Could not load shipping email status");
-      if (!body.status) throw new Error("Shipping email status was unavailable");
-      const emailStatus = body.status;
-      setEmailStates((current) => ({ ...current, [orderId]: deriveEmailState(emailStatus) }));
+      await refreshEmailState(orderId);
     } catch (error) {
       setNotice({ tone: "error", message: error instanceof Error ? error.message : "Could not load email status" });
     } finally {
-      setEmailBusy(null);
+      finishEmailAction(orderId);
     }
-  }, []);
+  }, [beginEmailAction, finishEmailAction, refreshEmailState]);
 
   const updateOrderNotes = useCallback(async (orderId: string, notes: string) => {
     setNotesBusy(true);
@@ -191,7 +208,7 @@ export default function OrdersQueueClient() {
   }, [load, offset, target, total, view]);
 
   const sendEmail = useCallback(async (order: AdminQueueOrder, state: EmailState) => {
-    setEmailBusy(order.id);
+    if (!beginEmailAction(order.id)) return;
     try {
       const response = await fetch(`/api/admin/orders/${encodeURIComponent(order.id)}/shipping-email`, {
         method: "POST",
@@ -201,20 +218,20 @@ export default function OrdersQueueClient() {
       const body = (await response.json().catch(() => ({}))) as MutationResponse;
       if (body.email?.pending) {
         setNotice({ tone: "warning", message: `A matching shipping email for order ${order.id} is still processing.` });
-        await loadEmailState(order.id);
+        await refreshEmailState(order.id);
         return;
       }
       if (!response.ok || body.email?.success === false) {
         throw new Error(body.error ?? body.email?.error ?? `Shipping email failed (${response.status})`);
       }
       setNotice({ tone: "success", message: `Shipping email sent for order ${order.id}.` });
-      await loadEmailState(order.id);
+      await refreshEmailState(order.id);
     } catch (error) {
       setNotice({ tone: "error", message: error instanceof Error ? error.message : "Shipping email failed" });
     } finally {
-      setEmailBusy(null);
+      finishEmailAction(order.id);
     }
-  }, [loadEmailState]);
+  }, [beginEmailAction, finishEmailAction, refreshEmailState]);
 
   const page = Math.floor(offset / PAGE_SIZE) + 1;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -395,11 +412,11 @@ export default function OrdersQueueClient() {
                       {email ? (
                         <>
                           <span className={email.tone === "error" ? "text-state-error" : email.tone === "success" ? "text-state-success" : ""}>{email.message}</span>
-                          {order.status === "shipped" && <Button size="sm" variant="outline" disabled={emailBusy === order.id} onClick={() => void sendEmail(order, email)}><Mail className="mr-2 h-4 w-4" />{email.label}</Button>}
+                          {order.status === "shipped" && <Button size="sm" variant="outline" disabled={emailBusy.has(order.id)} onClick={() => void sendEmail(order, email)}><Mail className="mr-2 h-4 w-4" />{email.label}</Button>}
                         </>
                       ) : (
-                        <Button size="sm" variant="ghost" disabled={emailBusy === order.id} onClick={() => void loadEmailState(order.id)}>
-                          {emailBusy === order.id ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}Check email status
+                        <Button size="sm" variant="ghost" disabled={emailBusy.has(order.id)} onClick={() => void loadEmailState(order.id)}>
+                          {emailBusy.has(order.id) ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}Check email status
                         </Button>
                       )}
                     </div>

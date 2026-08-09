@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateAgent } from '../../../../../../lib/mcp/auth';
 import { getOrderStatus } from '../../../../../../lib/mcp/tools/order';
+import {
+  parseMcpOrderId,
+  readMcpOrderLookup,
+} from '../../../../../../lib/mcp/order-lookup';
 
 export async function GET(request: NextRequest) {
   const auth = await authenticateAgent(request);
@@ -13,28 +17,26 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const orderId = request.nextUrl.searchParams.get('orderId');
-    
-    if (!orderId) {
+    const parsed = parseMcpOrderId(request.nextUrl.searchParams.get('orderId'));
+    if (!parsed.ok) {
       return NextResponse.json({
         success: false,
         error: {
-          code: 'MISSING_ORDER_ID',
-          message: 'orderId parameter is required'
+          code: parsed.code,
+          message: parsed.message
         }
-      }, { status: 400 });
+      }, { status: parsed.status });
     }
 
-    const result = await getOrderStatus(orderId, auth.agentId!);
+    const result = await getOrderStatus(parsed.orderId, auth.agentId!);
     
     return NextResponse.json(result);
-  } catch (error) {
+  } catch {
     return NextResponse.json({
       success: false,
       error: {
         code: 'ORDER_STATUS_ERROR',
-        message: 'Failed to get order status',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        message: 'Failed to get order status'
       }
     }, { status: 500 });
   }
@@ -52,29 +54,26 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json() as any;
-    const { orderId } = body;
-    
-    if (!orderId) {
+    const parsed = await readMcpOrderLookup(request);
+    if (!parsed.ok) {
       return NextResponse.json({
         success: false,
         error: {
-          code: 'MISSING_ORDER_ID',
-          message: 'orderId is required in request body'
+          code: parsed.code,
+          message: parsed.message
         }
-      }, { status: 400 });
+      }, { status: parsed.status });
     }
 
-    const result = await getOrderStatus(orderId, auth.agentId!);
+    const result = await getOrderStatus(parsed.orderId, auth.agentId!);
     
     return NextResponse.json(result);
-  } catch (error) {
+  } catch {
     return NextResponse.json({
       success: false,
       error: {
         code: 'ORDER_STATUS_ERROR',
-        message: 'Failed to get order status',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        message: 'Failed to get order status'
       }
     }, { status: 500 });
   }

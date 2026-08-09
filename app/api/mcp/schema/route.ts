@@ -201,7 +201,7 @@ export async function GET(request: NextRequest) {
       },
       {
         name: "get_order_status",
-        description: "Get order status and tracking information",
+        description: "Get owned order status, configured shipment tracking, and real fulfillment history",
         inputSchema: {
           type: "object",
           properties: {

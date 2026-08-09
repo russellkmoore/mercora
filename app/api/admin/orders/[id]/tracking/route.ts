@@ -84,6 +84,13 @@ export async function PATCH(
           tracking: buildShipmentView(result.order, registry),
           eventId: result.eventId,
         });
+      case "unchanged":
+        return NextResponse.json({
+          order: toAdminOrder(result.order),
+          tracking: buildShipmentView(result.order, registry),
+          eventId: null,
+          idempotent: true,
+        });
       case "not_found":
         return NextResponse.json(
           { code: "order_not_found", error: "Order not found" },

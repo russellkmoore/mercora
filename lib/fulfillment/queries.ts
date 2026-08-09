@@ -1,6 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 import { getDbAsync } from "@/lib/db";
 import { orders } from "@/lib/db/schema/order";
+import { SHIPMENT_NO_UNSETTLED_REFUNDS_SQL } from "@/lib/utils/refund-validation";
 
 export const ADMIN_ORDER_VIEWS = ["awaiting", "shipped", "cancelled", "all"] as const;
 export type AdminOrderView = (typeof ADMIN_ORDER_VIEWS)[number];
@@ -53,7 +54,8 @@ export function isAdminSearchWithinLimit(raw: unknown): boolean {
 export function viewPredicate(view: AdminOrderView): SQL {
   switch (view) {
     case "awaiting":
-      return sql`status = 'processing' AND payment_status = 'paid'`;
+      return sql`status = 'processing' AND payment_status = 'paid'
+        AND ${sql.raw(SHIPMENT_NO_UNSETTLED_REFUNDS_SQL)}`;
     case "shipped":
       return sql`status IN ('shipped', 'delivered')`;
     case "cancelled":
