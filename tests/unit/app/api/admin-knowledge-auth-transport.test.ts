@@ -89,17 +89,28 @@ describe('knowledge vectorization auth transport', () => {
     );
   });
 
-  it('has no production caller that constructs a token query parameter', () => {
+  it('keeps service credentials out of query parameters', () => {
     const files = [
       ...productionSources(join(process.cwd(), 'app')),
       ...productionSources(join(process.cwd(), 'lib')),
     ];
+    const signedGuestLinkFile = join(process.cwd(), 'lib', 'fulfillment', 'shipping-email.ts');
     const offenders = files.filter((file) => {
       const source = readFileSync(file, 'utf8');
-      return /[?&]token=|searchParams\.set\(\s*['"]token['"]/.test(source);
+      return (
+        file !== signedGuestLinkFile &&
+        /[?&]token=|searchParams\.set\(\s*['"]token['"]/.test(source)
+      );
     });
 
     expect(offenders).toEqual([]);
+
+    // The sole query-token exception is an expiring, order-bound guest
+    // credential. Pin both its route and URL encoding so this exception cannot
+    // silently become a general service-secret transport.
+    const guestLinkSource = readFileSync(signedGuestLinkFile, 'utf8');
+    expect(guestLinkSource).toContain('/order-status/${encodeURIComponent(order.id)}');
+    expect(guestLinkSource).toContain('url.searchParams.set("token", token)');
   });
 
   it('rejects traversal on POST before writing or triggering vectorization', async () => {

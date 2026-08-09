@@ -141,9 +141,18 @@ never authoritative.
 | Orders | `get_order_status` |
 | Agents | `create_agent`, `list_agents`, `get_agent_details`, `update_agent_status`, `rotate_agent_key` |
 
-Shipment-event-backed tracking remains part of Mercora's planned fulfillment
-vertical slice. Until then, order status exposes only fields backed by the
-current order record and does not fabricate carrier events.
+`get_order_status` returns only an order owned by the authenticated agent. Its
+`shipment` object is derived from server-owned carrier/tracking columns and the
+validated runtime carrier registry; stored or client-provided tracking URLs are
+never trusted. `tracking_history` contains the real order-created marker plus a
+bounded, customer-safe projection of `shipment_created` and `tracking_updated`
+audit events. Actor identifiers, email-delivery events, and opaque event details
+are not exposed. Legacy shipped orders without an audit row fall back to their
+persisted `shipped_at` marker rather than receiving fabricated history.
+
+The dedicated `/api/mcp/tools/order/track` endpoint presents the same owned
+shipment as camel-cased carrier, tracking-link, and history fields. Missing,
+non-MCP, and differently owned orders remain indistinguishable.
 
 ## Rotation operations
 

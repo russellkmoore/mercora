@@ -25,7 +25,27 @@ describe('real D1 Workers harness', () => {
       '0010_add_inventory_adjustments.sql',
       '0011_add_external_refund_restock_setting.sql',
       '0012_expand_mcp_agent_credentials.sql',
+      '0013_add_shipping_carrier.sql',
+      '0014_add_order_events.sql',
+      '0015_normalize_order_timestamps.sql',
+      '0016_enforce_order_timestamp_format.sql',
     ]);
+  });
+
+  it('stores canonical ISO UTC timestamps when an order insert omits them', async () => {
+    const id = 'U14-DEFAULT-TIMESTAMPS';
+    await env.DB.prepare('DELETE FROM orders WHERE id = ?').bind(id).run();
+    await env.DB.prepare(`
+      INSERT INTO orders (id, total_amount, currency_code, items)
+      VALUES (?, ?, 'USD', '[]')
+    `).bind(id, JSON.stringify({ amount: 100, currency: 'USD' })).run();
+
+    const stored = await env.DB.prepare(
+      'SELECT created_at, updated_at FROM orders WHERE id = ?',
+    ).bind(id).first<{ created_at: string; updated_at: string }>();
+
+    expect(stored?.created_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    expect(stored?.updated_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
   });
 
   it('serializes concurrent primary-key claims against real D1', async () => {
