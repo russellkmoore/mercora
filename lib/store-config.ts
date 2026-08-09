@@ -9,6 +9,17 @@
 
 export type Environment = Record<string, string | undefined>;
 
+export type StoreCarrierDefinition = {
+  /** Stable lowercase code persisted with an order. */
+  code: string;
+  /** Customer- and operator-facing name. */
+  label: string;
+  /** HTTPS URL containing one `{trackingNumber}` placeholder. */
+  trackingUrlTemplate?: string;
+  /** Historical free-text values accepted while reading existing orders. */
+  legacyAliases: readonly string[];
+};
+
 export type StoreConfig = {
   identity: {
     name: string;
@@ -52,6 +63,7 @@ export type StoreConfig = {
   commerce: {
     currency: string;
     freeShippingThresholdCents?: number;
+    carriers: readonly StoreCarrierDefinition[];
     features: {
       recommendations: boolean;
       giftCards: boolean;
@@ -105,6 +117,30 @@ export const storeDefaults: StoreConfig = {
   },
   commerce: {
     currency: "USD",
+    carriers: [
+      {
+        code: "ups",
+        label: "UPS",
+        trackingUrlTemplate:
+          "https://www.ups.com/track?loc=en_US&tracknum={trackingNumber}",
+        legacyAliases: ["united parcel service", "unitedparcel"],
+      },
+      {
+        code: "fedex",
+        label: "FedEx",
+        trackingUrlTemplate:
+          "https://www.fedex.com/fedextrack/?trknbr={trackingNumber}",
+        legacyAliases: ["federal express", "federalexpress"],
+      },
+      {
+        code: "usps",
+        label: "USPS",
+        trackingUrlTemplate:
+          "https://tools.usps.com/go/TrackConfirmAction?tLabels={trackingNumber}",
+        legacyAliases: ["united states postal service", "us postal service"],
+      },
+      { code: "other", label: "Other", legacyAliases: [] },
+    ],
     features: { recommendations: true, giftCards: false, subscriptions: false },
   },
   deployment: {
@@ -140,6 +176,122 @@ function optionalHttpsUrl(env: Environment, key: string) {
 
 function siteUrl(env: Environment) {
   return optionalHttpsUrl(env, "NEXT_PUBLIC_SITE_URL") ?? storeDefaults.urls.site;
+}
+
+const CARRIER_CODE_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
+const MAX_CARRIER_LABEL_LENGTH = 80;
+const MAX_CARRIER_ALIAS_LENGTH = 80;
+const MAX_CARRIER_ALIASES = 20;
+const TRACKING_PLACEHOLDER = "{trackingNumber}";
+
+function compactCarrierToken(value: string): string {
+  return value.trim().toLowerCase().replace(/[\s._-]/g, "");
+}
+
+function safeTrackingTemplate(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length > 2_048) return undefined;
+  if (value.split(TRACKING_PLACEHOLDER).length !== 2) return undefined;
+
+  try {
+    const parsed = new URL(value.replace(TRACKING_PLACEHOLDER, "TRACKING_NUMBER"));
+    if (
+      parsed.protocol !== "https:" ||
+      !parsed.hostname ||
+      parsed.username ||
+      parsed.password ||
+      parsed.hostname.includes("tracking_number")
+    ) {
+      return undefined;
+    }
+    return value;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Parse an operator-provided registry atomically. A malformed entry makes the
+ * whole value fall back to the known-safe defaults instead of creating a
+ * partially configured checkout at runtime.
+ */
+function parseCarrierDefinitions(value: string | undefined): readonly StoreCarrierDefinition[] {
+  if (!value?.trim()) return storeDefaults.commerce.carriers;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return storeDefaults.commerce.carriers;
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 50) {
+    return storeDefaults.commerce.carriers;
+  }
+
+  const definitions: StoreCarrierDefinition[] = [];
+  const definitionCodes = new Set<string>();
+  const claimedTokens = new Map<string, string>();
+  for (const candidate of parsed) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      return storeDefaults.commerce.carriers;
+    }
+    const raw = candidate as Record<string, unknown>;
+    if (typeof raw.code !== "string" || typeof raw.label !== "string") {
+      return storeDefaults.commerce.carriers;
+    }
+
+    const code = raw.code.trim().toLowerCase();
+    const label = raw.label.trim();
+    if (
+      !CARRIER_CODE_PATTERN.test(code) ||
+      !label ||
+      label.length > MAX_CARRIER_LABEL_LENGTH ||
+      definitionCodes.has(code)
+    ) {
+      return storeDefaults.commerce.carriers;
+    }
+    definitionCodes.add(code);
+
+    const template = raw.trackingUrlTemplate;
+    const trackingUrlTemplate = template === undefined
+      ? undefined
+      : safeTrackingTemplate(template);
+    if (template !== undefined && trackingUrlTemplate === undefined) {
+      return storeDefaults.commerce.carriers;
+    }
+
+    if (!Array.isArray(raw.legacyAliases) || raw.legacyAliases.length > MAX_CARRIER_ALIASES) {
+      return storeDefaults.commerce.carriers;
+    }
+    const legacyAliases: string[] = [];
+    for (const alias of raw.legacyAliases) {
+      if (typeof alias !== "string") return storeDefaults.commerce.carriers;
+      const trimmed = alias.trim();
+      if (!trimmed || trimmed.length > MAX_CARRIER_ALIAS_LENGTH) {
+        return storeDefaults.commerce.carriers;
+      }
+      legacyAliases.push(trimmed);
+    }
+
+    for (const valueToClaim of [code, ...legacyAliases]) {
+      const compact = compactCarrierToken(valueToClaim);
+      if (!compact) return storeDefaults.commerce.carriers;
+      const existingOwner = claimedTokens.get(compact);
+      if (existingOwner && existingOwner !== code) return storeDefaults.commerce.carriers;
+      if (existingOwner === code) continue;
+      for (const [claimed, owner] of claimedTokens) {
+        if (
+          owner !== code &&
+          (claimed.startsWith(compact) || compact.startsWith(claimed))
+        ) {
+          return storeDefaults.commerce.carriers;
+        }
+      }
+      claimedTokens.set(compact, code);
+    }
+    definitions.push({ code, label, ...(trackingUrlTemplate ? { trackingUrlTemplate } : {}), legacyAliases });
+  }
+
+  return definitions;
 }
 
 /**
@@ -196,6 +348,7 @@ export function resolveStoreConfig(env: Environment = {}): StoreConfig {
       ...storeDefaults.commerce,
       currency: text(env, "STORE_CURRENCY", storeDefaults.commerce.currency),
       freeShippingThresholdCents: parseOptionalCents(env["STORE_FREE_SHIPPING_THRESHOLD_CENTS"]),
+      carriers: parseCarrierDefinitions(env["STORE_CARRIERS_JSON"]),
     },
     deployment: {
       indexable: bool(env, "NEXT_PUBLIC_ROBOTS_INDEX", storeDefaults.deployment.indexable),

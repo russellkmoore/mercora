@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 
 describe('admin order quick-edit contract', () => {
   it('sends only notes through the metadata-only generic order PUT', () => {
-    const source = readFileSync('app/admin/orders/page.tsx', 'utf8');
+    const source = readFileSync('app/admin/orders/OrdersQueueClient.tsx', 'utf8');
     const start = source.indexOf('const updateOrderNotes');
-    const end = source.indexOf('const toggleOrderExpansion', start);
+    const end = source.indexOf('const submitShipment', start);
     const updateSection = source.slice(start, end);
 
     expect(updateSection).toContain('body: JSON.stringify({');
@@ -17,13 +17,16 @@ describe('admin order quick-edit contract', () => {
   });
 
   it('prefers canonical stored checkout breakdown fields in both admin views', () => {
-    for (const path of ['app/admin/orders/page.tsx', 'app/admin/orders/[id]/page.tsx']) {
+    for (const [path, formatter] of [
+      ['app/admin/orders/OrdersQueueClient.tsx', 'formatQueueMoney'],
+      ['app/admin/orders/[id]/page.tsx', 'formatStoredCurrency'],
+    ]) {
       const source = readFileSync(path, 'utf8');
       expect(source).toContain('checkout_catalog_subtotal');
       expect(source).toContain('checkout_shipping_before_discount');
       expect(source).toContain('checkout_tax');
       expect(source).toContain('checkout_discount');
-      expect(source).toContain('formatStoredCurrency');
+      expect(source).toContain(formatter);
     }
   });
 

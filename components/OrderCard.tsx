@@ -5,6 +5,12 @@ import { cn } from "@/lib/utils";
 import { Order, Review } from "@/lib/types";
 import { ReviewForm } from "@/components/reviews/ReviewForm";
 import { Money } from "@/lib/money";
+import type { ShipmentView } from "@/lib/fulfillment/shipment-view";
+
+export type OrderCardOrder = Pick<
+  Order,
+  "id" | "status" | "total_amount" | "items" | "created_at" | "shipped_at" | "delivered_at"
+>;
 
 type OrderStatus = "pending" | "processing" | "shipped" | "delivered" | "cancelled" | "refunded";
 
@@ -29,7 +35,13 @@ function buildReviewKey(review: Review) {
   return review.order_item_id ?? review.product_id ?? review.id;
 }
 
-export default function OrderCard({ order }: { order: Order }) {
+export default function OrderCard({
+  order,
+  shipment,
+}: {
+  order: OrderCardOrder;
+  shipment: ShipmentView;
+}) {
   const date = formatOrderDate(order.created_at || "");
   const total = Money.fromStored(order.total_amount).format();
   const items = Array.isArray(order.items) ? order.items : [];
@@ -141,10 +153,40 @@ export default function OrderCard({ order }: { order: Order }) {
         Total: <span className="text-green-400">{total}</span>
       </div>
 
+      {order.shipped_at && (
+        <div className="mt-4 rounded-md border border-neutral-700 bg-neutral-900 p-3 text-sm">
+          <p className="font-semibold text-white">Shipment</p>
+          <dl className="mt-2 space-y-1 text-gray-300">
+            {shipment.carrierLabel && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-gray-400">Carrier</dt>
+                <dd>{shipment.carrierLabel}</dd>
+              </div>
+            )}
+            {shipment.trackingNumber && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-gray-400">Tracking number</dt>
+                <dd className="break-all font-mono">{shipment.trackingNumber}</dd>
+              </div>
+            )}
+          </dl>
+          {shipment.trackingUrl && (
+            <a
+              href={shipment.trackingUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="mt-3 inline-flex font-medium text-orange-400 underline hover:text-orange-300"
+            >
+              Track your package
+            </a>
+          )}
+        </div>
+      )}
+
       <div className="mt-4 flex flex-col gap-2">
         {!reviewable && (
           <p className="text-xs text-amber-300">
-            Delivery pending – we’ll invite you to review items once your gear arrives.
+            Delivery pending – we’ll invite you to review items once your order arrives.
           </p>
         )}
         {reviewError && <p className="text-xs text-red-400">{reviewError}</p>}

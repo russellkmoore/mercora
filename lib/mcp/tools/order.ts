@@ -9,6 +9,7 @@ import {
   getOwnedMcpOrderBinding,
 } from '../checkout';
 import { requireOwnedSession } from '../session';
+import { buildMcpOrderDelivery } from '../order-delivery';
 import type { MCPToolResponse, OrderRequest, OrderResponse } from '../types';
 
 const ZERO_TOTAL = toWireMoney(0);
@@ -166,17 +167,23 @@ export async function getOrderStatus(
     );
   }
 
+  const delivery = await buildMcpOrderDelivery(order);
+
   return {
     success: true,
     data: {
       orderId: order.id!,
       status: order.status,
       total: toWireMoney(order.total_amount, order.currency_code),
-      tracking_number: order.tracking_number,
-      estimated_delivery: calculateEstimatedDelivery(
-        order.shipping_address,
-        order.shipping_method || 'standard',
-      ),
+      tracking_number: delivery.shipment.trackingNumber ?? undefined,
+      shipment: {
+        carrier: delivery.shipment.carrier,
+        carrier_label: delivery.shipment.carrierLabel,
+        tracking_number: delivery.shipment.trackingNumber,
+        tracking_url: delivery.shipment.trackingUrl,
+      },
+      tracking_history: delivery.history,
+      estimated_delivery: delivery.estimatedDelivery,
     },
     context: {
       session_id: 'status-check',
@@ -188,7 +195,9 @@ export async function getOrderStatus(
       estimated_satisfaction: 90,
       next_actions: order.status === 'delivered'
         ? ['Review the delivered order']
-        : ['Check back for status updates'],
+        : delivery.shipment.trackingUrl
+          ? ['Track the shipment with the configured carrier']
+          : ['Check back for status updates'],
     },
   };
 }

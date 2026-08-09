@@ -32,6 +32,8 @@ export const orders = sqliteTable("orders", {
   
   // Shipping and payment
   shipping_method: text("shipping_method"),
+  // Stable carrier code selected from the store's fulfillment registry.
+  shipping_carrier: text("shipping_carrier"),
   payment_method: text("payment_method"),
   payment_status: text("payment_status", {
     enum: ["pending", "paid", "failed", "refunded"]
@@ -43,8 +45,8 @@ export const orders = sqliteTable("orders", {
   extensions: text("extensions", { mode: "json" }),
   
   // Timestamps and tracking
-  created_at: text("created_at").default(sql`CURRENT_TIMESTAMP`),
-  updated_at: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
+  created_at: text("created_at").default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  updated_at: text("updated_at").default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
   shipped_at: text("shipped_at"), // ISO 8601 timestamp
   delivered_at: text("delivered_at"), // ISO 8601 timestamp
   tracking_number: text("tracking_number"),

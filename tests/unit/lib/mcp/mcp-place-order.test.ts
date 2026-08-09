@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getBinding: vi.fn(),
   getOwnedOrder: vi.fn(),
   finalize: vi.fn(),
+  buildDelivery: vi.fn(),
 }));
 
 vi.mock('@/lib/mcp/session', () => ({ requireOwnedSession: mocks.requireOwnedSession }));
@@ -16,6 +17,9 @@ vi.mock('@/lib/services/order-finalization', () => {
   class PaymentVerificationError extends Error {}
   return { finalizeOrderPayment: mocks.finalize, PaymentVerificationError };
 });
+vi.mock('@/lib/mcp/order-delivery', () => ({
+  buildMcpOrderDelivery: mocks.buildDelivery,
+}));
 
 import { getOrderStatus, placeOrder } from '@/lib/mcp/tools/order';
 
@@ -39,6 +43,20 @@ beforeEach(() => {
   });
   mocks.getBinding.mockResolvedValue(paidOrder);
   mocks.finalize.mockResolvedValue({ paid: true, promoted: true, order: paidOrder });
+  mocks.buildDelivery.mockResolvedValue({
+    shipment: {
+      carrier: 'ups',
+      carrierLabel: 'UPS',
+      trackingNumber: '1Z999',
+      trackingUrl: 'https://carrier.example/1Z999',
+    },
+    history: [{
+      date: '2026-08-02T00:00:00.000Z',
+      status: 'shipped',
+      description: 'Package shipped',
+    }],
+    estimatedDelivery: '3-5 business days',
+  });
 });
 
 describe('MCP order finalization', () => {
@@ -76,5 +94,27 @@ describe('MCP order finalization', () => {
     mocks.getOwnedOrder.mockResolvedValue(null);
     const result = await getOrderStatus(paidOrder.id, 'attacker');
     expect(result.error?.code).toBe('ORDER_NOT_FOUND');
+    expect(mocks.buildDelivery).not.toHaveBeenCalled();
+  });
+
+  it('returns the configured shipment projection and real event history for its owner', async () => {
+    mocks.getOwnedOrder.mockResolvedValue({
+      ...paidOrder,
+      status: 'shipped',
+      shipping_carrier: 'ups',
+      tracking_number: '1Z999',
+    });
+    const result = await getOrderStatus(paidOrder.id, 'agent-1');
+    expect(result.success).toBe(true);
+    expect(result.data).toMatchObject({
+      tracking_number: '1Z999',
+      shipment: {
+        carrier: 'ups',
+        carrier_label: 'UPS',
+        tracking_number: '1Z999',
+        tracking_url: 'https://carrier.example/1Z999',
+      },
+      tracking_history: [{ status: 'shipped' }],
+    });
   });
 });

@@ -26,6 +26,18 @@ beforeEach(() => {
       orderId: 'MCP-AGENT1-1-A1B2C3D4',
       status: 'processing',
       total: { amount: 25, currency: 'USD', precision: 2 },
+      tracking_number: '1Z999',
+      shipment: {
+        carrier: 'ups',
+        carrier_label: 'UPS',
+        tracking_number: '1Z999',
+        tracking_url: 'https://carrier.example/1Z999',
+      },
+      tracking_history: [{
+        date: '2026-08-02T00:00:00.000Z',
+        status: 'shipped',
+        description: 'Package shipped',
+      }],
       estimated_delivery: '3-5 business days',
     },
     context: { session_id: 'status-check', agent_id: 'agent-1', processing_time_ms: 1 },
@@ -34,14 +46,21 @@ beforeEach(() => {
 });
 
 describe('MCP tracking route', () => {
-  it('projects the authenticated agent order without invented carrier history', async () => {
+  it('projects configured carrier data and real fulfillment history without invented location', async () => {
     const response = await GET(getRequest(
       'https://mercora.test/api/mcp/tools/order/track?orderId=MCP-AGENT1-1-A1B2C3D4',
     ));
     expect(response.status).toBe(200);
     const body = await response.json() as { data: Record<string, unknown> };
     expect(mocks.getOrderStatus).toHaveBeenCalledWith('MCP-AGENT1-1-A1B2C3D4', 'agent-1');
-    expect(body.data).toMatchObject({ status: 'processing', history: [] });
+    expect(body.data).toMatchObject({
+      status: 'processing',
+      trackingNumber: '1Z999',
+      carrier: 'ups',
+      carrierLabel: 'UPS',
+      trackingUrl: 'https://carrier.example/1Z999',
+      history: [{ status: 'shipped' }],
+    });
     expect(body.data.location).toBeUndefined();
   });
 
@@ -53,5 +72,34 @@ describe('MCP tracking route', () => {
     }) as import('next/server').NextRequest);
     expect(response.status).toBe(200);
     expect(mocks.authenticateAgent).toHaveBeenCalledOnce();
+  });
+
+  it('rejects an oversized POST before reading order state', async () => {
+    const response = await POST(new Request('https://mercora.test/api/mcp/tools/order/track', {
+      method: 'POST',
+      body: JSON.stringify({ orderId: 'MCP-OK', pad: 'x'.repeat(1_100) }),
+    }) as import('next/server').NextRequest);
+    expect(response.status).toBe(413);
+    expect(mocks.getOrderStatus).not.toHaveBeenCalled();
+  });
+
+  it.each(['GET', 'POST'])('returns a structured generic error when %s projection fails', async (method) => {
+    mocks.getOrderStatus.mockRejectedValue(new Error('private database detail'));
+    const response = method === 'GET'
+      ? await GET(getRequest(
+        'https://mercora.test/api/mcp/tools/order/track?orderId=MCP-AGENT1-1-A1B2C3D4',
+      ))
+      : await POST(new Request('https://mercora.test/api/mcp/tools/order/track', {
+        method: 'POST',
+        body: JSON.stringify({ orderId: 'MCP-AGENT1-1-A1B2C3D4' }),
+      }) as import('next/server').NextRequest);
+
+    expect(response.status).toBe(500);
+    const body = await response.json() as { error: { code: string; message: string } };
+    expect(body.error).toEqual({
+      code: 'ORDER_TRACKING_ERROR',
+      message: 'Failed to get order tracking',
+    });
+    expect(JSON.stringify(body)).not.toContain('private database detail');
   });
 });
