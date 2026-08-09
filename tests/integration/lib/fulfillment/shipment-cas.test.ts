@@ -188,6 +188,30 @@ describe("tracking value-CAS", () => {
     expect(events[0].event_type).toBe("tracking_updated");
   });
 
+  it("treats concurrent same-value corrections as idempotent without phantom events", async () => {
+    await insertOrder("U13-CAS-TRACK-NOOP", {
+      status: "shipped",
+      carrier: "ups",
+      tracking: "1ZSAME",
+    });
+
+    const results = await Promise.all([
+      updateTracking(
+        "U13-CAS-TRACK-NOOP",
+        { carrier: "ups", trackingNumber: "1ZSAME" },
+        actor,
+      ),
+      updateTracking(
+        "U13-CAS-TRACK-NOOP",
+        { carrier: "ups", trackingNumber: "1ZSAME" },
+        actor,
+      ),
+    ]);
+
+    expect(results.map(({ outcome }) => outcome)).toEqual(["unchanged", "unchanged"]);
+    expect((await eventsFor("U13-CAS-TRACK-NOOP")).results).toEqual([]);
+  });
+
   it("rejects tracking writes before shipment", async () => {
     await insertOrder("U13-CAS-NOT-SHIPPED");
     const result = await updateTracking(

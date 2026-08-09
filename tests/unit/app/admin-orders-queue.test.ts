@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildQueueQuery,
   clampOffsetAfterRemoval,
+  createPerKeyGate,
   createRequestGate,
   deriveEmailState,
   formatQueueMoney,
@@ -29,6 +30,21 @@ describe("admin fulfillment queue model", () => {
     gate.abort();
     expect(second.signal.aborted).toBe(true);
     expect(second.isCurrent()).toBe(false);
+  });
+
+  it("keeps independent per-order actions locked until each one finishes", () => {
+    const gate = createPerKeyGate();
+    expect(gate.start("order-a")).toBe(true);
+    expect(gate.start("order-b")).toBe(true);
+    expect(gate.start("order-a")).toBe(false);
+    expect([...gate.snapshot()].sort()).toEqual(["order-a", "order-b"]);
+
+    gate.finish("order-b");
+    expect(gate.start("order-a")).toBe(false);
+    expect([...gate.snapshot()]).toEqual(["order-a"]);
+
+    gate.finish("order-a");
+    expect(gate.start("order-a")).toBe(true);
   });
 
   it("moves backward after shipping the last row on a page", () => {
@@ -120,6 +136,11 @@ describe("admin queue client source contract", () => {
     expect(source).toContain("/shipping-email`");
     expect(source).not.toContain("/events?limit=50");
     expect(source).toContain("deriveEmailState(emailStatus)");
+  });
+  it("uses a synchronous per-order gate for overlapping email actions", () => {
+    expect(source).toContain("createPerKeyGate()");
+    expect(source).toContain("emailBusy.has(order.id)");
+    expect(source).not.toContain("emailBusy === order.id");
   });
   it("renders explicit fallbacks for unavailable and omitted checkout money", () => {
     expect(source).toContain('formatQueueMoney(order.totalAmount) ?? "Unavailable"');

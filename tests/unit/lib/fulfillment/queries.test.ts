@@ -20,9 +20,10 @@ function compile(fragment: SQL) {
 
 describe("fulfillment queue SQL", () => {
   it("keeps unpaid drafts out of awaiting and all views", () => {
-    expect(compile(viewPredicate("awaiting")).sql).toBe(
-      "status = 'processing' AND payment_status = 'paid'",
-    );
+    const awaiting = compile(viewPredicate("awaiting")).sql;
+    expect(awaiting).toContain("status = 'processing' AND payment_status = 'paid'");
+    expect(awaiting).toContain("NOT EXISTS");
+    expect(awaiting).toContain("IN ('pending', 'requires_action')");
     expect(compile(viewPredicate("all")).sql).toBe(
       "NOT (status = 'pending' AND COALESCE(payment_status, 'pending') <> 'paid')",
     );

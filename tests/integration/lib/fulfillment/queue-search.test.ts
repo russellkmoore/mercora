@@ -101,4 +101,20 @@ describe("real D1 fulfillment queue search", () => {
     expect(byRecipient.total).toBe(1);
     expect(byEmail.total).toBe(1);
   });
+
+  it.each(["pending", "requires_action"])(
+    "excludes orders held by a %s refund from the awaiting queue and count",
+    async (status) => {
+      await insertSearchOrder(
+        `U14-SEARCH-REFUND-${status}`,
+        null,
+        JSON.stringify({ refunds: [{ status }] }),
+      );
+
+      const queue = await queryAdminOrders({ view: "awaiting", limit: 20, offset: 0 });
+
+      expect(queue.orders.map(({ id }) => id)).not.toContain(`U14-SEARCH-REFUND-${status}`);
+      expect(queue.counts.awaiting).toBe(queue.total);
+    },
+  );
 });

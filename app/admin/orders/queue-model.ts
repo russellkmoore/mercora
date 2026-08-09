@@ -1,6 +1,24 @@
 import type { MachMoney } from "@/lib/money";
 
 export const QUEUE_VIEWS = ["awaiting", "shipped", "cancelled", "all"] as const;
+
+/** Synchronous per-order exclusion for async UI actions. */
+export function createPerKeyGate() {
+  const active = new Set<string>();
+  return {
+    start(key: string): boolean {
+      if (active.has(key)) return false;
+      active.add(key);
+      return true;
+    },
+    finish(key: string): void {
+      active.delete(key);
+    },
+    snapshot(): Set<string> {
+      return new Set(active);
+    },
+  };
+}
 export type QueueView = (typeof QUEUE_VIEWS)[number];
 
 export const QUEUE_VIEW_LABELS: Record<QueueView, string> = {

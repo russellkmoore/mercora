@@ -229,6 +229,20 @@ describe("admin tracking route", () => {
       tracking: { carrier: "ups", trackingNumber: "1Z123" },
     });
   });
+
+  it("returns an idempotent response without claiming an audit event for unchanged tracking", async () => {
+    mocks.updateTracking.mockResolvedValue({ outcome: "unchanged", order: shippedOrder });
+    const response = await tracking(new NextRequest(
+      "https://store.test/api/admin/orders/ORD-1/tracking",
+      {
+        method: "PATCH",
+        body: JSON.stringify({ carrier: "ups", trackingNumber: "1Z123" }),
+      },
+    ), context);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ idempotent: true, eventId: null });
+  });
 });
 
 describe("admin events route", () => {

@@ -173,6 +173,7 @@ export async function shipOrder(
 
 export type UpdateTrackingResult =
   | { outcome: "updated"; order: Order; eventId: string }
+  | { outcome: "unchanged"; order: Order }
   | { outcome: "not_found" }
   | { outcome: "conflict"; order: Order }
   | { outcome: "not_shipped"; status: string };
@@ -201,6 +202,9 @@ export async function updateTracking(
   const eventId = crypto.randomUUID();
   const previousCarrier = current.shipping_carrier ?? null;
   const previousTracking = current.tracking_number ?? null;
+  if (previousCarrier === input.carrier && previousTracking === input.trackingNumber) {
+    return { outcome: "unchanged", order: hydrateOrder(current) };
+  }
   const details = JSON.stringify({
     previous: { carrier: previousCarrier, trackingNumber: previousTracking },
     next: { carrier: input.carrier, trackingNumber: input.trackingNumber },
@@ -307,6 +311,43 @@ export async function listRecentOrderEvents(
     .where(eq(orderEvents.order_id, orderId))
     .orderBy(desc(orderEvents.created_at), desc(orderEvents.id))
     .limit(bounded);
+}
+
+export interface TrackingEventSummary {
+  id: string;
+  eventType: "shipment_created" | "tracking_updated";
+  createdAt: string;
+}
+
+/**
+ * Customer-safe, scalar-only tracking history. Selecting no JSON-mode columns
+ * keeps opaque or historically inconsistent audit details out of order tracking.
+ */
+export async function listRecentTrackingEventSummaries(
+  orderId: string,
+  limit = 100,
+): Promise<TrackingEventSummary[]> {
+  const bounded = Math.max(1, Math.min(Math.trunc(limit), 100));
+  const db = await getDbAsync();
+  const rows = await db
+    .select({
+      id: orderEvents.id,
+      eventType: orderEvents.event_type,
+      createdAt: orderEvents.created_at,
+    })
+    .from(orderEvents)
+    .where(and(
+      eq(orderEvents.order_id, orderId),
+      inArray(orderEvents.event_type, ["shipment_created", "tracking_updated"]),
+    ))
+    .orderBy(desc(orderEvents.created_at), desc(orderEvents.id))
+    .limit(bounded);
+
+  return rows.flatMap((row) =>
+    row.eventType === "shipment_created" || row.eventType === "tracking_updated"
+      ? [{ id: row.id, eventType: row.eventType, createdAt: row.createdAt }]
+      : []
+  );
 }
 
 export async function recordEmailEvent(

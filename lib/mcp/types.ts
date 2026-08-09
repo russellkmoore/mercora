@@ -136,7 +136,20 @@ export interface OrderResponse {
   status: string;
   total: MachMoney;
   tracking_number?: string;
+  shipment?: {
+    carrier: string | null;
+    carrier_label: string | null;
+    tracking_number: string | null;
+    tracking_url: string | null;
+  };
+  tracking_history?: MCPTrackingEvent[];
   estimated_delivery: string;
+}
+
+export interface MCPTrackingEvent {
+  date: string;
+  status: "order_confirmed" | "shipped" | "tracking_updated" | "delivered";
+  description: string;
 }
 
 // Authentication Types
