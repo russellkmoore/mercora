@@ -7,8 +7,8 @@
   "name": "mercora",
   "main": "worker.ts",
   "triggers": {
-    // Retry paid-order effects every five minutes and regenerate Admin BI every six hours.
-    "crons": ["*/5 * * * *", "0 */6 * * *"]
+    // Recovery queues: every 5m; Admin BI: every 6h; recommendations: daily at 08:15 UTC.
+    "crons": ["*/5 * * * *", "0 */6 * * *", "15 8 * * *"]
   },
   "compatibility_date": "2026-08-01",
   "compatibility_flags": [

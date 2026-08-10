@@ -29,7 +29,49 @@ describe('real D1 Workers harness', () => {
       '0014_add_order_events.sql',
       '0015_normalize_order_timestamps.sql',
       '0016_enforce_order_timestamp_format.sql',
+      '0017_add_product_recommendations.sql',
     ]);
+  });
+
+  it('installs recommendation defaults and enforces recommendation row invariants', async () => {
+    const settings = await env.DB.prepare(
+      `SELECT key, value FROM admin_settings
+       WHERE category = 'recommendations' ORDER BY key`,
+    ).all<{ key: string; value: string }>();
+    expect(settings.results).toEqual([
+      { key: 'recommendations.exclude_owned', value: 'true' },
+      { key: 'recommendations.limit', value: '3' },
+      { key: 'recommendations.personalize', value: 'true' },
+      { key: 'recommendations.strategy', value: '"deterministic"' },
+    ]);
+
+    await expect(
+      env.DB.prepare(
+        `INSERT INTO product_recommendations
+          (source_product_id, recommended_product_id, rank)
+         VALUES ('same', 'same', 0)`,
+      ).run(),
+    ).rejects.toThrow();
+    await expect(
+      env.DB.prepare(
+        `INSERT INTO product_recommendations
+          (source_product_id, recommended_product_id, rank)
+         VALUES ('source', 'recommended', -1)`,
+      ).run(),
+    ).rejects.toThrow();
+  });
+
+  it('generates canonical UTC timestamps for recommendation rows', async () => {
+    await env.DB.prepare(
+      `INSERT INTO product_recommendations
+        (source_product_id, recommended_product_id, rank)
+       VALUES ('source', 'recommended', 0)`,
+    ).run();
+    const row = await env.DB.prepare(
+      `SELECT generated_at FROM product_recommendations
+       WHERE source_product_id = 'source'`,
+    ).first<{ generated_at: string }>();
+    expect(row?.generated_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
   });
 
   it('stores canonical ISO UTC timestamps when an order insert omits them', async () => {
