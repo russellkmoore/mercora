@@ -59,6 +59,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { RecommendationSettingsCard } from "@/components/admin/RecommendationSettingsCard";
 import { 
   Settings, Store, Bot, Mail, Database, 
   RefreshCw, Save, Globe, DollarSign,
@@ -582,6 +583,7 @@ export default function AdminSettingsPage() {
               </div>
             </div>
           </Card>
+          <RecommendationSettingsCard />
         </div>
       )}
 

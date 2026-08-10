@@ -20,6 +20,10 @@
 import { getDbAsync } from '@/lib/db';
 import { admin_settings } from '@/lib/db/schema/settings';
 import { eq } from 'drizzle-orm';
+import type {
+  RecommendationSettings,
+  RecommendationStrategy,
+} from '@/lib/recommendations/types';
 
 /**
  * Get a typed settings object for easy use in components
@@ -118,4 +122,27 @@ export interface RefundPolicy {
   minimumRefundAmount: number;
   applyRestockingFeeOnPartialReturn: boolean;
   externalFullRestockEnabled: boolean;
+}
+
+export function normalizeRecommendationSettings(
+  raw: Record<string, unknown>,
+): RecommendationSettings {
+  const strategyRaw = raw['recommendations.strategy'];
+  const strategy: RecommendationStrategy = strategyRaw === 'ai_batch'
+    ? 'ai_batch'
+    : 'deterministic';
+  const rawLimit = raw['recommendations.limit'];
+  const limit = typeof rawLimit === 'number' && Number.isFinite(rawLimit)
+    ? Math.max(1, Math.min(6, Math.trunc(rawLimit)))
+    : 3;
+  return {
+    strategy,
+    personalize: raw['recommendations.personalize'] !== false,
+    limit,
+    excludeOwned: raw['recommendations.exclude_owned'] !== false,
+  };
+}
+
+export async function getRecommendationSettings(): Promise<RecommendationSettings> {
+  return normalizeRecommendationSettings(await getSettings('recommendations'));
 }

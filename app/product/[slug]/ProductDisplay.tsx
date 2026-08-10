@@ -19,6 +19,7 @@
  * ```tsx
  * <ProductDisplay
  *   product={productData}
+ *   recommendations={recommendationList}
  *   reviews={reviewList}
  *   reviewEligibility={eligibility}
  * />
@@ -53,6 +54,7 @@ import {
 
 interface ProductDisplayProps {
   product: Product;
+  recommendations: Product[];
   reviews: Review[];
   reviewEligibility?: ProductReviewEligibility;
 }
@@ -79,6 +81,7 @@ function stringifyDescription(description: Product["description"]): string {
 
 export default function ProductDisplay({
   product,
+  recommendations,
   reviews,
   reviewEligibility,
 }: ProductDisplayProps) {
@@ -333,8 +336,7 @@ export default function ProductDisplay({
         </div>
       </div>
 
-      {/* AI-Powered Product Recommendations */}
-      <ProductRecommendations product={product} />
+      <ProductRecommendations recommendations={recommendations} />
     </>
   );
 }

@@ -97,6 +97,7 @@ export * from "./order";
 
 // Append-oriented order fulfillment audit log
 export * from "./order-events";
+export * from "./product-recommendations";
 
 // Admin Settings schema (application-specific)
 export * from "./settings";
