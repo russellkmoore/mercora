@@ -35,12 +35,12 @@ export const TEXT_GENERATION_MODEL: AIModelConfig = {
 /**
  * Embedding model used for vectorized search and semantic similarity
  */
-export const EMBEDDING_MODEL: AIModelConfig = {
+export const EMBEDDING_MODEL = {
   model: "@cf/baai/bge-base-en-v1.5",
   temperature: 0, // Not applicable for embeddings
   maxTokens: 0, // Not applicable for embeddings
   description: "BGE Base EN v1.5 - High-quality English embeddings for semantic search"
-};
+} as const satisfies AIModelConfig;
 
 /**
  * Model configurations for specific use cases
@@ -167,7 +167,7 @@ export function getCurrentTextModel(): string {
 /**
  * Get the current embedding model identifier
  */
-export function getCurrentEmbeddingModel(): string {
+export function getCurrentEmbeddingModel(): typeof EMBEDDING_MODEL.model {
   return EMBEDDING_MODEL.model;
 }
 

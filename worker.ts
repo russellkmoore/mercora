@@ -17,6 +17,7 @@ import { default as handler } from "./.open-next/worker.js";
 import { regenerateAnalytics } from "@/lib/analytics/generate-insights";
 import { drainOrderEffects } from "@/lib/services/order-effects";
 import { drainInventoryAdjustments } from "@/lib/services/inventory-adjustments";
+import { runRecommendationCron } from "@/lib/recommendations/cron";
 
 export default {
   fetch: handler.fetch,
@@ -37,6 +38,11 @@ export default {
           )
           .catch((err) => console.error("[cron] recovery queue drain failed:", err))
       );
+      return;
+    }
+
+    if (controller.cron === "15 8 * * *") {
+      ctx.waitUntil(runRecommendationCron(env));
       return;
     }
 
