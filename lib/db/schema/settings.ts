@@ -165,5 +165,35 @@ export const defaultSettings = [
     category: 'promotions',
     description: 'First-time buyer discount percentage',
     data_type: 'number'
+  },
+
+  // Product recommendations
+  {
+    key: 'recommendations.strategy',
+    value: JSON.stringify('deterministic'),
+    category: 'recommendations',
+    description: 'PDP recommendation source: deterministic or ai_batch',
+    data_type: 'string'
+  },
+  {
+    key: 'recommendations.personalize',
+    value: JSON.stringify(true),
+    category: 'recommendations',
+    description: 'Reserve one recommendation slot for customers with order history',
+    data_type: 'boolean'
+  },
+  {
+    key: 'recommendations.limit',
+    value: JSON.stringify(3),
+    category: 'recommendations',
+    description: 'Number of products shown in the PDP recommendation strip',
+    data_type: 'number'
+  },
+  {
+    key: 'recommendations.exclude_owned',
+    value: JSON.stringify(true),
+    category: 'recommendations',
+    description: 'Hide products the customer already purchased',
+    data_type: 'boolean'
   }
 ];

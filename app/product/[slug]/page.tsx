@@ -45,6 +45,8 @@ import { getProductBySlug, getProductReviews, getProductReviewEligibility } from
 import { notFound } from "next/navigation";
 import ProductDisplay from "./ProductDisplay";
 import { toPublicProduct } from "@/lib/models/mach/product-serializer";
+import { getRecommendationsForProduct } from "@/lib/recommendations";
+import { buildServerUserContext } from "@/lib/recommendations/user-context.server";
 
 export const revalidate = 0;
 
@@ -59,8 +61,9 @@ export default async function ProductPage({ params }: any) {
   const storedProduct = await getProductBySlug(params.slug);
   if (!storedProduct || storedProduct.status !== "active") return notFound();
   const product = toPublicProduct(storedProduct);
+  const userContextPromise = buildServerUserContext(userId);
 
-  const [reviews, reviewEligibility] = await Promise.all([
+  const [reviews, reviewEligibility, recommendations] = await Promise.all([
     getProductReviews({
       productId: product.id,
       status: ["published"],
@@ -70,12 +73,22 @@ export default async function ProductPage({ params }: any) {
       productId: product.id,
       customerId: userId,
     }),
+    userContextPromise
+      .then((userContext) =>
+        getRecommendationsForProduct(storedProduct, { userContext }),
+      )
+      .then((products) => products.map(toPublicProduct)),
   ]);
 
   return (
     <main className="bg-neutral-900 text-white min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
       <div className="max-w-5xl mx-auto">
-        <ProductDisplay product={product} reviews={reviews} reviewEligibility={reviewEligibility} />
+        <ProductDisplay
+          product={product}
+          recommendations={recommendations}
+          reviews={reviews}
+          reviewEligibility={reviewEligibility}
+        />
       </div>
     </main>
   );
