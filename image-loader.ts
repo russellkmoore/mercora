@@ -49,6 +49,19 @@ import type { ImageLoaderProps } from "next/image";
  * @param src - Image source path (absolute or relative)
  * @returns Normalized path without leading slash
  */
+/**
+ * Paths the application serves from its own `public/` directory.
+ *
+ * Every other local path is rewritten to the image bucket, which does not hold
+ * these files — a rewrite would point the browser at a 404 even though the
+ * asset ships with the deployment.
+ */
+const LOCAL_ASSET_PREFIXES = ["/placeholder", "/logo", "/volt"];
+
+function isLocalAsset(src: string) {
+  return LOCAL_ASSET_PREFIXES.some((prefix) => src.startsWith(prefix));
+}
+
 function imageCdn() {
   const value = process.env.NEXT_PUBLIC_IMAGE_CDN?.trim();
   if (!value) return undefined;
@@ -85,7 +98,7 @@ export default function cloudflareLoader({
     return src;
   }
 
-  if (src.startsWith("/placeholder") || src.startsWith("/logo")) return src;
+  if (isLocalAsset(src)) return src;
   const cdn = imageCdn();
   const key = toObjectKey(src, cdn);
   if (key === null) return src;

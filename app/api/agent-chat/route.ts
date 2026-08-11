@@ -77,6 +77,9 @@ import {
 } from "@/lib/models/mach/product-serializer";
 
 const MAX_REQUEST_BODY_BYTES = 256 * 1024;
+/** Purchased items named per order, and across the whole lookup. */
+const MAX_PURCHASED_ITEMS_PER_ORDER = 5;
+const MAX_PURCHASED_LOOKUP = MAX_ORDERS * MAX_PURCHASED_ITEMS_PER_ORDER;
 
 type ChatRole = "user" | "assistant";
 
@@ -89,6 +92,8 @@ interface ChatMessage {
 interface PromptOrder {
   id: string;
   itemCount: number;
+  /** Catalog ids of the purchased items, resolved to names from the catalog. */
+  productIds: string[];
   /**
    * Decimal major units. Order bodies arrive from the orders API, which
    * serializes Money in major units at the HTTP boundary — not the integer
@@ -166,6 +171,35 @@ function normalizeHistory(value: unknown): ChatMessage[] | null {
   return messages;
 }
 
+/**
+ * Resolve purchased catalog ids to current product names.
+ *
+ * A failed lookup degrades to counts and totals rather than failing the chat:
+ * naming past purchases is an enrichment, not a precondition for answering.
+ */
+async function resolvePurchasedNames(orders: PromptOrder[]): Promise<Map<string, string>> {
+  const ids = [...new Set(orders.flatMap((order) => order.productIds))]
+    .slice(0, MAX_PURCHASED_LOOKUP);
+  if (!ids.length) return new Map();
+
+  try {
+    const db = await getDbAsync();
+    const rows = await db
+      .select({ id: products.id, name: products.name })
+      .from(products)
+      .where(and(inArray(products.id, ids), eq(products.status, "active")));
+
+    return new Map(
+      rows
+        .filter((row) => typeof row.name === "string" && row.name.trim())
+        .map((row) => [row.id, cleanPromptText(row.name, 120)]),
+    );
+  } catch (error) {
+    console.error("Error resolving purchased product names:", error);
+    return new Map();
+  }
+}
+
 function normalizeOrders(value: unknown): PromptOrder[] | null {
   if (!isBoundedArray(value, MAX_ORDERS)) return null;
 
@@ -184,6 +218,21 @@ function normalizeOrders(value: unknown): PromptOrder[] | null {
         ? Math.min(Math.max(Math.trunc(rawItems), 0), 100)
         : 0;
 
+    // Ids only. Names come from the catalog at prompt time, so a renamed or
+    // withdrawn product cannot be reintroduced by an order snapshot, and the
+    // request body stays small.
+    const productIds: string[] = [];
+    if (Array.isArray(rawItems)) {
+      for (const item of rawItems) {
+        if (productIds.length >= MAX_PURCHASED_ITEMS_PER_ORDER) break;
+        if (!isPlainRecord(item)) continue;
+        const productId = item.product_id;
+        if (typeof productId !== "string") continue;
+        const trimmed = productId.trim();
+        if (trimmed && trimmed.length <= 128) productIds.push(trimmed);
+      }
+    }
+
     const amountContainer = isPlainRecord(candidate.total_amount)
       ? candidate.total_amount.amount
       : undefined;
@@ -198,6 +247,7 @@ function normalizeOrders(value: unknown): PromptOrder[] | null {
     orders.push({
       id: cleanPromptText(rawId, 128),
       itemCount,
+      productIds,
       totalMajor,
     });
   }
@@ -379,12 +429,16 @@ export async function POST(req: NextRequest) {
       // Continue without vector context if Vectorize fails
     }
 
+    const purchasedNames = await resolvePurchasedNames(orders);
     const purchaseHistory = orders.length
       ? orders
-          .map(
-            (order) =>
-              `Order ${order.id}: ${order.itemCount} items, $${order.totalMajor.toFixed(2)}`
-          )
+          .map((order) => {
+            const names = order.productIds
+              .map((id) => purchasedNames.get(id))
+              .filter((name): name is string => Boolean(name));
+            const summary = `Order ${order.id}: ${order.itemCount} items, $${order.totalMajor.toFixed(2)}`;
+            return names.length ? `${summary} (${names.join(", ")})` : summary;
+          })
           .join(" • ")
       : "No previous orders";
     const locationSummary = requestLocation.country
