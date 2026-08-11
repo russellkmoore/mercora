@@ -86,7 +86,12 @@ interface ChatMessage {
 interface PromptOrder {
   id: string;
   itemCount: number;
-  totalMinor: number;
+  /**
+   * Decimal major units. Order bodies arrive from the orders API, which
+   * serializes Money in major units at the HTTP boundary — not the integer
+   * minor units Mercora stores.
+   */
+  totalMajor: number;
 }
 
 class RequestBodyTooLargeError extends Error {}
@@ -180,15 +185,17 @@ function normalizeOrders(value: unknown): PromptOrder[] | null {
       ? candidate.total_amount.amount
       : undefined;
     const rawTotal = typeof amountContainer === "number" ? amountContainer : candidate.total;
-    const totalMinor =
+    // Truncating here would discard the cents of a major-unit amount, so the
+    // value is only clamped; formatting rounds it for display.
+    const totalMajor =
       typeof rawTotal === "number" && Number.isFinite(rawTotal)
-        ? Math.min(Math.max(Math.trunc(rawTotal), 0), Number.MAX_SAFE_INTEGER)
+        ? Math.min(Math.max(rawTotal, 0), Number.MAX_SAFE_INTEGER)
         : 0;
 
     orders.push({
       id: cleanPromptText(rawId, 128),
       itemCount,
-      totalMinor,
+      totalMajor,
     });
   }
   return orders;
@@ -373,7 +380,7 @@ export async function POST(req: NextRequest) {
       ? orders
           .map(
             (order) =>
-              `Order ${order.id}: ${order.itemCount} items, $${(order.totalMinor / 100).toFixed(2)}`
+              `Order ${order.id}: ${order.itemCount} items, $${order.totalMajor.toFixed(2)}`
           )
           .join(" • ")
       : "No previous orders";
