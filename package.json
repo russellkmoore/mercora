@@ -68,7 +68,7 @@
     "react-dom": "^19.0.0",
     "react-icons": "^5.7.0",
     "resend": "^6.18.1",
-    "sanitize-html": "2.17.5",
+    "sanitize-html": "2.17.6",
     "server-only": "^0.0.1",
     "sonner": "^2.0.6",
     "stripe": "^22.4.0",
