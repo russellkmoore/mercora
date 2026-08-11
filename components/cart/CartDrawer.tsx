@@ -44,10 +44,11 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription, SheetC
 import CartItemCard from "./CartItemCard";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart, X } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { cartSubtotal, Money } from "@/lib/money";
+import { useCartHydration } from "@/lib/hooks/useCartHydration";
 
 /**
  * CartDrawer component providing shopping cart functionality
@@ -56,30 +57,25 @@ import { cartSubtotal, Money } from "@/lib/money";
  */
 export default function CartDrawer() {
   const [isOpen, setIsOpen] = useState(false);
-  const [hasMounted, setHasMounted] = useState(false);
+  const isHydrated = useCartHydration();
   const items = useCartStore((state) => state.items) || [];
-
-  useEffect(() => {
-    // Trigger manual rehydration and mark as mounted
-    useCartStore.persist.rehydrate();
-    setHasMounted(true);
-  }, []);
 
   // Calculate total price for all items in cart with safety checks
   const total = cartSubtotal(items);
 
   // Only show real count after mounting to prevent hydration mismatch
-  const itemCount = hasMounted ? items.length : 0;
+  const itemCount = isHydrated ? items.length : 0;
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
         <Button
           variant="ghost"
+          aria-label={`Cart (${itemCount} ${itemCount === 1 ? "item" : "items"})`}
           className="text-white hover:bg-white hover:text-orange-500 relative"
         >
-          <ShoppingCart className="mr-2 h-4 w-4" />
-          Cart ({itemCount})
+          <ShoppingCart className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Cart ({itemCount})</span>
           {itemCount > 0 && (
             <span className="absolute -top-2 -right-2 bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
               {itemCount}
