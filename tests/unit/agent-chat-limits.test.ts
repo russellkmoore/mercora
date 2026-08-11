@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  MAX_HISTORY_CONTENT_LENGTH,
+  MAX_HISTORY_MESSAGES,
   MAX_ORDERS,
   MAX_USER_CONTEXT_LENGTH,
+  selectRecentHistory,
   selectRecentOrders,
 } from "@/lib/agent-chat-limits";
 
@@ -51,6 +54,36 @@ describe("selectRecentOrders", () => {
 
   it("handles fewer orders than the bound", () => {
     expect(selectRecentOrders([order("only", "2026-01-01T00:00:00.000Z")])).toHaveLength(1);
+  });
+});
+
+describe("selectRecentHistory", () => {
+  const turn = (i: number, content = `m${i}`) => ({ role: "user", content });
+
+  it("bounds a conversation the chat route would otherwise reject", () => {
+    const messages = Array.from({ length: 30 }, (_, i) => turn(i));
+    expect(selectRecentHistory(messages)).toHaveLength(MAX_HISTORY_MESSAGES);
+  });
+
+  it("keeps the latest turns, not the earliest", () => {
+    const messages = Array.from({ length: 15 }, (_, i) => turn(i));
+    const selected = selectRecentHistory(messages);
+    expect(selected[0].content).toBe("m3");
+    expect(selected[selected.length - 1].content).toBe("m14");
+  });
+
+  it("trims a turn longer than the route accepts", () => {
+    const long = turn(0, "x".repeat(MAX_HISTORY_CONTENT_LENGTH + 500));
+    expect(selectRecentHistory([long])[0].content).toHaveLength(MAX_HISTORY_CONTENT_LENGTH);
+  });
+
+  it("leaves short turns untouched", () => {
+    const messages = [turn(0, "hello")];
+    expect(selectRecentHistory(messages)[0]).toBe(messages[0]);
+  });
+
+  it("handles an empty conversation", () => {
+    expect(selectRecentHistory([])).toEqual([]);
   });
 });
 

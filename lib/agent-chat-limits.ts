@@ -17,6 +17,36 @@ export const MAX_ORDERS = 3;
 /** Characters of formatted user context. */
 export const MAX_USER_CONTEXT_LENGTH = 1_000;
 
+/** Turns of conversation history. The client sends the most recent. */
+export const MAX_HISTORY_MESSAGES = 12;
+
+/** Characters per history turn. A long assistant answer can reach this. */
+export const MAX_HISTORY_CONTENT_LENGTH = 4_000;
+
+/** Characters in the customer's question. */
+export const MAX_QUESTION_LENGTH = 4_000;
+
+/** Characters in the display name sent for personalization. */
+export const MAX_USER_NAME_LENGTH = 100;
+
+/**
+ * The most recent turns, bounded to MAX_HISTORY_MESSAGES and trimmed to
+ * MAX_HISTORY_CONTENT_LENGTH each.
+ *
+ * Keeps the tail rather than the head: a conversation stays coherent when the
+ * latest turns survive, and the route rejects a longer array outright. Content
+ * is trimmed too, because one long answer is enough to fail the whole request.
+ */
+export function selectRecentHistory<T extends { content: string }>(
+  messages: readonly T[],
+): T[] {
+  return messages.slice(-MAX_HISTORY_MESSAGES).map((message) =>
+    message.content.length > MAX_HISTORY_CONTENT_LENGTH
+      ? { ...message, content: message.content.slice(0, MAX_HISTORY_CONTENT_LENGTH) }
+      : message,
+  );
+}
+
 /**
  * Newest first, bounded to MAX_ORDERS. Orders without a timestamp sort last so
  * a missing created_at cannot displace a known-recent order.
