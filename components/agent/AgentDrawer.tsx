@@ -38,6 +38,7 @@ import { useState, useEffect, useRef } from "react";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useUser } from "@clerk/nextjs";
 import { useEnhancedUserContext, formatUserContextForAI } from "@/lib/hooks/useEnhancedUserContext";
+import { MAX_USER_CONTEXT_LENGTH, selectRecentOrders } from "@/lib/agent-chat-limits";
 import ProductCard from "./ProductCard";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Image from "next/image";
@@ -148,8 +149,8 @@ export default function AgentDrawer({
         body: JSON.stringify({ 
           question: userMessage.content,
           userName: user?.firstName || user?.fullName || "Guest",
-          userContext: formatUserContextForAI(userContext),
-          orders: userContext.orders,
+          userContext: formatUserContextForAI(userContext).slice(0, MAX_USER_CONTEXT_LENGTH),
+          orders: selectRecentOrders(userContext.orders),
           history: messages 
         }),
       });
