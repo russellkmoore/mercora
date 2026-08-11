@@ -44,3 +44,19 @@ next-env.d.ts
 .dev.vars*
 mercora.code-workspace
 linkedin-article.md
+
+# Database dump/export artifacts can contain customer and payment data.
+# Keep schema migrations and curated seeds under migrations/ and data/d1/.
+*-dump.sql
+*.dump.sql
+*-export.sql
+*.export.sql
+*.sqlite
+*.sqlite3
+*.db
+
+# Explicit repository-owned schema, seed, and test-fixture locations may use
+# these extensions or artifact-like names deliberately.
+!/migrations/**
+!/data/d1/**
+!/tests/fixtures/**
