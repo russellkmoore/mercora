@@ -108,7 +108,7 @@ export const storeDefaults: StoreConfig = {
     surfaceElevated: "#171717",
     foreground: "#ffffff",
     mutedForeground: "#a3a3a3",
-    logoPath: "/volt.svg",
+    logoPath: "/volt.png",
   },
   social: { instagram: "", facebook: "", x: "", youtube: "", linkedin: "" },
   mcp: {

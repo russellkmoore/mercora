@@ -769,7 +769,7 @@ export default function ProductEditor({
                         <div className="flex items-center space-x-3">
                           <div className="w-10 h-10 bg-linear-to-br from-purple-500 to-orange-500 rounded-lg flex items-center justify-center">
                             <Image
-                              src="/volt.svg"
+                              src="/volt.png"
                               alt="Volt AI"
                               width={24}
                               height={24}
