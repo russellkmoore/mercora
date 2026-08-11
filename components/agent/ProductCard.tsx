@@ -2,17 +2,21 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Money } from "@/lib/money";
+import { fromWireMoney } from "@/lib/money";
 
 export default function ProductCard({ product }: { product: any }) {
   // Extract primary image URL from the new product structure
   const imageUrl = product.primary_image?.url || product.media?.[0]?.url || "/placeholder.jpg";
   
-  // Get price from first variant
+  // Get price from first variant. These arrive as MACH wire money (decimal
+  // major units), not the minor units Mercora stores.
   const variant = product.variants?.[0];
-  const price = variant?.price?.amount || 0;
-  const compareAtPrice = variant?.compare_at_price?.amount;
-  const isOnSale = compareAtPrice && compareAtPrice > price;
+  const price = fromWireMoney(variant?.price);
+  const compareAtPrice = variant?.compare_at_price
+    ? fromWireMoney(variant.compare_at_price)
+    : null;
+  const isOnSale =
+    compareAtPrice !== null && compareAtPrice.toMinorUnits() > price.toMinorUnits();
 
   // Get description from the new structure
   const description = typeof product.description === 'string' ? 
@@ -39,10 +43,10 @@ export default function ProductCard({ product }: { product: any }) {
             {description.length > 60 ? description.substring(0, 60) + '...' : description}
           </p>
           <p className="text-xs font-medium text-orange-600 mt-0.5">
-            {Money.fromMinor(price).format()}
+            {price.format()}
             {isOnSale && (
               <span className="text-xs text-gray-400 line-through ml-1">
-                {Money.fromMinor(compareAtPrice).format()}
+                {compareAtPrice.format()}
               </span>
             )}
           </p>
