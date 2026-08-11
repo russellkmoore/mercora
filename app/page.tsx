@@ -53,7 +53,7 @@ export default async function HomePage() {
     .slice(0, 3);
 
   return (
-    <main className="bg-neutral-900 text-white px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
+    <div className="bg-neutral-900 text-white px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
       {/* Hero Section */}
       <section className="max-w-6xl mx-auto text-center mb-16 sm:mb-20">
         <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight uppercase mb-4 sm:mb-6 leading-tight">
@@ -80,7 +80,7 @@ export default async function HomePage() {
           />
         ))}
       </section>
-    </main>
+    </div>
   );
 }
 

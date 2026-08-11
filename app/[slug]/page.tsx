@@ -11,6 +11,7 @@ import { getPageBySlug } from "@/lib/models/pages";
 import PageRenderer from "./PageRenderer";
 import { auth } from "@clerk/nextjs/server";
 import { getStoreConfig } from "@/lib/store-config";
+import { parseCmsTimestamp } from "@/lib/utils/cms-timestamp";
 
 interface PageProps {
   params: Promise<{
@@ -33,6 +34,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       };
     }
 
+    const publishedAt = parseCmsTimestamp(page.published_at ?? page.created_at);
+    const modifiedAt = parseCmsTimestamp(page.updated_at);
+
     return {
       title: page.meta_title || page.title,
       description: page.meta_description || page.excerpt || `${page.title} - Mercora`,
@@ -41,8 +45,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         title: page.meta_title || page.title,
         description: page.meta_description || page.excerpt || `${page.title} - Mercora`,
         type: 'article',
-        publishedTime: page.published_at ? new Date(page.published_at).toISOString() : new Date(page.created_at).toISOString(),
-        modifiedTime: new Date(page.updated_at).toISOString(),
+        ...(publishedAt && { publishedTime: publishedAt.toISOString() }),
+        ...(modifiedAt && { modifiedTime: modifiedAt.toISOString() }),
       },
       alternates: {
         canonical: `/${page.slug}`,

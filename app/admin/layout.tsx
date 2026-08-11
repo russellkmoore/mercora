@@ -60,7 +60,7 @@ export default function AdminLayout({
             <AdminSidebar />
             
             {/* Main Admin Content Area */}
-            <main className="flex-1 transition-all duration-300 ease-in-out">
+            <div className="flex-1 transition-all duration-300 ease-in-out">
               <div className="p-6">
                 <Suspense fallback={
                   <div className="flex items-center justify-center h-64">
@@ -70,7 +70,7 @@ export default function AdminLayout({
                   {children}
                 </Suspense>
               </div>
-            </main>
+            </div>
           </div>
 
           {/* Admin-specific toast notifications */}
