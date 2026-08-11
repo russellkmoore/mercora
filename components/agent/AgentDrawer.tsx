@@ -279,7 +279,7 @@ export default function AgentDrawer({
               <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 space-y-3">
                 <div className="h-12 w-12 flex items-center justify-center">
                   <Image
-                    src="/volt.svg"        // use PNG for crisp CF-resized avatars
+                    src="/volt.png"        // use PNG for crisp CF-resized avatars
                     alt="Volt mascot"
                     width={40}                    // a bit of padding inside the circle
                     height={40}
@@ -311,7 +311,7 @@ export default function AgentDrawer({
                   <div key={i} className="flex items-start space-x-2">
                     <div className="h-6 w-6 flex items-center justify-center">
                       <Image
-                        src="/volt.svg"
+                        src="/volt.png"
                         alt="Volt mascot"
                         width={20}
                         height={20}
