@@ -89,11 +89,18 @@ interface ChatMessage {
   created_at?: string;
 }
 
+interface PromptPurchasedItem {
+  /** Catalog id, or "" when an early order recorded one the catalog dropped. */
+  productId: string;
+  /** Name as recorded when the order was placed. */
+  snapshotName: string;
+}
+
 interface PromptOrder {
   id: string;
   itemCount: number;
-  /** Catalog ids of the purchased items, resolved to names from the catalog. */
-  productIds: string[];
+  /** Purchased items, named from the catalog where it still knows them. */
+  purchasedItems: PromptPurchasedItem[];
   /**
    * Decimal major units. Order bodies arrive from the orders API, which
    * serializes Money in major units at the HTTP boundary — not the integer
@@ -178,8 +185,13 @@ function normalizeHistory(value: unknown): ChatMessage[] | null {
  * naming past purchases is an enrichment, not a precondition for answering.
  */
 async function resolvePurchasedNames(orders: PromptOrder[]): Promise<Map<string, string>> {
-  const ids = [...new Set(orders.flatMap((order) => order.productIds))]
-    .slice(0, MAX_PURCHASED_LOOKUP);
+  const ids = [
+    ...new Set(
+      orders.flatMap((order) =>
+        order.purchasedItems.map(({ productId }) => productId).filter(Boolean),
+      ),
+    ),
+  ].slice(0, MAX_PURCHASED_LOOKUP);
   if (!ids.length) return new Map();
 
   try {
@@ -218,18 +230,31 @@ function normalizeOrders(value: unknown): PromptOrder[] | null {
         ? Math.min(Math.max(Math.trunc(rawItems), 0), 100)
         : 0;
 
-    // Ids only. Names come from the catalog at prompt time, so a renamed or
-    // withdrawn product cannot be reintroduced by an order snapshot, and the
-    // request body stays small.
-    const productIds: string[] = [];
+    // The catalog is preferred for names, so a renamed product reads correctly.
+    // The snapshot name is kept as a fallback: early orders recorded a numeric
+    // product_id that no longer matches a catalog id, and an order the catalog
+    // can no longer explain is still an order the customer placed.
+    const purchasedItems: PromptPurchasedItem[] = [];
     if (Array.isArray(rawItems)) {
       for (const item of rawItems) {
-        if (productIds.length >= MAX_PURCHASED_ITEMS_PER_ORDER) break;
+        if (purchasedItems.length >= MAX_PURCHASED_ITEMS_PER_ORDER) break;
         if (!isPlainRecord(item)) continue;
-        const productId = item.product_id;
-        if (typeof productId !== "string") continue;
-        const trimmed = productId.trim();
-        if (trimmed && trimmed.length <= 128) productIds.push(trimmed);
+
+        const rawProductId = item.product_id;
+        const productId =
+          typeof rawProductId === "string"
+            ? rawProductId.trim()
+            : typeof rawProductId === "number" && Number.isFinite(rawProductId)
+              ? String(rawProductId)
+              : "";
+
+        const rawName = item.product_name;
+        const snapshotName =
+          typeof rawName === "string" ? cleanPromptText(rawName, 120).trim() : "";
+
+        if (!productId && !snapshotName) continue;
+        if (productId.length > 128) continue;
+        purchasedItems.push({ productId, snapshotName });
       }
     }
 
@@ -247,7 +272,7 @@ function normalizeOrders(value: unknown): PromptOrder[] | null {
     orders.push({
       id: cleanPromptText(rawId, 128),
       itemCount,
-      productIds,
+      purchasedItems,
       totalMajor,
     });
   }
@@ -433,9 +458,10 @@ export async function POST(req: NextRequest) {
     const purchaseHistory = orders.length
       ? orders
           .map((order) => {
-            const names = order.productIds
-              .map((id) => purchasedNames.get(id))
-              .filter((name): name is string => Boolean(name));
+            const names = order.purchasedItems
+              .map(({ productId, snapshotName }) =>
+                (productId && purchasedNames.get(productId)) || snapshotName)
+              .filter(Boolean);
             const summary = `Order ${order.id}: ${order.itemCount} items, $${order.totalMajor.toFixed(2)}`;
             return names.length ? `${summary} (${names.join(", ")})` : summary;
           })
@@ -472,6 +498,7 @@ ${fenced("LOCATION", locationSummary, 300)}
 === PRODUCT SELECTION RULES ===
 1. **BE HIGHLY SELECTIVE**: From the available products below, recommend only 1-4 that are truly relevant
 2. **AVOID DUPLICATES**: Never recommend products the user already owns (check purchase history)
+2a. **PURCHASE HISTORY IS THE ONLY SOURCE FOR WHAT THEY BOUGHT**: When asked what they have purchased, name only products listed in PURCHASE HISTORY. Never name a product from RETRIEVED PRODUCT CONTEXT as something they bought. If an order lists no product names, say the names are not on record rather than guessing.
 3. **MATCH THE REQUEST**: Only recommend products that directly address what the user asked for
 4. **QUALITY CURATION**: It's better to recommend 1 perfect product than 5 mediocre ones
 5. **EXPLAIN WHY**: Briefly explain why each recommended product fits their needs
