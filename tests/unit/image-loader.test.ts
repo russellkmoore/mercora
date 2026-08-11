@@ -31,6 +31,25 @@ describe("cloudflareLoader", () => {
     expect(cloudflareLoader(args)).toBe("https://images.example.test/products/example.png");
   });
 
+  it("serves assets that ship in public/ from the app, not the image bucket", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_IMAGE_CDN", "https://images.example.test");
+
+    // The bucket holds product media only; rewriting these produces a 404.
+    for (const src of ["/volt.png", "/placeholder.jpg", "/logo.svg"]) {
+      expect(cloudflareLoader({ ...args, src })).toBe(src);
+    }
+  });
+
+  it("still routes product media to the bucket", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_IMAGE_CDN", "https://images.example.test");
+
+    expect(cloudflareLoader(args)).toBe(
+      "https://images.example.test/cdn-cgi/image/width=640,format=auto,quality=80/products/example.png",
+    );
+  });
+
   it("never rewrites an unrelated external image", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("NEXT_PUBLIC_IMAGE_CDN", "https://images.example.test");
