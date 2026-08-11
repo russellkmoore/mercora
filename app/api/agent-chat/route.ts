@@ -62,6 +62,7 @@ import { runAI, getCurrentEmbeddingModel, extractAIResponse } from "@/lib/ai/con
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
 import { enforceRateLimit, getClientIp } from "@/lib/rate-limit";
 import { isBoundedArray, isPlainRecord } from "@/lib/public-request-validation";
+import { MAX_ORDERS, MAX_USER_CONTEXT_LENGTH } from "@/lib/agent-chat-limits";
 import {
   toPublicProduct,
   toWireProduct,
@@ -70,10 +71,8 @@ import {
 
 const MAX_QUESTION_LENGTH = 4_000;
 const MAX_USER_NAME_LENGTH = 100;
-const MAX_USER_CONTEXT_LENGTH = 1_000;
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_HISTORY_CONTENT_LENGTH = 4_000;
-const MAX_ORDERS = 3;
 const MAX_REQUEST_BODY_BYTES = 256 * 1024;
 
 type ChatRole = "user" | "assistant";
