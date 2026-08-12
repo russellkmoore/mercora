@@ -3,6 +3,19 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 export const TELEMETRY_MARKER = 'commerce.telemetry.v1' as const;
 export const MAX_TELEMETRY_JSON_BYTES = 2_048;
 
+export const TELEMETRY_PATHS: ReadonlySet<string> = new Set([
+  '/api/admin/orders',
+  '/api/admin/orders/:id/events',
+  '/api/admin/orders/:id/ship',
+  '/api/admin/orders/:id/shipping-email',
+  '/api/admin/orders/:id/tracking',
+  '/api/orders',
+  '/api/orders/:id',
+  '/api/orders/refund',
+  '/api/payment-intent',
+  '/api/webhooks/stripe',
+]);
+
 export const TELEMETRY_EVENTS = {
   'payment.pricing_rejected': { severity: 'warning', sampleRate: 0.05 },
   'payment.inventory_unavailable': { severity: 'warning', sampleRate: 0.1 },
@@ -83,7 +96,9 @@ const ALLOWED_FIELD_ENUMS = {
     'conflict', 'failed', 'invalid', 'needs_review', 'partial_failure',
     'rejected', 'retry_scheduled', 'unavailable', 'unresolved',
   ]),
-  provider: new Set(['analytics', 'carrier', 'd1', 'resend', 'stripe', 'workers_ai']),
+  provider: new Set([
+    'analytics', 'carrier', 'cloudflare_email', 'd1', 'resend', 'stripe', 'workers_ai',
+  ]),
   trigger: new Set(['manual', 'recovery', 'request', 'scheduled', 'webhook']),
 } as const;
 
@@ -137,7 +152,7 @@ function queryFreePath(value: unknown): string | undefined {
   if (!withoutQuery || withoutQuery.length > 128 || /[\u0000-\u001f\u007f]/.test(withoutQuery)) {
     return undefined;
   }
-  return withoutQuery;
+  return TELEMETRY_PATHS.has(withoutQuery) ? withoutQuery : undefined;
 }
 
 export function sanitizeTelemetryFields(value: unknown): TelemetryFields | undefined {
