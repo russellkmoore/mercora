@@ -94,7 +94,7 @@
     "tailwindcss": "^4.3.3",
     "tsx": "^4.20.3",
     "tw-animate-css": "^1.3.5",
-    "typescript": "^5",
+    "typescript": "^7",
     "vitest": "^4.1.10",
     "wrangler": "^4.120.0"
   }
