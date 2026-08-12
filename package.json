@@ -62,7 +62,7 @@
     "drizzle-orm": "^0.45.2",
     "isomorphic-dompurify": "3.22.0",
     "lucide-react": "^1.30.0",
-    "marked": "^16.3.0",
+    "marked": "^18.0.9",
     "next": "^16.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
