@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { hasSameOrigin } from "@/lib/auth/same-origin";
-import { mutateCustomerAddresses } from "@/lib/account/customer";
+import { mutateCustomerAddresses, replaceCustomerAddress } from "@/lib/account/customer";
 import { assertBoundedRequest, parseAddressInput } from "@/lib/account/validation";
 
 function denial() {
@@ -20,12 +20,9 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
     let found = false;
     const customer = await mutateCustomerAddresses(userId, (addresses) => {
       found = false;
-      found = addresses.some((entry) => entry.id === id);
-      if (!found) return addresses;
-      return addresses.map((entry) => {
-        if (entry.id === id) return { ...input, id };
-        return input.is_default ? { ...entry, is_default: false } : entry;
-      });
+      const next = replaceCustomerAddress(addresses, id, { ...input, id });
+      found = next !== null;
+      return next ?? addresses;
     });
     if (!found) return denial();
     return NextResponse.json({ address: customer.addresses?.find((entry) => entry.id === id) });

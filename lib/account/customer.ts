@@ -12,6 +12,26 @@ export class CustomerWriteConflictError extends Error {
   }
 }
 
+/** Replace one address while maintaining exactly one default for a non-empty set. */
+export function replaceCustomerAddress(
+  addresses: MACHCustomerAddress[],
+  id: string,
+  replacement: MACHCustomerAddress,
+): MACHCustomerAddress[] | null {
+  const index = addresses.findIndex((entry) => entry.id === id);
+  if (index < 0) return null;
+  const makeDefault = replacement.is_default === true;
+  const next = addresses.map((entry, entryIndex) => {
+    if (entryIndex === index) return { ...replacement, id };
+    return makeDefault ? { ...entry, is_default: false } : entry;
+  });
+  if (next.length > 0 && !next.some((entry) => entry.is_default)) {
+    const promoteIndex = addresses[index].is_default ? index : 0;
+    next[promoteIndex] = { ...next[promoteIndex], is_default: true };
+  }
+  return next;
+}
+
 /** Lazily and idempotently provision the authenticated Clerk identity. */
 export async function getOrCreateCustomer(userId: string): Promise<MACHCustomer> {
   const existing = await getCustomer(userId);
