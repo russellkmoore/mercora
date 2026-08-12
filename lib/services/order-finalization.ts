@@ -128,13 +128,13 @@ export async function finalizeOrderPayment(args: {
       limit: 25,
     });
     if (effects.failed > 0) {
-      console.error(`[checkout] ${effects.failed} paid effect(s) queued for retry on order ${paidOrder.id}`);
+      console.error(`[checkout] ${effects.failed} paid effect(s) queued for retry`);
     }
   } catch (error) {
     // Paid state and deterministic effect rows are already durable. The
     // scheduled runner owns recovery even if this opportunistic drain cannot
     // reach D1 after the payment transition.
-    console.error(`[checkout] Paid effects queued for retry on order ${paidOrder.id}:`, error);
+    console.error('[checkout] Paid effects queued for retry');
   }
 
   return { paid: true, promoted: promotion.promoted, order: promotion.order };

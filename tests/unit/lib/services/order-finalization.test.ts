@@ -331,10 +331,8 @@ describe('verified paid-order finalization', () => {
     })).resolves.toMatchObject({ paid: true, promoted: true });
 
     expect(mocks.promoteOrderToPaid).toHaveBeenCalledOnce();
-    expect(errorLog).toHaveBeenCalledWith(
-      `[checkout] Paid effects queued for retry on order ${mocks.record.id}:`,
-      error
-    );
+    expect(errorLog).toHaveBeenCalledWith('[checkout] Paid effects queued for retry');
+    expect(errorLog.mock.calls.flat().join(' ')).not.toContain(mocks.record.id);
     errorLog.mockRestore();
   });
 

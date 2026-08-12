@@ -6,6 +6,7 @@ import { Order, Review } from "@/lib/types";
 import { ReviewForm } from "@/components/reviews/ReviewForm";
 import { Money } from "@/lib/money";
 import type { ShipmentView } from "@/lib/fulfillment/shipment-view";
+import Link from "next/link";
 
 export type OrderCardOrder = Pick<
   Order,
@@ -184,6 +185,11 @@ export default function OrderCard({
       )}
 
       <div className="mt-4 flex flex-col gap-2">
+        {orderId && (
+          <Link href={`/account/orders/${encodeURIComponent(orderId)}`} className="text-sm font-medium text-orange-400 hover:text-orange-300">
+            View order details
+          </Link>
+        )}
         {!reviewable && (
           <p className="text-xs text-amber-300">
             Delivery pending – we’ll invite you to review items once your order arrives.

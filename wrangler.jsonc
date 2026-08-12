@@ -49,6 +49,11 @@
   "ai": {
     "binding": "AI"
   },
+  "send_email": [
+    {
+      "name": "EMAIL"
+    }
+  ],
   "ratelimits": [
     {
       "name": "AI_RATE_LIMITER",

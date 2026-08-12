@@ -30,6 +30,8 @@ export type StoreConfig = {
   contact: {
     supportEmail: string;
     senderEmail: string;
+    replyToEmail?: string;
+    merchantNotificationEmail?: string;
     postalAddress: string;
     supportHours: string;
   };
@@ -174,6 +176,42 @@ function optionalHttpsUrl(env: Environment, key: string) {
   }
 }
 
+function optionalEmail(env: Environment, key: string): string | undefined {
+  const value = env[key]?.trim();
+  return value && value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+    ? value
+    : undefined;
+}
+
+const EMAIL_ADDRESS_PATTERN = /^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/;
+
+function safeSender(value: string | undefined, fallbackName: string, fallbackEmail: string): string {
+  const candidate = value?.trim();
+  if (candidate && candidate.length <= 320) {
+    const named = candidate.match(/^([^<>]{1,100})\s*<([^<>]+)>$/);
+    if (named && EMAIL_ADDRESS_PATTERN.test(named[2].trim())) {
+      return `${named[1].trim()} <${named[2].trim()}>`;
+    }
+    if (EMAIL_ADDRESS_PATTERN.test(candidate)) return candidate;
+  }
+  const email = EMAIL_ADDRESS_PATTERN.test(fallbackEmail)
+    ? fallbackEmail
+    : storeDefaults.contact.supportEmail;
+  return `${fallbackName} <${email}>`;
+}
+
+function policyUrl(env: Environment, key: string, fallback: string): string {
+  const value = env[key]?.trim();
+  if (!value) return fallback;
+  if (value.startsWith("/") && !value.startsWith("//")) return value;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password ? url.href : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function siteUrl(env: Environment) {
   return optionalHttpsUrl(env, "NEXT_PUBLIC_SITE_URL") ?? storeDefaults.urls.site;
 }
@@ -315,7 +353,9 @@ export function resolveStoreConfig(env: Environment = {}): StoreConfig {
     contact: {
       ...storeDefaults.contact,
       supportEmail,
-      senderEmail: text(env, "STORE_SENDER_EMAIL", `${name} <${supportEmail}>`),
+      senderEmail: safeSender(env.STORE_SENDER_EMAIL, name, supportEmail),
+      replyToEmail: optionalEmail(env, "STORE_REPLY_TO_EMAIL") ?? optionalEmail(env, "STORE_SUPPORT_EMAIL"),
+      merchantNotificationEmail: optionalEmail(env, "STORE_MERCHANT_NOTIFICATION_EMAIL"),
       postalAddress: text(env, "STORE_POSTAL_ADDRESS", storeDefaults.contact.postalAddress),
       supportHours: text(env, "STORE_SUPPORT_HOURS", storeDefaults.contact.supportHours),
     },
@@ -324,9 +364,9 @@ export function resolveStoreConfig(env: Environment = {}): StoreConfig {
       site: siteUrl(env),
       imageCdn: optionalHttpsUrl(env, "NEXT_PUBLIC_IMAGE_CDN"),
       clerkHost: optionalHttpsUrl(env, "NEXT_PUBLIC_CLERK_HOST"),
-      privacy: text(env, "NEXT_PUBLIC_PRIVACY_URL", storeDefaults.urls.privacy),
-      terms: text(env, "NEXT_PUBLIC_TERMS_URL", storeDefaults.urls.terms),
-      returns: text(env, "NEXT_PUBLIC_RETURNS_URL", storeDefaults.urls.returns),
+      privacy: policyUrl(env, "NEXT_PUBLIC_PRIVACY_URL", storeDefaults.urls.privacy),
+      terms: policyUrl(env, "NEXT_PUBLIC_TERMS_URL", storeDefaults.urls.terms),
+      returns: policyUrl(env, "NEXT_PUBLIC_RETURNS_URL", storeDefaults.urls.returns),
     },
     persistence: {
       ...storeDefaults.persistence,

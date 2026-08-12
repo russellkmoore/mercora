@@ -29,6 +29,8 @@ import type {
   ProductReviewEligibility,
 } from '@/lib/types';
 import { sendReviewReminderEmail, sendReviewStatusNotification } from '@/lib/utils/review-notifications';
+import { isEmailSuppressed } from '@/lib/models/email-preferences';
+import { isUnsubscribeConfigured } from '@/lib/email/unsubscribe-token';
 
 interface SubmitReviewInput extends ReviewSubmissionPayload {
   customerId: string;
@@ -954,6 +956,7 @@ export async function updateReviewStatus(input: ReviewStatusUpdateInput): Promis
           reviewBody: review.body ?? undefined,
           rating: review.rating,
           event: 'status_change',
+          idempotencyKey: `review-status/${input.reviewId}/${review.status}/${timestamp}`,
         });
       } catch (error) {
         console.error('Failed to send review status notification', error);
@@ -1005,6 +1008,7 @@ export async function respondToReview(input: ReviewResponseInput): Promise<Revie
           reviewBody: review.body ?? undefined,
           rating: review.rating,
           event: 'response',
+          idempotencyKey: `review-response/${input.reviewId}/${timestamp}`,
         });
       } catch (error) {
         console.error('Failed to send review response notification', error);
@@ -1093,7 +1097,11 @@ export async function findReviewReminderCandidates(
 
   const remindedSet = new Set<string>();
   for (const reminder of reminderRows) {
-    remindedSet.add(`${reminder.order_id}:${reminder.product_id}`);
+    // Failed provider attempts remain eligible for a later bounded admin run;
+    // the stable sender key prevents a concurrent retry from duplicating mail.
+    if (reminder.status !== 'failed') {
+      remindedSet.add(`${reminder.order_id}:${reminder.product_id}`);
+    }
   }
 
   const candidates: ReviewReminderCandidate[] = [];
@@ -1167,12 +1175,24 @@ export async function sendReviewReminders(options: ReminderQueryOptions = {}) {
       continue;
     }
 
+    if (!isUnsubscribeConfigured() || await isEmailSuppressed(candidate.customerEmail, 'review_reminders')) {
+      await db.insert(review_reminders).values({
+        order_id: candidate.orderId,
+        product_id: candidate.productId,
+        customer_id: candidate.customerId ?? undefined,
+        status: 'suppressed',
+        sent_at: new Date().toISOString(),
+      });
+      continue;
+    }
+
     try {
       await sendReviewReminderEmail({
         email: candidate.customerEmail,
         name: candidate.customerName ?? undefined,
         productName: candidate.productName ?? 'your purchase',
         orderId: candidate.orderId,
+        productId: candidate.productId,
       });
       await db.insert(review_reminders).values({
         order_id: candidate.orderId,

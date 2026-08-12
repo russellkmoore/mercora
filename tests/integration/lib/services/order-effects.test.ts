@@ -74,6 +74,8 @@ beforeEach(async () => {
   await env.DB.exec('DROP TRIGGER IF EXISTS reject_subscription_effect');
   await env.DB.prepare('DELETE FROM order_effects WHERE order_id = ?')
     .bind('WEB-RECOVERY-1').run();
+  await env.DB.prepare('DELETE FROM inventory_adjustments WHERE order_id = ?')
+    .bind('WEB-RECOVERY-1').run();
   await env.DB.prepare('DELETE FROM orders WHERE id = ?').bind('WEB-RECOVERY-1').run();
 });
 
@@ -100,6 +102,7 @@ FROM order_effects ORDER BY effect_key
       { effect_key: 'paid:WEB-RECOVERY-1:coupon:SAVE:v1', effect_type: 'coupon', status: 'pending', attempt_count: 0 },
       { effect_key: 'paid:WEB-RECOVERY-1:gift-card:v1', effect_type: 'gift_card', status: 'pending', attempt_count: 0 },
       { effect_key: 'paid:WEB-RECOVERY-1:inventory:v1', effect_type: 'inventory', status: 'pending', attempt_count: 0 },
+      { effect_key: 'paid:WEB-RECOVERY-1:merchant-notification:v1', effect_type: 'merchant_notification', status: 'pending', attempt_count: 0 },
       { effect_key: 'paid:WEB-RECOVERY-1:subscription:v1', effect_type: 'subscription', status: 'pending', attempt_count: 0 },
     ]);
 
@@ -234,6 +237,7 @@ SET status = 'processing', attempt_count = 99, claim_token = 'owner-old',
     const applyTender = vi.fn(async () => undefined);
     const orderPaid = vi.fn(async () => undefined);
     const sendConfirmation = vi.fn(async () => ({ success: true, id: 'email-1' }));
+    const sendMerchantNotification = vi.fn(async () => ({ success: true, skipped: true }));
     const result = await drainOrderEffects({
       database: env.DB,
       getOrder: vi.fn(async () => paid),
@@ -248,11 +252,12 @@ SET status = 'processing', attempt_count = 99, claim_token = 'owner-old',
         subscriptions: { validateCheckout: vi.fn(), orderPaid },
       },
       sendConfirmation,
+      sendMerchantNotification,
       now: () => new Date(start.getTime() + 1_000),
       limit: 25,
     });
 
-    expect(result).toEqual({ claimed: 6, succeeded: 6, failed: 0 });
+    expect(result).toEqual({ claimed: 7, succeeded: 7, failed: 0 });
     expect(runInventory).toHaveBeenCalledOnce();
     expect(redeem).toHaveBeenCalledTimes(2);
     expect(applyTender).toHaveBeenCalledOnce();
@@ -260,6 +265,10 @@ SET status = 'processing', attempt_count = 99, claim_token = 'owner-old',
     expect(sendConfirmation).toHaveBeenCalledWith(
       paid,
       'order-confirmation/WEB-RECOVERY-1/v1'
+    );
+    expect(sendMerchantNotification).toHaveBeenCalledWith(
+      paid,
+      'merchant-notification/WEB-RECOVERY-1/v1'
     );
     const statuses = await env.DB.prepare('SELECT DISTINCT status FROM order_effects')
       .all<{ status: string }>();
@@ -309,5 +318,70 @@ SELECT status, result FROM inventory_adjustments WHERE order_id = ?
       outcome: 'needs_review',
       variantId: 'variant-1',
     });
+  });
+
+  it('terminals an indeterminate email effect for manual review instead of retrying it', async () => {
+    const paid = order('paid');
+    await insertOrder(paid);
+    await stagePaidOrderEffects(paid, { database: env.DB, now: start });
+    await keepOnly('confirmation_email');
+
+    const first = await drainOrderEffects({
+      database: env.DB,
+      getOrder: vi.fn(async () => paid),
+      sendConfirmation: vi.fn(async () => ({
+        success: false,
+        needsReview: true,
+        error: 'accepted-state unknown',
+      })),
+      now: () => start,
+    });
+    expect(first).toEqual({ claimed: 1, succeeded: 0, failed: 1 });
+    const row = await env.DB.prepare(`SELECT status, next_attempt_at, last_error, result
+      FROM order_effects`).first<{
+        status: string;
+        next_attempt_at: string | null;
+        last_error: string;
+        result: string;
+      }>();
+    expect(row).toMatchObject({
+      status: 'failed',
+      next_attempt_at: null,
+      last_error: 'accepted-state unknown',
+    });
+    expect(JSON.parse(row!.result)).toEqual({ needsReview: true, error: 'accepted-state unknown' });
+
+    await expect(drainOrderEffects({ database: env.DB, now: () => new Date(start.getTime() + 86_400_000) }))
+      .resolves.toEqual({ claimed: 0, succeeded: 0, failed: 0 });
+  });
+
+  it('runs the merchant effect successfully for an email-less web or MCP order', async () => {
+    const paid = order('paid');
+    delete paid.extensions!.email;
+    delete paid.shipping_address!.email;
+    await insertOrder(paid);
+    await stagePaidOrderEffects(paid, { database: env.DB, now: start });
+    await keepOnly('merchant_notification');
+    const sendMerchantNotification = vi.fn(async (effectOrder: Order) => {
+      expect(effectOrder.extensions?.email).toBeUndefined();
+      expect(effectOrder.shipping_address?.email).toBeUndefined();
+      return { success: true, id: 'merchant-email-1' };
+    });
+
+    await expect(drainOrderEffects({
+      database: env.DB,
+      getOrder: vi.fn(async () => paid),
+      sendMerchantNotification,
+      now: () => start,
+    })).resolves.toEqual({ claimed: 1, succeeded: 1, failed: 0 });
+    expect(sendMerchantNotification).toHaveBeenCalledWith(
+      paid,
+      'merchant-notification/WEB-RECOVERY-1/v1',
+    );
+    await expect(env.DB.prepare(`SELECT status, result FROM order_effects`).first())
+      .resolves.toMatchObject({
+        status: 'succeeded',
+        result: JSON.stringify({ providerId: 'merchant-email-1', skipped: false }),
+      });
   });
 });

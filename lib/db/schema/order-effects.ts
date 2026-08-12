@@ -7,7 +7,14 @@ export const order_effects = sqliteTable(
     effect_key: text('effect_key').primaryKey(),
     order_id: text('order_id').notNull().references(() => orders.id),
     effect_type: text('effect_type', {
-      enum: ['inventory', 'coupon', 'gift_card', 'subscription', 'confirmation_email'],
+      enum: [
+        'inventory',
+        'coupon',
+        'gift_card',
+        'subscription',
+        'confirmation_email',
+        'merchant_notification',
+      ],
     }).notNull(),
     status: text('status', {
       enum: ['pending', 'processing', 'succeeded', 'failed'],

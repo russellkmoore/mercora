@@ -106,8 +106,12 @@ function projectedAttempt(
   const rawError = details && typeof details === "object" && !Array.isArray(details)
     ? (details as Record<string, unknown>).error
     : null;
+  const needsReview = details && typeof details === "object" && !Array.isArray(details)
+    ? (details as Record<string, unknown>).needsReview === true
+    : false;
   return {
     type: event.event_type,
+    needsReview,
     error: typeof rawError === "string" && rawError.trim()
       ? rawError.trim().slice(0, 300)
       : null,
@@ -195,8 +199,16 @@ export async function POST(
       );
     }
 
-    // One filtered row is enough to prove whether any delivery succeeded.
-    const lastSuccess = await latestOrderEvent(id, shippingEmailSuccessfulEventTypes);
+    const [lastSuccess, latestAttempt] = await Promise.all([
+      latestOrderEvent(id, shippingEmailSuccessfulEventTypes),
+      latestOrderEvent(id, SHIPPING_EMAIL_ATTEMPT_EVENT_TYPES),
+    ]);
+    if (projectedAttempt(latestAttempt)?.needsReview) {
+      return NextResponse.json({
+        code: "shipping_email_needs_review",
+        error: "The latest shipping email may have been accepted and requires manual review before another send",
+      }, { status: 409 });
+    }
     if (parsed.mode === "retry" && lastSuccess) {
       return NextResponse.json(
         { code: "wrong_mode", error: "Use resend after a successful shipping email" },
@@ -264,6 +276,7 @@ export async function POST(
       return NextResponse.json({
         email: {
           success: false,
+          ...(result.needsReview ? { needsReview: true } : {}),
           error: result.error || "Shipping email failed",
           ...(result.errorCode ? { errorCode: result.errorCode } : {}),
         },

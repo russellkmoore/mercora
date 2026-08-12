@@ -58,13 +58,22 @@ describe("admin fulfillment queue model", () => {
       .toMatchObject({ mode: "retry", label: "Send email" });
     expect(deriveEmailState({
       hasSuccessfulSend: false,
-      latestAttempt: { type: "shipping_email_failed", error: null },
+      latestAttempt: { type: "shipping_email_failed", error: null, needsReview: false },
     }))
       .toMatchObject({ mode: "retry", tone: "error" });
     expect(deriveEmailState({
       hasSuccessfulSend: true,
-      latestAttempt: { type: "shipping_email_failed", error: "provider timeout" },
+      latestAttempt: { type: "shipping_email_failed", error: "provider timeout", needsReview: false },
     })).toMatchObject({ mode: "resend", label: "Retry resend", tone: "error" });
+    expect(deriveEmailState({
+      hasSuccessfulSend: true,
+      latestAttempt: { type: "shipping_email_failed", error: "accepted-state unknown", needsReview: true },
+    })).toMatchObject({
+      mode: "resend",
+      disabled: true,
+      label: "Manual review required",
+      tone: "error",
+    });
   });
 
   it("formats valid fractional wire money and rejects null or malformed values", () => {
@@ -119,6 +128,17 @@ describe("admin fulfillment queue model", () => {
     expect(entry.details.join(" ")).not.toContain("secret.example");
     expect(entry.actor).toContain("…");
   });
+
+  it("labels an indeterminate email attempt as requiring manual review", () => {
+    const [entry] = formatTimeline([{
+      id: "email-review",
+      type: "shipping_email_failed",
+      details: { needsReview: true, error: "Accepted-state unknown" },
+      createdAt: "2026-08-01T00:00:00.000Z",
+    }]);
+    expect(entry.title).toBe("Shipping email needs manual review");
+    expect(entry.tone).toBe("error");
+  });
 });
 
 describe("admin queue client source contract", () => {
@@ -141,6 +161,7 @@ describe("admin queue client source contract", () => {
     expect(source).toContain("createPerKeyGate()");
     expect(source).toContain("emailBusy.has(order.id)");
     expect(source).not.toContain("emailBusy === order.id");
+    expect(source).toContain("email.disabled || emailBusy.has(order.id)");
   });
   it("renders explicit fallbacks for unavailable and omitted checkout money", () => {
     expect(source).toContain('formatQueueMoney(order.totalAmount) ?? "Unavailable"');
