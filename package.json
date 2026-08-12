@@ -77,7 +77,7 @@
     "zustand": "^5.0.6"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "0.20.1",
+    "@cloudflare/vitest-pool-workers": "0.20.3",
     "@cloudflare/workers-types": "^5.20260801.1",
     "@opennextjs/cloudflare": "^1.20.2",
     "@tailwindcss/postcss": "^4.3.3",
