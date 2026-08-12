@@ -126,3 +126,4 @@ export * from "./order-effects";
 // Durable authoritative variant-inventory mutations (application-specific)
 export * from "./inventory-adjustments";
 export * from "./email-preferences";
+export * from "./email-deliveries";

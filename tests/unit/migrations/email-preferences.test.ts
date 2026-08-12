@@ -16,5 +16,7 @@ describe("0018 email preferences migration", () => {
     expect(migration).toContain("CREATE TABLE email_preferences");
     expect(migration).not.toMatch(/INSERT\s+INTO\s+email_preferences/i);
     expect(migration).toContain("PRIMARY KEY (email, category)");
+    expect(migration).toContain("CREATE TABLE email_deliveries");
+    expect(migration).toContain("idempotency_key TEXT PRIMARY KEY");
   });
 });
