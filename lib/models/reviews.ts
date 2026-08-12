@@ -29,6 +29,8 @@ import type {
   ProductReviewEligibility,
 } from '@/lib/types';
 import { sendReviewReminderEmail, sendReviewStatusNotification } from '@/lib/utils/review-notifications';
+import { isEmailSuppressed } from '@/lib/models/email-preferences';
+import { isUnsubscribeConfigured } from '@/lib/email/unsubscribe-token';
 
 interface SubmitReviewInput extends ReviewSubmissionPayload {
   customerId: string;
@@ -1164,6 +1166,17 @@ export async function sendReviewReminders(options: ReminderQueryOptions = {}) {
   for (const candidate of candidates) {
     if (!candidate.customerEmail) {
       failures.push({ candidate, error: 'Missing customer email' });
+      continue;
+    }
+
+    if (!isUnsubscribeConfigured() || await isEmailSuppressed(candidate.customerEmail, 'review_reminders')) {
+      await db.insert(review_reminders).values({
+        order_id: candidate.orderId,
+        product_id: candidate.productId,
+        customer_id: candidate.customerId ?? undefined,
+        status: 'suppressed',
+        sent_at: new Date().toISOString(),
+      });
       continue;
     }
 

@@ -32,6 +32,19 @@ describe("resolveStoreConfig", () => {
     expect(config.contact.senderEmail).toBe("Acme Store <help@acme.example>");
   });
 
+  it("accepts only validated email and policy-link configuration", () => {
+    const config = resolveStoreConfig({
+      STORE_REPLY_TO_EMAIL: "support@example.com",
+      STORE_MERCHANT_NOTIFICATION_EMAIL: "not an email",
+      NEXT_PUBLIC_TERMS_URL: "javascript:alert(1)",
+      NEXT_PUBLIC_PRIVACY_URL: "https://policies.example.com/privacy",
+    });
+    expect(config.contact.replyToEmail).toBe("support@example.com");
+    expect(config.contact.merchantNotificationEmail).toBeUndefined();
+    expect(config.urls.terms).toBe(storeDefaults.urls.terms);
+    expect(config.urls.privacy).toBe("https://policies.example.com/privacy");
+  });
+
   it("parses a validated runtime carrier registry", () => {
     const carriers = [
       {

@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import { Money, type StoredMoney } from '@/lib/money';
 import { escapeHtmlText } from '@/lib/utils/maintenance-html';
 import { getStoreConfig } from '@/lib/store-config';
+import { postalFooterHtml } from '@/lib/email/footer';
 
 let resend: Resend | null = null;
 
@@ -83,6 +84,7 @@ export async function sendOrderConfirmationEmail(
     const { data, error } = await resendClient.emails.send({
       from: store.contact.senderEmail,
       to: [orderData.customerEmail],
+      ...(store.contact.replyToEmail ? { replyTo: store.contact.replyToEmail } : {}),
       subject: `Order Confirmation #${orderData.orderNumber} - ${store.identity.name}`,
       html: emailHtml,
     }, options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : undefined);
@@ -235,6 +237,7 @@ export function generateOrderConfirmationHTML(orderData: OrderData): string {
         <div style="text-align: center; padding: 32px 32px 0; border-top: 1px solid #e6ebf1;">
           <p style="color: #64748b; font-size: 12px; line-height: 16px; margin: 0 0 8px;">Questions about your order? Reply to this email or contact our support team.</p>
           <p style="color: #64748b; font-size: 12px; line-height: 16px; margin: 0 0 8px;">Thank you for choosing ${safeStoreName}!</p>
+          ${postalFooterHtml()}
         </div>
 
       </div>
@@ -244,6 +247,7 @@ export function generateOrderConfirmationHTML(orderData: OrderData): string {
 }
 
 function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string {
+  const store = getStoreConfig();
   // Helper function to ensure absolute URLs for images using Cloudflare Image service
   const getAbsoluteImageUrl = (imageUrl: string | undefined): string | undefined => {
     if (!imageUrl) return undefined;
@@ -256,7 +260,12 @@ function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string
     
     // Use Cloudflare Image service for optimized delivery in emails
     // Set width to 100px for email images and quality to 80 for good balance
-    return `https://voltique-images.russellkmoore.me/cdn-cgi/image/width=100,quality=80,format=auto/${normalizedPath}`;
+    try {
+      const path = store.urls.imageCdn && store.deployment.imageTransformsEnabled
+        ? `/cdn-cgi/image/width=100,quality=80,format=auto/${normalizedPath}`
+        : `/${normalizedPath}`;
+      return new URL(path, store.urls.imageCdn ?? store.urls.site).href;
+    } catch { return undefined; }
   };
 
   // Generate status-specific content
@@ -356,14 +365,14 @@ function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Order Update - Voltique</title>
+      <title>Order Update - ${escapeHtmlText(store.identity.name)}</title>
     </head>
     <body style="margin: 0; padding: 0; background-color: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Ubuntu, sans-serif;">
       <div style="background-color: #ffffff; margin: 0 auto; padding: 20px 0 48px; margin-bottom: 64px; max-width: 600px;">
         
         <!-- Header -->
         <div style="text-align: center; padding: 32px 0; border-bottom: 1px solid #e6ebf1;">
-          <h1 style="color: #f97316; font-size: 32px; font-weight: bold; margin: 0; padding: 0;">Voltique</h1>
+          <h1 style="color: #f97316; font-size: 32px; font-weight: bold; margin: 0; padding: 0;">${escapeHtmlText(store.identity.name)}</h1>
           <p style="color: #64748b; font-size: 14px; margin: 8px 0 0;">Premium Outdoor Gear</p>
         </div>
 
@@ -412,7 +421,8 @@ function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string
         <!-- Footer -->
         <div style="text-align: center; padding: 32px 32px 0; border-top: 1px solid #e6ebf1;">
           <p style="color: #64748b; font-size: 12px; line-height: 16px; margin: 0 0 8px;">Questions about your order? Reply to this email or contact our support team.</p>
-          <p style="color: #64748b; font-size: 12px; line-height: 16px; margin: 0 0 8px;">Thank you for choosing Voltique!</p>
+          <p style="color: #64748b; font-size: 12px; line-height: 16px; margin: 0 0 8px;">Thank you for choosing ${escapeHtmlText(store.identity.name)}!</p>
+          ${postalFooterHtml()}
         </div>
 
       </div>
@@ -425,6 +435,7 @@ export async function sendOrderStatusUpdateEmail(orderData: OrderStatusUpdateDat
   try {
     const emailHtml = generateOrderStatusUpdateHTML(orderData);
     const resendClient = getResendClient();
+    const store = getStoreConfig();
     
     // Determine subject based on status
     let subject = `Order Update #${orderData.orderNumber}`;
@@ -447,9 +458,10 @@ export async function sendOrderStatusUpdateEmail(orderData: OrderStatusUpdateDat
     }
     
     const { data, error } = await resendClient.emails.send({
-      from: 'Volt at Voltique<volt@russellkmoore.me>',
+      from: store.contact.senderEmail,
       to: [orderData.customerEmail],
-      subject: `${subject} - Voltique`,
+      ...(store.contact.replyToEmail ? { replyTo: store.contact.replyToEmail } : {}),
+      subject: `${subject} - ${store.identity.name}`,
       html: emailHtml,
     });
 

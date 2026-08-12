@@ -2,6 +2,7 @@ import { Money } from '@/lib/money';
 import { getStoreConfig } from '@/lib/store-config';
 import { getResendClient, type EmailResult } from '@/lib/utils/email';
 import { escapeHtmlText } from '@/lib/utils/maintenance-html';
+import { postalFooterHtml } from '@/lib/email/footer';
 
 export interface RefundSettledEmailInput {
   orderId: string;
@@ -28,12 +29,14 @@ export async function sendRefundSettledEmail(
     <strong>#${escapeHtmlText(input.orderId)}</strong>.</p>
   <p>Your bank may take several business days to show the credit.</p>
   <p>Questions? Contact ${escapeHtmlText(store.contact.supportEmail)}.</p>
+  ${postalFooterHtml()}
 </body></html>`;
 
   try {
     const { data, error } = await getResendClient().emails.send({
       from: store.contact.senderEmail,
       to: [input.customerEmail],
+      ...(store.contact.replyToEmail ? { replyTo: store.contact.replyToEmail } : {}),
       subject: `Refund processed for order #${input.orderId} - ${store.identity.name}`,
       html,
     }, { idempotencyKey: `refund/${input.refundId}/succeeded/v1` });
