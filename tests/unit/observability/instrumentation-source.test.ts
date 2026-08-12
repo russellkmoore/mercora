@@ -40,7 +40,7 @@ const instrumentation = {
   ],
   'app/api/admin/orders/[id]/events/route.ts': ['fulfillment.query_failed'],
   'lib/recommendations/cron.ts': ['recommendation.rebuild_failed'],
-  'worker.ts': ['cron.recovery_failed'],
+  'lib/observability/scheduled.ts': ['cron.recovery_failed', 'cron.analytics_failed'],
 } as const;
 
 function parseSource(path: string): ts.SourceFile {
@@ -82,8 +82,8 @@ function rawExceptionConsoleCalls(source: ts.SourceFile): string[] {
   return calls;
 }
 
-describe('actionable failure telemetry wiring', () => {
-  it('covers current commerce and operational paths with the closed taxonomy', () => {
+describe('actionable failure telemetry source contract', () => {
+  it('keeps executable recordTelemetry calls wired to the closed taxonomy', () => {
     for (const [path, events] of Object.entries(instrumentation)) {
       const calls = telemetryCalls(parseSource(path));
       for (const event of events) expect(calls, `${path}: ${event}`).toContain(event);
