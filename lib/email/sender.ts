@@ -29,6 +29,7 @@ export interface EmailResult {
   id?: string;
   provider?: EmailProvider;
   pending?: boolean;
+  needsReview?: boolean;
   skipped?: boolean;
   error?: string;
   errorCode?: string;
@@ -123,16 +124,27 @@ async function claimDelivery(database: D1Database, key: string, provider: EmailP
       error_code = NULL, last_error = NULL, updated_at = ?
     WHERE idempotency_key = ? AND provider = ? AND (
       status = 'pending' OR status = 'failed' OR
-      (status = 'processing' AND lease_expires_at <= ?)
+      (? = 'resend' AND status = 'processing' AND lease_expires_at <= ?)
     ) RETURNING claim_token`
-  ).bind(provider, token, new Date(now.getTime() + LEASE_MS).toISOString(), nowIso, key, provider, nowIso)
+  ).bind(provider, token, new Date(now.getTime() + LEASE_MS).toISOString(), nowIso, key, provider, provider, nowIso)
     .first<{ claim_token: string }>();
   if (claimed) return { kind: "claimed" as const, token };
+  if (provider === "cloudflare") {
+    await database.prepare(`UPDATE email_deliveries SET
+        status = 'needs_review', claim_token = NULL, lease_expires_at = NULL,
+        error_code = 'E_DELIVERY_INDETERMINATE',
+        last_error = 'Cloudflare Email accepted-state is unknown after the delivery lease expired',
+        updated_at = ?
+      WHERE idempotency_key = ? AND provider = 'cloudflare'
+        AND status = 'processing' AND lease_expires_at <= ?`
+    ).bind(nowIso, key, nowIso).run();
+  }
   const existing = await database.prepare(`SELECT provider, status, provider_message_id
     FROM email_deliveries WHERE idempotency_key = ?`
   ).bind(key).first<{ provider: EmailProvider; status: string; provider_message_id: string | null }>();
   if (existing?.provider !== provider) throw new Error("Idempotency key was claimed by a different email provider");
   if (existing?.status === "succeeded") return { kind: "succeeded" as const, id: existing.provider_message_id ?? undefined };
+  if (existing?.status === "needs_review") return { kind: "needs_review" as const };
   return { kind: "pending" as const };
 }
 
@@ -143,7 +155,7 @@ async function finishDelivery(database: D1Database, key: string, token: string, 
       updated_at = ?, completed_at = ?
     WHERE idempotency_key = ? AND status = 'processing' AND claim_token = ?`
   ).bind(
-    result.success ? "succeeded" : "failed",
+    result.success ? "succeeded" : result.needsReview ? "needs_review" : "failed",
     result.id ?? null,
     result.errorCode ?? null,
     result.error ? bounded(result.error, "Email delivery failed") : null,
@@ -164,7 +176,12 @@ async function deliver(message: OutboundEmail, runtime: Runtime, idempotencyKey?
       return { success: true, id: response.messageId, provider: "cloudflare" };
     } catch (error) {
       const code = error && typeof error === "object" && "code" in error ? bounded((error as { code?: unknown }).code, "") : undefined;
-      return { success: false, provider: "cloudflare", error: bounded(error instanceof Error ? error.message : error, "Cloudflare Email delivery failed"), ...(code ? { errorCode: code } : {}) };
+      return {
+        success: false,
+        provider: "cloudflare",
+        error: bounded(error instanceof Error ? error.message : error, "Cloudflare Email delivery outcome is unknown"),
+        ...(code ? { errorCode: code } : { errorCode: "E_DELIVERY_INDETERMINATE", needsReview: true }),
+      };
     }
   }
   try {
@@ -200,12 +217,27 @@ export async function sendEmail(message: OutboundEmail, options: EmailSendOption
     try { claim = await claimDelivery(runtime.database, key, runtime.provider, options.now ?? new Date()); }
     catch (error) { return { success: false, provider: runtime.provider, error: bounded(error instanceof Error ? error.message : error, "Email idempotency claim failed"), errorCode: "E_IDEMPOTENCY_CLAIM" }; }
     if (claim.kind === "succeeded") return { success: true, provider: runtime.provider, ...(claim.id ? { id: claim.id } : {}) };
+    if (claim.kind === "needs_review") return {
+      success: false,
+      needsReview: true,
+      provider: runtime.provider,
+      error: "Cloudflare Email delivery outcome is unknown and requires manual reconciliation",
+      errorCode: "E_DELIVERY_INDETERMINATE",
+    };
     if (claim.kind === "pending") return { success: false, pending: true, provider: runtime.provider, error: "Email delivery is already in progress", errorCode: "concurrent_idempotent_requests" };
   }
   const result = await deliver(message, runtime, key);
   if (key && runtime.database && claim?.kind === "claimed") {
     try { await finishDelivery(runtime.database, key, claim.token, result, options.now ?? new Date()); }
-    catch { return { success: false, provider: runtime.provider, error: "Email delivery state could not be recorded", errorCode: "E_IDEMPOTENCY_COMPLETE" }; }
+    catch {
+      return {
+        success: false,
+        provider: runtime.provider,
+        ...(result.success ? { needsReview: true } : {}),
+        error: "Email delivery state could not be recorded",
+        errorCode: "E_IDEMPOTENCY_COMPLETE",
+      };
+    }
   }
   return result;
 }

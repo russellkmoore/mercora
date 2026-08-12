@@ -264,6 +264,7 @@ export async function POST(
       return NextResponse.json({
         email: {
           success: false,
+          ...(result.needsReview ? { needsReview: true } : {}),
           error: result.error || "Shipping email failed",
           ...(result.errorCode ? { errorCode: result.errorCode } : {}),
         },

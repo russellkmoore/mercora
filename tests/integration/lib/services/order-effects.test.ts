@@ -74,6 +74,8 @@ beforeEach(async () => {
   await env.DB.exec('DROP TRIGGER IF EXISTS reject_subscription_effect');
   await env.DB.prepare('DELETE FROM order_effects WHERE order_id = ?')
     .bind('WEB-RECOVERY-1').run();
+  await env.DB.prepare('DELETE FROM inventory_adjustments WHERE order_id = ?')
+    .bind('WEB-RECOVERY-1').run();
   await env.DB.prepare('DELETE FROM orders WHERE id = ?').bind('WEB-RECOVERY-1').run();
 });
 
@@ -316,5 +318,40 @@ SELECT status, result FROM inventory_adjustments WHERE order_id = ?
       outcome: 'needs_review',
       variantId: 'variant-1',
     });
+  });
+
+  it('terminals an indeterminate email effect for manual review instead of retrying it', async () => {
+    const paid = order('paid');
+    await insertOrder(paid);
+    await stagePaidOrderEffects(paid, { database: env.DB, now: start });
+    await keepOnly('confirmation_email');
+
+    const first = await drainOrderEffects({
+      database: env.DB,
+      getOrder: vi.fn(async () => paid),
+      sendConfirmation: vi.fn(async () => ({
+        success: false,
+        needsReview: true,
+        error: 'accepted-state unknown',
+      })),
+      now: () => start,
+    });
+    expect(first).toEqual({ claimed: 1, succeeded: 0, failed: 1 });
+    const row = await env.DB.prepare(`SELECT status, next_attempt_at, last_error, result
+      FROM order_effects`).first<{
+        status: string;
+        next_attempt_at: string | null;
+        last_error: string;
+        result: string;
+      }>();
+    expect(row).toMatchObject({
+      status: 'failed',
+      next_attempt_at: null,
+      last_error: 'accepted-state unknown',
+    });
+    expect(JSON.parse(row!.result)).toEqual({ needsReview: true, error: 'accepted-state unknown' });
+
+    await expect(drainOrderEffects({ database: env.DB, now: () => new Date(start.getTime() + 86_400_000) }))
+      .resolves.toEqual({ claimed: 0, succeeded: 0, failed: 0 });
   });
 });

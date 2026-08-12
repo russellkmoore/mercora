@@ -48,6 +48,8 @@ export interface ShippingEmailResult {
   success: boolean;
   /** The provider is still resolving another request with the same stable key. */
   pending?: boolean;
+  /** The provider may have accepted the message; an operator must reconcile before retrying. */
+  needsReview?: boolean;
   providerId?: string;
   error?: string;
   errorCode?: string;
@@ -212,6 +214,7 @@ export async function sendShippingConfirmationEmail(
     return {
       success: result.success,
       ...(result.pending ? { pending: true } : {}),
+      ...(result.needsReview ? { needsReview: true } : {}),
       ...(result.id ? { providerId: result.id } : {}),
       ...(result.error ? { error: result.error } : {}),
       ...(result.errorCode ? { errorCode: result.errorCode } : {}),
@@ -232,6 +235,7 @@ function failureDetails(
     idempotencyKey,
     error: result.error || "Shipping email failed",
     ...(result.errorCode ? { errorCode: result.errorCode } : {}),
+    ...(result.needsReview ? { needsReview: true } : {}),
     ...(result.errorCode === CONCURRENT_EMAIL_SEND_ERROR
       ? { concurrentDuplicate: true }
       : {}),
