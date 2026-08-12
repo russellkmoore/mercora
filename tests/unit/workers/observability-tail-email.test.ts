@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AlertConfiguration, AlertEmailMessage } from '@/workers/observability-tail/src/core';
-import { sendAlertEmail } from '@/workers/observability-tail/src/email';
+import {
+  buildRawEmail,
+  sendAlertEmail,
+} from '@/workers/observability-tail/src/email';
 
 const message: AlertEmailMessage = {
   from: 'alerts@merchant.test',
@@ -24,19 +27,21 @@ describe('observability alert email providers', () => {
   it('uses the native binding for Cloudflare Email Sending', async () => {
     const send = vi.fn(async () => undefined);
     const fetcher = vi.fn(async () => new Response(null, { status: 202 }));
+    const nativeMessage = { from: message.from, to: message.to };
+    const nativeEmailFactory = vi.fn(async () => nativeMessage);
     await sendAlertEmail(
       message,
       { ...base, provider: 'cloudflare' },
       { ALERT_EMAIL: { send } },
       fetcher,
+      nativeEmailFactory,
     );
-    expect(send).toHaveBeenCalledWith({
-      from: message.from,
-      to: message.to,
-      subject: message.subject,
-      html: message.html,
-      text: message.text,
-    });
+    expect(send).toHaveBeenCalledWith(nativeMessage);
+    expect(nativeEmailFactory).toHaveBeenCalledWith(
+      message.from,
+      message.to,
+      expect.stringContaining(`Subject: ${message.subject}\r\n`),
+    );
     expect(fetcher).not.toHaveBeenCalled();
   });
 
@@ -63,13 +68,24 @@ describe('observability alert email providers', () => {
   it('does not fail over to another provider after delivery starts', async () => {
     const send = vi.fn(async () => { throw new Error('native delivery failed'); });
     const fetcher = vi.fn(async () => new Response(null, { status: 202 }));
+    const nativeEmailFactory = vi.fn(async () => ({ from: message.from, to: message.to }));
     await expect(sendAlertEmail(
       message,
       { ...base, provider: 'cloudflare' },
       { ALERT_EMAIL: { send }, RESEND_API_KEY: 'test-api-key' },
       fetcher,
+      nativeEmailFactory,
     )).rejects.toThrow('native delivery failed');
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('builds a bounded multipart message for the native provider', () => {
+    const raw = buildRawEmail(message);
+    expect(raw).toContain('Content-Type: text/plain; charset=UTF-8\r\n');
+    expect(raw).toContain('Content-Type: text/html; charset=UTF-8\r\n');
+    expect(raw).toContain(message.text);
+    expect(raw).toContain(message.html);
+    expect(raw).not.toMatch(/\nBcc:/i);
   });
 
   it('rejects failed Resend responses without reading or logging their body', async () => {
