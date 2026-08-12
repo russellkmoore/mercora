@@ -55,6 +55,10 @@ describe('real D1 Workers harness', () => {
 
     expect(customer?.id).toBe(customerId);
     expect(preferences?.count).toBe(0);
+    const deliveries = await env.DB.prepare(
+      'SELECT COUNT(*) AS count FROM email_deliveries',
+    ).first<{ count: number }>();
+    expect(deliveries?.count).toBe(0);
   });
 
   it('installs recommendation defaults and enforces recommendation row invariants', async () => {

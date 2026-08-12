@@ -183,6 +183,23 @@ function optionalEmail(env: Environment, key: string): string | undefined {
     : undefined;
 }
 
+const EMAIL_ADDRESS_PATTERN = /^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/;
+
+function safeSender(value: string | undefined, fallbackName: string, fallbackEmail: string): string {
+  const candidate = value?.trim();
+  if (candidate && candidate.length <= 320) {
+    const named = candidate.match(/^([^<>]{1,100})\s*<([^<>]+)>$/);
+    if (named && EMAIL_ADDRESS_PATTERN.test(named[2].trim())) {
+      return `${named[1].trim()} <${named[2].trim()}>`;
+    }
+    if (EMAIL_ADDRESS_PATTERN.test(candidate)) return candidate;
+  }
+  const email = EMAIL_ADDRESS_PATTERN.test(fallbackEmail)
+    ? fallbackEmail
+    : storeDefaults.contact.supportEmail;
+  return `${fallbackName} <${email}>`;
+}
+
 function policyUrl(env: Environment, key: string, fallback: string): string {
   const value = env[key]?.trim();
   if (!value) return fallback;
@@ -336,7 +353,7 @@ export function resolveStoreConfig(env: Environment = {}): StoreConfig {
     contact: {
       ...storeDefaults.contact,
       supportEmail,
-      senderEmail: text(env, "STORE_SENDER_EMAIL", `${name} <${supportEmail}>`),
+      senderEmail: safeSender(env.STORE_SENDER_EMAIL, name, supportEmail),
       replyToEmail: optionalEmail(env, "STORE_REPLY_TO_EMAIL") ?? optionalEmail(env, "STORE_SUPPORT_EMAIL"),
       merchantNotificationEmail: optionalEmail(env, "STORE_MERCHANT_NOTIFICATION_EMAIL"),
       postalAddress: text(env, "STORE_POSTAL_ADDRESS", storeDefaults.contact.postalAddress),

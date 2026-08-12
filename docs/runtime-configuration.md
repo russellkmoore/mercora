@@ -13,7 +13,8 @@ time.
 | Images | `NEXT_PUBLIC_IMAGE_CDN`, `NEXT_PUBLIC_IMAGE_TRANSFORMS=false` |
 | Browser persistence | `NEXT_PUBLIC_STORAGE_NAMESPACE`, `NEXT_PUBLIC_CART_STORAGE_KEY`, `NEXT_PUBLIC_CHAT_STORAGE_KEY` |
 | Theme | `NEXT_PUBLIC_THEME_PRIMARY`, `NEXT_PUBLIC_STORE_LOGO_PATH` |
-| Contact and legal links | `STORE_SUPPORT_EMAIL`, `STORE_SENDER_EMAIL`, `STORE_POSTAL_ADDRESS`, `STORE_SUPPORT_HOURS`, `NEXT_PUBLIC_PRIVACY_URL`, `NEXT_PUBLIC_TERMS_URL`, `NEXT_PUBLIC_RETURNS_URL` |
+| Contact and legal links | `STORE_SUPPORT_EMAIL`, `STORE_SENDER_EMAIL`, `STORE_REPLY_TO_EMAIL`, `STORE_MERCHANT_NOTIFICATION_EMAIL`, `STORE_POSTAL_ADDRESS`, `STORE_SUPPORT_HOURS`, `NEXT_PUBLIC_PRIVACY_URL`, `NEXT_PUBLIC_TERMS_URL`, `NEXT_PUBLIC_RETURNS_URL` |
+| Outbound email | `EMAIL_PROVIDER=cloudflare\|resend`; Cloudflare `EMAIL` binding (recommended) or encrypted `RESEND_API_KEY` |
 
 `NEXT_PUBLIC_*` values are intentionally public. Store credentials (Stripe
 secrets, Clerk secrets, Cloudflare API tokens) belong in `.dev.vars` locally or
