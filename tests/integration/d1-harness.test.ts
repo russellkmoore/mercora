@@ -30,7 +30,31 @@ describe('real D1 Workers harness', () => {
       '0015_normalize_order_timestamps.sql',
       '0016_enforce_order_timestamp_format.sql',
       '0017_add_product_recommendations.sql',
+      '0018_add_email_preferences.sql',
     ]);
+  });
+
+  it('adds empty email preference state without changing a populated baseline', async () => {
+    const customerId = 'O01-POPULATED-CUSTOMER';
+    await env.DB.prepare(`
+      INSERT OR IGNORE INTO customers (id, type, person, created_at, updated_at)
+      VALUES (?, 'person', ?, ?, ?)
+    `).bind(
+      customerId,
+      JSON.stringify({ email: 'existing@example.com' }),
+      '2026-08-01T00:00:00.000Z',
+      '2026-08-01T00:00:00.000Z',
+    ).run();
+
+    const customer = await env.DB.prepare(
+      'SELECT id FROM customers WHERE id = ?',
+    ).bind(customerId).first<{ id: string }>();
+    const preferences = await env.DB.prepare(
+      'SELECT COUNT(*) AS count FROM email_preferences',
+    ).first<{ count: number }>();
+
+    expect(customer?.id).toBe(customerId);
+    expect(preferences?.count).toBe(0);
   });
 
   it('installs recommendation defaults and enforces recommendation row invariants', async () => {
