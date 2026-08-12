@@ -53,7 +53,7 @@
     "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.1.0",
     "@shadcn/ui": "^0.0.4",
-    "@stripe/react-stripe-js": "^3.9.0",
+    "@stripe/react-stripe-js": "^6.8.0",
     "@stripe/stripe-js": "^7.8.0",
     "@tailwindcss/typography": "^0.5.20",
     "big.js": "^7.0.1",
