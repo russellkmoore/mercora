@@ -91,7 +91,7 @@ export const review_reminders = sqliteTable(
     order_id: text('order_id').notNull(),
     product_id: text('product_id').notNull(),
     customer_id: text('customer_id'),
-    status: text('status', { enum: ['sent', 'failed'] }).notNull().default('sent'),
+    status: text('status', { enum: ['sent', 'failed', 'suppressed'] }).notNull().default('sent'),
     error: text('error'),
     sent_at: text('sent_at').default(sql`CURRENT_TIMESTAMP`),
     created_at: text('created_at').default(sql`CURRENT_TIMESTAMP`),

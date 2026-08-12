@@ -4,22 +4,18 @@ const mocks = vi.hoisted(() => ({
   send: vi.fn(),
 }));
 
-vi.mock('resend', () => ({
-  Resend: class {
-    emails = { send: mocks.send };
-  },
-}));
+vi.mock('@/lib/email/sender', () => ({ sendEmail: mocks.send }));
 
 vi.mock('@/lib/store-config', () => ({
   getStoreConfig: () => ({
     identity: { name: 'Test Store', tagline: 'Test commerce' },
-    contact: { senderEmail: 'Test Store <orders@example.com>' },
+    contact: { senderEmail: 'Test Store <orders@example.com>', supportEmail: 'help@example.com' },
     urls: { site: 'https://store.example.com', imageCdn: 'https://images.example.com' },
     deployment: { imageTransformsEnabled: true },
   }),
 }));
 
-import { sendOrderConfirmationEmail } from '@/lib/utils/email';
+import { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail } from '@/lib/utils/email';
 
 const orderData = {
   orderNumber: 'WEB-EMAIL-1',
@@ -42,14 +38,14 @@ const orderData = {
 };
 
 beforeEach(() => {
-  mocks.send.mockResolvedValue({ data: { id: 'email-provider-1' }, error: null });
+  mocks.send.mockResolvedValue({ success: true, id: 'email-provider-1', provider: 'resend' });
 });
 
 describe('order confirmation provider boundary', () => {
   it('uses generic runtime configuration and forwards the deterministic provider key', async () => {
     await expect(sendOrderConfirmationEmail(orderData, {
       idempotencyKey: 'order-confirmation/WEB-EMAIL-1/v1',
-    })).resolves.toEqual({ success: true, id: 'email-provider-1' });
+    })).resolves.toEqual({ success: true, id: 'email-provider-1', provider: 'resend' });
 
     expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({
       from: 'Test Store <orders@example.com>',
@@ -64,10 +60,37 @@ describe('order confirmation provider boundary', () => {
   });
 
   it('returns success false when the provider rejects the attempt', async () => {
-    mocks.send.mockResolvedValue({ data: null, error: { message: 'provider rejected' } });
+    mocks.send.mockResolvedValue({ success: false, error: 'provider rejected' });
 
     await expect(sendOrderConfirmationEmail(orderData, {
       idempotencyKey: 'order-confirmation/WEB-EMAIL-1/v1',
     })).resolves.toEqual({ success: false, error: 'provider rejected' });
+  });
+});
+
+describe('order status provider boundary', () => {
+  it('escapes persisted customer content and rejects unsafe tracking links', async () => {
+    await sendOrderStatusUpdateEmail({
+      orderNumber: '<order>',
+      customerName: '<Customer>',
+      customerEmail: 'customer@example.com',
+      status: 'shipped',
+      carrier: '<Carrier>',
+      trackingNumber: '<tracking>',
+      trackingUrl: 'javascript:alert(1)',
+      notes: '<note>',
+      items: [{
+        productId: 'product-1', name: '<Product>', price: { amount: 100, currency: 'USD' }, quantity: 1,
+      }],
+      shippingAddress: {
+        street: '<street>', city: '<city>', state: '<state>', zipCode: '<zip>', country: '<country>',
+      },
+    });
+
+    const html = mocks.send.mock.calls.at(-1)?.[0].html as string;
+    expect(html).toContain('&lt;Customer&gt;');
+    expect(html).toContain('&lt;Product&gt;');
+    expect(html).toContain('&lt;street&gt;');
+    expect(html).not.toContain('javascript:alert(1)');
   });
 });

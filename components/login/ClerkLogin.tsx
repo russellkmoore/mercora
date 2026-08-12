@@ -51,9 +51,9 @@ export default function ClerkLogin() {
         <UserButton appearance={{ elements: { avatarBox: "w-8 h-8" } }}>
           <UserButton.MenuItems>
             <UserButton.Link
-              label="View Order History"
+              label="My Account"
               labelIcon={<Package />}
-              href="/orders"
+              href="/account"
             />
             {!adminLoading && isAdmin && (
               <UserButton.Link

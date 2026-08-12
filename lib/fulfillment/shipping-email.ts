@@ -1,4 +1,4 @@
-import { getResendClient } from "@/lib/utils/email";
+import { sendEmail } from "@/lib/email/sender";
 import { getStoreConfig } from "@/lib/store-config";
 import { escapeHtmlText } from "@/lib/utils/maintenance-html";
 import { getOrderById } from "@/lib/models/mach/orders";
@@ -12,9 +12,12 @@ import { getCarrierRegistry } from "./carrier-config";
 import { latestOrderEvent, recordEmailEvent } from "./service";
 import { buildShipmentView, type ShipmentView } from "./shipment-view";
 import type { Actor, OrderEventType } from "./types";
+import { postalFooterHtml, postalFooterText } from "@/lib/email/footer";
 
 export const SHIPPING_EMAIL_TEMPLATE_VERSION = 1;
-export const RESEND_CONCURRENT_SEND_ERROR = "concurrent_idempotent_requests";
+export const CONCURRENT_EMAIL_SEND_ERROR = "concurrent_idempotent_requests";
+/** @deprecated Use the provider-neutral name. */
+export const RESEND_CONCURRENT_SEND_ERROR = CONCURRENT_EMAIL_SEND_ERROR;
 
 const MAX_PREVIEW_ITEMS = 5;
 const SUCCESSFUL_SEND_EVENTS = [
@@ -28,6 +31,7 @@ interface ShippingStoreSnapshot {
   senderEmail: string;
   supportEmail: string;
   siteUrl: string;
+  replyToEmail?: string;
 }
 
 export interface ShippingConfirmationData {
@@ -44,6 +48,8 @@ export interface ShippingEmailResult {
   success: boolean;
   /** The provider is still resolving another request with the same stable key. */
   pending?: boolean;
+  /** The provider may have accepted the message; an operator must reconcile before retrying. */
+  needsReview?: boolean;
   providerId?: string;
   error?: string;
   errorCode?: string;
@@ -119,6 +125,7 @@ export async function buildShippingConfirmationData(
       senderEmail: config.contact.senderEmail,
       supportEmail: config.contact.supportEmail,
       siteUrl: config.urls.site,
+      replyToEmail: config.contact.replyToEmail,
     },
   };
 }
@@ -129,6 +136,7 @@ interface PreparedEmail {
   subject: string;
   html: string;
   text: string;
+  replyTo?: string;
 }
 
 function prepareShippingEmail(data: ShippingConfirmationData): PreparedEmail {
@@ -164,7 +172,7 @@ function prepareShippingEmail(data: ShippingConfirmationData): PreparedEmail {
     ? `<div style="padding:0 32px 8px"><h3 style="color:#1e293b;font-size:16px;margin:0 0 8px">In this shipment</h3><table style="border-collapse:collapse;width:100%;margin:0 0 8px">${itemRows}</table></div>`
     : "";
 
-  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Your order has shipped - ${storeName}</title></head><body style="margin:0;padding:0;background:#f6f9fc;font-family:Arial,sans-serif"><div style="background:#fff;margin:0 auto;padding:20px 0 48px;max-width:600px"><div style="text-align:center;padding:32px 0;border-bottom:1px solid #e6ebf1"><h1 style="color:#f97316;font-size:32px;margin:0">${storeName}</h1><p style="color:#64748b;font-size:14px;margin:8px 0 0">${tagline}</p></div><div style="padding:24px 32px"><h2 style="color:#1e293b;font-size:24px;margin:0 0 16px">Your order has shipped</h2><p style="color:#64748b;font-size:16px;line-height:24px;margin:0 0 16px">Hi ${greeting},</p><p style="color:#64748b;font-size:16px;line-height:24px;margin:0">Good news &mdash; order <strong>#${orderNumber}</strong> is on its way.</p></div>${trackingBlock}${trackingButton}${statusButton}${itemsBlock}<div style="text-align:center;padding:32px 32px 0;border-top:1px solid #e6ebf1;margin-top:24px"><p style="color:#64748b;font-size:12px;line-height:16px;margin:0 0 8px">Questions about your delivery? Contact ${supportEmail}.</p><p style="color:#64748b;font-size:12px;line-height:16px;margin:0">Thank you for choosing ${storeName}.</p></div></div></body></html>`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Your order has shipped - ${storeName}</title></head><body style="margin:0;padding:0;background:#f6f9fc;font-family:Arial,sans-serif"><div style="background:#fff;margin:0 auto;padding:20px 0 48px;max-width:600px"><div style="text-align:center;padding:32px 0;border-bottom:1px solid #e6ebf1"><h1 style="color:#f97316;font-size:32px;margin:0">${storeName}</h1><p style="color:#64748b;font-size:14px;margin:8px 0 0">${tagline}</p></div><div style="padding:24px 32px"><h2 style="color:#1e293b;font-size:24px;margin:0 0 16px">Your order has shipped</h2><p style="color:#64748b;font-size:16px;line-height:24px;margin:0 0 16px">Hi ${greeting},</p><p style="color:#64748b;font-size:16px;line-height:24px;margin:0">Good news &mdash; order <strong>#${orderNumber}</strong> is on its way.</p></div>${trackingBlock}${trackingButton}${statusButton}${itemsBlock}<div style="text-align:center;padding:32px 32px 0;border-top:1px solid #e6ebf1;margin-top:24px"><p style="color:#64748b;font-size:12px;line-height:16px;margin:0 0 8px">Questions about your delivery? Contact ${supportEmail}.</p><p style="color:#64748b;font-size:12px;line-height:16px;margin:0">Thank you for choosing ${storeName}.</p>${postalFooterHtml()}</div></div></body></html>`;
 
   const textLines = [
     `${data.store.name}: Your order has shipped`,
@@ -175,6 +183,7 @@ function prepareShippingEmail(data: ShippingConfirmationData): PreparedEmail {
     data.shipment.trackingUrl ? `Track your package: ${data.shipment.trackingUrl}` : null,
     data.orderStatusUrl ? `View your order: ${data.orderStatusUrl}` : null,
     `Questions? Contact ${data.store.supportEmail}.`,
+    postalFooterText(),
   ].filter((line): line is string => line !== null);
 
   return {
@@ -183,6 +192,7 @@ function prepareShippingEmail(data: ShippingConfirmationData): PreparedEmail {
     subject: `Your order has shipped! #${singleLine(data.orderNumber)} - ${singleLine(data.store.name)}`,
     html,
     text: textLines.join("\n\n"),
+    ...(data.store.replyToEmail ? { replyTo: data.store.replyToEmail } : {}),
   };
 }
 
@@ -200,18 +210,15 @@ export async function sendShippingConfirmationEmail(
   idempotencyKey: string,
 ): Promise<ShippingEmailResult> {
   try {
-    const email = prepareShippingEmail(data);
-    const { data: providerData, error } = await getResendClient().emails.send(email, {
-      idempotencyKey,
-    });
-    if (error) {
-      return {
-        success: false,
-        error: error.message || "Shipping email failed",
-        ...(error.name ? { errorCode: error.name } : {}),
-      };
-    }
-    return { success: true, ...(providerData?.id ? { providerId: providerData.id } : {}) };
+    const result = await sendEmail(prepareShippingEmail(data), { idempotencyKey });
+    return {
+      success: result.success,
+      ...(result.pending ? { pending: true } : {}),
+      ...(result.needsReview ? { needsReview: true } : {}),
+      ...(result.id ? { providerId: result.id } : {}),
+      ...(result.error ? { error: result.error } : {}),
+      ...(result.errorCode ? { errorCode: result.errorCode } : {}),
+    };
   } catch (error) {
     return {
       success: false,
@@ -228,7 +235,8 @@ function failureDetails(
     idempotencyKey,
     error: result.error || "Shipping email failed",
     ...(result.errorCode ? { errorCode: result.errorCode } : {}),
-    ...(result.errorCode === RESEND_CONCURRENT_SEND_ERROR
+    ...(result.needsReview ? { needsReview: true } : {}),
+    ...(result.errorCode === CONCURRENT_EMAIL_SEND_ERROR
       ? { concurrentDuplicate: true }
       : {}),
   };
@@ -237,7 +245,7 @@ function failureDetails(
 export function isConcurrentShippingEmailAttempt(
   result: ShippingEmailResult,
 ): boolean {
-  return result.errorCode === RESEND_CONCURRENT_SEND_ERROR;
+  return result.errorCode === CONCURRENT_EMAIL_SEND_ERROR;
 }
 
 /**
@@ -305,11 +313,11 @@ export async function sendInitialShippingEmail(
         ...(result.providerId ? { providerId: result.providerId } : {}),
       });
     } catch (error) {
-      console.error("shipping_email_audit_write_failed", { orderId, error });
+      console.error("shipping_email_audit_write_failed");
     }
     return { attempted: true, ...result, eventId };
   } catch (error) {
-    console.error("shipping_email_initial_failed", { orderId, error });
+    console.error("shipping_email_initial_failed");
     return {
       attempted: false,
       success: false,

@@ -8,9 +8,7 @@ const mocks = vi.hoisted(() => ({
   getStoreConfig: vi.fn(),
 }));
 
-vi.mock("@/lib/utils/email", () => ({
-  getResendClient: () => ({ emails: { send: mocks.send } }),
-}));
+vi.mock("@/lib/email/sender", () => ({ sendEmail: mocks.send }));
 vi.mock("@/lib/models/mach/orders", () => ({ getOrderById: mocks.getOrderById }));
 vi.mock("@/lib/fulfillment/service", () => ({
   latestOrderEvent: mocks.latestOrderEvent,
@@ -89,7 +87,7 @@ beforeEach(() => {
   mocks.getOrderById.mockResolvedValue(shippedOrder());
   mocks.latestOrderEvent.mockResolvedValue(null);
   mocks.recordEmailEvent.mockResolvedValue("event-1");
-  mocks.send.mockResolvedValue({ data: { id: "provider-1" }, error: null });
+  mocks.send.mockResolvedValue({ success: true, id: "provider-1", provider: "resend" });
   delete process.env.ORDER_STATUS_SECRET;
 });
 
@@ -234,11 +232,10 @@ describe("shipping email idempotency and delivery", () => {
 
   it("treats a concurrent stable-key attempt as pending without recording a failure", async () => {
     mocks.send.mockResolvedValue({
-      data: null,
-      error: {
-        name: "concurrent_idempotent_requests",
-        message: "A matching request is still running",
-      },
+      success: false,
+      pending: true,
+      errorCode: "concurrent_idempotent_requests",
+      error: "A matching request is still running",
     });
     const result = await sendInitialShippingEmail("ORD-1", actor);
     expect(result).toMatchObject({
@@ -249,6 +246,28 @@ describe("shipping email idempotency and delivery", () => {
       eventId: null,
     });
     expect(mocks.recordEmailEvent).not.toHaveBeenCalled();
+  });
+
+  it("records an indeterminate provider outcome as requiring manual review", async () => {
+    mocks.send.mockResolvedValue({
+      success: false,
+      needsReview: true,
+      errorCode: "E_DELIVERY_INDETERMINATE",
+      error: "Accepted-state unknown",
+    });
+    const result = await sendInitialShippingEmail("ORD-1", actor);
+    expect(result).toMatchObject({
+      attempted: true,
+      success: false,
+      needsReview: true,
+      errorCode: "E_DELIVERY_INDETERMINATE",
+    });
+    expect(mocks.recordEmailEvent).toHaveBeenCalledWith(
+      "ORD-1",
+      "shipping_email_failed",
+      actor,
+      expect.objectContaining({ needsReview: true }),
+    );
   });
 
   it("gives concurrent initial attempts one key and never reports two provider successes", async () => {
@@ -263,13 +282,12 @@ describe("shipping email idempotency and delivery", () => {
       if (arrivals === 2) release();
       await bothArrived;
       return position === 1
-        ? { data: { id: "provider-1" }, error: null }
+        ? { success: true, id: "provider-1", provider: "resend" }
         : {
-            data: null,
-            error: {
-              name: "concurrent_idempotent_requests",
-              message: "A matching request is still running",
-            },
+            success: false,
+            pending: true,
+            errorCode: "concurrent_idempotent_requests",
+            error: "A matching request is still running",
           };
     });
 
