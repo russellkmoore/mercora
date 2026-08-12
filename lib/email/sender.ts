@@ -137,7 +137,7 @@ async function claimDelivery(database: D1Database, key: string, provider: EmailP
 }
 
 async function finishDelivery(database: D1Database, key: string, token: string, result: EmailResult, now: Date) {
-  await database.prepare(`UPDATE email_deliveries SET
+  const completed = await database.prepare(`UPDATE email_deliveries SET
       status = ?, claim_token = NULL, lease_expires_at = NULL,
       provider_message_id = ?, error_code = ?, last_error = ?,
       updated_at = ?, completed_at = ?
@@ -149,6 +149,9 @@ async function finishDelivery(database: D1Database, key: string, token: string, 
     result.error ? bounded(result.error, "Email delivery failed") : null,
     now.toISOString(), result.success ? now.toISOString() : null, key, token,
   ).run();
+  if (completed.meta.changes !== 1) {
+    throw new Error("Email delivery ownership expired before completion");
+  }
 }
 
 async function deliver(message: OutboundEmail, runtime: Runtime, idempotencyKey?: string): Promise<EmailResult> {
