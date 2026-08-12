@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("mobile header width contract", () => {
@@ -9,8 +10,8 @@ describe("mobile header width contract", () => {
   });
 
   it("pins the shrink/truncation and compact-cart CSS that enforces the bound", () => {
-    const header = readFileSync("components/HeaderClient.tsx", "utf8");
-    const cart = readFileSync("components/cart/CartDrawer.tsx", "utf8");
+    const header = readFileSync(join(process.cwd(), "components/HeaderClient.tsx"), "utf8");
+    const cart = readFileSync(join(process.cwd(), "components/cart/CartDrawer.tsx"), "utf8");
     const mobileTrigger = header.match(/<SheetTrigger\b[\s\S]*?<\/SheetTrigger>/)?.[0];
     const desktopTrigger = header.match(/<DropdownMenuTrigger\b[\s\S]*?<\/DropdownMenuTrigger>/)?.[0];
 
