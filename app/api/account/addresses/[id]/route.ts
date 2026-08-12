@@ -19,6 +19,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
     const input = parseAddressInput(await request.json() as Record<string, unknown>);
     let found = false;
     const customer = await mutateCustomerAddresses(userId, (addresses) => {
+      found = false;
       found = addresses.some((entry) => entry.id === id);
       if (!found) return addresses;
       return addresses.map((entry) => {
@@ -43,6 +44,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
   try {
     let found = false;
     await mutateCustomerAddresses(userId, (addresses) => {
+      found = false;
       const removed = addresses.find((entry) => entry.id === id);
       if (!removed) return addresses;
       found = true;
