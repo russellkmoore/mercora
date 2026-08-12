@@ -1,15 +1,16 @@
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getOrderByCustomerAndId } from "@/lib/models/mach/orders";
 import { buildShipmentView } from "@/lib/fulfillment/shipment-view";
 import { Money } from "@/lib/money";
 
 export default async function AccountOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { userId } = await auth();
+  if (!userId) redirect("/sign-in?redirect_url=/account/orders");
   const { id } = await params;
   if (id.length > 128) notFound();
-  const order = await getOrderByCustomerAndId(userId!, id);
+  const order = await getOrderByCustomerAndId(userId, id);
   if (!order) notFound();
   const shipment = buildShipmentView(order);
   const address = order.shipping_address;
