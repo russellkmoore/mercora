@@ -35,3 +35,14 @@ updates:
       - dependency-name: eslint
         versions:
           - 10.x
+
+      # typescript-eslint does not support the TypeScript 7 compiler API, and
+      # eslint-config-next depends on it, so linting aborts with "typescript-
+      # eslint does not support TS 7.0" before a single file is read. The type
+      # checker and the build are fine on 7; only linting is blocked.
+      #
+      # Remove this entry once typescript-eslint supports TypeScript 7:
+      # https://github.com/typescript-eslint/typescript-eslint/issues/10940
+      - dependency-name: typescript
+        versions:
+          - 7.x
