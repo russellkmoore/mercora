@@ -11,7 +11,10 @@ import {
   type CommerceCapabilities,
 } from '@/lib/commerce/capabilities';
 import type { Order } from '@/lib/types/order';
-import { sendOrderConfirmation } from '@/lib/services/order-confirmation';
+import {
+  sendMerchantOrderNotification,
+  sendOrderConfirmation,
+} from '@/lib/services/order-confirmation';
 import { runPaidOrderInventoryEffect } from '@/lib/services/inventory-adjustments';
 
 const EFFECT_LEASE_MS = 5 * 60 * 1000;
@@ -22,7 +25,8 @@ export type OrderEffectType =
   | 'coupon'
   | 'gift_card'
   | 'subscription'
-  | 'confirmation_email';
+  | 'confirmation_email'
+  | 'merchant_notification';
 
 export interface ClaimedOrderEffect {
   effect_key: string;
@@ -44,6 +48,7 @@ export interface OrderEffectRuntime {
   redeem?: typeof redeemCoupon;
   recordCouponReconciliation?: typeof recordCouponReconciliation;
   sendConfirmation?: typeof sendOrderConfirmation;
+  sendMerchantNotification?: typeof sendMerchantOrderNotification;
   runInventory?: (order: Order, effect: ClaimedOrderEffect) => Promise<unknown>;
   now?: () => Date;
 }
@@ -95,6 +100,10 @@ function effectDefinitions(
     definitions.push({
       key: `paid:${order.id}:confirmation-email:v1`,
       type: 'confirmation_email',
+    });
+    definitions.push({
+      key: `paid:${order.id}:merchant-notification:v1`,
+      type: 'merchant_notification',
     });
   }
   return definitions;
@@ -234,7 +243,13 @@ async function executeEffect(
       const send = runtime.sendConfirmation ?? sendOrderConfirmation;
       const result = await send(order, `order-confirmation/${order.id}/v1`);
       if (!result.success) throw new Error(result.error || 'Confirmation email failed');
-      return { providerId: result.id ?? null };
+      return { providerId: result.id ?? null, skipped: result.skipped === true };
+    }
+    case 'merchant_notification': {
+      const send = runtime.sendMerchantNotification ?? sendMerchantOrderNotification;
+      const result = await send(order, `merchant-notification/${order.id}/v1`);
+      if (!result.success) throw new Error(result.error || 'Merchant notification failed');
+      return { providerId: result.id ?? null, skipped: result.skipped === true };
     }
   }
 }

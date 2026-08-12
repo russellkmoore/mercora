@@ -1,4 +1,4 @@
-import { getResendClient } from "@/lib/utils/email";
+import { sendEmail } from "@/lib/email/sender";
 import { getStoreConfig } from "@/lib/store-config";
 import { escapeHtmlText } from "@/lib/utils/maintenance-html";
 import { getOrderById } from "@/lib/models/mach/orders";
@@ -15,7 +15,9 @@ import type { Actor, OrderEventType } from "./types";
 import { postalFooterHtml, postalFooterText } from "@/lib/email/footer";
 
 export const SHIPPING_EMAIL_TEMPLATE_VERSION = 1;
-export const RESEND_CONCURRENT_SEND_ERROR = "concurrent_idempotent_requests";
+export const CONCURRENT_EMAIL_SEND_ERROR = "concurrent_idempotent_requests";
+/** @deprecated Use the provider-neutral name. */
+export const RESEND_CONCURRENT_SEND_ERROR = CONCURRENT_EMAIL_SEND_ERROR;
 
 const MAX_PREVIEW_ITEMS = 5;
 const SUCCESSFUL_SEND_EVENTS = [
@@ -206,18 +208,14 @@ export async function sendShippingConfirmationEmail(
   idempotencyKey: string,
 ): Promise<ShippingEmailResult> {
   try {
-    const email = prepareShippingEmail(data);
-    const { data: providerData, error } = await getResendClient().emails.send(email, {
-      idempotencyKey,
-    });
-    if (error) {
-      return {
-        success: false,
-        error: error.message || "Shipping email failed",
-        ...(error.name ? { errorCode: error.name } : {}),
-      };
-    }
-    return { success: true, ...(providerData?.id ? { providerId: providerData.id } : {}) };
+    const result = await sendEmail(prepareShippingEmail(data), { idempotencyKey });
+    return {
+      success: result.success,
+      ...(result.pending ? { pending: true } : {}),
+      ...(result.id ? { providerId: result.id } : {}),
+      ...(result.error ? { error: result.error } : {}),
+      ...(result.errorCode ? { errorCode: result.errorCode } : {}),
+    };
   } catch (error) {
     return {
       success: false,
@@ -234,7 +232,7 @@ function failureDetails(
     idempotencyKey,
     error: result.error || "Shipping email failed",
     ...(result.errorCode ? { errorCode: result.errorCode } : {}),
-    ...(result.errorCode === RESEND_CONCURRENT_SEND_ERROR
+    ...(result.errorCode === CONCURRENT_EMAIL_SEND_ERROR
       ? { concurrentDuplicate: true }
       : {}),
   };
@@ -243,7 +241,7 @@ function failureDetails(
 export function isConcurrentShippingEmailAttempt(
   result: ShippingEmailResult,
 ): boolean {
-  return result.errorCode === RESEND_CONCURRENT_SEND_ERROR;
+  return result.errorCode === CONCURRENT_EMAIL_SEND_ERROR;
 }
 
 /**

@@ -100,6 +100,7 @@ FROM order_effects ORDER BY effect_key
       { effect_key: 'paid:WEB-RECOVERY-1:coupon:SAVE:v1', effect_type: 'coupon', status: 'pending', attempt_count: 0 },
       { effect_key: 'paid:WEB-RECOVERY-1:gift-card:v1', effect_type: 'gift_card', status: 'pending', attempt_count: 0 },
       { effect_key: 'paid:WEB-RECOVERY-1:inventory:v1', effect_type: 'inventory', status: 'pending', attempt_count: 0 },
+      { effect_key: 'paid:WEB-RECOVERY-1:merchant-notification:v1', effect_type: 'merchant_notification', status: 'pending', attempt_count: 0 },
       { effect_key: 'paid:WEB-RECOVERY-1:subscription:v1', effect_type: 'subscription', status: 'pending', attempt_count: 0 },
     ]);
 
@@ -234,6 +235,7 @@ SET status = 'processing', attempt_count = 99, claim_token = 'owner-old',
     const applyTender = vi.fn(async () => undefined);
     const orderPaid = vi.fn(async () => undefined);
     const sendConfirmation = vi.fn(async () => ({ success: true, id: 'email-1' }));
+    const sendMerchantNotification = vi.fn(async () => ({ success: true, skipped: true }));
     const result = await drainOrderEffects({
       database: env.DB,
       getOrder: vi.fn(async () => paid),
@@ -248,11 +250,12 @@ SET status = 'processing', attempt_count = 99, claim_token = 'owner-old',
         subscriptions: { validateCheckout: vi.fn(), orderPaid },
       },
       sendConfirmation,
+      sendMerchantNotification,
       now: () => new Date(start.getTime() + 1_000),
       limit: 25,
     });
 
-    expect(result).toEqual({ claimed: 6, succeeded: 6, failed: 0 });
+    expect(result).toEqual({ claimed: 7, succeeded: 7, failed: 0 });
     expect(runInventory).toHaveBeenCalledOnce();
     expect(redeem).toHaveBeenCalledTimes(2);
     expect(applyTender).toHaveBeenCalledOnce();
@@ -260,6 +263,10 @@ SET status = 'processing', attempt_count = 99, claim_token = 'owner-old',
     expect(sendConfirmation).toHaveBeenCalledWith(
       paid,
       'order-confirmation/WEB-RECOVERY-1/v1'
+    );
+    expect(sendMerchantNotification).toHaveBeenCalledWith(
+      paid,
+      'merchant-notification/WEB-RECOVERY-1/v1'
     );
     const statuses = await env.DB.prepare('SELECT DISTINCT status FROM order_effects')
       .all<{ status: string }>();
