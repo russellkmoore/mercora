@@ -134,12 +134,14 @@ export interface ShippingEmailStatus {
   latestAttempt: {
     type: "shipping_email_sent" | "shipping_email_failed" | "shipping_email_resent";
     error: string | null;
+    needsReview: boolean;
   } | null;
 }
 
 export interface EmailState {
   tone: "success" | "error" | "muted";
   mode: EmailMode;
+  disabled: boolean;
   label: string;
   message: string;
 }
@@ -147,18 +149,28 @@ export interface EmailState {
 export function deriveEmailState(status: ShippingEmailStatus): EmailState {
   const mode: EmailMode = status.hasSuccessfulSend ? "resend" : "retry";
   if (!status.latestAttempt) {
-    return { tone: "muted", mode, label: "Send email", message: "No shipping email sent yet" };
+    return { tone: "muted", mode, disabled: false, label: "Send email", message: "No shipping email sent yet" };
+  }
+  if (status.latestAttempt.needsReview) {
+    return {
+      tone: "error",
+      mode,
+      disabled: true,
+      label: "Manual review required",
+      message: "Shipping email may have been accepted; review provider delivery before sending again",
+    };
   }
   if (status.latestAttempt.type === "shipping_email_failed") {
     const error = status.latestAttempt.error ? `: ${status.latestAttempt.error}` : "";
     return {
       tone: "error",
       mode,
+      disabled: false,
       label: mode === "resend" ? "Retry resend" : "Retry email",
       message: `Shipping email failed${error}`,
     };
   }
-  return { tone: "success", mode: "resend", label: "Resend email", message: "Shipping email sent" };
+  return { tone: "success", mode: "resend", disabled: false, label: "Resend email", message: "Shipping email sent" };
 }
 
 export function buildQueueQuery(params: {
@@ -282,7 +294,9 @@ export function formatTimeline(events: FulfillmentEvent[]): TimelineEntry[] {
       details.push(`Carrier: ${text(previous.carrier, "none")} → ${text(next.carrier, "none")}`);
       details.push(`Tracking: ${text(previous.trackingNumber, "none")} → ${text(next.trackingNumber, "none")}`);
     } else if (event.type === "shipping_email_failed") {
-      title = "Shipping email failed";
+      title = payload.needsReview === true
+        ? "Shipping email needs manual review"
+        : "Shipping email failed";
       tone = "error";
       if (typeof payload.error === "string" && payload.error.trim()) details.push(`Error: ${payload.error.trim()}`);
     } else if (event.type === "shipping_email_resent") {
