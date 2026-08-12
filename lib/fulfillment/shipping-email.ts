@@ -1,4 +1,5 @@
 import { sendEmail } from "@/lib/email/sender";
+import { recordTelemetry } from "@/lib/observability/telemetry";
 import { getStoreConfig } from "@/lib/store-config";
 import { escapeHtmlText } from "@/lib/utils/maintenance-html";
 import { getOrderById } from "@/lib/models/mach/orders";
@@ -297,6 +298,12 @@ export async function sendInitialShippingEmail(
       if (isConcurrentShippingEmailAttempt(result)) {
         return { attempted: true, ...result, pending: true, eventId: null };
       }
+      recordTelemetry("email.delivery_failed", {
+        operation: "send",
+        outcome: result.needsReview ? "needs_review" : "failed",
+        retryable: !result.needsReview,
+        trigger: "request",
+      });
       const eventId = await recordEmailEvent(
         orderId,
         "shipping_email_failed",
@@ -313,11 +320,16 @@ export async function sendInitialShippingEmail(
         ...(result.providerId ? { providerId: result.providerId } : {}),
       });
     } catch (error) {
-      console.error("shipping_email_audit_write_failed");
+      recordTelemetry("email.audit_write_failed", {
+        operation: "audit_write", outcome: "failed", provider: "d1",
+        retryable: true, trigger: "request",
+      }, error);
     }
     return { attempted: true, ...result, eventId };
   } catch (error) {
-    console.error("shipping_email_initial_failed");
+    recordTelemetry("email.delivery_failed", {
+      operation: "send", outcome: "failed", retryable: true, trigger: "request",
+    }, error);
     return {
       attempted: false,
       success: false,

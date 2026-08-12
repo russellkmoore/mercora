@@ -16,6 +16,7 @@ import {
   drainOrderEffects,
   stagePaidOrderEffects,
 } from '@/lib/services/order-effects';
+import { recordTelemetry } from '@/lib/observability/telemetry';
 
 export class PaymentVerificationError extends Error {}
 
@@ -109,7 +110,14 @@ export async function finalizeOrderPayment(args: {
 
   // Stage deterministic, dormant effect rows before the paid CAS. A crash
   // after promotion can then be recovered by another request or the scheduler.
-  await stagePaidOrderEffects(order, { includeEmail: args.sendEmail !== false });
+  try {
+    await stagePaidOrderEffects(order, { includeEmail: args.sendEmail !== false });
+  } catch (error) {
+    recordTelemetry('paid_effect.staging_failed', {
+      operation: 'stage', outcome: 'failed', provider: 'd1', retryable: true,
+    }, error);
+    throw error;
+  }
 
   const amountReceived = Money.fromMinor(paymentIntent.amount_received, receivedCurrency);
   const promotion = await promoteOrderToPaid({ orderId: args.orderId, amountReceived });
@@ -120,7 +128,14 @@ export async function finalizeOrderPayment(args: {
   const paidOrder = promotion.order;
   // Ensure repairs legacy/already-paid convergence. Inline draining is an
   // optimization; every failure remains durable for scheduled retry.
-  await stagePaidOrderEffects(paidOrder, { includeEmail: args.sendEmail !== false });
+  try {
+    await stagePaidOrderEffects(paidOrder, { includeEmail: args.sendEmail !== false });
+  } catch (error) {
+    recordTelemetry('paid_effect.staging_failed', {
+      operation: 'stage', outcome: 'failed', provider: 'd1', retryable: true,
+    }, error);
+    throw error;
+  }
   try {
     const effects = await drainOrderEffects({
       orderId: paidOrder.id!,
@@ -128,13 +143,19 @@ export async function finalizeOrderPayment(args: {
       limit: 25,
     });
     if (effects.failed > 0) {
-      console.error(`[checkout] ${effects.failed} paid effect(s) queued for retry`);
+      recordTelemetry('paid_effect.first_attempt_failed', {
+        operation: 'process', outcome: 'retry_scheduled', count: effects.failed,
+        retryable: true, trigger: 'request',
+      });
     }
   } catch (error) {
     // Paid state and deterministic effect rows are already durable. The
     // scheduled runner owns recovery even if this opportunistic drain cannot
     // reach D1 after the payment transition.
-    console.error('[checkout] Paid effects queued for retry');
+    recordTelemetry('paid_effect.drain_failed', {
+      operation: 'process', outcome: 'failed', provider: 'd1', retryable: true,
+      trigger: 'request',
+    }, error);
   }
 
   return { paid: true, promoted: promotion.promoted, order: promotion.order };

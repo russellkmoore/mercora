@@ -25,6 +25,7 @@ import {
   PaymentVerificationError,
 } from '@/lib/services/order-finalization';
 import { enforceRateLimit, getClientIp } from '@/lib/rate-limit';
+import { recordTelemetry } from '@/lib/observability/telemetry';
 import { toAdminOrder, toCustomerOrder } from '@/lib/models/mach/order-serializer';
 
 
@@ -119,7 +120,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(response);
 
   } catch (error) {
-    console.error('Orders API error:', error);
+    recordTelemetry('order.query_failed', {
+      operation: 'process', outcome: 'failed', provider: 'd1',
+      retryable: true, path: '/api/orders', trigger: 'request',
+    }, error);
     return NextResponse.json(
       { error: 'Failed to retrieve orders' },
       { status: 500 }
@@ -199,13 +203,17 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     if (error instanceof PaymentVerificationError) {
-      console.warn('Order payment verification rejected:', error.message);
+      recordTelemetry('order.payment_verification_rejected', {
+        operation: 'validate', outcome: 'rejected', path: '/api/orders',
+      }, error);
       return NextResponse.json(
         { error: 'Payment could not be verified for this order' },
         { status: 409 }
       );
     }
-    console.error('Order finalization failed:', error);
+    recordTelemetry('order.finalization_failed', {
+      operation: 'finalize', outcome: 'failed', retryable: true, path: '/api/orders',
+    }, error);
     return NextResponse.json({ error: 'Failed to finalize order' }, { status: 500 });
   }
 }
@@ -307,7 +315,10 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json(response);
 
   } catch (error) {
-    console.error('Orders API error:', error);
+    recordTelemetry('order.metadata_update_failed', {
+      operation: 'persist', outcome: 'failed', provider: 'd1',
+      retryable: true, path: '/api/orders', trigger: 'request',
+    }, error);
     return NextResponse.json(
       { error: 'Failed to update order' },
       { status: 500 }

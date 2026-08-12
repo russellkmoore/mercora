@@ -15,6 +15,7 @@ import {
 import { latestOrderEvent, recordEmailEvent } from "@/lib/fulfillment/service";
 import type { Actor } from "@/lib/fulfillment/types";
 import { getOrderById } from "@/lib/models/mach/orders";
+import { recordTelemetry } from "@/lib/observability/telemetry";
 
 type Mode = "retry" | "resend";
 const MAX_BODY_BYTES = 1_024;
@@ -93,7 +94,10 @@ async function recordOutcome(
   try {
     return await recordEmailEvent(orderId, type, actor, details);
   } catch (error) {
-    console.error("shipping_email_audit_write_failed", { orderId, type, error });
+    recordTelemetry("email.audit_write_failed", {
+      operation: "audit_write", outcome: "failed", provider: "d1",
+      retryable: true, path: "/api/admin/orders/:id/shipping-email", trigger: "request",
+    }, error);
     return null;
   }
 }
@@ -150,7 +154,10 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("GET /api/admin/orders/[id]/shipping-email failed", { orderId: id, error });
+    recordTelemetry("email.audit_write_failed", {
+      operation: "audit_write", outcome: "failed", provider: "d1",
+      retryable: true, path: "/api/admin/orders/:id/shipping-email", trigger: "request",
+    }, error);
     return NextResponse.json(
       { code: "shipping_email_status_failed", error: "Failed to load shipping email status" },
       { status: 500 },
@@ -246,14 +253,7 @@ export async function POST(
     const result = await sendShippingConfirmationEmail(data, idempotencyKey);
     if (!result.success) {
       const concurrentDuplicate = isConcurrentShippingEmailAttempt(result);
-      const context = {
-        orderId: id,
-        mode: parsed.mode,
-        error: result.error,
-        errorCode: result.errorCode,
-      };
       if (concurrentDuplicate) {
-        console.warn("shipping_email_send_concurrent", context);
         return NextResponse.json({
           email: {
             success: false,
@@ -265,7 +265,10 @@ export async function POST(
           auditRecorded: false,
         }, { status: 202 });
       } else {
-        console.error("shipping_email_send_failed", context);
+        recordTelemetry("email.delivery_failed", {
+          operation: "send", outcome: "failed", provider: "resend",
+          retryable: true, path: "/api/admin/orders/:id/shipping-email", trigger: "manual",
+        });
       }
       const eventId = await recordOutcome(
         id,
@@ -298,7 +301,10 @@ export async function POST(
       auditRecorded: eventId !== null,
     });
   } catch (error) {
-    console.error("POST /api/admin/orders/[id]/shipping-email failed", { orderId: id, error });
+    recordTelemetry("email.delivery_failed", {
+      operation: "send", outcome: "failed", retryable: true,
+      path: "/api/admin/orders/:id/shipping-email", trigger: "manual",
+    }, error);
     return NextResponse.json(
       { code: "shipping_email_failed", error: "Failed to send shipping email" },
       { status: 500 },

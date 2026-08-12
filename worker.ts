@@ -18,6 +18,7 @@ import { regenerateAnalytics } from "@/lib/analytics/generate-insights";
 import { drainOrderEffects } from "@/lib/services/order-effects";
 import { drainInventoryAdjustments } from "@/lib/services/inventory-adjustments";
 import { runRecommendationCron } from "@/lib/recommendations/cron";
+import { recordTelemetry } from "@/lib/observability/telemetry";
 
 export default {
   fetch: handler.fetch,
@@ -36,7 +37,10 @@ export default {
           .then(([effects, inventory]) =>
             console.log("[cron] recovery queues drained", { effects, inventory })
           )
-          .catch((err) => console.error("[cron] recovery queue drain failed:", err))
+          .catch((error) => recordTelemetry("cron.recovery_failed", {
+            operation: "process", outcome: "failed", provider: "d1",
+            retryable: true, trigger: "recovery",
+          }, error))
       );
       return;
     }
@@ -54,7 +58,10 @@ export default {
     ctx.waitUntil(
       regenerateAnalytics(env)
         .then(() => console.log("[cron] analytics cache regenerated"))
-        .catch((err) => console.error("[cron] analytics regeneration failed:", err))
+        .catch((error) => recordTelemetry("cron.analytics_failed", {
+          operation: "rebuild", outcome: "failed", provider: "d1",
+          retryable: true, trigger: "scheduled",
+        }, error))
     );
   },
 } satisfies ExportedHandler<CloudflareEnv>;

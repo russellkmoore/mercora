@@ -14,6 +14,7 @@ import { carrierRegistryFromConfig } from "@/lib/fulfillment/carrier-config";
 import { Money, type MachMoney } from "@/lib/money";
 import { getStoreConfig } from "@/lib/store-config";
 import type { AdminQueueRow } from "@/lib/fulfillment/queries";
+import { recordTelemetry } from "@/lib/observability/telemetry";
 
 const MAX_ADMIN_ORDER_OFFSET = 1_000_000;
 
@@ -173,7 +174,10 @@ export async function GET(request: NextRequest) {
       meta: { view, limit, offset },
     });
   } catch (error) {
-    console.error("GET /api/admin/orders failed", error);
+    recordTelemetry("fulfillment.query_failed", {
+      operation: "process", outcome: "failed", provider: "d1", retryable: true,
+      path: "/api/admin/orders", trigger: "request",
+    }, error);
     return NextResponse.json(
       { code: "orders_read_failed", error: "Failed to load orders" },
       { status: 500 },

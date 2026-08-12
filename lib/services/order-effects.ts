@@ -16,6 +16,7 @@ import {
   sendOrderConfirmation,
 } from '@/lib/services/order-confirmation';
 import { runPaidOrderInventoryEffect } from '@/lib/services/inventory-adjustments';
+import { recordTelemetry } from '@/lib/observability/telemetry';
 
 const EFFECT_LEASE_MS = 5 * 60 * 1000;
 const MAX_EFFECT_ERROR = 2_000;
@@ -373,9 +374,21 @@ export async function drainOrderEffects(
       }
       result.succeeded += 1;
     } catch (error) {
+      const needsReview = error instanceof EffectNeedsReviewError;
       await failOrderEffect(database, effect, error, options.now?.() ?? new Date(), {
-        needsReview: error instanceof EffectNeedsReviewError,
+        needsReview,
       });
+      recordTelemetry(
+        effect.attempt_count >= 3
+          ? 'paid_effect.repeated_failure'
+          : 'paid_effect.first_attempt_failed',
+        {
+          operation: 'process', outcome: needsReview ? 'needs_review' : 'retry_scheduled',
+          effect_type: effect.effect_type, attempt: effect.attempt_count,
+          retryable: !needsReview, trigger: options.orderId ? 'request' : 'recovery',
+        },
+        error,
+      );
       result.failed += 1;
     }
   }

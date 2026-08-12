@@ -331,8 +331,16 @@ describe('verified paid-order finalization', () => {
     })).resolves.toMatchObject({ paid: true, promoted: true });
 
     expect(mocks.promoteOrderToPaid).toHaveBeenCalledOnce();
-    expect(errorLog).toHaveBeenCalledWith('[checkout] Paid effects queued for retry');
-    expect(errorLog.mock.calls.flat().join(' ')).not.toContain(mocks.record.id);
+    const alert = JSON.parse(String(errorLog.mock.calls[0][0]));
+    expect(alert).toMatchObject({
+      marker: 'commerce.telemetry.v1',
+      event: 'paid_effect.drain_failed',
+      severity: 'critical',
+      fields: { operation: 'process', outcome: 'failed', retryable: true },
+      error_class: 'Error',
+    });
+    expect(JSON.stringify(alert)).not.toContain(mocks.record.id);
+    expect(JSON.stringify(alert)).not.toContain(error.message);
     errorLog.mockRestore();
   });
 
