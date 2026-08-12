@@ -208,19 +208,38 @@ export function extractCriticalAlerts(events: readonly unknown[]): ExtractedAler
   const unique = new Map<string, CriticalAlert>();
   let scanned = 0;
   let matched = 0;
+  let truncated = events.length > MAX_TRACE_ITEMS;
   try {
-    for (const rawEvent of events.slice(0, MAX_TRACE_ITEMS)) {
-      if (!isRecord(rawEvent) || !Array.isArray(rawEvent.logs)) continue;
-      for (const rawLog of rawEvent.logs) {
-        if (scanned >= MAX_LOGS_SCANNED || matched >= MAX_CANDIDATE_ALERTS) break;
+    const traceItems = events.slice(0, MAX_TRACE_ITEMS);
+    scan: for (let eventIndex = 0; eventIndex < traceItems.length; eventIndex += 1) {
+      const rawEvent = traceItems[eventIndex];
+      if (!isRecord(rawEvent)) continue;
+      let rawLogs: unknown;
+      try {
+        rawLogs = Reflect.get(rawEvent, 'logs');
+      } catch {
+        continue;
+      }
+      if (!Array.isArray(rawLogs)) continue;
+      for (let logIndex = 0; logIndex < rawLogs.length; logIndex += 1) {
+        if (scanned >= MAX_LOGS_SCANNED) {
+          truncated = true;
+          break scan;
+        }
+        const rawLog = rawLogs[logIndex];
         scanned += 1;
         if (!isRecord(rawLog) || rawLog.level !== 'error') continue;
         const alert = parseLogMessage(rawLog.message);
         if (!alert) continue;
         matched += 1;
-        if (!unique.has(alert.bucket)) unique.set(alert.bucket, alert);
+        if (unique.has(alert.bucket)) continue;
+        unique.set(alert.bucket, alert);
+        if (unique.size >= MAX_CANDIDATE_ALERTS) {
+          truncated = logIndex + 1 < rawLogs.length ||
+            eventIndex + 1 < traceItems.length || truncated;
+          break scan;
+        }
       }
-      if (scanned >= MAX_LOGS_SCANNED || matched >= MAX_CANDIDATE_ALERTS) break;
     }
   } catch {
     return { alerts: [], overflow: 0 };
@@ -228,8 +247,7 @@ export function extractCriticalAlerts(events: readonly unknown[]): ExtractedAler
   const alerts = [...unique.values()];
   return {
     alerts,
-    overflow: Math.max(0, matched - alerts.length) +
-      (events.length > MAX_TRACE_ITEMS || scanned >= MAX_LOGS_SCANNED ? 1 : 0),
+    overflow: Math.max(0, matched - alerts.length) + (truncated ? 1 : 0),
   };
 }
 

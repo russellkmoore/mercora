@@ -74,7 +74,10 @@ export async function GET(
             .filter(([, label]) => label.length > 0),
         );
       } catch (error) {
-        console.warn("Could not resolve fulfillment actor labels", error);
+        recordTelemetry("fulfillment.query_failed", {
+          operation: "process", outcome: "partial_failure", provider: "d1",
+          retryable: true, path: "/api/admin/orders/:id/events", trigger: "request",
+        }, error);
       }
     }
 
