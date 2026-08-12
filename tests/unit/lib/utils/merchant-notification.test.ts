@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({ send: vi.fn(), getStoreConfig: vi.fn() }));
 vi.mock('@/lib/email/sender', () => ({ sendEmail: mocks.send }));
 vi.mock('@/lib/store-config', () => ({ getStoreConfig: mocks.getStoreConfig }));
 
-import { sendNewOrderMerchantNotification, type OrderData } from '@/lib/utils/email';
+import { sendNewOrderMerchantNotification, type MerchantOrderData, type OrderData } from '@/lib/utils/email';
 
 const order: OrderData = {
   orderNumber: 'ORD 1/2?x=1',
@@ -64,5 +64,15 @@ describe('merchant new-order notification', () => {
       skipped: true,
     });
     expect(mocks.send).not.toHaveBeenCalled();
+  });
+
+  it('sends fulfillment details without requiring a customer email or reply-to', async () => {
+    const emailLess: MerchantOrderData = { ...order, customerEmail: undefined };
+    await expect(sendNewOrderMerchantNotification(emailLess)).resolves.toMatchObject({ success: true });
+
+    const message = mocks.send.mock.calls[0][0];
+    expect(message).not.toHaveProperty('replyTo');
+    expect(message.text).not.toContain('Customer email:');
+    expect(message.html).toContain('Items to ship');
   });
 });

@@ -4,6 +4,7 @@ import {
   sendNewOrderMerchantNotification,
   sendOrderConfirmationEmail,
   type EmailResult,
+  type MerchantOrderData,
   type OrderData,
 } from '@/lib/utils/email';
 import { getDbAsync } from '@/lib/db';
@@ -57,19 +58,17 @@ function localizedText(value: unknown): string {
   return '';
 }
 
-export async function buildOrderEmailData(order: Order): Promise<OrderData | null> {
+type FulfillmentOrderData = Omit<OrderData, 'customerEmail'>;
+
+async function buildFulfillmentOrderData(order: Order): Promise<FulfillmentOrderData | null> {
   const address = order.shipping_address;
   const extensions = order.extensions ?? {};
-  const email = typeof extensions.email === 'string'
-    ? extensions.email
-    : address?.email;
-  if (!email || !address || !order.id) return null;
+  if (!address || !order.id || order.items.length === 0) return null;
   const images = await resolveOrderLineImages(order.items.map((item) => item.product_id));
 
   return {
     orderNumber: order.id,
     customerName: address.recipient || address.company || 'Customer',
-    customerEmail: email,
     items: order.items.map((item) => ({
       productId: item.product_id,
       name: item.product_name,
@@ -99,6 +98,32 @@ export async function buildOrderEmailData(order: Order): Promise<OrderData | nul
   };
 }
 
+function validReplyTo(value: string | null): string | undefined {
+  return value && value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+    ? value
+    : undefined;
+}
+
+export async function buildOrderEmailData(order: Order): Promise<OrderData | null> {
+  const data = await buildFulfillmentOrderData(order);
+  const email = typeof order.extensions?.email === 'string'
+    ? order.extensions.email
+    : order.shipping_address?.email;
+  return data && email ? { ...data, customerEmail: email } : null;
+}
+
+export async function buildMerchantOrderEmailData(order: Order): Promise<MerchantOrderData | null> {
+  const data = await buildFulfillmentOrderData(order);
+  if (!data) return null;
+  const rawEmail = typeof order.extensions?.email === 'string'
+    ? order.extensions.email.trim().toLowerCase()
+    : typeof order.shipping_address?.email === 'string'
+      ? order.shipping_address.email.trim().toLowerCase()
+      : null;
+  const customerEmail = validReplyTo(rawEmail);
+  return { ...data, ...(customerEmail ? { customerEmail } : {}) };
+}
+
 export async function sendOrderConfirmation(
   order: Order,
   idempotencyKey: string
@@ -111,8 +136,12 @@ export async function sendMerchantOrderNotification(
   order: Order,
   idempotencyKey: string,
 ): Promise<EmailResult> {
-  const data = await buildOrderEmailData(order);
+  const data = await buildMerchantOrderEmailData(order);
   return data
     ? sendNewOrderMerchantNotification(data, { idempotencyKey })
-    : { success: true, skipped: true };
+    : {
+        success: false,
+        error: 'Merchant notification requires an order id, shipping address, and line items',
+        errorCode: 'E_MERCHANT_PAYLOAD',
+      };
 }

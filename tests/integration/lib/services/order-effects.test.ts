@@ -354,4 +354,34 @@ SELECT status, result FROM inventory_adjustments WHERE order_id = ?
     await expect(drainOrderEffects({ database: env.DB, now: () => new Date(start.getTime() + 86_400_000) }))
       .resolves.toEqual({ claimed: 0, succeeded: 0, failed: 0 });
   });
+
+  it('runs the merchant effect successfully for an email-less web or MCP order', async () => {
+    const paid = order('paid');
+    delete paid.extensions!.email;
+    delete paid.shipping_address!.email;
+    await insertOrder(paid);
+    await stagePaidOrderEffects(paid, { database: env.DB, now: start });
+    await keepOnly('merchant_notification');
+    const sendMerchantNotification = vi.fn(async (effectOrder: Order) => {
+      expect(effectOrder.extensions?.email).toBeUndefined();
+      expect(effectOrder.shipping_address?.email).toBeUndefined();
+      return { success: true, id: 'merchant-email-1' };
+    });
+
+    await expect(drainOrderEffects({
+      database: env.DB,
+      getOrder: vi.fn(async () => paid),
+      sendMerchantNotification,
+      now: () => start,
+    })).resolves.toEqual({ claimed: 1, succeeded: 1, failed: 0 });
+    expect(sendMerchantNotification).toHaveBeenCalledWith(
+      paid,
+      'merchant-notification/WEB-RECOVERY-1/v1',
+    );
+    await expect(env.DB.prepare(`SELECT status, result FROM order_effects`).first())
+      .resolves.toMatchObject({
+        status: 'succeeded',
+        result: JSON.stringify({ providerId: 'merchant-email-1', skipped: false }),
+      });
+  });
 });
