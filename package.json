@@ -81,7 +81,7 @@
     "@cloudflare/workers-types": "^5.20260801.1",
     "@opennextjs/cloudflare": "^1.20.2",
     "@tailwindcss/postcss": "^4.3.3",
-    "@types/big.js": "^6.2.2",
+    "@types/big.js": "^7.0.0",
     "@types/node": "^24.13.3",
     "@types/react": "^19",
     "@types/react-dom": "^19",
