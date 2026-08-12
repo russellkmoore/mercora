@@ -1,12 +1,19 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync(new URL("../../../app/orders/page.tsx", import.meta.url), "utf8");
+const source = readFileSync(new URL("../../../app/account/orders/page.tsx", import.meta.url), "utf8");
+const compatibility = readFileSync(new URL("../../../app/orders/page.tsx", import.meta.url), "utf8");
 
 describe("orders page customer boundary", () => {
   it("checks authentication before loading customer orders", () => {
     expect(source.indexOf("if (!userId)")).toBeGreaterThan(-1);
-    expect(source.indexOf("if (!userId)")).toBeLessThan(source.indexOf("getOrdersByUserId(userId)"));
+    expect(source.indexOf("if (!userId)")).toBeLessThan(source.indexOf("getOrdersByCustomer(userId)"));
+  });
+
+  it("preserves the legacy route as a query-compatible redirect", () => {
+    expect(compatibility).toContain("searchParams");
+    expect(compatibility).toContain("/account/orders");
+    expect(compatibility).not.toContain("getOrdersBy");
   });
 
   it("passes an explicit order allowlist to the client component", () => {
