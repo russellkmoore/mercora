@@ -111,10 +111,22 @@ tests exercise SQLite cooldown state without delivering mail.
 
 For a canary, use a non-production account and recipient controlled by the
 operator. Deploy the configured Tail Worker first, then attach one non-production
-producer. Temporarily call `recordTelemetry("payment.intent_create_failed",`
-`{ operation: "create", outcome: "failed", provider: "stripe", path:`
-`"/internal/canary" }, new Error("canary"))` from a guarded non-production-only
-path. Confirm one alert, confirm another invocation is suppressed during the
+producer. From a guarded non-production-only path, temporarily call:
+
+```ts
+recordTelemetry(
+  "payment.intent_create_failed",
+  {
+    operation: "create",
+    outcome: "failed",
+    provider: "stripe",
+    path: "/api/payment-intent",
+  },
+  new Error("canary"),
+);
+```
+
+Confirm one alert, confirm another invocation is suppressed during the
 cooldown, remove the canary, and inspect Workers Logs for only the bounded
 envelope. Never use a customer request, real order, production payment, raw
 exception, or production recipient for this check.

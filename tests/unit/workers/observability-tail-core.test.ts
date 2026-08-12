@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   TELEMETRY_EVENTS,
@@ -62,6 +64,14 @@ describe('observability Tail Worker parser and renderer', () => {
       expect(TELEMETRY_EVENTS[event].severity).toBe('critical');
     }
     expect([...TAIL_ROUTE_PATHS]).toEqual([...TELEMETRY_PATHS]);
+  });
+
+  it('keeps documented telemetry paths inside the closed route contract', () => {
+    const documentation = readFileSync(join(process.cwd(), 'docs/observability.md'), 'utf8');
+    const documentedPaths = [...documentation.matchAll(/path:\s*`?"([^"]+)"/g)]
+      .map((match) => match[1]);
+    expect(documentedPaths).not.toHaveLength(0);
+    expect(documentedPaths.every((path) => TELEMETRY_PATHS.has(path))).toBe(true);
   });
 
   it('accepts only an exact one-argument structured critical marker', () => {
