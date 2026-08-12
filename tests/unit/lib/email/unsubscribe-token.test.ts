@@ -36,7 +36,15 @@ describe("bounded unsubscribe tokens", () => {
 
   it("fails closed when no sufficiently strong key is configured", async () => {
     vi.stubEnv("EMAIL_UNSUBSCRIBE_SECRET_CURRENT", "short");
-    vi.stubEnv("EMAIL_UNSUBSCRIBE_SECRET", "");
+    expect(await createUnsubscribeToken("person@example.com", "review_reminders", now)).toBeNull();
+  });
+
+  it("never mints with the previous key or a weak current key", async () => {
+    vi.stubEnv("EMAIL_UNSUBSCRIBE_SECRET_CURRENT", "short");
+    vi.stubEnv("EMAIL_UNSUBSCRIBE_SECRET_PREVIOUS", previous);
+    expect(await createUnsubscribeToken("person@example.com", "review_reminders", now)).toBeNull();
+
+    vi.stubEnv("EMAIL_UNSUBSCRIBE_SECRET_CURRENT", "");
     expect(await createUnsubscribeToken("person@example.com", "review_reminders", now)).toBeNull();
   });
 });

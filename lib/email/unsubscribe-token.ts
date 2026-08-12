@@ -25,13 +25,20 @@ export function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function secrets(): string[] {
-  const current = process.env.EMAIL_UNSUBSCRIBE_SECRET_CURRENT ?? process.env.EMAIL_UNSUBSCRIBE_SECRET;
-  const previous = process.env.EMAIL_UNSUBSCRIBE_SECRET_PREVIOUS;
-  return [current, previous].filter((value): value is string => Boolean(value && value.length >= MIN_SECRET_LENGTH));
+function strongSecret(value: string | undefined): string | undefined {
+  return value && value.length >= MIN_SECRET_LENGTH ? value : undefined;
 }
 
-export function isUnsubscribeConfigured(): boolean { return secrets().length > 0; }
+function currentSecret(): string | undefined {
+  return strongSecret(process.env.EMAIL_UNSUBSCRIBE_SECRET_CURRENT);
+}
+
+function verificationSecrets(): string[] {
+  return [currentSecret(), strongSecret(process.env.EMAIL_UNSUBSCRIBE_SECRET_PREVIOUS)]
+    .filter((value): value is string => Boolean(value));
+}
+
+export function isUnsubscribeConfigured(): boolean { return Boolean(currentSecret()); }
 
 function ttlSeconds(): number {
   const configured = Number(process.env.EMAIL_UNSUBSCRIBE_TTL_SECONDS);
@@ -57,7 +64,7 @@ export async function createUnsubscribeToken(
   category: EmailCategory = "review_reminders",
   now = new Date(),
 ): Promise<string | null> {
-  const [current] = secrets();
+  const current = currentSecret();
   if (!current) return null;
   const normalized = normalizeEmail(email);
   if (!normalized || normalized.length > 254) return null;
@@ -68,23 +75,34 @@ export async function createUnsubscribeToken(
 }
 
 export async function verifyUnsubscribeToken(token: string, now = new Date()): Promise<TokenPayload | null> {
-  if (!token || token.length > MAX_TOKEN_LENGTH) return null;
-  const parts = token.split(".");
-  if (parts.length !== 2) return null;
-  let payload: TokenPayload;
-  let signature: Uint8Array;
   try {
-    payload = JSON.parse(new TextDecoder().decode(decode(parts[0]))) as TokenPayload;
-    signature = decode(parts[1]);
-  } catch { return null; }
-  const currentSeconds = Math.floor(now.getTime() / 1_000);
-  if (payload.v !== VERSION || payload.category !== "review_reminders" ||
-      payload.email !== normalizeEmail(payload.email) || payload.email.length > 254 ||
-      !Number.isSafeInteger(payload.iat) || !Number.isSafeInteger(payload.exp) ||
-      payload.exp <= currentSeconds || payload.iat > currentSeconds + 300 ||
-      payload.exp - payload.iat <= 0 || payload.exp - payload.iat > MAX_TTL_SECONDS) return null;
-  for (const secret of secrets()) {
-    if (equal(signature, await sign(secret, parts[0]))) return payload;
+    if (!token || token.length > MAX_TOKEN_LENGTH) return null;
+    const parts = token.split(".");
+    if (parts.length !== 2) return null;
+    const parsed: unknown = JSON.parse(new TextDecoder().decode(decode(parts[0])));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const candidate = parsed as Record<string, unknown>;
+    if (candidate.v !== VERSION || candidate.category !== "review_reminders" ||
+        typeof candidate.email !== "string" || candidate.email.length === 0 || candidate.email.length > 254 ||
+        typeof candidate.iat !== "number" || !Number.isSafeInteger(candidate.iat) || candidate.iat < 0 ||
+        typeof candidate.exp !== "number" || !Number.isSafeInteger(candidate.exp) || candidate.exp < 0) return null;
+    const payload: TokenPayload = {
+      v: VERSION,
+      email: candidate.email,
+      category: candidate.category,
+      iat: candidate.iat,
+      exp: candidate.exp,
+    };
+    const currentSeconds = Math.floor(now.getTime() / 1_000);
+    if (payload.email !== normalizeEmail(payload.email) ||
+        payload.exp <= currentSeconds || payload.iat > currentSeconds + 300 ||
+        payload.exp - payload.iat <= 0 || payload.exp - payload.iat > MAX_TTL_SECONDS) return null;
+    const signature = decode(parts[1]);
+    for (const secret of verificationSecrets()) {
+      if (equal(signature, await sign(secret, parts[0]))) return payload;
+    }
+    return null;
+  } catch {
+    return null;
   }
-  return null;
 }
