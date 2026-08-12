@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import {
   InventoryUnavailableError,
@@ -259,6 +259,7 @@ SELECT COUNT(*) AS count, MAX(quantity) AS quantity FROM inventory_adjustments W
     await insertVariant('u09-fractional', { track_inventory: true, quantity: 1.5 });
     await stagePaidInventoryAdjustments(paid, { database: env.DB, now: start });
 
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const drained = await drainInventoryAdjustments({
       database: env.DB,
       orderId: paid.id,
@@ -267,6 +268,59 @@ SELECT COUNT(*) AS count, MAX(quantity) AS quantity FROM inventory_adjustments W
 
     expect(drained).toMatchObject({ claimed: 1, needsReview: 1, failed: 0 });
     expect(await quantity('u09-fractional')).toBe(1.5);
+    const alert = JSON.parse(String(errorLog.mock.calls[0][0]));
+    expect(alert).toMatchObject({
+      marker: 'commerce.telemetry.v1',
+      event: 'inventory.adjustment_needs_review',
+      severity: 'critical',
+      fields: {
+        operation: 'process', outcome: 'needs_review', effect_type: 'paid_decrement',
+        attempt: 1, retryable: false, trigger: 'request',
+      },
+    });
+    expect(JSON.stringify(alert)).not.toContain(paid.id);
+    errorLog.mockRestore();
+  });
+
+  it('reports a repeated mutation failure while retaining retry state', async () => {
+    const paid = order('U09-REPEATED', [line('u09-repeated', 1)]);
+    await insertOrder(paid);
+    await insertVariant('u09-repeated', { track_inventory: true, quantity: 2 });
+    await stagePaidInventoryAdjustments(paid, { database: env.DB, now: start });
+    await env.DB.prepare(
+      'UPDATE inventory_adjustments SET attempt_count = 2 WHERE order_id = ?',
+    ).bind(paid.id).run();
+    await env.DB.prepare(`
+CREATE TRIGGER u09_reject_inventory_terminal
+BEFORE UPDATE OF status ON inventory_adjustments
+WHEN NEW.status IN ('succeeded', 'skipped', 'needs_review')
+BEGIN
+  SELECT RAISE(ABORT, 'terminal marker rejected');
+END
+`).run();
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const drained = await drainInventoryAdjustments({
+      database: env.DB,
+      orderId: paid.id,
+      now: () => start,
+    });
+
+    expect(drained).toMatchObject({ claimed: 1, succeeded: 0, failed: 1 });
+    expect(await quantity('u09-repeated')).toBe(2);
+    const alert = JSON.parse(String(errorLog.mock.calls[0][0]));
+    expect(alert).toMatchObject({
+      marker: 'commerce.telemetry.v1',
+      event: 'inventory.adjustment_repeated_failure',
+      severity: 'critical',
+      fields: {
+        operation: 'process', outcome: 'retry_scheduled', effect_type: 'paid_decrement',
+        attempt: 3, retryable: true, trigger: 'request',
+      },
+      error_class: 'Error',
+    });
+    expect(JSON.stringify(alert)).not.toContain('terminal marker rejected');
+    errorLog.mockRestore();
   });
 
   it('terminals a safe-integer overflow for review without restocking', async () => {

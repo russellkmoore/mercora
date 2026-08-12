@@ -3,11 +3,12 @@ import { NextRequest } from 'next/server';
 
 const mocks = vi.hoisted(() => ({
   insertValues: vi.fn(),
-  insertFails: false,
+  insertError: null as Error | null,
   createPaymentIntent: vi.fn(),
   cancelPaymentIntent: vi.fn(),
   priceCheckout: vi.fn(),
   assertCheckoutInventoryAvailable: vi.fn(),
+  recordTelemetry: vi.fn(),
 }));
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -45,10 +46,13 @@ vi.mock('@/lib/db', () => ({
     insert: () => ({
       values: async (value: unknown) => {
         mocks.insertValues(value);
-        if (mocks.insertFails) throw new Error('D1 unavailable');
+        if (mocks.insertError) throw mocks.insertError;
       },
     }),
   })),
+}));
+vi.mock('@/lib/observability/telemetry', () => ({
+  recordTelemetry: mocks.recordTelemetry,
 }));
 
 import { POST } from '@/app/api/payment-intent/route';
@@ -103,7 +107,7 @@ function request() {
 }
 
 beforeEach(() => {
-  mocks.insertFails = false;
+  mocks.insertError = null;
   mocks.cancelPaymentIntent.mockResolvedValue(undefined);
   mocks.priceCheckout.mockResolvedValue(quote);
   mocks.assertCheckoutInventoryAvailable.mockResolvedValue(undefined);
@@ -156,11 +160,58 @@ describe('payment-intent durable authority boundary', () => {
   });
 
   it('withholds the client secret and cancels the PI if pending persistence fails', async () => {
-    mocks.insertFails = true;
+    const persistenceError = new Error('D1 unavailable');
+    mocks.insertError = persistenceError;
     const response = await POST(request());
     expect(response.status).toBe(503);
     expect(mocks.cancelPaymentIntent).toHaveBeenCalledWith('pi_authoritative');
     expect(await response.json()).not.toHaveProperty('clientSecret');
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      'payment.order_persist_failed',
+      {
+        operation: 'persist', outcome: 'failed', provider: 'd1', retryable: true,
+        path: '/api/payment-intent',
+      },
+      persistenceError,
+    );
+  });
+
+  it('reports provider creation failure without changing the retryable response', async () => {
+    const providerError = new Error('Stripe unavailable');
+    mocks.createPaymentIntent.mockRejectedValue(providerError);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ error: 'Payment provider is unavailable' });
+    expect(mocks.insertValues).not.toHaveBeenCalled();
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      'payment.intent_create_failed',
+      {
+        operation: 'create', outcome: 'failed', provider: 'stripe', retryable: true,
+        path: '/api/payment-intent',
+      },
+      providerError,
+    );
+  });
+
+  it('reports cancellation failure after persistence fails and still withholds the secret', async () => {
+    const cancelError = new Error('Stripe cancellation unavailable');
+    mocks.insertError = new Error('D1 unavailable');
+    mocks.cancelPaymentIntent.mockRejectedValue(cancelError);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).not.toHaveProperty('clientSecret');
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      'payment.intent_cancel_failed',
+      {
+        operation: 'process', outcome: 'failed', provider: 'stripe', retryable: true,
+        path: '/api/payment-intent',
+      },
+      cancelError,
+    );
   });
 
   it('returns 409 before creating a PaymentIntent when aggregate stock is unavailable', async () => {

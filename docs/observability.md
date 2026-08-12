@@ -109,6 +109,23 @@ Dry runs bundle locally and do not deploy. Unit tests use fake provider calls,
 verify that provider failures never trigger cross-provider fallback, and Workers
 tests exercise SQLite cooldown state without delivering mail.
 
+Behavioral tests cover the material failure paths independently of the source
+taxonomy contract:
+
+- payment intent creation, order persistence, and provider cancellation;
+- webhook claim, ownership, processing, failure-recording, and payment
+  verification outcomes;
+- post-payment effect and inventory failures after their retry threshold;
+- inventory adjustments that require manual review;
+- fulfillment transition, delivery, and delivery-audit failures;
+- recommendation rebuild and scheduled recovery/analytics failures; and
+- both outbound providers, including the rule that a selected provider failure
+  never falls back to the other configured provider.
+
+The AST-based source contract additionally ensures that executable telemetry
+calls use the closed event taxonomy. It is a wiring guard, not a substitute for
+the behavior tests above.
+
 For a canary, use a non-production account and recipient controlled by the
 operator. Deploy the configured Tail Worker first, then attach one non-production
 producer. From a guarded non-production-only path, temporarily call:

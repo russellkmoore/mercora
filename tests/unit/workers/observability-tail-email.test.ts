@@ -91,12 +91,26 @@ describe('observability alert email providers', () => {
   it('rejects failed Resend responses without reading or logging their body', async () => {
     const cancel = vi.fn(async () => undefined);
     const response = new Response(new ReadableStream({ cancel }), { status: 500 });
+    const send = vi.fn(async () => undefined);
     await expect(sendAlertEmail(
       message,
       { ...base, provider: 'resend', resendApiKey: 'test-api-key' },
-      {},
+      { ALERT_EMAIL: { send } },
       async () => response,
     )).rejects.toThrow('Resend alert delivery failed');
     expect(cancel).toHaveBeenCalledOnce();
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('does not fail over to Cloudflare when the selected Resend request throws', async () => {
+    const send = vi.fn(async () => undefined);
+    const networkError = new Error('Resend network unavailable');
+    await expect(sendAlertEmail(
+      message,
+      { ...base, provider: 'resend', resendApiKey: 'test-api-key' },
+      { ALERT_EMAIL: { send } },
+      async () => { throw networkError; },
+    )).rejects.toBe(networkError);
+    expect(send).not.toHaveBeenCalled();
   });
 });
