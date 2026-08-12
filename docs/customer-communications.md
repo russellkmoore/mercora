@@ -29,6 +29,11 @@ quarantined as `needs_review` and is never sent automatically again. Resend can
 safely reclaim an expired delivery because it receives the stable key. Known
 provider rejections remain retryable. Paid-order effects surface an
 indeterminate delivery as a terminal manual-review result instead of looping.
+The fulfillment status endpoint projects that state to the admin queue, which
+disables retry and resend actions. The server also rejects stale or direct
+resend requests while the latest attempt needs review, so a fresh UUID cannot
+bypass the quarantine. A later resolved-success event restores ordinary
+explicit resends; this slice does not add a reconciliation workflow.
 Run migration `0018_add_email_preferences.sql` before enabling the sender.
 
 Transactional messages are order confirmation, shipping confirmation, refund

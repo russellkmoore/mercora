@@ -112,7 +112,32 @@ describe("GET /api/admin/orders/[id]/shipping-email", () => {
     expect(await response.json()).toEqual({
       status: {
         hasSuccessfulSend: true,
-        latestAttempt: { type: "shipping_email_failed", error: "provider timeout" },
+        latestAttempt: {
+          type: "shipping_email_failed",
+          error: "provider timeout",
+          needsReview: false,
+        },
+      },
+    });
+  });
+
+  it("projects an unresolved accepted-state for the queue UI", async () => {
+    mocks.latestOrderEvent
+      .mockResolvedValueOnce(sentEvent())
+      .mockResolvedValueOnce({
+        id: "failure-review",
+        event_type: "shipping_email_failed",
+        details: { error: "Accepted-state unknown", needsReview: true },
+      });
+
+    const response = await GET(statusRequest(), context);
+    expect(await response.json()).toMatchObject({
+      status: {
+        hasSuccessfulSend: true,
+        latestAttempt: {
+          type: "shipping_email_failed",
+          needsReview: true,
+        },
       },
     });
   });
@@ -150,11 +175,16 @@ describe("POST /api/admin/orders/[id]/shipping-email", () => {
     expect(mocks.getOrderById).not.toHaveBeenCalled();
   });
 
-  it("uses one bounded successful-event lookup and the stable key for retry", async () => {
+  it("uses bounded success and latest-attempt lookups and the stable key for retry", async () => {
     const response = await POST(request("retry"), context);
     expect(response.status).toBe(200);
     expect(mocks.latestOrderEvent).toHaveBeenCalledWith("ORD-1", [
       "shipping_email_sent",
+      "shipping_email_resent",
+    ]);
+    expect(mocks.latestOrderEvent).toHaveBeenCalledWith("ORD-1", [
+      "shipping_email_sent",
+      "shipping_email_failed",
       "shipping_email_resent",
     ]);
     expect(mocks.sendShippingConfirmationEmail).toHaveBeenCalledWith(
@@ -173,12 +203,16 @@ describe("POST /api/admin/orders/[id]/shipping-email", () => {
   });
 
   it("rejects retry after success and resend before success", async () => {
-    mocks.latestOrderEvent.mockResolvedValueOnce(sentEvent());
+    mocks.latestOrderEvent
+      .mockResolvedValueOnce(sentEvent())
+      .mockResolvedValueOnce(sentEvent());
     const retry = await POST(request("retry"), context);
     expect(retry.status).toBe(409);
     expect(await retry.json()).toMatchObject({ code: "wrong_mode" });
 
-    mocks.latestOrderEvent.mockResolvedValueOnce(null);
+    mocks.latestOrderEvent
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
     const resend = await POST(request("resend"), context);
     expect(resend.status).toBe(409);
     expect(await resend.json()).toMatchObject({ code: "wrong_mode" });
@@ -249,6 +283,64 @@ describe("POST /api/admin/orders/[id]/shipping-email", () => {
       { type: "admin", id: "admin-1" },
       expect.objectContaining({ needsReview: true }),
     );
+  });
+
+  it("blocks a second resend after a successful send has an ambiguous resend", async () => {
+    const uuid = vi.spyOn(crypto, "randomUUID");
+    const events: Array<ReturnType<typeof sentEvent>> = [sentEvent()];
+    mocks.latestOrderEvent.mockImplementation(async (_orderId, types: string[]) =>
+      [...events].reverse().find((event) => types.includes(event.event_type)) ?? null,
+    );
+    mocks.recordEmailEvent.mockImplementation(async (_orderId, type, _actor, details) => {
+      events.push({ id: `event-${events.length}`, event_type: type, details });
+      return `event-${events.length}`;
+    });
+    mocks.sendShippingConfirmationEmail.mockResolvedValueOnce({
+      success: false,
+      needsReview: true,
+      error: "Accepted-state unknown",
+      errorCode: "E_DELIVERY_INDETERMINATE",
+    });
+
+    const ambiguous = await POST(request("resend"), context);
+    expect(ambiguous.status).toBe(200);
+    expect(await ambiguous.json()).toMatchObject({ email: { needsReview: true } });
+    const firstKey = mocks.sendShippingConfirmationEmail.mock.calls[0][1];
+    expect(firstKey).toMatch(/^shipping-confirmation\/ORD-1\/resend\/v1\//);
+
+    const blocked = await POST(request("resend"), context);
+    expect(blocked.status).toBe(409);
+    expect(await blocked.json()).toMatchObject({ code: "shipping_email_needs_review" });
+    expect(mocks.sendShippingConfirmationEmail).toHaveBeenCalledTimes(1);
+    expect(mocks.sendShippingConfirmationEmail.mock.calls.map((call) => call[1]))
+      .toEqual([firstKey]);
+    expect(uuid).toHaveBeenCalledTimes(1);
+    uuid.mockRestore();
+  });
+
+  it("blocks a second initial attempt after its accepted-state becomes ambiguous", async () => {
+    const events: Array<ReturnType<typeof sentEvent>> = [];
+    mocks.latestOrderEvent.mockImplementation(async (_orderId, types: string[]) =>
+      [...events].reverse().find((event) => types.includes(event.event_type)) ?? null,
+    );
+    mocks.recordEmailEvent.mockImplementation(async (_orderId, type, _actor, details) => {
+      events.push({ id: `event-${events.length}`, event_type: type, details });
+      return `event-${events.length}`;
+    });
+    mocks.sendShippingConfirmationEmail.mockResolvedValueOnce({
+      success: false,
+      needsReview: true,
+      error: "Accepted-state unknown",
+      errorCode: "E_DELIVERY_INDETERMINATE",
+    });
+
+    await POST(request("retry"), context);
+    const blocked = await POST(request("retry"), context);
+
+    expect(blocked.status).toBe(409);
+    expect(await blocked.json()).toMatchObject({ code: "shipping_email_needs_review" });
+    expect(mocks.initialShippingEmailKey).toHaveBeenCalledTimes(1);
+    expect(mocks.sendShippingConfirmationEmail).toHaveBeenCalledTimes(1);
   });
 
   it("reports provider success even if the post-send audit write fails", async () => {

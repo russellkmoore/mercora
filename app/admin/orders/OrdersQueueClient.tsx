@@ -419,7 +419,7 @@ export default function OrdersQueueClient() {
                       {email ? (
                         <>
                           <span className={email.tone === "error" ? "text-state-error" : email.tone === "success" ? "text-state-success" : ""}>{email.message}</span>
-                          {order.status === "shipped" && <Button size="sm" variant="outline" disabled={emailBusy.has(order.id)} onClick={() => void sendEmail(order, email)}><Mail className="mr-2 h-4 w-4" />{email.label}</Button>}
+                          {order.status === "shipped" && <Button size="sm" variant="outline" disabled={email.disabled || emailBusy.has(order.id)} onClick={() => void sendEmail(order, email)}><Mail className="mr-2 h-4 w-4" />{email.label}</Button>}
                         </>
                       ) : (
                         <Button size="sm" variant="ghost" disabled={emailBusy.has(order.id)} onClick={() => void loadEmailState(order.id)}>
