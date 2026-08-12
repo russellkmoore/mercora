@@ -96,11 +96,13 @@ describe('knowledge vectorization auth transport', () => {
     ];
     const signedGuestLinkFile = join(process.cwd(), 'lib', 'fulfillment', 'shipping-email.ts');
     const signedUnsubscribeRoute = join(process.cwd(), 'app', 'api', 'email', 'unsubscribe', 'route.ts');
+    const signedUnsubscribeEmail = join(process.cwd(), 'lib', 'utils', 'review-notifications.ts');
     const offenders = files.filter((file) => {
       const source = readFileSync(file, 'utf8');
       return (
         file !== signedGuestLinkFile &&
         file !== signedUnsubscribeRoute &&
+        file !== signedUnsubscribeEmail &&
         /[?&]token=|searchParams\.set\(\s*['"]token['"]/.test(source)
       );
     });
@@ -118,6 +120,9 @@ describe('knowledge vectorization auth transport', () => {
     // credential scoped only to a non-transactional preference mutation.
     const unsubscribeSource = readFileSync(signedUnsubscribeRoute, 'utf8');
     expect(unsubscribeSource).toContain('verifyUnsubscribeToken(token)');
+    const unsubscribeEmailSource = readFileSync(signedUnsubscribeEmail, 'utf8');
+    expect(unsubscribeEmailSource).toContain("createUnsubscribeToken(input.email, 'review_reminders')");
+    expect(unsubscribeEmailSource).toContain("unsubscribeUrl.searchParams.set('token', token)");
     expect(unsubscribeSource).toContain('suppressEmail(payload.email, payload.category)');
     expect(unsubscribeSource).toContain('"cache-control": "no-store"');
   });

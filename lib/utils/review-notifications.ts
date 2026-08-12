@@ -1,5 +1,13 @@
 import type { ReviewStatus } from '@/lib/types';
-import { getResendClient } from '@/lib/utils/email';
+import { sendEmail } from '@/lib/email/sender';
+import { getStoreConfig } from '@/lib/store-config';
+import { escapeHtmlText } from '@/lib/utils/maintenance-html';
+import {
+  postalFooterHtml,
+  postalFooterText,
+  unsubscribeFooterHtml,
+} from '@/lib/email/footer';
+import { createUnsubscribeToken } from '@/lib/email/unsubscribe-token';
 
 interface ReviewStatusNotificationInput {
   email: string;
@@ -10,6 +18,7 @@ interface ReviewStatusNotificationInput {
   reviewBody?: string;
   rating?: number;
   event?: 'status_change' | 'response';
+  idempotencyKey?: string;
 }
 
 interface ReviewReminderEmailInput {
@@ -17,109 +26,97 @@ interface ReviewReminderEmailInput {
   name?: string;
   productName: string;
   orderId: string;
+  productId: string;
 }
 
 function formatStatus(status: ReviewStatus) {
   switch (status) {
-    case 'published':
-      return 'approved';
-    case 'needs_review':
-      return 'awaiting moderation';
-    case 'suppressed':
-      return 'held back';
-    case 'auto_rejected':
-      return 'rejected';
+    case 'published': return 'approved';
+    case 'needs_review': return 'awaiting moderation';
+    case 'suppressed': return 'held back';
+    case 'auto_rejected': return 'rejected';
     case 'pending':
-    default:
-      return 'pending review';
+    default: return 'pending review';
   }
 }
 
+function firstName(name?: string): string {
+  return name?.trim().split(/\s+/)[0] || 'there';
+}
+
+function plain(value: string): string {
+  return value.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function throwOnFailure(result: Awaited<ReturnType<typeof sendEmail>>): void {
+  if (!result.success) throw new Error(result.error || 'Email delivery failed');
+}
+
 export async function sendReviewStatusNotification(input: ReviewStatusNotificationInput): Promise<void> {
-  const resend = getResendClient();
-  const greeting = input.name ? `Hi ${input.name.split(' ')[0]},` : 'Hi there,';
+  const store = getStoreConfig();
   const statusLabel = formatStatus(input.status);
-  const subjectPrefix = input.event === 'response' ? 'We replied to your review' : `Your review was ${statusLabel}`;
-  const subject = `${subjectPrefix} · ${input.productName}`;
-
+  const subjectPrefix = input.event === 'response'
+    ? 'We replied to your review'
+    : `Your review was ${statusLabel}`;
+  const subject = `${subjectPrefix} - ${plain(input.productName)}`;
   const responseSection = input.adminResponse
-    ? `
-        <div style="margin-top: 16px; padding: 16px; background-color: #111827; border-radius: 8px;">
-          <h3 style="margin: 0 0 8px; color: #f97316; font-size: 16px; font-weight: 600;">Store response</h3>
-          <p style="margin: 0; color: #e5e7eb; line-height: 22px;">${input.adminResponse.replace(/\n/g, '<br />')}</p>
-        </div>
-      `
+    ? `<div style="margin-top:16px;padding:16px;background:#f8fafc;border-radius:8px"><h3>Store response</h3><p style="white-space:pre-line">${escapeHtmlText(input.adminResponse)}</p></div>`
     : '';
-
   const reviewDetails = input.reviewBody
-    ? `
-        <div style="margin-top: 16px; padding: 16px; background-color: #1f2937; border-radius: 8px;">
-          <h3 style="margin: 0 0 8px; color: #f9fafb; font-size: 16px; font-weight: 600;">Your review</h3>
-          ${typeof input.rating === 'number'
-            ? `<p style="margin: 0 0 12px; color: #fbbf24; font-weight: 600;">${'★'.repeat(Math.round(input.rating))}${'☆'.repeat(5 - Math.round(input.rating))}</p>`
-            : ''}
-          <p style="margin: 0; color: #d1d5db; line-height: 22px;">${input.reviewBody.replace(/\n/g, '<br />')}</p>
-        </div>
-      `
+    ? `<div style="margin-top:16px;padding:16px;background:#f8fafc;border-radius:8px"><h3>Your review</h3>${typeof input.rating === 'number' ? `<p>${'★'.repeat(Math.round(input.rating))}${'☆'.repeat(5 - Math.round(input.rating))}</p>` : ''}<p style="white-space:pre-line">${escapeHtmlText(input.reviewBody)}</p></div>`
     : '';
+  const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto"><h2>${escapeHtmlText(store.identity.name)} Reviews</h2><p>Hi ${escapeHtmlText(firstName(input.name))},</p><p>${input.event === 'response' ? 'Our team replied to your feedback.' : `The status of your review for <strong>${escapeHtmlText(input.productName)}</strong> has changed.`}</p><p><strong>Current status:</strong> ${escapeHtmlText(statusLabel)}</p>${reviewDetails}${responseSection}<p>Thank you for sharing your experience.</p>${postalFooterHtml()}</div>`;
+  const text = [
+    `${store.identity.name} Reviews`,
+    `Hi ${firstName(input.name)},`,
+    input.event === 'response'
+      ? `Our team replied to your review of ${input.productName}.`
+      : `Your review of ${input.productName} is ${statusLabel}.`,
+    input.reviewBody ? `Your review: ${input.reviewBody}` : null,
+    input.adminResponse ? `Store response: ${input.adminResponse}` : null,
+    postalFooterText(),
+  ].filter((line): line is string => line !== null).join('\n\n');
 
-  const html = `
-    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #0f172a; padding: 32px; color: #f9fafb;">
-      <div style="max-width: 520px; margin: 0 auto; background-color: #111827; border-radius: 16px; padding: 32px; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.4);">
-        <h2 style="margin: 0; font-size: 22px; font-weight: 700; color: #f97316;">Voltique Reviews</h2>
-        <p style="margin: 16px 0 0; color: #e5e7eb; line-height: 24px;">${greeting}</p>
-        <p style="margin: 12px 0 0; color: #d1d5db; line-height: 24px;">
-          ${input.event === 'response'
-            ? 'Our merchandising team just replied to your feedback.'
-            : `We wanted to let you know the status of your review for <strong>${input.productName}</strong>.`}
-        </p>
-        <div style="margin-top: 16px; padding: 16px; border-radius: 12px; background: linear-gradient(135deg, #f97316, #ea580c); color: #fff;">
-          <p style="margin: 0; font-size: 18px; font-weight: 700;">${input.productName}</p>
-          <p style="margin: 4px 0 0; font-size: 14px; opacity: 0.9;">Current status: ${statusLabel}</p>
-        </div>
-        ${reviewDetails}
-        ${responseSection}
-        <p style="margin: 24px 0 0; color: #9ca3af; font-size: 14px; line-height: 22px;">
-          Thanks again for taking the time to share your experience. Your feedback helps fellow adventurers choose the right gear.
-        </p>
-        <p style="margin: 16px 0 0; color: #6b7280; font-size: 12px;">— Voltique Merchandising Team</p>
-      </div>
-    </div>
-  `;
-
-  await resend.emails.send({
-    from: 'Voltique Reviews <volt@russellkmoore.me>',
+  const result = await sendEmail({
+    from: store.contact.senderEmail,
     to: [input.email],
+    ...(store.contact.replyToEmail ? { replyTo: store.contact.replyToEmail } : {}),
     subject,
     html,
-  });
+    text,
+  }, { idempotencyKey: input.idempotencyKey });
+  throwOnFailure(result);
 }
 
 export async function sendReviewReminderEmail(input: ReviewReminderEmailInput): Promise<void> {
-  const resend = getResendClient();
-  const greeting = input.name ? `Hi ${input.name.split(' ')[0]},` : 'Hi there,';
-
-  const html = `
-    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #0f172a; padding: 32px; color: #f9fafb;">
-      <div style="max-width: 520px; margin: 0 auto; background-color: #111827; border-radius: 16px; padding: 32px; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.4);">
-        <h2 style="margin: 0; font-size: 22px; font-weight: 700; color: #f97316;">How's your new gear?</h2>
-        <p style="margin: 16px 0 0; color: #e5e7eb; line-height: 24px;">${greeting}</p>
-        <p style="margin: 12px 0 0; color: #d1d5db; line-height: 24px;">
-          We hope you're putting <strong>${input.productName}</strong> to good use. When you have a moment, we'd love to hear how it's working out. You'll find the prompt alongside order <strong>${input.orderId}</strong> in your history.
-        </p>
-        <a href="https://voltique.russellkmoore.me/orders" style="display: inline-block; margin-top: 20px; padding: 12px 20px; background: linear-gradient(135deg, #f97316, #ea580c); color: #fff; border-radius: 9999px; text-decoration: none; font-weight: 600;">Share your review</a>
-        <p style="margin: 24px 0 0; color: #9ca3af; font-size: 14px; line-height: 22px;">
-          Reviews help other shoppers make confident choices and give our team insight into what to improve next.
-        </p>
-        <p style="margin: 16px 0 0; color: #6b7280; font-size: 12px;">If you've already shared your thoughts, thank you! You can ignore this reminder.</p>
-      </div>
-    </div>
-  `;
-
-  await resend.emails.send({
-    from: 'Voltique Reviews <volt@russellkmoore.me>',
+  const store = getStoreConfig();
+  const token = await createUnsubscribeToken(input.email, 'review_reminders');
+  if (!token) throw new Error('Review reminders require unsubscribe-token configuration');
+  const reviewUrl = new URL('/account/orders', store.urls.site).href;
+  const unsubscribeUrl = new URL('/api/email/unsubscribe', store.urls.site);
+  unsubscribeUrl.searchParams.set('token', token);
+  const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto"><h2>How is your purchase working out?</h2><p>Hi ${escapeHtmlText(firstName(input.name))},</p><p>We would appreciate your review of <strong>${escapeHtmlText(input.productName)}</strong> from order <strong>${escapeHtmlText(input.orderId)}</strong>.</p><p><a href="${escapeHtmlText(reviewUrl)}">Share your review</a></p><p>If you have already shared your thoughts, thank you. You can ignore this reminder.</p>${unsubscribeFooterHtml(unsubscribeUrl.href)}${postalFooterHtml()}</div>`;
+  const text = [
+    `${store.identity.name}: Review your purchase`,
+    `Hi ${firstName(input.name)},`,
+    `We would appreciate your review of ${input.productName} from order ${input.orderId}.`,
+    `Share your review: ${reviewUrl}`,
+    `Unsubscribe from review reminders: ${unsubscribeUrl.href}`,
+    postalFooterText(),
+  ].join('\n\n');
+  const result = await sendEmail({
+    from: store.contact.senderEmail,
     to: [input.email],
-    subject: `How's your ${input.productName}?`,
+    ...(store.contact.replyToEmail ? { replyTo: store.contact.replyToEmail } : {}),
+    subject: `How is your ${plain(input.productName)}?`,
     html,
+    text,
+    headers: {
+      'List-Unsubscribe': `<${unsubscribeUrl.href}>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    },
+  }, {
+    idempotencyKey: `review-reminder/${input.orderId}/${input.productId}/v1`,
   });
+  throwOnFailure(result);
 }
