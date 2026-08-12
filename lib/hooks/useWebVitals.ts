@@ -86,6 +86,11 @@ export function useWebVitals() {
                 : "good",
           entries: [],
           navigationType: "navigate",
+          // web-vitals 6 requires a navigationId so a metric can be attributed
+          // to a soft navigation. This metric is synthesized from a touch
+          // rather than reported by the library, so it belongs to the initial
+          // navigation.
+          navigationId: 1,
           userAgent: navigator.userAgent,
           isMobile: true,
         };

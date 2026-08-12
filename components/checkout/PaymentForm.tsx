@@ -70,7 +70,8 @@ export default function PaymentForm({
     layout: {
       type: 'tabs',
       defaultCollapsed: false,
-      radios: false,
+      // stripe-js 9 replaced the boolean with an enum; false became 'never'.
+      radios: 'never',
       spacedAccordionItems: isMobileSafari // More spacing on mobile Safari
     },
     paymentMethodOrder: ['card', 'apple_pay', 'google_pay'],
