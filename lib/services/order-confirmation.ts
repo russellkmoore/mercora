@@ -10,6 +10,7 @@ import {
 import { getDbAsync } from '@/lib/db';
 import { products } from '@/lib/db/schema/products';
 import { inArray } from 'drizzle-orm';
+import { getStoreConfig } from '@/lib/store-config';
 
 const MAX_IMAGE_PRODUCT_IDS = 100;
 
@@ -115,12 +116,13 @@ export async function buildOrderEmailData(order: Order): Promise<OrderData | nul
 export async function buildMerchantOrderEmailData(order: Order): Promise<MerchantOrderData | null> {
   const data = await buildFulfillmentOrderData(order);
   if (!data) return null;
-  const rawEmail = typeof order.extensions?.email === 'string'
-    ? order.extensions.email.trim().toLowerCase()
-    : typeof order.shipping_address?.email === 'string'
-      ? order.shipping_address.email.trim().toLowerCase()
-      : null;
-  const customerEmail = validReplyTo(rawEmail);
+  const extensionEmail = typeof order.extensions?.email === 'string'
+    ? validReplyTo(order.extensions.email.trim().toLowerCase())
+    : undefined;
+  const addressEmail = typeof order.shipping_address?.email === 'string'
+    ? validReplyTo(order.shipping_address.email.trim().toLowerCase())
+    : undefined;
+  const customerEmail = extensionEmail ?? addressEmail;
   return { ...data, ...(customerEmail ? { customerEmail } : {}) };
 }
 
@@ -136,6 +138,9 @@ export async function sendMerchantOrderNotification(
   order: Order,
   idempotencyKey: string,
 ): Promise<EmailResult> {
+  if (!getStoreConfig().contact.merchantNotificationEmail) {
+    return { success: true, skipped: true };
+  }
   const data = await buildMerchantOrderEmailData(order);
   return data
     ? sendNewOrderMerchantNotification(data, { idempotencyKey })

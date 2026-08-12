@@ -5,12 +5,14 @@ import type { Order } from '@/lib/types/order';
 const mocks = vi.hoisted(() => ({
   sendConfirmation: vi.fn(),
   sendMerchant: vi.fn(),
+  getStoreConfig: vi.fn(),
 }));
 
 vi.mock('@/lib/utils/email', () => ({
   sendOrderConfirmationEmail: mocks.sendConfirmation,
   sendNewOrderMerchantNotification: mocks.sendMerchant,
 }));
+vi.mock('@/lib/store-config', () => ({ getStoreConfig: mocks.getStoreConfig }));
 
 import { sendMerchantOrderNotification } from '@/lib/services/order-confirmation';
 
@@ -45,6 +47,9 @@ function emailLessOrder(): Order {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.getStoreConfig.mockReturnValue({
+    contact: { merchantNotificationEmail: 'fulfillment@example.test' },
+  });
   mocks.sendMerchant.mockResolvedValue({ success: true, id: 'merchant-1' });
 });
 
@@ -69,6 +74,16 @@ describe('merchant order effect payload', () => {
     order.shipping_address = undefined;
     await expect(sendMerchantOrderNotification(order, 'merchant/MCP-EMAILLESS-1/v1'))
       .resolves.toMatchObject({ success: false, errorCode: 'E_MERCHANT_PAYLOAD' });
+    expect(mocks.sendMerchant).not.toHaveBeenCalled();
+  });
+
+  it('reports a skip only when the merchant recipient is absent', async () => {
+    mocks.getStoreConfig.mockReturnValue({ contact: {} });
+    const invalid = emailLessOrder();
+    invalid.shipping_address = undefined;
+
+    await expect(sendMerchantOrderNotification(invalid, 'merchant/MCP-EMAILLESS-1/v1'))
+      .resolves.toEqual({ success: true, skipped: true });
     expect(mocks.sendMerchant).not.toHaveBeenCalled();
   });
 });
