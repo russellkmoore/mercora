@@ -13,17 +13,6 @@ export interface OutboundEmail {
   headers?: Record<string, string>;
 }
 
-interface CloudflareEmailAddress {
-  name: string;
-  email: string;
-}
-
-interface CloudflareEmailBinding {
-  send(message: Omit<OutboundEmail, "from"> & {
-    from: string | CloudflareEmailAddress;
-  }): Promise<{ messageId: string }>;
-}
-
 export interface EmailResult {
   success: boolean;
   id?: string;
@@ -45,16 +34,21 @@ interface ResendLike {
 export interface EmailSendOptions {
   idempotencyKey?: string;
   provider?: EmailProvider;
-  cloudflareBinding?: CloudflareEmailBinding;
+  cloudflareBinding?: SendEmail;
   resendClient?: ResendLike;
   database?: D1Database;
-  env?: Record<string, unknown>;
+  env?: {
+    EMAIL?: CloudflareEnv["EMAIL"];
+    DB?: CloudflareEnv["DB"];
+    EMAIL_PROVIDER?: string;
+    RESEND_API_KEY?: string;
+  };
   now?: Date;
 }
 
 interface Runtime {
   provider: EmailProvider;
-  cloudflare?: CloudflareEmailBinding;
+  cloudflare?: SendEmail;
   resend?: ResendLike;
   database?: D1Database;
 }
@@ -70,15 +64,16 @@ async function resolveRuntime(options: EmailSendOptions): Promise<Runtime> {
   let workerEnv = options.env ?? {};
   if (!options.env) {
     try {
-      workerEnv = (await getCloudflareContext({ async: true })).env as unknown as Record<string, unknown>;
+      const env = (await getCloudflareContext({ async: true })).env;
+      workerEnv = { EMAIL: env.EMAIL, DB: env.DB };
     } catch {
       workerEnv = {};
     }
   }
-  const cloudflare = options.cloudflareBinding ?? workerEnv.EMAIL as CloudflareEmailBinding | undefined;
-  const database = options.database ?? workerEnv.DB as D1Database | undefined;
+  const cloudflare = options.cloudflareBinding ?? workerEnv.EMAIL;
+  const database = options.database ?? workerEnv.DB;
   const resendKey = stringValue(workerEnv.RESEND_API_KEY) ?? stringValue(process.env.RESEND_API_KEY);
-  const resend = options.resendClient ?? (resendKey ? new Resend(resendKey) as unknown as ResendLike : undefined);
+  const resend = options.resendClient ?? (resendKey ? new Resend(resendKey) : undefined);
   const configured = options.provider ?? stringValue(workerEnv.EMAIL_PROVIDER) ?? stringValue(process.env.EMAIL_PROVIDER);
   if (configured && configured !== "cloudflare" && configured !== "resend") {
     throw new Error("EMAIL_PROVIDER must be 'cloudflare' or 'resend'");
@@ -101,7 +96,7 @@ async function resolveRuntime(options: EmailSendOptions): Promise<Runtime> {
   return { provider: available[0], cloudflare, resend, database };
 }
 
-function parseSender(value: string): string | CloudflareEmailAddress {
+function parseSender(value: string): string | EmailAddress {
   const named = value.match(/^([^<>]{1,100})\s*<([^<>]+)>$/);
   return named ? { name: named[1].trim(), email: named[2].trim() } : value;
 }

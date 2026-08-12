@@ -23,6 +23,12 @@ during durable retries.
 
 Stable delivery keys are recorded in D1 for provider-neutral retry protection.
 Cloudflare sends with a stable key therefore require both `EMAIL` and `DB`.
+Because the native Cloudflare binding has no caller-supplied provider
+idempotency key, an expired claim whose acceptance could not be recorded is
+quarantined as `needs_review` and is never sent automatically again. Resend can
+safely reclaim an expired delivery because it receives the stable key. Known
+provider rejections remain retryable. Paid-order effects surface an
+indeterminate delivery as a terminal manual-review result instead of looping.
 Run migration `0018_add_email_preferences.sql` before enabling the sender.
 
 Transactional messages are order confirmation, shipping confirmation, refund
@@ -41,8 +47,15 @@ rate-limited `POST` records the preference idempotently. Responses are
 The merchant notification is its own paid-order effect, independent of the
 customer confirmation. Without `STORE_MERCHANT_NOTIFICATION_EMAIL` it completes
 as a successful no-op. When configured, it includes fulfillment details and a
-deep link to the specific admin order; its failure cannot displace the customer
-confirmation and is retried independently by the durable effect runner.
+deep link to the specific admin order even when a web or MCP order has no
+customer email. A validated customer email is used only as an optional
+`Reply-To`. Invalid fulfillment data fails visibly; only an absent merchant
+recipient is skipped. Its failure cannot displace the customer confirmation and
+is retried independently by the durable effect runner.
+
+Wrangler owns the committed `CloudflareEnv` and runtime declarations. Run
+`npm run cf-typegen` after changing bindings and `npm run cf-typecheck` to verify
+the generated file is current; CI runs the latter on every change.
 
 ## Deferred privacy operations
 

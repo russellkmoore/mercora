@@ -29,7 +29,8 @@
     "db:migrate:apply:preview": "node scripts/d1-migrate.mjs --target preview --apply --confirm-preview",
     "db:migrate:status:production": "node scripts/d1-migrate.mjs --target production",
     "db:migrate:apply:production": "node scripts/d1-migrate.mjs --target production --apply --confirm-production",
-    "cf-typegen": "wrangler types --env-interface CloudflareEnv ./cloudflare-env.d.ts",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv --strict-vars false ./cloudflare-env.d.ts",
+    "cf-typecheck": "wrangler types --env-interface CloudflareEnv --strict-vars false ./cloudflare-env.d.ts --check",
     "token:generate": "tsx scripts/manage-tokens.ts generate",
     "token:list": "tsx scripts/manage-tokens.ts list",
     "token:revoke": "tsx scripts/manage-tokens.ts revoke"
