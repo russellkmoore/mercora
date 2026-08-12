@@ -33,6 +33,10 @@ export interface OrderData {
   estimatedDelivery?: string;
 }
 
+export type MerchantOrderData = Omit<OrderData, 'customerEmail'> & {
+  customerEmail?: string;
+};
+
 export interface OrderStatusUpdateData {
   orderNumber: string;
   customerName: string;
@@ -473,7 +477,7 @@ export async function sendOrderStatusUpdateEmail(
 
 /** Notify a configured merchant independently from the customer confirmation. */
 export async function sendNewOrderMerchantNotification(
-  orderData: OrderData,
+  orderData: MerchantOrderData,
   options: { idempotencyKey?: string } = {},
 ): Promise<EmailResult> {
   const store = getStoreConfig();
@@ -504,18 +508,18 @@ export async function sendNewOrderMerchantNotification(
     `Total: ${Money.fromStored(orderData.total).format()}`,
     'Ship to',
     address,
-    `Customer email: ${orderData.customerEmail}`,
+    orderData.customerEmail ? `Customer email: ${orderData.customerEmail}` : null,
     `Manage this order: ${adminUrl}`,
-  ].join('\n\n');
+  ].filter((line): line is string => line !== null).join('\n\n');
   const rows = orderData.items.map((item) =>
     `<tr><td style="padding:6px 0;border-bottom:1px solid #e2e8f0"><strong>${escapeHtmlText(String(item.quantity))} &times;</strong> ${escapeHtmlText(item.name)}</td><td style="padding:6px 0;border-bottom:1px solid #e2e8f0;text-align:right">${escapeHtmlText(Money.fromStored(item.price).times(item.quantity).format())}</td></tr>`
   ).join('');
-  const html = `<div style="font-family:Arial,sans-serif;max-width:600px"><h2>New order ${escapeHtmlText(orderData.orderNumber)}</h2><p>${escapeHtmlText(Money.fromStored(orderData.total).format())} · ${escapeHtmlText(orderData.customerEmail)}</p><h3>Items to ship</h3><table style="border-collapse:collapse;width:100%">${rows}</table><h3>Ship to</h3><p style="white-space:pre-line">${escapeHtmlText(address)}</p><p><a href="${escapeHtmlText(adminUrl)}">Manage this order</a></p>${postalFooterHtml()}</div>`;
+  const html = `<div style="font-family:Arial,sans-serif;max-width:600px"><h2>New order ${escapeHtmlText(orderData.orderNumber)}</h2><p>${escapeHtmlText(Money.fromStored(orderData.total).format())}${orderData.customerEmail ? ` · ${escapeHtmlText(orderData.customerEmail)}` : ''}</p><h3>Items to ship</h3><table style="border-collapse:collapse;width:100%">${rows}</table><h3>Ship to</h3><p style="white-space:pre-line">${escapeHtmlText(address)}</p><p><a href="${escapeHtmlText(adminUrl)}">Manage this order</a></p>${postalFooterHtml()}</div>`;
 
   return sendEmail({
     from: store.contact.senderEmail,
     to: [recipient],
-    replyTo: orderData.customerEmail,
+    ...(orderData.customerEmail ? { replyTo: orderData.customerEmail } : {}),
     subject: `New order ${orderData.orderNumber} - ${Money.fromStored(orderData.total).format()}`,
     html,
     text,
