@@ -14,7 +14,10 @@ export const TELEMETRY_EVENTS = {
   'payment.order_persist_failed': { severity: 'critical', sampleRate: 1 },
   'order.payment_verification_rejected': { severity: 'warning', sampleRate: 0.1 },
   'order.finalization_failed': { severity: 'critical', sampleRate: 1 },
+  'order.query_failed': { severity: 'error', sampleRate: 0.25 },
+  'order.metadata_update_failed': { severity: 'error', sampleRate: 0.25 },
   'paid_effect.staging_failed': { severity: 'critical', sampleRate: 1 },
+  'paid_effect.drain_failed': { severity: 'critical', sampleRate: 1 },
   'paid_effect.first_attempt_failed': { severity: 'error', sampleRate: 0.25 },
   'paid_effect.repeated_failure': { severity: 'critical', sampleRate: 1 },
   'inventory.adjustment_first_attempt_failed': { severity: 'error', sampleRate: 0.25 },
@@ -31,12 +34,14 @@ export const TELEMETRY_EVENTS = {
   'refund.provider_inconsistent': { severity: 'critical', sampleRate: 1 },
   'refund.settlement_failed': { severity: 'critical', sampleRate: 1 },
   'fulfillment.transition_failed': { severity: 'critical', sampleRate: 1 },
+  'fulfillment.query_failed': { severity: 'error', sampleRate: 0.25 },
   'email.delivery_failed': { severity: 'error', sampleRate: 0.25 },
   'email.audit_write_failed': { severity: 'error', sampleRate: 0.25 },
   'recommendation.rebuild_failed': { severity: 'critical', sampleRate: 1 },
   'recommendation.no_rows_written': { severity: 'warning', sampleRate: 0.25 },
   'recommendation.stale_rows': { severity: 'warning', sampleRate: 0.25 },
   'cron.recovery_failed': { severity: 'critical', sampleRate: 1 },
+  'cron.analytics_failed': { severity: 'critical', sampleRate: 1 },
 } as const;
 
 export type TelemetryEvent = keyof typeof TELEMETRY_EVENTS;

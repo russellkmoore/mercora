@@ -5,6 +5,7 @@ import { getDbAsync } from "@/lib/db";
 import { adminUsers } from "@/lib/db/schema/admin_users";
 import { listRecentOrderEvents } from "@/lib/fulfillment/service";
 import { getOrderById } from "@/lib/models/mach/orders";
+import { recordTelemetry } from "@/lib/observability/telemetry";
 
 const DEFAULT_EVENT_LIMIT = 100;
 const MAX_EVENT_LIMIT = 500;
@@ -92,7 +93,10 @@ export async function GET(
       meta: { limit },
     });
   } catch (error) {
-    console.error("GET /api/admin/orders/[id]/events failed", error);
+    recordTelemetry("fulfillment.query_failed", {
+      operation: "process", outcome: "failed", provider: "d1", retryable: true,
+      path: "/api/admin/orders/:id/events", trigger: "request",
+    }, error);
     return NextResponse.json(
       { code: "events_read_failed", error: "Failed to load order events" },
       { status: 500 },

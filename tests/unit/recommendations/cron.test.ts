@@ -40,6 +40,7 @@ describe("runRecommendationCron", () => {
   });
 
   it("emits structured warnings for empty and stale rebuilds", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     await runRecommendationCron(
@@ -47,9 +48,14 @@ describe("runRecommendationCron", () => {
       vi.fn().mockResolvedValue({ ...summary, rowsWritten: 0, staleRowCount: 2 }),
     );
     expect(JSON.parse(String(warn.mock.calls[0][0]))).toMatchObject({
-      event: "recommendations.rebuild",
-      outcome: "no_rows_written",
-      staleRowCount: 2,
+      marker: "commerce.telemetry.v1",
+      event: "recommendation.no_rows_written",
+      severity: "warning",
+      fields: {
+        operation: "rebuild",
+        count: 2,
+        trigger: "scheduled",
+      },
     });
   });
 

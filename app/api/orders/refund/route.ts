@@ -17,6 +17,7 @@ import {
   computeRefundedTotal,
   type RefundRecord,
 } from '@/lib/utils/refund-validation';
+import { recordTelemetry } from '@/lib/observability/telemetry';
 
 interface RefundRequest {
   orderId: string;
@@ -114,7 +115,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON request body' }, { status: 400 });
   }
   const input = parseRequest(body);
-  if (!input) return NextResponse.json({ error: 'Invalid refund request' }, { status: 400 });
+  if (!input) {
+    recordTelemetry('refund.request_rejected', {
+      operation: 'validate', outcome: 'rejected', http_status: 400,
+      path: '/api/orders/refund', trigger: 'request',
+    });
+    return NextResponse.json({ error: 'Invalid refund request' }, { status: 400 });
+  }
 
   const db = await getDbAsync();
   const actor = typeof authResult.tokenInfo?.tokenName === 'string'
@@ -311,7 +318,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     // A transport error is ambiguous: Stripe may have accepted the request.
     // Keep the exact reservation pending so a retry reuses the same provider key.
-    console.error(`[refund] Stripe call is unresolved for order ${input.orderId}:`, error);
+    recordTelemetry('refund.provider_unresolved', {
+      operation: 'process', outcome: 'unresolved', provider: 'stripe',
+      retryable: true, path: '/api/orders/refund', trigger: 'request',
+    }, error);
     return NextResponse.json(
       { error: 'Refund status is unresolved; retry this same request' },
       { status: 503, headers: { 'Retry-After': '5' } }
@@ -330,14 +340,9 @@ export async function POST(request: NextRequest) {
   if (!providerResultIsConsistent) {
     // Keep the reservation pending: an inconsistent response must be reconciled,
     // never released or settled against the wrong order or amount.
-    console.error('[refund] Stripe returned an inconsistent refund', {
-      orderId: input.orderId,
-      expectedPaymentIntentId: paymentIntentId,
-      expectedRefundId: reservation.stripeRefundId,
-      expectedAmount: reservation.refundAmount,
-      actualPaymentIntentId: providerPaymentIntent,
-      actualRefundId: stripeRefund.id,
-      actualAmount: stripeRefund.amount,
+    recordTelemetry('refund.provider_inconsistent', {
+      operation: 'validate', outcome: 'invalid', provider: 'stripe',
+      http_status: 502, path: '/api/orders/refund', trigger: 'request',
     });
     return NextResponse.json(
       { error: 'Payment provider returned an inconsistent refund' },
@@ -397,6 +402,10 @@ export async function POST(request: NextRequest) {
   });
   if (!settled.ok) return responseForStoreFailure(settled.reason);
   if (settlementConflict) {
+    recordTelemetry('refund.settlement_failed', {
+      operation: 'persist', outcome: 'conflict', provider: 'd1',
+      retryable: true, path: '/api/orders/refund', trigger: 'request',
+    });
     return NextResponse.json(
       { error: 'Refund was accepted but ledger reconciliation is pending' },
       { status: 503, headers: { 'Retry-After': '5' } }
@@ -405,14 +414,6 @@ export async function POST(request: NextRequest) {
   if (normalizedStatus === 'failed') {
     return NextResponse.json({ error: 'Stripe rejected the refund' }, { status: 502 });
   }
-
-  console.log('[refund] refund request reconciled', {
-    orderId: input.orderId,
-    stripeRefundId: stripeRefund.id,
-    amount: reservation.refundAmount,
-    status: normalizedStatus,
-    actor,
-  });
 
   return NextResponse.json({
     success: true,
