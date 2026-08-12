@@ -79,7 +79,7 @@ describe('privacy-safe telemetry envelope', () => {
     );
   });
 
-  it('bounds numeric cardinality, enum values, and query-free paths', () => {
+  it('bounds numeric cardinality and accepts only closed route templates', () => {
     expect(sanitizeTelemetryFields({
       attempt: 5_000,
       count: Number.MAX_SAFE_INTEGER,
@@ -92,8 +92,11 @@ describe('privacy-safe telemetry envelope', () => {
       attempt: 100,
       count: 10_000,
       duration_ms: 3_600_000,
-      path: '/safe/path',
     });
+    expect(sanitizeTelemetryFields({ path: '/api/orders/:id?private=value' }))
+      .toEqual({ path: '/api/orders/:id' });
+    expect(sanitizeTelemetryFields({ path: '/api/orders/WEB-customer-secret' }))
+      .toBeUndefined();
   });
 
   it('samples expected failures but never samples critical failures', () => {
