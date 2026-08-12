@@ -1,47 +1,18 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
+import { TELEMETRY_EVENTS } from '@/lib/observability/telemetry';
 
-const instrumentation = {
-  'app/api/payment-intent/route.ts': [
-    'payment.pricing_rejected',
-    'payment.inventory_unavailable',
-    'payment.intent_create_failed',
-    'payment.order_persist_failed',
-  ],
-  'app/api/orders/route.ts': [
-    'order.payment_verification_rejected',
-    'order.finalization_failed',
-  ],
-  'app/api/webhooks/stripe/route.ts': [
-    'webhook.signature_rejected',
-    'webhook.claim_failed',
-    'webhook.processing_failed',
-    'webhook.failure_record_failed',
-  ],
-  'app/api/orders/refund/route.ts': [
-    'refund.request_rejected',
-    'refund.provider_unresolved',
-    'refund.provider_inconsistent',
-    'refund.settlement_failed',
-  ],
-  'lib/services/order-effects.ts': [
-    'paid_effect.repeated_failure',
-    'paid_effect.first_attempt_failed',
-  ],
-  'lib/services/inventory-adjustments.ts': [
-    'inventory.adjustment_repeated_failure',
-    'inventory.adjustment_needs_review',
-  ],
-  'lib/fulfillment/shipping-email.ts': [
-    'email.delivery_failed',
-    'email.audit_write_failed',
-  ],
-  'app/api/admin/orders/[id]/events/route.ts': ['fulfillment.query_failed'],
-  'lib/recommendations/cron.ts': ['recommendation.rebuild_failed'],
-  'lib/observability/scheduled.ts': ['cron.recovery_failed', 'cron.analytics_failed'],
-} as const;
+function sourceFiles(root: string): string[] {
+  return readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(root, entry.name);
+    if (entry.isDirectory()) return sourceFiles(path);
+    return /\.(?:ts|tsx)$/.test(entry.name) && !entry.name.endsWith('.d.ts') ? [path] : [];
+  });
+}
+
+const producerSources = [...sourceFiles('app'), ...sourceFiles('lib'), 'worker.ts'];
 
 function parseSource(path: string): ts.SourceFile {
   const source = readFileSync(join(process.cwd(), path), 'utf8');
@@ -83,15 +54,29 @@ function rawExceptionConsoleCalls(source: ts.SourceFile): string[] {
 }
 
 describe('actionable failure telemetry source contract', () => {
-  it('keeps executable recordTelemetry calls wired to the closed taxonomy', () => {
-    for (const [path, events] of Object.entries(instrumentation)) {
-      const calls = telemetryCalls(parseSource(path));
-      for (const event of events) expect(calls, `${path}: ${event}`).toContain(event);
+  const callsByPath = new Map(
+    producerSources.map((path) => [path, telemetryCalls(parseSource(path))] as const),
+  );
+
+  it('wires every critical taxonomy event into executable producer code', () => {
+    const wiredEvents = new Set([...callsByPath.values()].flatMap((events) => [...events]));
+    const criticalEvents = Object.entries(TELEMETRY_EVENTS)
+      .filter(([, definition]) => definition.severity === 'critical')
+      .map(([event]) => event);
+
+    expect(criticalEvents.filter((event) => !wiredEvents.has(event))).toEqual([]);
+  });
+
+  it('keeps every executable producer event in the closed taxonomy', () => {
+    const taxonomy = new Set(Object.keys(TELEMETRY_EVENTS));
+    for (const [path, calls] of callsByPath) {
+      for (const event of calls) expect(taxonomy.has(event), `${path}: ${event}`).toBe(true);
     }
   });
 
   it('does not retain raw exception console logging in instrumented boundaries', () => {
-    for (const path of Object.keys(instrumentation)) {
+    for (const [path, calls] of callsByPath) {
+      if (calls.size === 0) continue;
       expect(rawExceptionConsoleCalls(parseSource(path)), path).toEqual([]);
     }
   });
