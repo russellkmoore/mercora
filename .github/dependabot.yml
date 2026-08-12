@@ -6,3 +6,32 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+
+    # Every update rewrites package-lock.json, so ten separate pull requests
+    # means nine conflicts the moment the first one merges. Grouping the routine
+    # updates makes that one lockfile change instead. Majors stay ungrouped so a
+    # framework or toolchain jump still arrives as its own reviewable pull
+    # request rather than riding along with patch bumps.
+    groups:
+      production-dependencies:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      dev-dependencies:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+
+    ignore:
+      # No published eslint-plugin-react supports ESLint 10 — 7.37.5 peers on
+      # eslint "^3 || ... || ^9.7" — and eslint-config-next depends on it, so
+      # linting fails with "contextOrFilename.getFilename is not a function"
+      # before any repository configuration is consulted.
+      #
+      # Remove this entry once eslint-plugin-react accepts ESLint 10 and
+      # eslint-config-next has picked the release up.
+      - dependency-name: eslint
+        versions:
+          - 10.x
