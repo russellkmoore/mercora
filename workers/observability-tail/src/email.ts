@@ -4,6 +4,46 @@ export type AlertFetch = (
   input: RequestInfo | URL,
   init?: RequestInit,
 ) => Promise<Response>;
+export type NativeEmailFactory = (
+  from: string,
+  to: string,
+  raw: string,
+) => Promise<EmailMessage>;
+
+const MIME_BOUNDARY = 'mercora-observability-alert-v1';
+
+async function defaultNativeEmailFactory(
+  from: string,
+  to: string,
+  raw: string,
+): Promise<EmailMessage> {
+  const { EmailMessage } = await import('cloudflare:email');
+  return new EmailMessage(from, to, raw);
+}
+
+export function buildRawEmail(message: AlertEmailMessage): string {
+  const lines = [
+    `From: ${message.from}`,
+    `To: ${message.to}`,
+    `Subject: ${message.subject}`,
+    'MIME-Version: 1.0',
+    `Content-Type: multipart/alternative; boundary="${MIME_BOUNDARY}"`,
+    '',
+    `--${MIME_BOUNDARY}`,
+    'Content-Type: text/plain; charset=UTF-8',
+    'Content-Transfer-Encoding: 8bit',
+    '',
+    message.text,
+    `--${MIME_BOUNDARY}`,
+    'Content-Type: text/html; charset=UTF-8',
+    'Content-Transfer-Encoding: 8bit',
+    '',
+    message.html,
+    `--${MIME_BOUNDARY}--`,
+    '',
+  ];
+  return lines.join('\r\n');
+}
 
 function emailBinding(source: unknown): SendEmail | null {
   try {
@@ -21,16 +61,16 @@ function emailBinding(source: unknown): SendEmail | null {
 async function sendWithCloudflare(
   message: AlertEmailMessage,
   source: unknown,
+  nativeEmailFactory: NativeEmailFactory,
 ): Promise<void> {
   const binding = emailBinding(source);
   if (!binding) throw new Error('Cloudflare Email Sending binding is unavailable');
-  await binding.send({
-    from: message.from,
-    to: message.to,
-    subject: message.subject,
-    html: message.html,
-    text: message.text,
-  });
+  const nativeMessage = await nativeEmailFactory(
+    message.from,
+    message.to,
+    buildRawEmail(message),
+  );
+  await binding.send(nativeMessage);
 }
 
 async function discardBody(response: Response): Promise<void> {
@@ -64,9 +104,10 @@ export async function sendAlertEmail(
   config: AlertConfiguration,
   source: unknown,
   fetcher: AlertFetch = fetch,
+  nativeEmailFactory: NativeEmailFactory = defaultNativeEmailFactory,
 ): Promise<void> {
   if (config.provider === 'cloudflare') {
-    await sendWithCloudflare(message, source);
+    await sendWithCloudflare(message, source, nativeEmailFactory);
     return;
   }
   await sendWithResend(message, config, fetcher);

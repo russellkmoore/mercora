@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:workers": "vitest run --config vitest.workers.config.mts",
+    "test:observability-worker": "vitest run --config vitest.observability.config.mts",
     "test:watch": "vitest",
     "predeploy": "node scripts/check-deploy-config.mjs",
     "deploy": "npm run clean && npm run build:worker && opennextjs-cloudflare deploy",
