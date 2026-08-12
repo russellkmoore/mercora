@@ -1,6 +1,11 @@
 import { Money } from '@/lib/money';
 import type { Order } from '@/lib/types/order';
-import { sendOrderConfirmationEmail, type EmailResult } from '@/lib/utils/email';
+import {
+  sendNewOrderMerchantNotification,
+  sendOrderConfirmationEmail,
+  type EmailResult,
+  type OrderData,
+} from '@/lib/utils/email';
 import { getDbAsync } from '@/lib/db';
 import { products } from '@/lib/db/schema/products';
 import { inArray } from 'drizzle-orm';
@@ -52,19 +57,16 @@ function localizedText(value: unknown): string {
   return '';
 }
 
-export async function sendOrderConfirmation(
-  order: Order,
-  idempotencyKey: string
-): Promise<EmailResult> {
+export async function buildOrderEmailData(order: Order): Promise<OrderData | null> {
   const address = order.shipping_address;
   const extensions = order.extensions ?? {};
   const email = typeof extensions.email === 'string'
     ? extensions.email
     : address?.email;
-  if (!email || !address || !order.id) return { success: true };
+  if (!email || !address || !order.id) return null;
   const images = await resolveOrderLineImages(order.items.map((item) => item.product_id));
 
-  return sendOrderConfirmationEmail({
+  return {
     orderNumber: order.id,
     customerName: address.recipient || address.company || 'Customer',
     customerEmail: email,
@@ -94,5 +96,23 @@ export async function sendOrderConfirmation(
       zipCode: address.postal_code || '',
       country: address.country,
     },
-  }, { idempotencyKey });
+  };
+}
+
+export async function sendOrderConfirmation(
+  order: Order,
+  idempotencyKey: string
+): Promise<EmailResult> {
+  const data = await buildOrderEmailData(order);
+  return data ? sendOrderConfirmationEmail(data, { idempotencyKey }) : { success: true, skipped: true };
+}
+
+export async function sendMerchantOrderNotification(
+  order: Order,
+  idempotencyKey: string,
+): Promise<EmailResult> {
+  const data = await buildOrderEmailData(order);
+  return data
+    ? sendNewOrderMerchantNotification(data, { idempotencyKey })
+    : { success: true, skipped: true };
 }

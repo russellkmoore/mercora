@@ -1,8 +1,8 @@
 import { Money } from '@/lib/money';
 import { getStoreConfig } from '@/lib/store-config';
-import { getResendClient, type EmailResult } from '@/lib/utils/email';
+import { sendEmail, type EmailResult } from '@/lib/email/sender';
 import { escapeHtmlText } from '@/lib/utils/maintenance-html';
-import { postalFooterHtml } from '@/lib/email/footer';
+import { postalFooterHtml, postalFooterText } from '@/lib/email/footer';
 
 export interface RefundSettledEmailInput {
   orderId: string;
@@ -32,20 +32,21 @@ export async function sendRefundSettledEmail(
   ${postalFooterHtml()}
 </body></html>`;
 
-  try {
-    const { data, error } = await getResendClient().emails.send({
-      from: store.contact.senderEmail,
-      to: [input.customerEmail],
-      ...(store.contact.replyToEmail ? { replyTo: store.contact.replyToEmail } : {}),
-      subject: `Refund processed for order #${input.orderId} - ${store.identity.name}`,
-      html,
-    }, { idempotencyKey: `refund/${input.refundId}/succeeded/v1` });
-    if (error) return { success: false, error: error.message || 'Refund email failed' };
-    return { success: true, id: data?.id };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Refund email failed',
-    };
-  }
+  const text = [
+    `${store.identity.name}: Refund processed`,
+    `Hi ${customerName},`,
+    `We processed a refund of ${amount} for order #${input.orderId}.`,
+    'Your bank may take several business days to show the credit.',
+    `Questions? Contact ${store.contact.supportEmail}.`,
+    postalFooterText(),
+  ].join('\n\n');
+
+  return sendEmail({
+    from: store.contact.senderEmail,
+    to: [input.customerEmail],
+    ...(store.contact.replyToEmail ? { replyTo: store.contact.replyToEmail } : {}),
+    subject: `Refund processed for order #${input.orderId} - ${store.identity.name}`,
+    html,
+    text,
+  }, { idempotencyKey: `refund/${input.refundId}/succeeded/v1` });
 }

@@ -1,17 +1,10 @@
-import { Resend } from 'resend';
 import { Money, type StoredMoney } from '@/lib/money';
 import { escapeHtmlText } from '@/lib/utils/maintenance-html';
 import { getStoreConfig } from '@/lib/store-config';
-import { postalFooterHtml } from '@/lib/email/footer';
+import { postalFooterHtml, postalFooterText } from '@/lib/email/footer';
+import { sendEmail, type EmailResult } from '@/lib/email/sender';
 
-let resend: Resend | null = null;
-
-export function getResendClient(): Resend {
-  if (!resend) {
-    resend = new Resend(process.env.RESEND_API_KEY);
-  }
-  return resend;
-}
+export type { EmailResult } from '@/lib/email/sender';
 
 export interface OrderData {
   orderNumber: string;
@@ -40,12 +33,6 @@ export interface OrderData {
   estimatedDelivery?: string;
 }
 
-export interface EmailResult {
-  success: boolean;
-  id?: string;
-  error?: string;
-}
-
 export interface OrderStatusUpdateData {
   orderNumber: string;
   customerName: string;
@@ -72,34 +59,47 @@ export interface OrderStatusUpdateData {
   };
 }
 
+function safeHttps(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' && !parsed.username && !parsed.password ? parsed.href : undefined;
+  } catch { return undefined; }
+}
+
 export async function sendOrderConfirmationEmail(
   orderData: OrderData,
   options: { idempotencyKey?: string } = {}
 ): Promise<EmailResult> {
-  try {
-    const emailHtml = generateOrderConfirmationHTML(orderData);
-    const resendClient = getResendClient();
-    const store = getStoreConfig();
-    
-    const { data, error } = await resendClient.emails.send({
-      from: store.contact.senderEmail,
-      to: [orderData.customerEmail],
-      ...(store.contact.replyToEmail ? { replyTo: store.contact.replyToEmail } : {}),
-      subject: `Order Confirmation #${orderData.orderNumber} - ${store.identity.name}`,
-      html: emailHtml,
-    }, options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : undefined);
+  const store = getStoreConfig();
+  return sendEmail({
+    from: store.contact.senderEmail,
+    to: [orderData.customerEmail],
+    ...(store.contact.replyToEmail ? { replyTo: store.contact.replyToEmail } : {}),
+    subject: `Order Confirmation #${orderData.orderNumber} - ${store.identity.name}`,
+    html: generateOrderConfirmationHTML(orderData),
+    text: generateOrderConfirmationText(orderData),
+  }, options);
+}
 
-    if (error) {
-      console.error('Email sending error:', error);
-      return { success: false, error: error.message || 'Email sending failed' };
-    }
-
-    console.log('Order confirmation email sent:', data?.id);
-    return { success: true, id: data?.id };
-  } catch (error) {
-    console.error('Email sending failed:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
-  }
+export function generateOrderConfirmationText(orderData: OrderData): string {
+  const store = getStoreConfig();
+  const itemLines = orderData.items.map((item) =>
+    `${item.quantity} x ${item.name} — ${Money.fromStored(item.price).times(item.quantity).format()}`
+  );
+  return [
+    `${store.identity.name}: Order confirmation #${orderData.orderNumber}`,
+    `Hi ${orderData.customerName},`,
+    'Thank you for your order. It is being prepared for shipment.',
+    ...itemLines,
+    `Subtotal: ${Money.fromStored(orderData.subtotal).format()}`,
+    `Shipping: ${Money.fromStored(orderData.shipping).format()}`,
+    `Tax: ${Money.fromStored(orderData.tax).format()}`,
+    `Total: ${Money.fromStored(orderData.total).format()}`,
+    `Ship to: ${orderData.shippingAddress.street}, ${orderData.shippingAddress.city}, ${orderData.shippingAddress.state} ${orderData.shippingAddress.zipCode}, ${orderData.shippingAddress.country}`,
+    `Questions? Contact ${store.contact.supportEmail}.`,
+    postalFooterText(),
+  ].join('\n\n');
 }
 
 export function generateOrderConfirmationHTML(orderData: OrderData): string {
@@ -252,7 +252,10 @@ function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string
   const getAbsoluteImageUrl = (imageUrl: string | undefined): string | undefined => {
     if (!imageUrl) return undefined;
     if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-      return imageUrl;
+      try {
+        const parsed = new URL(imageUrl);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : undefined;
+      } catch { return undefined; }
     }
     
     // Normalize the path (remove leading slash if present)
@@ -267,6 +270,7 @@ function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string
       return new URL(path, store.urls.imageCdn ?? store.urls.site).href;
     } catch { return undefined; }
   };
+  const safeTrackingUrl = safeHttps(orderData.trackingUrl);
 
   // Generate status-specific content
   let statusMessage = "";
@@ -277,7 +281,7 @@ function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string
     case 'processing':
       statusMessage = "Your order is being processed";
       statusColor = "#3b82f6";
-      statusContent = `<p style="color: #64748b; font-size: 16px; line-height: 24px; margin: 0 0 16px;">We're preparing your gear for shipment. You'll receive another email with tracking information once your order ships.</p>`;
+      statusContent = `<p style="color: #64748b; font-size: 16px; line-height: 24px; margin: 0 0 16px;">We're preparing your order for shipment. You'll receive another email with tracking information once your order ships.</p>`;
       break;
 
     case 'shipped':
@@ -288,10 +292,10 @@ function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string
         ${orderData.carrier ? `
           <div style="background-color: #f1f5f9; border-radius: 8px; padding: 16px; margin: 16px 0;">
             <h3 style="color: #1e293b; font-size: 16px; font-weight: bold; margin: 0 0 8px;">Shipping Details</h3>
-            <p style="color: #64748b; font-size: 14px; margin: 0 0 4px;"><strong>Carrier:</strong> ${orderData.carrier}</p>
-            ${orderData.trackingNumber ? `<p style="color: #64748b; font-size: 14px; margin: 0 0 4px;"><strong>Tracking Number:</strong> ${orderData.trackingNumber}</p>` : ''}
-            ${orderData.trackingUrl ? `
-              <a href="${orderData.trackingUrl}" style="display: inline-block; background-color: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 12px;">
+            <p style="color: #64748b; font-size: 14px; margin: 0 0 4px;"><strong>Carrier:</strong> ${escapeHtmlText(orderData.carrier)}</p>
+            ${orderData.trackingNumber ? `<p style="color: #64748b; font-size: 14px; margin: 0 0 4px;"><strong>Tracking Number:</strong> ${escapeHtmlText(orderData.trackingNumber)}</p>` : ''}
+            ${safeTrackingUrl ? `
+              <a href="${escapeHtmlText(safeTrackingUrl)}" style="display: inline-block; background-color: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 12px;">
                 Track Your Package
               </a>
             ` : ''}
@@ -304,7 +308,7 @@ function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string
       statusMessage = "Your order has been delivered!";
       statusColor = "#059669";
       statusContent = `
-        <p style="color: #64748b; font-size: 16px; line-height: 24px; margin: 0 0 16px;">Your order has been successfully delivered. We hope you love your new gear!</p>
+        <p style="color: #64748b; font-size: 16px; line-height: 24px; margin: 0 0 16px;">Your order has been successfully delivered. We hope you enjoy your purchase!</p>
         <p style="color: #64748b; font-size: 14px; line-height: 20px; margin: 0 0 16px;">If you have any issues with your order, please don't hesitate to contact our support team.</p>
       `;
       break;
@@ -316,7 +320,7 @@ function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string
         <p style="color: #64748b; font-size: 16px; line-height: 24px; margin: 0 0 16px;">Your order has been cancelled as requested.</p>
         ${orderData.cancellationReason ? `
           <div style="background-color: #fef3f2; border-left: 4px solid #dc2626; padding: 12px 16px; margin: 16px 0;">
-            <p style="color: #7f1d1d; font-size: 14px; margin: 0;"><strong>Reason:</strong> ${orderData.cancellationReason}</p>
+            <p style="color: #7f1d1d; font-size: 14px; margin: 0;"><strong>Reason:</strong> ${escapeHtmlText(orderData.cancellationReason)}</p>
           </div>
         ` : ''}
         <p style="color: #64748b; font-size: 14px; line-height: 20px; margin: 0 0 16px;">If you have any questions about this cancellation or need assistance with a new order, please contact our support team.</p>
@@ -344,14 +348,15 @@ function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string
   // Generate items HTML (simplified for status updates)
   const itemsHTML = orderData.items.slice(0, 3).map(item => {
     const absoluteImageUrl = getAbsoluteImageUrl(item.imageUrl);
+    const safeItemName = escapeHtmlText(item.name);
     return `
     <tr style="border-bottom: 1px solid #e2e8f0;">
       <td style="padding: 8px 0; vertical-align: top; width: 50px;">
-        ${absoluteImageUrl ? `<img src="${absoluteImageUrl}" alt="${item.name}" style="width: 40px; height: 40px; border-radius: 4px; object-fit: cover; display: block;">` : `<div style="width: 40px; height: 40px; background-color: #f1f5f9; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 10px; text-align: center;">No Image</div>`}
+        ${absoluteImageUrl ? `<img src="${escapeHtmlText(absoluteImageUrl)}" alt="${safeItemName}" style="width: 40px; height: 40px; border-radius: 4px; object-fit: cover; display: block;">` : `<div style="width: 40px; height: 40px; background-color: #f1f5f9; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 10px; text-align: center;">No Image</div>`}
       </td>
       <td style="padding: 8px 0 8px 12px; vertical-align: top;">
-        <div style="color: #1e293b; font-size: 14px; font-weight: bold; margin: 0 0 2px;">${item.name}</div>
-        <div style="color: #64748b; font-size: 12px; margin: 0;">Qty: ${item.quantity}</div>
+        <div style="color: #1e293b; font-size: 14px; font-weight: bold; margin: 0 0 2px;">${safeItemName}</div>
+        <div style="color: #64748b; font-size: 12px; margin: 0;">Qty: ${escapeHtmlText(String(item.quantity))}</div>
       </td>
     </tr>
   `;
@@ -373,24 +378,24 @@ function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string
         <!-- Header -->
         <div style="text-align: center; padding: 32px 0; border-bottom: 1px solid #e6ebf1;">
           <h1 style="color: #f97316; font-size: 32px; font-weight: bold; margin: 0; padding: 0;">${escapeHtmlText(store.identity.name)}</h1>
-          <p style="color: #64748b; font-size: 14px; margin: 8px 0 0;">Premium Outdoor Gear</p>
+          <p style="color: #64748b; font-size: 14px; margin: 8px 0 0;">${escapeHtmlText(store.identity.tagline)}</p>
         </div>
 
         <!-- Status Update -->
         <div style="padding: 24px 32px;">
           <h2 style="color: ${statusColor}; font-size: 24px; font-weight: bold; margin: 0 0 16px;">${statusMessage}</h2>
-          <p style="color: #64748b; font-size: 16px; line-height: 24px; margin: 0 0 16px;">Hi ${orderData.customerName},</p>
+          <p style="color: #64748b; font-size: 16px; line-height: 24px; margin: 0 0 16px;">Hi ${escapeHtmlText(orderData.customerName)},</p>
           
           ${statusContent}
 
           <div style="background-color: #f8fafc; border-radius: 8px; padding: 16px; margin: 16px 0;">
-            <p style="color: #1e293b; font-size: 16px; font-weight: bold; margin: 0 0 8px;">Order #${orderData.orderNumber}</p>
-            <p style="color: #64748b; font-size: 14px; margin: 0;">Status: <span style="color: ${statusColor}; font-weight: bold;">${orderData.status.charAt(0).toUpperCase() + orderData.status.slice(1)}</span></p>
+            <p style="color: #1e293b; font-size: 16px; font-weight: bold; margin: 0 0 8px;">Order #${escapeHtmlText(orderData.orderNumber)}</p>
+            <p style="color: #64748b; font-size: 14px; margin: 0;">Status: <span style="color: ${statusColor}; font-weight: bold;">${escapeHtmlText(orderData.status.charAt(0).toUpperCase() + orderData.status.slice(1))}</span></p>
           </div>
           
           ${orderData.notes ? `
             <div style="background-color: #f1f5f9; border-radius: 8px; padding: 12px; margin: 16px 0;">
-              <p style="color: #64748b; font-size: 14px; margin: 0;"><strong>Note:</strong> ${orderData.notes}</p>
+              <p style="color: #64748b; font-size: 14px; margin: 0;"><strong>Note:</strong> ${escapeHtmlText(orderData.notes)}</p>
             </div>
           ` : ''}
         </div>
@@ -412,9 +417,9 @@ function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string
         <div style="padding: 24px 32px;">
           <h3 style="color: #1e293b; font-size: 18px; font-weight: bold; margin: 0 0 12px;">Shipping Address</h3>
           <p style="color: #64748b; font-size: 14px; line-height: 20px; margin: 0;">
-            ${orderData.shippingAddress.street}<br>
-            ${orderData.shippingAddress.city}, ${orderData.shippingAddress.state} ${orderData.shippingAddress.zipCode}<br>
-            ${orderData.shippingAddress.country}
+            ${escapeHtmlText(orderData.shippingAddress.street)}<br>
+            ${escapeHtmlText(orderData.shippingAddress.city)}, ${escapeHtmlText(orderData.shippingAddress.state)} ${escapeHtmlText(orderData.shippingAddress.zipCode)}<br>
+            ${escapeHtmlText(orderData.shippingAddress.country)}
           </p>
         </div>
 
@@ -431,49 +436,88 @@ function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string
   `;
 }
 
-export async function sendOrderStatusUpdateEmail(orderData: OrderStatusUpdateData): Promise<EmailResult> {
-  try {
-    const emailHtml = generateOrderStatusUpdateHTML(orderData);
-    const resendClient = getResendClient();
-    const store = getStoreConfig();
-    
-    // Determine subject based on status
-    let subject = `Order Update #${orderData.orderNumber}`;
-    switch (orderData.status) {
-      case 'shipped':
-        subject = `Your Order Has Shipped! #${orderData.orderNumber}`;
-        break;
-      case 'delivered':
-        subject = `Order Delivered #${orderData.orderNumber}`;
-        break;
-      case 'cancelled':
-        subject = `Order Cancelled #${orderData.orderNumber}`;
-        break;
-      case 'processing':
-        subject = `Order Processing #${orderData.orderNumber}`;
-        break;
-      case 'refunded':
-        subject = `Order Refunded #${orderData.orderNumber}`;
-        break;
-    }
-    
-    const { data, error } = await resendClient.emails.send({
-      from: store.contact.senderEmail,
-      to: [orderData.customerEmail],
-      ...(store.contact.replyToEmail ? { replyTo: store.contact.replyToEmail } : {}),
-      subject: `${subject} - ${store.identity.name}`,
-      html: emailHtml,
-    });
+export async function sendOrderStatusUpdateEmail(
+  orderData: OrderStatusUpdateData,
+  options: { idempotencyKey?: string } = {},
+): Promise<EmailResult> {
+  const store = getStoreConfig();
+  const trackingUrl = safeHttps(orderData.trackingUrl);
+  const subjects: Record<string, string> = {
+    shipped: `Your Order Has Shipped! #${orderData.orderNumber}`,
+    delivered: `Order Delivered #${orderData.orderNumber}`,
+    cancelled: `Order Cancelled #${orderData.orderNumber}`,
+    processing: `Order Processing #${orderData.orderNumber}`,
+    refunded: `Order Refunded #${orderData.orderNumber}`,
+  };
+  const text = [
+    `${store.identity.name}: ${subjects[orderData.status] ?? `Order Update #${orderData.orderNumber}`}`,
+    `Hi ${orderData.customerName},`,
+    `Your order status is now ${orderData.status}.`,
+    orderData.carrier ? `Carrier: ${orderData.carrier}` : null,
+    orderData.trackingNumber ? `Tracking number: ${orderData.trackingNumber}` : null,
+    trackingUrl ? `Track your package: ${trackingUrl}` : null,
+    orderData.notes ? `Note: ${orderData.notes}` : null,
+    `Questions? Contact ${store.contact.supportEmail}.`,
+    postalFooterText(),
+  ].filter((line): line is string => line !== null).join('\n\n');
 
-    if (error) {
-      console.error('Email sending error:', error);
-      return { success: false, error: error.message || 'Email sending failed' };
-    }
+  return sendEmail({
+    from: store.contact.senderEmail,
+    to: [orderData.customerEmail],
+    ...(store.contact.replyToEmail ? { replyTo: store.contact.replyToEmail } : {}),
+    subject: `${subjects[orderData.status] ?? `Order Update #${orderData.orderNumber}`} - ${store.identity.name}`,
+    html: generateOrderStatusUpdateHTML(orderData),
+    text,
+  }, options);
+}
 
-    console.log('Order status update email sent:', data?.id);
-    return { success: true, id: data?.id };
-  } catch (error) {
-    console.error('Email sending failed:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
-  }
+/** Notify a configured merchant independently from the customer confirmation. */
+export async function sendNewOrderMerchantNotification(
+  orderData: OrderData,
+  options: { idempotencyKey?: string } = {},
+): Promise<EmailResult> {
+  const store = getStoreConfig();
+  const recipient = store.contact.merchantNotificationEmail;
+  if (!recipient) return { success: true, skipped: true };
+
+  const adminUrl = new URL(
+    `/admin/orders/${encodeURIComponent(orderData.orderNumber)}`,
+    store.urls.site,
+  ).href;
+  const itemText = orderData.items.map((item) =>
+    `${item.quantity} x ${item.name} — ${Money.fromStored(item.price).times(item.quantity).format()}`
+  );
+  const address = [
+    orderData.customerName,
+    orderData.shippingAddress.street,
+    [orderData.shippingAddress.city, orderData.shippingAddress.state, orderData.shippingAddress.zipCode]
+      .filter(Boolean).join(', '),
+    orderData.shippingAddress.country,
+  ].filter(Boolean).join('\n');
+  const text = [
+    `New order ${orderData.orderNumber}`,
+    'Items to ship',
+    ...itemText,
+    `Subtotal: ${Money.fromStored(orderData.subtotal).format()}`,
+    `Shipping: ${Money.fromStored(orderData.shipping).format()}`,
+    `Tax: ${Money.fromStored(orderData.tax).format()}`,
+    `Total: ${Money.fromStored(orderData.total).format()}`,
+    'Ship to',
+    address,
+    `Customer email: ${orderData.customerEmail}`,
+    `Manage this order: ${adminUrl}`,
+  ].join('\n\n');
+  const rows = orderData.items.map((item) =>
+    `<tr><td style="padding:6px 0;border-bottom:1px solid #e2e8f0"><strong>${escapeHtmlText(String(item.quantity))} &times;</strong> ${escapeHtmlText(item.name)}</td><td style="padding:6px 0;border-bottom:1px solid #e2e8f0;text-align:right">${escapeHtmlText(Money.fromStored(item.price).times(item.quantity).format())}</td></tr>`
+  ).join('');
+  const html = `<div style="font-family:Arial,sans-serif;max-width:600px"><h2>New order ${escapeHtmlText(orderData.orderNumber)}</h2><p>${escapeHtmlText(Money.fromStored(orderData.total).format())} · ${escapeHtmlText(orderData.customerEmail)}</p><h3>Items to ship</h3><table style="border-collapse:collapse;width:100%">${rows}</table><h3>Ship to</h3><p style="white-space:pre-line">${escapeHtmlText(address)}</p><p><a href="${escapeHtmlText(adminUrl)}">Manage this order</a></p>${postalFooterHtml()}</div>`;
+
+  return sendEmail({
+    from: store.contact.senderEmail,
+    to: [recipient],
+    replyTo: orderData.customerEmail,
+    subject: `New order ${orderData.orderNumber} - ${Money.fromStored(orderData.total).format()}`,
+    html,
+    text,
+  }, options);
 }
