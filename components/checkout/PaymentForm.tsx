@@ -37,6 +37,7 @@ import {
 } from '@stripe/react-stripe-js';
 import { Button } from '@/components/ui/button';
 import type { StripePaymentElementOptions } from '@stripe/stripe-js';
+import { useStoreConfig } from '@/lib/store';
 
 interface PaymentFormProps {
   clientSecret: string;
@@ -54,6 +55,7 @@ export default function PaymentForm({
   onError,
   disabled = false,
 }: PaymentFormProps) {
+  const store = useStoreConfig();
   const stripe = useStripe();
   const elements = useElements();
   
@@ -174,6 +176,9 @@ export default function PaymentForm({
               'Complete Payment'
             )}
           </Button>
+          <p className="text-center text-xs text-gray-500">
+            By completing payment, you agree to the <a className="underline" href={store.urls.terms}>terms</a> and acknowledge the <a className="underline" href={store.urls.privacy}>privacy policy</a>. Review the <a className="underline" href={store.urls.returns}>returns policy</a> before ordering.
+          </p>
         </form>
       )}
 

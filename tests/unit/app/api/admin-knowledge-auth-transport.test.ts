@@ -95,10 +95,12 @@ describe('knowledge vectorization auth transport', () => {
       ...productionSources(join(process.cwd(), 'lib')),
     ];
     const signedGuestLinkFile = join(process.cwd(), 'lib', 'fulfillment', 'shipping-email.ts');
+    const signedUnsubscribeRoute = join(process.cwd(), 'app', 'api', 'email', 'unsubscribe', 'route.ts');
     const offenders = files.filter((file) => {
       const source = readFileSync(file, 'utf8');
       return (
         file !== signedGuestLinkFile &&
+        file !== signedUnsubscribeRoute &&
         /[?&]token=|searchParams\.set\(\s*['"]token['"]/.test(source)
       );
     });
@@ -111,6 +113,13 @@ describe('knowledge vectorization auth transport', () => {
     const guestLinkSource = readFileSync(signedGuestLinkFile, 'utf8');
     expect(guestLinkSource).toContain('/order-status/${encodeURIComponent(order.id)}');
     expect(guestLinkSource).toContain('url.searchParams.set("token", token)');
+
+    // Unsubscribe is the second bounded exception: an expiring HMAC bearer
+    // credential scoped only to a non-transactional preference mutation.
+    const unsubscribeSource = readFileSync(signedUnsubscribeRoute, 'utf8');
+    expect(unsubscribeSource).toContain('verifyUnsubscribeToken(token)');
+    expect(unsubscribeSource).toContain('suppressEmail(payload.email, payload.category)');
+    expect(unsubscribeSource).toContain('"cache-control": "no-store"');
   });
 
   it('rejects traversal on POST before writing or triggering vectorization', async () => {
