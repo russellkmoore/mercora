@@ -134,8 +134,12 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
     : null;
 
   return (
-    <Link href={`/product/${slug}`} prefetch={true}>
-      <div className="bg-neutral-800 rounded-lg overflow-hidden shadow hover:shadow-lg transition cursor-pointer touch-manipulation">
+    <Link
+      href={`/product/${slug}`}
+      prefetch={true}
+      className="group block overflow-hidden rounded-lg bg-neutral-800 shadow transition hover:shadow-lg touch-manipulation"
+    >
+      <div>
         <div className="relative aspect-video bg-neutral-700">
             <Image
               src={imageUrl}
@@ -206,13 +210,9 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
             {availability === "available" ? "In Stock" : "Coming Soon"}
           </p>
 
-          <Link
-            href={`/product/${slug}`}
-            className="text-orange-500 hover:underline text-sm font-medium"
-            prefetch={true}
-          >
+          <span className="text-orange-500 group-hover:underline text-sm font-medium">
             Learn more →
-          </Link>
+          </span>
         </div>
       </div>
     </Link>

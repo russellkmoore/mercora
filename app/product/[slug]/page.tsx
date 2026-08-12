@@ -81,7 +81,7 @@ export default async function ProductPage({ params }: any) {
   ]);
 
   return (
-    <main className="bg-neutral-900 text-white min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
+    <div className="bg-neutral-900 text-white min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
       <div className="max-w-5xl mx-auto">
         <ProductDisplay
           product={product}
@@ -90,6 +90,6 @@ export default async function ProductPage({ params }: any) {
           reviewEligibility={reviewEligibility}
         />
       </div>
-    </main>
+    </div>
   );
 }

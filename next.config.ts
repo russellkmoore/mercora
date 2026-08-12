@@ -10,40 +10,8 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["@next/font"],
   },
-  // Configure webpack for better performance without problematic optimizations
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      // Basic chunk optimization with reduced preloading
-      config.optimization = {
-        ...config.optimization,
-        splitChunks: {
-          ...config.optimization.splitChunks,
-          cacheGroups: {
-            ...config.optimization.splitChunks.cacheGroups,
-            vendor: {
-              test: /[\\/]node_modules[\\/]/,
-              name: 'vendors',
-              chunks: 'all',
-              priority: 10,
-              reuseExistingChunk: true,
-              maxSize: 150000, // Smaller chunks to reduce preloading
-            },
-            common: {
-              name: 'common',
-              minChunks: 2,
-              priority: 5,
-              chunks: 'all',
-              maxSize: 100000, // Keep common chunks small
-            },
-          },
-        },
-      };
-      
-      // Reduce module concatenation which can cause larger chunks
-      config.optimization.concatenateModules = false;
-    }
-    return config;
-  },
+  // Keep Next's stock chunking. A broad `chunks: "all"` cache group can attach
+  // dependency CSS to the main app entry and cause it to be served as script.
   // Basic headers for performance and resource loading control
   async headers() {
     return [

@@ -62,7 +62,6 @@ import AgentDrawer from "@/components/agent/AgentDrawer";
 import ClerkLogin from "@/components/login/ClerkLogin";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import CartDrawer from "@/components/cart/CartDrawer";
-import { CartHydrationGuard } from "@/components/cart/CartHydrationGuard";
 import ClientOnly from "@/components/ClientOnly";
 import { useStoreConfig } from "@/lib/store";
 import type { MACHCategory } from '@/lib/types/mach';
@@ -346,9 +345,13 @@ export default function HeaderClient({
   );
 
   return (
-    <div className="flex justify-between items-center px-4 sm:px-6 py-4 bg-black text-white">
-      <Link href="/" className="text-lg sm:text-xl font-bold">
-        {store.identity.name}
+    <div className="flex w-full min-w-0 items-center justify-between gap-1 bg-black px-4 py-4 text-white sm:gap-2 sm:px-6">
+      <Link
+        href="/"
+        className="min-w-0 flex-1 truncate text-lg font-bold sm:text-xl md:flex-none"
+        title={store.identity.name}
+      >
+        <span className="block truncate">{store.identity.name}</span>
       </Link>
 
       {/* Desktop Navigation */}
@@ -407,13 +410,15 @@ export default function HeaderClient({
       </div>
 
       {/* Mobile Navigation */}
-      <div className="flex md:hidden gap-2 items-center">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-2 md:hidden">
         <CartDrawer />
         
         <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
           <SheetTrigger asChild>
             <Button
               variant="ghost"
+              size="icon"
+              aria-label="Open navigation menu"
               className="text-white hover:bg-white hover:text-orange-500"
             >
               <Menu className="h-5 w-5" />

@@ -6,8 +6,8 @@ export const metadata = {
 
 export default function AdminReviewsPage() {
   return (
-    <main className="p-6 lg:p-8">
+    <div className="p-6 lg:p-8">
       <ReviewModerationDashboard />
-    </main>
+    </div>
   );
 }

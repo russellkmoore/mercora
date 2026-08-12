@@ -12,6 +12,7 @@ import { useEffect } from "react";
 import { PageSelect } from "@/lib/db/schema/pages";
 import { Calendar, User } from "lucide-react";
 import { sanitizePageHtml } from "@/lib/utils/sanitize-html";
+import { formatCmsTimestamp } from "@/lib/utils/cms-timestamp";
 
 interface PageRendererProps {
   page: PageSelect;
@@ -50,15 +51,6 @@ export default function PageRenderer({ page, allowedImageOrigin }: PageRendererP
     }
   }, [page.custom_js]);
 
-  // Format date for display
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
   // Get page template styling
   const getTemplateClasses = (template: string) => {
     switch (template) {
@@ -85,6 +77,8 @@ export default function PageRenderer({ page, allowedImageOrigin }: PageRendererP
 
   const templateClasses = getTemplateClasses(page.template || 'default');
   const sanitizedContent = sanitizePageHtml(page.content, { allowedImageOrigin });
+  const publishedLabel = formatCmsTimestamp(page.published_at);
+  const updatedLabel = formatCmsTimestamp(page.updated_at);
 
   return (
     <>
@@ -109,17 +103,17 @@ export default function PageRenderer({ page, allowedImageOrigin }: PageRendererP
 
               {/* Page Meta Information */}
               <div className="flex flex-wrap items-center gap-6 text-sm text-gray-500">
-                {page.published_at && (
+                {publishedLabel && (
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
-                    <span>Published {formatDate(page.published_at.toString())}</span>
+                    <span>Published {publishedLabel}</span>
                   </div>
                 )}
                 
-                {page.updated_at && page.updated_at !== page.created_at && (
+                {updatedLabel && page.updated_at !== page.created_at && (
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
-                    <span>Updated {formatDate(page.updated_at.toString())}</span>
+                    <span>Updated {updatedLabel}</span>
                   </div>
                 )}
 

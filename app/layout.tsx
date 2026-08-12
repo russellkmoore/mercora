@@ -152,7 +152,7 @@ export default function RootLayout({
             <Header />
           </Suspense>
 
-          {/* Main content area - grows to fill available space */}
+          {/* The root owns the storefront's single main landmark. */}
           <main className="flex-1" suppressHydrationWarning>
             {children}
           </main>
