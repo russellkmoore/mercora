@@ -113,11 +113,18 @@ describe('observability Tail Worker parser and renderer', () => {
 
   it('deduplicates by a closed low-cardinality bucket and caps scanning work', () => {
     const repeated = Array.from({ length: MAX_CANDIDATE_ALERTS + 20 }, () => trace(envelope()));
-    const extracted = extractCriticalAlerts(repeated);
-    expect(extracted.alerts).toHaveLength(1);
+    const distinct = trace(envelope({
+      event: 'refund.settlement_failed',
+      area: 'refund',
+    }));
+    const extracted = extractCriticalAlerts([...repeated, distinct]);
+    expect(extracted.alerts).toHaveLength(2);
     expect(extracted.overflow).toBeGreaterThan(0);
     expect(extracted.alerts[0].bucket).toBe(
       'payment.intent_create_failed|StripeConnectionError|stripe|none|none',
+    );
+    expect(extracted.alerts[1].bucket).toBe(
+      'refund.settlement_failed|StripeConnectionError|stripe|none|none',
     );
   });
 

@@ -9,10 +9,21 @@ import {
 } from './core';
 import { sendAlertEmail } from './email';
 
-interface ReservedAlert {
+export interface ReservedAlert {
   alert: CriticalAlert;
   reservation: CooldownReservation;
-  stub: DurableObjectStub<AlertCooldown>;
+  shortenAfterFailure(now: number, failureBackoffMs: number): Promise<void>;
+}
+
+export type ReservationAttempt =
+  | { outcome: 'reserved'; value: ReservedAlert }
+  | { outcome: 'suppressed' }
+  | { outcome: 'failed' };
+
+export interface TailProcessingDependencies {
+  reserve?: typeof reserveAlert;
+  send?: typeof sendAlertEmail;
+  deliveryNow?: () => number;
 }
 
 async function reserveAlert(
@@ -20,14 +31,28 @@ async function reserveAlert(
   env: ObservabilityTailEnv,
   now: number,
   cooldownMs: number,
-): Promise<ReservedAlert | null> {
+): Promise<ReservationAttempt> {
   try {
     const stub = env.ALERT_COOLDOWN.get(env.ALERT_COOLDOWN.idFromName(alert.bucket));
     const reservation = await stub.reserve(now, cooldownMs);
-    return reservation ? { alert, reservation, stub } : null;
+    if (!reservation) return { outcome: 'suppressed' };
+    return {
+      outcome: 'reserved',
+      value: {
+        alert,
+        reservation,
+        async shortenAfterFailure(failureNow, failureBackoffMs): Promise<void> {
+          await stub.shortenAfterFailure(
+            reservation.reservedUntil,
+            failureNow,
+            failureBackoffMs,
+          );
+        },
+      },
+    };
   } catch (error) {
     safeInternalLog('cooldown_reservation_failed', error);
-    return null;
+    return { outcome: 'failed' };
   }
 }
 
@@ -36,9 +61,9 @@ async function shortenReservationsAfterFailure(
   now: number,
   failureBackoffMs: number,
 ): Promise<void> {
-  await Promise.all(reservations.map(async ({ reservation, stub }) => {
+  await Promise.all(reservations.map(async (reservation) => {
     try {
-      await stub.shortenAfterFailure(reservation.reservedUntil, now, failureBackoffMs);
+      await reservation.shortenAfterFailure(now, failureBackoffMs);
     } catch (error) {
       safeInternalLog('cooldown_failure_backoff_failed', error);
     }
@@ -49,6 +74,7 @@ export async function processTailEvents(
   events: readonly unknown[],
   env: ObservabilityTailEnv,
   now = Date.now(),
+  dependencies: TailProcessingDependencies = {},
 ): Promise<void> {
   try {
     const extracted = extractCriticalAlerts(events);
@@ -58,11 +84,18 @@ export async function processTailEvents(
       safeInternalLog('alert_configuration_invalid');
       return;
     }
-    const candidates = extracted.alerts.slice(0, MAX_ALERTS_PER_EMAIL);
-    const boundedOverflow = extracted.overflow + extracted.alerts.length - candidates.length;
-    const reservations = (await Promise.all(candidates.map((alert) =>
-      reserveAlert(alert, env, now, config.cooldownMs))))
-      .filter((value): value is ReservedAlert => value !== null);
+    const reserve = dependencies.reserve ?? reserveAlert;
+    const reservations: ReservedAlert[] = [];
+    let boundedOverflow = extracted.overflow;
+    for (let index = 0; index < extracted.alerts.length; index += 1) {
+      if (reservations.length >= MAX_ALERTS_PER_EMAIL) {
+        boundedOverflow += extracted.alerts.length - index;
+        break;
+      }
+      const attempt = await reserve(extracted.alerts[index], env, now, config.cooldownMs);
+      if (attempt.outcome === 'reserved') reservations.push(attempt.value);
+      if (attempt.outcome === 'failed') boundedOverflow += 1;
+    }
     if (reservations.length === 0) return;
     const message = buildEmailMessage(
       reservations.map(({ alert }) => alert),
@@ -75,10 +108,14 @@ export async function processTailEvents(
       return;
     }
     try {
-      await sendAlertEmail(message, config, env);
+      await (dependencies.send ?? sendAlertEmail)(message, config, env);
     } catch (error) {
       safeInternalLog('alert_delivery_failed', error);
-      await shortenReservationsAfterFailure(reservations, Date.now(), config.failureBackoffMs);
+      await shortenReservationsAfterFailure(
+        reservations,
+        dependencies.deliveryNow?.() ?? Date.now(),
+        config.failureBackoffMs,
+      );
     }
   } catch (error) {
     safeInternalLog('tail_processing_failed', error);

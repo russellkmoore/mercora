@@ -51,6 +51,9 @@ jobs:
       - name: Test Workers integration
         run: npm run test:workers
 
+      - name: Test observability Durable Object
+        run: npm run test:observability-worker
+
       - name: Build
         run: npm run build
         env:
