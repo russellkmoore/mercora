@@ -54,14 +54,14 @@ export default async function OrdersPage() {
   // Handle unauthenticated access
   if (!userId) {
     return (
-      <main className="bg-neutral-900 text-white min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
+      <div className="bg-neutral-900 text-white min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
         <div className="max-w-6xl mx-auto p-4 sm:p-6">
           <h2 className="text-xl sm:text-2xl font-bold mb-4">Order History</h2>
           <p className="text-orange-500">
             You must be logged in to view your orders.
           </p>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -85,7 +85,7 @@ export default async function OrdersPage() {
   }));
 
   return (
-    <main className="bg-neutral-900 text-white min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
+    <div className="bg-neutral-900 text-white min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
       <div className="max-w-6xl mx-auto p-4 sm:p-6">
         <h2 className="text-xl sm:text-2xl font-bold mb-6">Order History</h2>
         {cards.length === 0 ? (
@@ -100,6 +100,6 @@ export default async function OrdersPage() {
           </div>
         )}
       </div>
-    </main>
+    </div>
   );
 }

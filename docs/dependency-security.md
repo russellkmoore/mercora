@@ -1,9 +1,9 @@
 # Dependency Security Baseline
 
-**Status:** Critical findings remediated; two upstream package exceptions remain
-**Baseline date:** 2026-08-03
+**Status:** No critical findings; two owned upstream package exceptions remain
+**Baseline date:** 2026-08-11
 **Owners:** Russell K. Moore and Devon Hillard
-**Next review:** 2026-08-17
+**Next review:** 2026-08-25
 
 ## Scope
 
@@ -16,16 +16,30 @@ npm audit
 npm audit --omit=dev
 ```
 
-The initial lockfile reported 62 findings: 2 low, 35 moderate, 21 high, and 4
-critical. The production-only view reported 55 findings: 2 low, 30 moderate,
-19 high, and 4 critical.
+The M01 branch-cut audit was captured from commit `45244fd` with Node 24.18.1,
+npm 11.16.0, and the committed lockfile:
 
-After the upgrades in this change:
+```bash
+npm audit --omit=dev --json
+```
+
+It reported 0 critical, 3 high, 0 moderate, and 0 low production findings.
+The three records are the direct `next` dependency and its bundled `postcss`
+and optional `sharp` packages. npm offers only a semver-major update to Next
+16.3.0 for this set, so M01 does not apply that breaking framework upgrade.
+Every high-severity production path is traced to one of the two owned,
+time-bounded exceptions below.
+
+For historical context, the pre-remediation lockfile reported 62 findings: 2
+low, 35 moderate, 21 high, and 4 critical. Its production-only view reported
+55 findings: 2 low, 30 moderate, 19 high, and 4 critical.
+
+The 2026-08-03 full-tree audit and fresh M01 production audit are:
 
 | Scope | Critical | High | Moderate | Low | Total |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Full dependency tree | 0 | 4 | 7 | 0 | 11 |
-| Production dependencies | 0 | 3 | 0 | 0 | 3 |
+| Full dependency tree (2026-08-03) | 0 | 4 | 7 | 0 | 11 |
+| Production dependencies (2026-08-11) | 0 | 3 | 0 | 0 | 3 |
 
 The three production records represent one direct package, `next`, and its two
 bundled vulnerable packages. They are covered by the two exceptions below.
@@ -50,6 +64,8 @@ updates or audit suppressions were used.
 
 ### Next-bundled PostCSS 8.4.31
 
+- **Owners / review deadline:** Russell K. Moore and Devon Hillard; review by
+  2026-08-25.
 - **Advisories:** `GHSA-6g55-p6wh-862q`, `GHSA-r28c-9q8g-f849`,
   `GHSA-fxqj-rqcc-2cmp`, and `GHSA-qx2v-qp2m-jg93`
 - **Package path:** `next > postcss`
@@ -66,6 +82,8 @@ updates or audit suppressions were used.
 
 ### Next-bundled Sharp 0.34.5
 
+- **Owners / review deadline:** Russell K. Moore and Devon Hillard; review by
+  2026-08-25.
 - **Advisory:** `GHSA-f88m-g3jw-g9cj`
 - **Package path:** `next > sharp`
 - **Why it remains:** Next 15.5.22 allows the 0.34 line. npm's supported fix is

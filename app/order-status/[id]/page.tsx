@@ -62,7 +62,7 @@ export default async function GuestOrderStatusPage({
   const view = buildGuestOrderProjection(order, getCarrierRegistry());
 
   return (
-    <main className="min-h-screen px-4 py-12">
+    <div className="min-h-screen px-4 py-12">
       <div className="mx-auto w-full max-w-2xl">
         <p className="text-sm text-text-secondary">{`${store.identity.name} order status`}</p>
         <h1 className="mt-1 break-all text-2xl font-bold text-text-primary">
@@ -136,6 +136,6 @@ export default async function GuestOrderStatusPage({
           .
         </p>
       </div>
-    </main>
+    </div>
   );
 }
