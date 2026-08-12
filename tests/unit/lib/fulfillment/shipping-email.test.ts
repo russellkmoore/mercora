@@ -248,6 +248,28 @@ describe("shipping email idempotency and delivery", () => {
     expect(mocks.recordEmailEvent).not.toHaveBeenCalled();
   });
 
+  it("records an indeterminate provider outcome as requiring manual review", async () => {
+    mocks.send.mockResolvedValue({
+      success: false,
+      needsReview: true,
+      errorCode: "E_DELIVERY_INDETERMINATE",
+      error: "Accepted-state unknown",
+    });
+    const result = await sendInitialShippingEmail("ORD-1", actor);
+    expect(result).toMatchObject({
+      attempted: true,
+      success: false,
+      needsReview: true,
+      errorCode: "E_DELIVERY_INDETERMINATE",
+    });
+    expect(mocks.recordEmailEvent).toHaveBeenCalledWith(
+      "ORD-1",
+      "shipping_email_failed",
+      actor,
+      expect.objectContaining({ needsReview: true }),
+    );
+  });
+
   it("gives concurrent initial attempts one key and never reports two provider successes", async () => {
     let arrivals = 0;
     let release!: () => void;

@@ -62,7 +62,24 @@ describe('provider-neutral email sender', () => {
     });
 
     expect(result).toMatchObject({ success: false, provider: 'cloudflare' });
+    expect(result).toMatchObject({ needsReview: true, errorCode: 'E_DELIVERY_INDETERMINATE' });
     expect(resend).not.toHaveBeenCalled();
+  });
+
+  it('keeps coded Cloudflare rejections retryable because they are known failures', async () => {
+    const failure = Object.assign(new Error('Recipient rejected'), { code: 'recipient_rejected' });
+    const result = await sendEmail(message, {
+      provider: 'cloudflare',
+      cloudflareBinding: { send: vi.fn(async () => { throw failure; }) },
+      env: {},
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      provider: 'cloudflare',
+      errorCode: 'recipient_rejected',
+    });
+    expect(result.needsReview).toBeUndefined();
   });
 
   it('fails closed when Cloudflare idempotency lacks D1', async () => {

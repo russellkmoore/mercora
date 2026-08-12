@@ -22,7 +22,7 @@ CREATE INDEX idx_email_preferences_category_email
 CREATE TABLE email_deliveries (
   idempotency_key TEXT PRIMARY KEY,
   provider TEXT NOT NULL CHECK (provider IN ('cloudflare', 'resend')),
-  status TEXT NOT NULL CHECK (status IN ('pending', 'processing', 'succeeded', 'failed')),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'processing', 'succeeded', 'failed', 'needs_review')),
   claim_token TEXT,
   lease_expires_at TEXT,
   provider_message_id TEXT,
@@ -34,7 +34,7 @@ CREATE TABLE email_deliveries (
   CHECK (length(idempotency_key) BETWEEN 1 AND 256),
   CHECK (
     (status = 'processing' AND claim_token IS NOT NULL AND lease_expires_at IS NOT NULL)
-    OR status IN ('pending', 'succeeded', 'failed')
+    OR status IN ('pending', 'succeeded', 'failed', 'needs_review')
   )
 );
 

@@ -59,6 +59,8 @@ export interface OrderEffectDrainResult {
   failed: number;
 }
 
+class EffectNeedsReviewError extends Error {}
+
 async function resolveDatabase(database?: D1Database): Promise<D1Database> {
   if (database) return database;
   const { env } = await getCloudflareContext({ async: true });
@@ -150,7 +152,7 @@ WHERE effect_key = (
     AND (? IS NULL OR oe.order_id = ?)
     AND (
       oe.status = 'pending'
-      OR (oe.status = 'failed' AND (oe.next_attempt_at IS NULL OR oe.next_attempt_at <= ?))
+      OR (oe.status = 'failed' AND oe.next_attempt_at IS NOT NULL AND oe.next_attempt_at <= ?)
       OR (oe.status = 'processing' AND oe.lease_expires_at <= ?)
     )
   ORDER BY oe.created_at, oe.effect_key
@@ -242,12 +244,14 @@ async function executeEffect(
     case 'confirmation_email': {
       const send = runtime.sendConfirmation ?? sendOrderConfirmation;
       const result = await send(order, `order-confirmation/${order.id}/v1`);
+      if (result.needsReview) throw new EffectNeedsReviewError(result.error || 'Confirmation email requires review');
       if (!result.success) throw new Error(result.error || 'Confirmation email failed');
       return { providerId: result.id ?? null, skipped: result.skipped === true };
     }
     case 'merchant_notification': {
       const send = runtime.sendMerchantNotification ?? sendMerchantOrderNotification;
       const result = await send(order, `merchant-notification/${order.id}/v1`);
+      if (result.needsReview) throw new EffectNeedsReviewError(result.error || 'Merchant notification requires review');
       if (!result.success) throw new Error(result.error || 'Merchant notification failed');
       return { providerId: result.id ?? null, skipped: result.skipped === true };
     }
@@ -299,14 +303,18 @@ export async function failOrderEffect(
   database: D1Database,
   effect: ClaimedOrderEffect,
   error: unknown,
-  now: Date
+  now: Date,
+  options: { needsReview?: boolean } = {}
 ): Promise<boolean> {
   const delayMs = Math.min(
     6 * 60 * 60 * 1000,
     5 * 60 * 1000 * 2 ** Math.min(effect.attempt_count - 1, 10)
   );
-  const nextAttemptAt = new Date(now.getTime() + delayMs).toISOString();
+  const nextAttemptAt = options.needsReview ? null : new Date(now.getTime() + delayMs).toISOString();
   const message = (error instanceof Error ? error.message : String(error)).slice(0, MAX_EFFECT_ERROR);
+  const reviewResult = options.needsReview
+    ? serializeEffectResult({ needsReview: true, error: message })
+    : null;
   const response = await database.prepare(`
 UPDATE order_effects
 SET status = 'failed',
@@ -314,6 +322,7 @@ SET status = 'failed',
     lease_expires_at = NULL,
     next_attempt_at = ?,
     last_error = ?,
+    result = ?,
     updated_at = ?
 WHERE effect_key = ?
   AND status = 'processing'
@@ -321,6 +330,7 @@ WHERE effect_key = ?
 `).bind(
     nextAttemptAt,
     message,
+    reviewResult,
     now.toISOString(),
     effect.effect_key,
     effect.claim_token
@@ -363,7 +373,9 @@ export async function drainOrderEffects(
       }
       result.succeeded += 1;
     } catch (error) {
-      await failOrderEffect(database, effect, error, options.now?.() ?? new Date());
+      await failOrderEffect(database, effect, error, options.now?.() ?? new Date(), {
+        needsReview: error instanceof EffectNeedsReviewError,
+      });
       result.failed += 1;
     }
   }

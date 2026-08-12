@@ -29,6 +29,7 @@ vi.mock("@/lib/fulfillment/shipping-email", () => ({
     idempotencyKey: key,
     error: result.error,
     ...(result.errorCode ? { errorCode: result.errorCode } : {}),
+    ...(result.needsReview ? { needsReview: true } : {}),
     ...(result.errorCode === "concurrent_idempotent_requests"
       ? { concurrentDuplicate: true }
       : {}),
@@ -225,6 +226,29 @@ describe("POST /api/admin/orders/[id]/shipping-email", () => {
       auditRecorded: false,
     });
     expect(mocks.recordEmailEvent).not.toHaveBeenCalled();
+  });
+
+  it("exposes an indeterminate delivery as needing manual review", async () => {
+    mocks.sendShippingConfirmationEmail.mockResolvedValue({
+      success: false,
+      needsReview: true,
+      error: "Accepted-state unknown",
+      errorCode: "E_DELIVERY_INDETERMINATE",
+    });
+    const response = await POST(request("retry"), context);
+    expect(await response.json()).toMatchObject({
+      email: {
+        success: false,
+        needsReview: true,
+        errorCode: "E_DELIVERY_INDETERMINATE",
+      },
+    });
+    expect(mocks.recordEmailEvent).toHaveBeenCalledWith(
+      "ORD-1",
+      "shipping_email_failed",
+      { type: "admin", id: "admin-1" },
+      expect.objectContaining({ needsReview: true }),
+    );
   });
 
   it("reports provider success even if the post-send audit write fails", async () => {

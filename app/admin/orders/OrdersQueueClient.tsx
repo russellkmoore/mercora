@@ -40,7 +40,7 @@ interface QueueResponse {
 interface MutationResponse {
   order?: { status?: string };
   tracking?: AdminQueueOrder["shipment"];
-  email?: { success?: boolean; pending?: boolean; error?: string };
+  email?: { success?: boolean; pending?: boolean; needsReview?: boolean; error?: string };
   error?: string;
   code?: string;
 }
@@ -186,6 +186,8 @@ export default function OrdersQueueClient() {
         tone: body.email?.success === false ? "warning" : "success",
         message: body.email?.pending
           ? `Order ${updated.id} is shipped; its email is still processing.`
+          : body.email?.needsReview
+          ? `Order ${updated.id} is shipped, but its email delivery outcome needs manual review before retrying.`
           : body.email?.success === false
           ? `Order ${updated.id} is shipped, but its email failed${body.email.error ? `: ${body.email.error}` : ""}.`
           : target.mode === "ship"
@@ -218,6 +220,11 @@ export default function OrdersQueueClient() {
       const body = (await response.json().catch(() => ({}))) as MutationResponse;
       if (body.email?.pending) {
         setNotice({ tone: "warning", message: `A matching shipping email for order ${order.id} is still processing.` });
+        await refreshEmailState(order.id);
+        return;
+      }
+      if (body.email?.needsReview) {
+        setNotice({ tone: "warning", message: `Shipping email delivery for order ${order.id} needs manual review before retrying.` });
         await refreshEmailState(order.id);
         return;
       }
