@@ -1,6 +1,6 @@
 "use client";
 
-import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { SignInButton, Show, UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { LogIn, Package, Shield } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -36,7 +36,7 @@ export default function ClerkLogin() {
 
   return (
     <>
-      <SignedOut>
+      <Show when="signed-out">
         <SignInButton mode="modal">
           <Button
             variant="ghost"
@@ -45,9 +45,9 @@ export default function ClerkLogin() {
             <LogIn className="mr-2 h-4 w-4" /> Sign In / Register
           </Button>
         </SignInButton>
-      </SignedOut>
+      </Show>
 
-      <SignedIn>
+      <Show when="signed-in">
         <UserButton appearance={{ elements: { avatarBox: "w-8 h-8" } }}>
           <UserButton.MenuItems>
             <UserButton.Link
@@ -64,7 +64,7 @@ export default function ClerkLogin() {
             )}
           </UserButton.MenuItems>
         </UserButton>
-      </SignedIn>
+      </Show>
     </>
   );
 }
