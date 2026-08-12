@@ -54,7 +54,7 @@
     "@react-email/render": "^2.1.0",
     "@shadcn/ui": "^0.0.4",
     "@stripe/react-stripe-js": "^3.9.0",
-    "@stripe/stripe-js": "^7.8.0",
+    "@stripe/stripe-js": "^9.13.0",
     "@tailwindcss/typography": "^0.5.20",
     "big.js": "^7.0.1",
     "class-variance-authority": "^0.7.1",
