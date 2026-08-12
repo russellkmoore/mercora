@@ -4,6 +4,8 @@ import { NextRequest } from 'next/server';
 const mocks = vi.hoisted(() => ({
   refundsCreate: vi.fn(),
   refundsRetrieve: vi.fn(),
+  mutateRefundLedger: vi.fn(),
+  recordTelemetry: vi.fn(),
   writes: [] as Array<Record<string, unknown>>,
   order: {} as Record<string, any>,
 }));
@@ -22,32 +24,12 @@ vi.mock('@/lib/payments/refund-ledger-store', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/payments/refund-ledger-store')>();
   return {
     ...actual,
-    mutateRefundLedger: vi.fn(async (_db, _orderId, mutate) => {
-      const extensions = mocks.order.extensions;
-      const refunds = Array.isArray(extensions.refunds) ? extensions.refunds : [];
-      const version = extensions.refunds_version ?? 0;
-      const decision = await mutate({
-        order: mocks.order,
-        extensions,
-        refunds,
-        version,
-        nextVersion: version + 1,
-        nowIso: '2026-08-05T22:00:00.000Z',
-      });
-      if (decision.action === 'write') {
-        mocks.order = {
-          ...mocks.order,
-          ...(decision.columns ?? {}),
-          extensions: decision.extensions,
-          updated_at: '2026-08-05T22:00:00.000Z',
-        };
-        mocks.writes.push(decision.extensions);
-        return { ok: true, skipped: false, order: mocks.order };
-      }
-      return { ok: true, skipped: true, order: mocks.order };
-    }),
+    mutateRefundLedger: mocks.mutateRefundLedger,
   };
 });
+vi.mock('@/lib/observability/telemetry', () => ({
+  recordTelemetry: mocks.recordTelemetry,
+}));
 
 import { POST } from '@/app/api/orders/refund/route';
 import {
@@ -71,7 +53,38 @@ function request(overrides: Record<string, unknown> = {}) {
   });
 }
 
+async function mutateLedgerSuccess(
+  _db: unknown,
+  _orderId: string,
+  mutate: (context: Record<string, any>) => Promise<any> | any,
+) {
+  const extensions = mocks.order.extensions;
+  const refunds = Array.isArray(extensions.refunds) ? extensions.refunds : [];
+  const version = extensions.refunds_version ?? 0;
+  const decision = await mutate({
+    order: mocks.order,
+    extensions,
+    refunds,
+    version,
+    nextVersion: version + 1,
+    nowIso: '2026-08-05T22:00:00.000Z',
+  });
+  if (decision.action === 'write') {
+    mocks.order = {
+      ...mocks.order,
+      ...(decision.columns ?? {}),
+      extensions: decision.extensions,
+      updated_at: '2026-08-05T22:00:00.000Z',
+    };
+    mocks.writes.push(decision.extensions);
+    return { ok: true, skipped: false, order: mocks.order };
+  }
+  return { ok: true, skipped: true, order: mocks.order };
+}
+
 beforeEach(() => {
+  mocks.mutateRefundLedger.mockReset();
+  mocks.mutateRefundLedger.mockImplementation(mutateLedgerSuccess);
   mocks.writes.length = 0;
   mocks.order = {
     id: 'WEB-REFUND-1',
@@ -120,6 +133,50 @@ describe('refund route durable ordering', () => {
     expect((mocks.order.extensions.refunds as Array<{ status: string }>)[0].status)
       .toBe('pending');
     expect(mocks.writes).toHaveLength(1);
+  });
+
+  it.each([
+    ['not_found', 404, false],
+    ['invalid_ledger', 409, false],
+    ['cas_exhausted', 503, true],
+  ] as const)(
+    'emits a critical settlement failure when accepted provider money cannot persist: %s',
+    async (reason, expectedStatus, retryable) => {
+      mocks.mutateRefundLedger
+        .mockImplementationOnce(mutateLedgerSuccess)
+        .mockResolvedValueOnce({ ok: false, reason });
+
+      const response = await POST(request());
+
+      expect(response.status).toBe(expectedStatus);
+      expect(mocks.refundsCreate).toHaveBeenCalledOnce();
+      expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+        'refund.settlement_failed',
+        expect.objectContaining({
+          operation: 'persist',
+          outcome: reason === 'cas_exhausted' ? 'conflict' : 'failed',
+          provider: 'd1',
+          retryable,
+        }),
+      );
+    },
+  );
+
+  it('emits a critical settlement failure and preserves a thrown ledger error', async () => {
+    const ledgerError = new Error('D1 unavailable');
+    mocks.mutateRefundLedger
+      .mockImplementationOnce(mutateLedgerSuccess)
+      .mockRejectedValueOnce(ledgerError);
+
+    await expect(POST(request())).rejects.toBe(ledgerError);
+    expect(mocks.refundsCreate).toHaveBeenCalledOnce();
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      'refund.settlement_failed',
+      expect.objectContaining({
+        operation: 'persist', outcome: 'failed', provider: 'd1', retryable: true,
+      }),
+      ledgerError,
+    );
   });
 
   it('returns a settled response retry without calling Stripe twice', async () => {

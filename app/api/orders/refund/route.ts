@@ -360,47 +360,64 @@ export async function POST(request: NextRequest) {
         ? 'requires_action'
         : 'pending';
   let settlementConflict = false;
-  const settled = await mutateRefundLedger(db, input.orderId, (context) => {
-    settlementConflict = false;
-    const entryIndex = context.refunds.findIndex(
-      (entry) => entry.idempotency_key === reservation!.idempotencyKey
-    );
-    if (entryIndex < 0) {
-      settlementConflict = true;
-      return { action: 'skip' };
-    }
-    const current = context.refunds[entryIndex];
-    if (current.status === 'succeeded' && current.stripe_refund_id === stripeRefund.id) {
-      return { action: 'skip' };
-    }
-    const refunds = context.refunds.slice();
-    refunds[entryIndex] = {
-      ...current,
-      status: normalizedStatus,
-      provider_status: providerStatus,
-      stripe_refund_id: stripeRefund.id,
-      processed_at: context.nowIso,
-    };
-    const extensions = {
-      ...context.extensions,
-      refunds,
-      refunds_version: context.nextVersion,
-    };
-    const total = Money.fromStored(
-      context.order.total_amount,
-      context.order.currency_code
-    ).toMinorUnits();
-    const fullySettled = normalizedStatus === 'succeeded' &&
-      computeRefundedTotal({ refunds }) === total;
-    return {
-      action: 'write',
-      extensions,
-      ...(fullySettled ? {
-        columns: { status: 'cancelled' as const, payment_status: 'refunded' as const },
-      } : {}),
-    };
-  });
-  if (!settled.ok) return responseForStoreFailure(settled.reason);
+  let settled: Awaited<ReturnType<typeof mutateRefundLedger>>;
+  try {
+    settled = await mutateRefundLedger(db, input.orderId, (context) => {
+      settlementConflict = false;
+      const entryIndex = context.refunds.findIndex(
+        (entry) => entry.idempotency_key === reservation!.idempotencyKey
+      );
+      if (entryIndex < 0) {
+        settlementConflict = true;
+        return { action: 'skip' };
+      }
+      const current = context.refunds[entryIndex];
+      if (current.status === 'succeeded' && current.stripe_refund_id === stripeRefund.id) {
+        return { action: 'skip' };
+      }
+      const refunds = context.refunds.slice();
+      refunds[entryIndex] = {
+        ...current,
+        status: normalizedStatus,
+        provider_status: providerStatus,
+        stripe_refund_id: stripeRefund.id,
+        processed_at: context.nowIso,
+      };
+      const extensions = {
+        ...context.extensions,
+        refunds,
+        refunds_version: context.nextVersion,
+      };
+      const total = Money.fromStored(
+        context.order.total_amount,
+        context.order.currency_code
+      ).toMinorUnits();
+      const fullySettled = normalizedStatus === 'succeeded' &&
+        computeRefundedTotal({ refunds }) === total;
+      return {
+        action: 'write',
+        extensions,
+        ...(fullySettled ? {
+          columns: { status: 'cancelled' as const, payment_status: 'refunded' as const },
+        } : {}),
+      };
+    });
+  } catch (error) {
+    recordTelemetry('refund.settlement_failed', {
+      operation: 'persist', outcome: 'failed', provider: 'd1',
+      retryable: true, path: '/api/orders/refund', trigger: 'request',
+    }, error);
+    throw error;
+  }
+  if (!settled.ok) {
+    recordTelemetry('refund.settlement_failed', {
+      operation: 'persist',
+      outcome: settled.reason === 'cas_exhausted' ? 'conflict' : 'failed',
+      provider: 'd1', retryable: settled.reason === 'cas_exhausted',
+      path: '/api/orders/refund', trigger: 'request',
+    });
+    return responseForStoreFailure(settled.reason);
+  }
   if (settlementConflict) {
     recordTelemetry('refund.settlement_failed', {
       operation: 'persist', outcome: 'conflict', provider: 'd1',
