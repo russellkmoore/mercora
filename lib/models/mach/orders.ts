@@ -81,6 +81,18 @@ export async function getOrderById(orderId: string): Promise<Order | null> {
   return hydrateOrder(orderRecords[0]);
 }
 
+/** Owner-scoped order detail lookup; the unscoped row never enters memory. */
+export async function getOrderByCustomerAndId(
+  customerId: string,
+  orderId: string,
+): Promise<Order | null> {
+  const db = await getDbAsync();
+  const [record] = await db.select().from(orders)
+    .where(and(eq(orders.id, orderId), eq(orders.customer_id, customerId)))
+    .limit(1);
+  return record ? hydrateOrder(record) : null;
+}
+
 // Update order status
 export async function updateOrderStatus(orderId: string, status: Order['status']): Promise<Order | null> {
   const db = await getDbAsync();
