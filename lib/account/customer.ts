@@ -1,4 +1,3 @@
-import { currentUser } from "@clerk/nextjs/server";
 import { and, eq, isNull } from "drizzle-orm";
 import { getDbAsync } from "@/lib/db";
 import { customers, deserializeCustomer } from "@/lib/db/schema/customer";
@@ -18,6 +17,7 @@ export async function getOrCreateCustomer(userId: string): Promise<MACHCustomer>
   const existing = await getCustomer(userId);
   if (existing) return existing;
 
+  const { currentUser } = await import("@clerk/nextjs/server");
   const user = await currentUser();
   const email = user?.emailAddresses.find((entry) => entry.id === user.primaryEmailAddressId)
     ?.emailAddress ?? user?.emailAddresses[0]?.emailAddress;
@@ -54,8 +54,9 @@ function nextVersion(previous: string | null): string {
 export async function mutateCustomerAddresses(
   customerId: string,
   mutate: (addresses: MACHCustomerAddress[]) => MACHCustomerAddress[],
+  database?: Awaited<ReturnType<typeof getDbAsync>>,
 ): Promise<MACHCustomer> {
-  const db = await getDbAsync();
+  const db = database ?? await getDbAsync();
   for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt += 1) {
     const [record] = await db.select().from(customers)
       .where(eq(customers.id, customerId)).limit(1);
@@ -80,8 +81,9 @@ export async function mutateCustomerAddresses(
 export async function updateCustomerProfile(
   customerId: string,
   profile: { firstName: string; lastName: string },
+  database?: Awaited<ReturnType<typeof getDbAsync>>,
 ): Promise<MACHCustomer> {
-  const db = await getDbAsync();
+  const db = database ?? await getDbAsync();
   for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt += 1) {
     const [record] = await db.select().from(customers)
       .where(eq(customers.id, customerId)).limit(1);
