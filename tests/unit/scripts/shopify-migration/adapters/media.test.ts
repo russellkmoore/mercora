@@ -128,14 +128,33 @@ describe("safe media downloader", () => {
     expect(evilRedirect).toHaveBeenCalledTimes(1);
 
     const privateRedirect = vi.fn<typeof fetch>()
-      .mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: "https://media.example.test/image.jpg" } }))
+      .mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: "https://example-store.myshopify.com/cdn/image.jpg" } }))
       .mockResolvedValueOnce(imageResponse());
     await expect(downloadVerifiedMedia(plan(), {
-      allowedHosts: ["cdn.shopify.com", "media.example.test"],
+      allowedHosts: ["cdn.shopify.com", "example-store.myshopify.com"],
       fetcher: privateRedirect,
-      resolveHost: async (host) => host === "media.example.test" ? ["127.0.0.1"] : PUBLIC_IP,
+      resolveHost: async (host) => host === "example-store.myshopify.com" ? ["127.0.0.1"] : PUBLIC_IP,
     })).rejects.toThrow(/non-public address/);
     expect(privateRedirect).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects arbitrary exact hosts and non-CDN myshopify paths before fetching", async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    await expect(downloadVerifiedMedia(plan({
+      sourceUrl: "https://merchant-assets.example.test/image.jpg",
+      sourceHost: "merchant-assets.example.test",
+    }), {
+      allowedHosts: ["merchant-assets.example.test"], fetcher, resolveHost: async () => PUBLIC_IP,
+    })).rejects.toThrow(/non-Shopify/);
+
+    const myshopify = plan({
+      sourceUrl: "https://example-store.myshopify.com/files/image.jpg",
+      sourceHost: "example-store.myshopify.com",
+    });
+    await expect(downloadVerifiedMedia(myshopify, {
+      allowedHosts: ["example-store.myshopify.com"], fetcher, resolveHost: async () => PUBLIC_IP,
+    })).rejects.toThrow(/allowed exact HTTPS origin/);
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it("rejects oversized declared and chunked bodies", async () => {

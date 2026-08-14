@@ -6,7 +6,7 @@ const options = {
   generatedAt: "2026-08-14T12:00:00.000Z",
   actorId: "migration-operator",
   fallbackAuthor: "Store Team",
-  allowedMediaHosts: ["cdn.example.test"],
+  allowedMediaHosts: ["cdn.shopify.com"],
 };
 
 describe("blog transform", () => {
@@ -24,8 +24,8 @@ describe("blog transform", () => {
       author: "Alex",
       tags: "How To, Featured, how to",
       summary_html: "<p>A useful summary.</p>",
-      body_html: '<p>Useful words.</p><img src="https://cdn.example.test/inside.webp"><iframe src="https://evil.test"></iframe>',
-      image: { src: "https://cdn.example.test/cover.jpg", alt: "Cover" },
+      body_html: '<p>Useful words.</p><img src="https://cdn.shopify.com/inside.webp"><iframe src="https://evil.test"></iframe>',
+      image: { src: "https://cdn.shopify.com/cover.jpg", alt: "Cover" },
       published: true,
       published_at: "2024-01-02T00:00:00Z",
       created_at: "2024-01-01T00:00:00Z",
@@ -96,8 +96,8 @@ describe("blog transform", () => {
         blog_id: 1,
         title: "No remote media",
         handle: "no-remote-media",
-        body_html: '<p>Text</p><img src="https://cdn.example.test/inline.png">',
-        image: { src: "https://cdn.example.test/cover.png" },
+        body_html: '<p>Text</p><img src="https://cdn.shopify.com/inline.png">',
+        image: { src: "https://cdn.shopify.com/cover.png" },
       }],
       { ...options, allowedMediaHosts: [] },
     );
@@ -125,8 +125,8 @@ describe("blog transform", () => {
         blog_id: 1,
         title: "Unsupported media",
         handle: "unsupported-media",
-        body_html: '<p>Text remains.</p><img src="https://cdn.example.test/inline.gif">',
-        image: { src: "https://cdn.example.test/cover.avif" },
+        body_html: '<p>Text remains.</p><img src="https://cdn.shopify.com/inline.gif">',
+        image: { src: "https://cdn.shopify.com/cover.avif" },
       }],
       options,
     );

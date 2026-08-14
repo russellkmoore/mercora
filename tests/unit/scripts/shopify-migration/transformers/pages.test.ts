@@ -9,7 +9,7 @@ import { transformPages } from "@/scripts/shopify-migration/transformers/pages";
 const options = {
   generatedAt: "2026-08-14T12:00:00.000Z",
   actorId: "migration-operator",
-  allowedMediaHosts: ["cdn.example.test"],
+  allowedMediaHosts: ["cdn.shopify.com"],
 };
 
 describe("page transform", () => {
@@ -18,7 +18,7 @@ describe("page transform", () => {
       id: 100,
       title: "Care Guide",
       handle: "care-guide",
-      body_html: '<h2>Care</h2><img src="https://cdn.example.test/care.png"><script>alert(1)</script><a href="javascript:bad()">bad</a>',
+      body_html: '<h2>Care</h2><img src="https://cdn.shopify.com/care.png"><script>alert(1)</script><a href="javascript:bad()">bad</a>',
       published_at: "2024-04-03T02:01:00Z",
       created_at: "2024-04-01T00:00:00Z",
       updated_at: "2024-04-02T00:00:00Z",
@@ -80,26 +80,26 @@ describe("page transform", () => {
       title: "Media",
       handle: "media",
       body_html: [
-        '<img alt="allowed" src="https://CDN.Example.Test/ok.webp">',
-        '<img alt="suffix" src="https://cdn.example.test.evil/bad.png">',
-        '<img alt="credentials" src="https://user@cdn.example.test/bad.png">',
-        '<img alt="port" src="https://cdn.example.test:8443/bad.png">',
+        '<img alt="allowed" src="https://CDN.Shopify.Com/ok.webp">',
+        '<img alt="suffix" src="https://cdn.shopify.com.evil/bad.png">',
+        '<img alt="credentials" src="https://user@cdn.shopify.com/bad.png">',
+        '<img alt="port" src="https://cdn.shopify.com:8443/bad.png">',
         '<img alt="ip" src="https://127.0.0.1/bad.png">',
         '<img alt="localhost" src="https://localhost/bad.png">',
         '<img alt="javascript" src="javascript:alert(1)">',
       ].join(""),
-    }], { ...options, allowedMediaHosts: ["CDN.Example.Test"] });
+    }], { ...options, allowedMediaHosts: ["CDN.Shopify.Com"] });
 
     expect(result.records[0].media).toHaveLength(1);
     expect(result.records[0].media[0]).toMatchObject({
-      sourceHost: "cdn.example.test",
-      sourceUrl: "https://cdn.example.test/ok.webp",
+      sourceHost: "cdn.shopify.com",
+      sourceUrl: "https://cdn.shopify.com/ok.webp",
     });
     expect(result.records[0].page.content.match(/\bsrc=/gu)).toHaveLength(1);
     expect(result.records[0].page.content).not.toContain('src="https://');
     expect(result.records[0].page.content).not.toContain("javascript:");
-    expect(result.records[0].page.content).not.toContain("cdn.example.test.evil");
-    expect(result.records[0].page.content).not.toContain("https://user@cdn.example.test/bad.png");
+    expect(result.records[0].page.content).not.toContain("cdn.shopify.com.evil");
+    expect(result.records[0].page.content).not.toContain("https://user@cdn.shopify.com/bad.png");
   });
 
   it.each([
@@ -107,12 +107,27 @@ describe("page transform", () => {
     "sub.localhost",
     "127.0.0.1",
     "[::1]",
-    "cdn.example.test:443",
-    "user@cdn.example.test",
+    "cdn.shopify.com:443",
+    "user@cdn.shopify.com",
+    "merchant-assets.example.test",
   ])("rejects unsafe media allowlist entry %s", (host) => {
-    expect(() => transformPages([], { ...options, allowedMediaHosts: [host] })).toThrow(
-      "Invalid allowed media hostname",
-    );
+    expect(() => transformPages([], { ...options, allowedMediaHosts: [host] })).toThrow(/allowed media hostname/);
+  });
+
+  it("accepts only the /cdn/ asset boundary on an exact myshopify host", () => {
+    const result = transformPages([{
+      id: 21,
+      title: "Shop assets",
+      handle: "shop-assets",
+      body_html: [
+        '<img alt="good" src="https://example-store.myshopify.com/cdn/good.png">',
+        '<img alt="bad" src="https://example-store.myshopify.com/files/bad.png">',
+      ].join(""),
+    }], { ...options, allowedMediaHosts: ["example-store.myshopify.com"] });
+
+    expect(result.records[0].media).toHaveLength(1);
+    expect(result.records[0].media[0].sourceUrl).toBe("https://example-store.myshopify.com/cdn/good.png");
+    expect(result.records[0].page.content).not.toContain("/files/bad.png");
   });
 
   it("rejects content beyond the current page persistence limits", () => {

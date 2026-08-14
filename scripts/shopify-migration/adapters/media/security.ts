@@ -26,6 +26,11 @@ export interface VerifiedMedia {
 }
 
 const blockedAddresses = new BlockList();
+const MYSHOPIFY_HOST = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.myshopify\.com$/u;
+
+function isShopifyAssetHost(hostname: string): boolean {
+  return hostname === "cdn.shopify.com" || MYSHOPIFY_HOST.test(hostname);
+}
 for (const [address, prefix] of [
   ["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8],
   ["169.254.0.0", 16], ["172.16.0.0", 12], ["192.0.0.0", 24], ["192.0.2.0", 24],
@@ -67,8 +72,12 @@ function allowedHostnames(hosts: readonly string[]): ReadonlySet<string> {
   for (const raw of hosts) {
     if (!raw || raw.includes("://") || /[/\\@:#?%\[\]*]/u.test(raw)) throw new Error("Invalid allowed media hostname");
     const hostname = new URL(`https://${raw}`).hostname.toLowerCase();
-    if (hostname !== raw.toLowerCase() || isIP(hostname) !== 0 || !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u.test(hostname)) {
-      throw new Error("Invalid allowed media hostname");
+    if (
+      hostname !== raw.toLowerCase() || isIP(hostname) !== 0 ||
+      !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u.test(hostname) ||
+      !isShopifyAssetHost(hostname)
+    ) {
+      throw new Error("Invalid or non-Shopify allowed media hostname");
     }
     result.add(hostname);
   }
@@ -81,7 +90,8 @@ function mediaUrl(value: string, allowed: ReadonlySet<string>): URL {
   const hostname = url.hostname.toLowerCase();
   if (
     url.protocol !== "https:" || url.username || url.password || url.port || url.hash ||
-    isIP(hostname) !== 0 || !allowed.has(hostname)
+    isIP(hostname) !== 0 || !allowed.has(hostname) || !isShopifyAssetHost(hostname) ||
+    (MYSHOPIFY_HOST.test(hostname) && !url.pathname.startsWith("/cdn/"))
   ) throw new Error("Media URL is not an allowed exact HTTPS origin");
   return url;
 }

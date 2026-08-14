@@ -23,7 +23,7 @@ function product(price: string, currencyHandle = "example"): ShopifyProduct {
     created_at: "2025-01-01T03:04:05Z",
     updated_at: "2025-01-03T03:04:05Z",
     options: [{ id: 21, name: "Size", values: ["Small", "Large"] }],
-    images: [{ id: 31, src: "https://cdn.example.test/image.JPG?width=800", alt: "Front", width: 800, height: 600 }],
+    images: [{ id: 31, src: "https://cdn.shopify.com/image.JPG?width=800", alt: "Front", width: 800, height: 600 }],
     variants: [{
       id: 41,
       sku: "SKU-ONE",
@@ -49,7 +49,7 @@ describe("catalog transforms", () => {
     const result = transformProducts([product(major, `product-${currency.toLowerCase()}`)], {
       currency,
       generatedAt,
-      allowedMediaHosts: ["cdn.example.test"],
+      allowedMediaHosts: ["cdn.shopify.com"],
       inventoryLocationId: "warehouse-main",
       fulfillmentType: "physical",
     });
@@ -66,7 +66,7 @@ describe("catalog transforms", () => {
       published_at: "2025-01-01T00:00:00Z",
       products_count: 1,
     };
-    const categories = transformCollections([collection], { generatedAt, allowedMediaHosts: ["cdn.example.test"] });
+    const categories = transformCollections([collection], { generatedAt, allowedMediaHosts: ["cdn.shopify.com"] });
     const memberships = collectionMembershipByProduct(
       [{ id: 60, collection_id: 50, product_id: 10 }],
       categories.idMap,
@@ -76,7 +76,7 @@ describe("catalog transforms", () => {
       generatedAt,
       inventoryLocationId: "warehouse-main",
       fulfillmentType: "physical" as const,
-      allowedMediaHosts: ["cdn.example.test"],
+      allowedMediaHosts: ["cdn.shopify.com"],
       categoryIdsByProduct: memberships,
     };
     const first = transformProducts([source], options);
@@ -148,10 +148,10 @@ describe("catalog transforms", () => {
       title: "Summer & More",
       handle: "summer-more",
       body_html: "<p>Seasonal <script>bad()</script> choices</p>",
-      image: { src: "https://cdn.example.test/collection.webp", alt: "Seasonal" },
+      image: { src: "https://cdn.shopify.com/collection.webp", alt: "Seasonal" },
       published_at: null,
       updated_at: "bad-date",
-    }], { generatedAt, allowedMediaHosts: ["cdn.example.test"] });
+    }], { generatedAt, allowedMediaHosts: ["cdn.shopify.com"] });
 
     expect(result.records[0].category).toMatchObject({
       name: JSON.stringify({ en: "Summer & More" }),
@@ -174,7 +174,7 @@ describe("catalog transforms", () => {
       currency: "USD",
       inventoryLocationId: "warehouse-main",
       fulfillmentType: "physical" as const,
-      allowedMediaHosts: ["cdn.example.test"],
+      allowedMediaHosts: ["cdn.shopify.com"],
     };
     const first = transformProducts([source], { ...base, generatedAt: "2026-01-01T00:00:00Z" });
     const second = transformProducts([source], { ...base, generatedAt: "2027-01-01T00:00:00Z" });
@@ -204,7 +204,7 @@ describe("catalog transforms", () => {
       id: 1,
       title: "Denied image",
       handle: "denied-image",
-      image: { src: "https://cdn.example.test/category.png" },
+      image: { src: "https://cdn.shopify.com/category.png" },
     }], { generatedAt, allowedMediaHosts: [] });
     expect(deniedCategory.records[0].media).toEqual([]);
     expect(deniedCategory.records[0].category.primary_image).toBeNull();
@@ -215,14 +215,14 @@ describe("catalog transforms", () => {
     oversized.title = "x".repeat(501);
     oversized.images = Array.from({ length: 251 }, (_, index) => ({
       id: index,
-      src: `https://cdn.example.test/${index}.png`,
+      src: `https://cdn.shopify.com/${index}.png`,
     }));
     expect(transformProducts([oversized], {
       currency: "USD",
       generatedAt,
       inventoryLocationId: "warehouse-main",
       fulfillmentType: "physical",
-      allowedMediaHosts: ["cdn.example.test"],
+      allowedMediaHosts: ["cdn.shopify.com"],
     }).records).toEqual([]);
 
     expect(transformCollections([{
@@ -262,7 +262,7 @@ describe("catalog transforms", () => {
       generatedAt,
       inventoryLocationId: "warehouse-main",
       fulfillmentType: "physical",
-      allowedMediaHosts: ["cdn.example.test"],
+      allowedMediaHosts: ["cdn.shopify.com"],
     });
 
     expect(result.records).toHaveLength(1);
