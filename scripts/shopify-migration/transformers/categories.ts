@@ -77,8 +77,6 @@ export function transformCollections(
       skipped.push({ record: collection, reason: `Duplicate category slug: ${slug}` });
       return;
     }
-    slugs.add(slug);
-
     const id = deterministicProviderId(SHOPIFY_PROVIDER, "category", sourceId);
     const description = collection.body_html
       ? JSON.stringify({ en: excerptFromHtml(collection.body_html, 10_000) ?? "" })
@@ -87,6 +85,7 @@ export function transformCollections(
       skipped.push({ record: collection, reason: "Category description exceeds the SQL-safe text limit" });
       return;
     }
+    slugs.add(slug);
     idMap.set(providerFingerprint(SHOPIFY_PROVIDER, "category", sourceId), id);
     const image = collection.image?.src
       ? mediaRewrite(collection.image.src, allowedMediaHosts, id, "category", 1, {
