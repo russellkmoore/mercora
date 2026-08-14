@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ShopifyCollection, ShopifyProduct } from "@/scripts/shopify-migration/lib/types";
+import { providerFingerprint } from "@/scripts/shopify-migration/lib/ids";
 import { transformCollections } from "@/scripts/shopify-migration/transformers/categories";
 import {
   collectionMembershipByProduct,
@@ -121,16 +122,27 @@ describe("catalog transforms", () => {
 
     const duplicateVariants = product("1");
     duplicateVariants.variants.push({ ...duplicateVariants.variants[0], id: 42 });
-    const duplicateProduct = { ...product("2"), id: 11 };
-    const result = transformProducts([duplicateVariants, duplicateProduct], {
+    const duplicateVariantResult = transformProducts([duplicateVariants], {
       currency: "USD",
       generatedAt,
       allowedMediaHosts: [],
       inventoryLocationId: "warehouse-main",
       fulfillmentType: "physical",
     });
-    expect(result.records[0].variants).toHaveLength(1);
-    expect(result.skipped[0].reason).toContain("Duplicate product slug");
+    expect(duplicateVariantResult.records[0].variants).toHaveLength(1);
+    expect(duplicateVariantResult.warnings.some((warning) => warning.includes("duplicate SKU"))).toBe(true);
+
+    const duplicateProduct = { ...product("2"), id: 11 };
+    const duplicateSlugResult = transformProducts([product("1"), duplicateProduct], {
+      currency: "USD",
+      generatedAt,
+      allowedMediaHosts: [],
+      inventoryLocationId: "warehouse-main",
+      fulfillmentType: "physical",
+    });
+    expect(duplicateSlugResult.records).toEqual([]);
+    expect(duplicateSlugResult.skipped).toHaveLength(2);
+    expect(duplicateSlugResult.skipped.every(({ reason }) => reason.toLowerCase().includes("ambiguous duplicate") && reason.includes("slug"))).toBe(true);
 
     const bad = product("not-money", "bad-price");
     expect(transformProducts([bad], {
@@ -250,11 +262,13 @@ describe("catalog transforms", () => {
   });
 
   it("does not reserve product slugs or SKUs when an earlier product fails later validation", () => {
+    const ids = [100, 101].sort((left, right) => providerFingerprint("shopify", "product", left)
+      .localeCompare(providerFingerprint("shopify", "product", right)));
     const rejected = product("1.00", "shared-product");
-    rejected.id = 100;
+    rejected.id = ids[0];
     rejected.body_html = `<p>${"😀".repeat(21_000)}</p>`;
     const accepted = product("2.00", "shared-product");
-    accepted.id = 101;
+    accepted.id = ids[1];
     accepted.variants[0].id = 102;
 
     const result = transformProducts([rejected, accepted], {
@@ -270,5 +284,50 @@ describe("catalog transforms", () => {
     expect(result.records[0].variants[0].sku).toBe("SKU-ONE");
     expect(result.skipped).toHaveLength(1);
     expect(result.skipped[0].reason).toContain("SQL-safe");
+  });
+
+  it("produces identical catalog rows and collection positions for permuted provider input", () => {
+    const collections: ShopifyCollection[] = [
+      { id: 30, title: "Thirty", handle: "thirty" },
+      { id: 10, title: "Ten", handle: "ten" },
+      { id: 20, title: "Twenty", handle: "twenty" },
+    ];
+    const firstCategories = transformCollections(collections, { generatedAt, allowedMediaHosts: [] });
+    const secondCategories = transformCollections([...collections].reverse(), { generatedAt, allowedMediaHosts: [] });
+    expect(firstCategories.records).toEqual(secondCategories.records);
+    expect(firstCategories.records.map(({ category }) => category.position)).toEqual([1, 2, 3]);
+
+    const products = [
+      { ...product("1.00", "shared"), id: 300, variants: [{ ...product("1.00").variants[0], id: 301, sku: "SKU-A" }] },
+      { ...product("2.00", "shared"), id: 200, variants: [{ ...product("2.00").variants[0], id: 201, sku: "SKU-B" }] },
+      { ...product("3.00", "other"), id: 400, variants: [{ ...product("3.00").variants[0], id: 401, sku: "SKU-A" }] },
+    ];
+    const transform = (input: ShopifyProduct[]) => transformProducts(input, {
+      currency: "USD",
+      generatedAt,
+      inventoryLocationId: "warehouse-main",
+      fulfillmentType: "physical",
+      allowedMediaHosts: ["cdn.shopify.com"],
+    });
+    const first = transform(products);
+    const second = transform([...products].reverse());
+    expect(first.records).toEqual(second.records);
+    expect(first.skipped.map(({ record, reason }) => [record.id, reason])).toEqual(
+      second.skipped.map(({ record, reason }) => [record.id, reason]),
+    );
+    expect(first.warnings).toEqual(second.warnings);
+    expect(first.records).toEqual([]);
+    expect(first.skipped).toHaveLength(3);
+
+    const duplicateCategories = [
+      { id: 1, title: "One", handle: "shared-category" },
+      { id: 2, title: "Two", handle: "shared-category" },
+    ];
+    const categoryConflicts = transformCollections(duplicateCategories, { generatedAt, allowedMediaHosts: [] });
+    const reversedCategoryConflicts = transformCollections([...duplicateCategories].reverse(), { generatedAt, allowedMediaHosts: [] });
+    expect(categoryConflicts.records).toEqual([]);
+    expect(categoryConflicts.skipped.map(({ record }) => record.id)).toEqual(
+      reversedCategoryConflicts.skipped.map(({ record }) => record.id),
+    );
   });
 });

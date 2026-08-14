@@ -3,6 +3,7 @@ import { isIP } from "node:net";
 import { CURRENCY_PRECISION } from "../../../lib/money/currencies.js";
 import { Money, type StoredMoney } from "../../../lib/money/money.js";
 import { sanitizeRichHtmlServer } from "../../../lib/utils/sanitize-html-core.js";
+import { providerFingerprint } from "../lib/ids.js";
 
 export const SHOPIFY_PROVIDER = "shopify";
 /** Stable persistence fallback when Shopify provides no usable source timestamp. */
@@ -84,6 +85,29 @@ export interface PureTransformResult<TSource, TRecord> {
   idMap: Map<string, string>;
   skipped: Array<TransformFailure<TSource>>;
   warnings: string[];
+}
+
+/** Canonicalize top-level provider records and identify ambiguous repeated source IDs. */
+export function canonicalProviderRecords<T>(
+  records: readonly T[],
+  entity: string,
+  sourceId: (record: T) => string | number | null | undefined,
+): { records: T[]; duplicateFingerprints: ReadonlySet<string> } {
+  const keyed = records.map((record, index) => {
+    const raw = String(sourceId(record) ?? "").trim();
+    return {
+      record,
+      key: raw ? providerFingerprint(SHOPIFY_PROVIDER, entity, raw) : `~${String(index).padStart(12, "0")}`,
+      valid: Boolean(raw),
+    };
+  });
+  const counts = new Map<string, number>();
+  for (const item of keyed) if (item.valid) counts.set(item.key, (counts.get(item.key) ?? 0) + 1);
+  keyed.sort((left, right) => left.key < right.key ? -1 : left.key > right.key ? 1 : 0);
+  return {
+    records: keyed.map(({ record }) => record),
+    duplicateFingerprints: new Set([...counts].flatMap(([key, count]) => count > 1 ? [key] : [])),
+  };
 }
 
 export function requiredMigrationTime(value: string): string {

@@ -5,6 +5,7 @@ import {
   SHOPIFY_PROVIDER,
   UNKNOWN_SOURCE_UNIX_TIMESTAMP,
   boundedPositiveInteger,
+  canonicalProviderRecords,
   excerptFromHtml,
   fitsEscapedSqlText,
   mediaHostAllowlist,
@@ -96,11 +97,13 @@ export function transformBlogContent(
   const categoryIdMap = new Map<string, string>();
   const skipped: Array<TransformFailure<ShopifyBlog | ShopifyArticle>> = [];
   const warnings: string[] = [];
-  const categorySlugs = new Set<string>();
-  const postSlugs = new Set<string>();
   const blogByFingerprint = new Map<string, { slug: string; handle: string }>();
+  const blogHandleByFingerprint = new Map<string, string>();
+  const blogSourceByFingerprint = new Map<string, ShopifyBlog>();
+  const articleSourceByFingerprint = new Map<string, ShopifyArticle>();
 
-  for (const blog of blogs) {
+  const canonicalBlogs = canonicalProviderRecords(blogs, "blog", (blog) => blog.id);
+  for (const blog of canonicalBlogs.records) {
     const sourceId = String(blog.id ?? "").trim();
     const name = blog.title?.trim();
     const slug = normalizeSlug(blog.handle ?? "");
@@ -112,14 +115,13 @@ export function transformBlogContent(
       skipped.push({ record: blog, reason: "Blog requires an id, title, and valid handle" });
       continue;
     }
-    if (categorySlugs.has(slug)) {
-      skipped.push({ record: blog, reason: `Duplicate blog category slug: ${slug}` });
+    const fingerprint = providerFingerprint(SHOPIFY_PROVIDER, "blog", sourceId);
+    if (canonicalBlogs.duplicateFingerprints.has(fingerprint)) {
+      skipped.push({ record: blog, reason: "Duplicate blog source identity" });
       continue;
     }
-    categorySlugs.add(slug);
-    const fingerprint = providerFingerprint(SHOPIFY_PROVIDER, "blog", sourceId);
-    categoryIdMap.set(fingerprint, slug);
-    blogByFingerprint.set(fingerprint, { slug, handle: exactHandle });
+    blogHandleByFingerprint.set(fingerprint, exactHandle);
+    blogSourceByFingerprint.set(fingerprint, blog);
     categories.push({
       sourceFingerprint: fingerprint,
       record: {
@@ -133,7 +135,26 @@ export function transformBlogContent(
     });
   }
 
-  for (const article of articles) {
+  const categorySlugCounts = new Map<string, number>();
+  for (const category of categories) {
+    categorySlugCounts.set(category.record.slug, (categorySlugCounts.get(category.record.slug) ?? 0) + 1);
+  }
+  const acceptedCategories = categories.flatMap((category) => {
+    if (categorySlugCounts.get(category.record.slug) === 1) return [category];
+    skipped.push({
+      record: blogSourceByFingerprint.get(category.sourceFingerprint)!,
+      reason: `Ambiguous duplicate blog category slug: ${category.record.slug}`,
+    });
+    return [];
+  });
+  for (const category of acceptedCategories) {
+    const handle = blogHandleByFingerprint.get(category.sourceFingerprint)!;
+    categoryIdMap.set(category.sourceFingerprint, category.record.slug);
+    blogByFingerprint.set(category.sourceFingerprint, { slug: category.record.slug, handle });
+  }
+
+  const canonicalArticles = canonicalProviderRecords(articles, "article", (article) => article.id);
+  for (const article of canonicalArticles.records) {
     const sourceId = String(article.id ?? "").trim();
     const sourceFingerprint = sourceId && sourceId.length <= 256
       ? providerFingerprint(SHOPIFY_PROVIDER, "article", sourceId)
@@ -147,6 +168,10 @@ export function transformBlogContent(
     const slug = normalizeSlug(article.handle ?? "");
     const exactHandle = article.handle?.trim();
     const author = article.author?.trim() || fallbackAuthor;
+    if (sourceFingerprint && canonicalArticles.duplicateFingerprints.has(sourceFingerprint)) {
+      skipped.push({ record: article, reason: "Duplicate article source identity" });
+      continue;
+    }
     if (
       !sourceFingerprint || sourceId.length > 256 || !category || !title || title.length > 200 || !slug || slug.length > 160 || !author ||
       author.length > 160 || (article.body_html?.length ?? 0) > 100_000 ||
@@ -159,10 +184,6 @@ export function transformBlogContent(
           ? "Article references a blog that was not imported"
           : "Article requires an id, title, author, and valid handle",
       });
-      continue;
-    }
-    if (postSlugs.has(slug)) {
-      skipped.push({ record: article, reason: `Duplicate blog post slug: ${slug}` });
       continue;
     }
     const ownerId = deterministicProviderId(SHOPIFY_PROVIDER, "article", sourceId);
@@ -199,8 +220,7 @@ export function transformBlogContent(
       continue;
     }
 
-    postSlugs.add(slug);
-
+    articleSourceByFingerprint.set(sourceFingerprint, article);
     records.push({
       sourceFingerprint,
       categoryReference: {
@@ -237,8 +257,17 @@ export function transformBlogContent(
       },
       conflict: { strategy: "insert-only", key: "slug", onConflict: "skip" },
     });
-    idMap.set(sourceFingerprint, slug);
   }
-
-  return { categories, records, idMap, categoryIdMap, skipped, warnings };
+  const postSlugCounts = new Map<string, number>();
+  for (const post of records) postSlugCounts.set(post.record.slug, (postSlugCounts.get(post.record.slug) ?? 0) + 1);
+  const acceptedRecords = records.flatMap((record) => {
+    if (postSlugCounts.get(record.record.slug) === 1) return [record];
+    skipped.push({
+      record: articleSourceByFingerprint.get(record.sourceFingerprint)!,
+      reason: `Ambiguous duplicate blog post slug: ${record.record.slug}`,
+    });
+    return [];
+  });
+  for (const record of acceptedRecords) idMap.set(record.sourceFingerprint, record.record.slug);
+  return { categories: acceptedCategories, records: acceptedRecords, idMap, categoryIdMap, skipped, warnings };
 }
