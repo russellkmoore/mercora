@@ -8,6 +8,7 @@ const PUBLIC_MEDIA_PREFIXES = new Set(["products", "categories", "blog", "pages"
 const SAFE_KEY_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._~-]*$/;
 const MAX_KEY_LENGTH = 1024;
 const IMMUTABLE_CACHE = "public, max-age=31536000, immutable";
+const INERT_MEDIA_CSP = "default-src 'none'; sandbox";
 
 const CONTENT_TYPES_BY_EXTENSION: Readonly<Record<string, string>> = {
   avif: "image/avif",
@@ -23,6 +24,7 @@ function simpleResponse(message: string, status: number, head = false): Response
     status,
     headers: {
       "Cache-Control": "no-store",
+      "Content-Security-Policy": INERT_MEDIA_CSP,
       "Content-Type": "text/plain; charset=utf-8",
       "X-Content-Type-Options": "nosniff",
     },
@@ -63,6 +65,7 @@ function verifiedContentType(object: R2Object): string | null {
 function responseHeaders(object: R2Object, contentType: string): Headers {
   const headers = new Headers({
     "Cache-Control": IMMUTABLE_CACHE,
+    "Content-Security-Policy": INERT_MEDIA_CSP,
     "Content-Length": String(object.size),
     "Content-Type": contentType,
     "ETag": object.httpEtag,
