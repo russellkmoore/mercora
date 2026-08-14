@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { JudgeMeReview } from "@/scripts/shopify-migration/lib/types";
+import type { JudgeMeFileRow, JudgeMeReview } from "@/scripts/shopify-migration/lib/types";
 import { providerFingerprint } from "@/scripts/shopify-migration/lib/ids";
 import {
   judgeMeReviewFingerprint,
+  normalizeJudgeMeFileRow,
+  normalizeJudgeMeFileRows,
   transformJudgeMeReviews,
 } from "@/scripts/shopify-migration/transformers/sensitive/reviews";
 
@@ -38,6 +40,51 @@ function mappings() {
 }
 
 describe("Judge.me review transform", () => {
+  it("normalizes bounded Judge.me CSV strings into typed reviews", () => {
+    const row: JudgeMeFileRow = {
+      title: "  Example review  ",
+      body: "Line one.\r\nLine two.",
+      rating: " 5 ",
+      created_at: " 2025-01-01T00:00:00Z ",
+      reviewer_name: " Example Reviewer ",
+      reviewer_email: " REVIEWER@EXAMPLE.INVALID ",
+      product_id: " product-source-private ",
+      product_handle: " example-product ",
+      status: " approved ",
+      ignored_private_column: "not retained",
+    };
+
+    expect(normalizeJudgeMeFileRow(row)).toEqual({
+      title: "Example review",
+      body: "Line one.\nLine two.",
+      rating: 5,
+      review_date: "2025-01-01T00:00:00Z",
+      reviewer_name: "Example Reviewer",
+      reviewer_email: "reviewer@example.invalid",
+      product_id: "product-source-private",
+      product_handle: "example-product",
+      status: "approved",
+    });
+  });
+
+  it("rejects invalid CSV ratings and bounds without retaining raw rows", () => {
+    const privateMarker = "private-reviewer@example.invalid";
+    const result = normalizeJudgeMeFileRows([
+      { rating: "4.5", body: "Synthetic body", product_handle: "example-product" },
+      { rating: "5", body: "x".repeat(10_001), product_handle: "example-product" },
+      { rating: "5", body: "Synthetic body", reviewer_email: privateMarker },
+    ]);
+
+    expect(result.records).toEqual([]);
+    expect(result.skipped.map(({ reason }) => reason)).toEqual([
+      "Review rating must be an integer from 1 to 5",
+      "Text exceeds 10000 characters",
+      "Review product identity is missing",
+    ]);
+    expect(result.skipped.every((entry) => entry.sourceFingerprint === null)).toBe(true);
+    expect(JSON.stringify(result)).not.toContain(privateMarker);
+  });
+
   it("is deterministic and defaults to pending, unverified history", () => {
     const options = { generatedAt, ...mappings() };
     const first = transformJudgeMeReviews([review()], options);

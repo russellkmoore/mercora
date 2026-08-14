@@ -65,6 +65,12 @@ export function safeTargetId(value: string | undefined): string | null {
   return normalized && SAFE_TARGET_ID.test(normalized) ? normalized : null;
 }
 
+/** Clerk ownership IDs are the only valid customer primary/foreign keys. */
+export function safeClerkUserId(value: string | undefined): string | null {
+  const normalized = value?.trim();
+  return normalized && /^user_[A-Za-z0-9]{8,250}$/.test(normalized) ? normalized : null;
+}
+
 export function resolvedProviderId(
   mappings: ReadonlyMap<string, string> | undefined,
   entity: string,

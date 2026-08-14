@@ -15,6 +15,7 @@ import {
   boundedText,
   normalizedEmail,
   resolvedProviderId,
+  safeClerkUserId,
   type SensitiveTransformResult,
   sourceId,
 } from "./_shared.js";
@@ -52,6 +53,7 @@ export interface HistoricalOrderTransformOptions {
   customerIds?: ReadonlyMap<string, string>;
   productIds?: ReadonlyMap<string, string>;
   variantIds?: ReadonlyMap<string, string>;
+  unresolvedCustomer: "reject" | "guest";
 }
 
 function address(value: ShopifyCustomerAddress | null | undefined): MACHAddress | null {
@@ -150,6 +152,9 @@ export function transformHistoricalOrders(
   options: HistoricalOrderTransformOptions,
 ): SensitiveTransformResult<HistoricalOrderTransformRecord> {
   assertBatchSize(orders.length);
+  if (options.unresolvedCustomer !== "reject" && options.unresolvedCustomer !== "guest") {
+    throw new TypeError("unresolvedCustomer must explicitly be reject or guest");
+  }
   const generatedAt = requiredMigrationTime(options.generatedAt);
   const records: HistoricalOrderTransformRecord[] = [];
   const idMap = new Map<string, string>();
@@ -171,11 +176,17 @@ export function transformHistoricalOrders(
       const total = majorToStoredMoney(order.total_price, currency);
       const items = order.line_items.map((item, position) =>
         checkedLineItem(item, providerId, position + 1, currency, options));
-      const customerId = order.customer?.id === undefined
-        ? null
-        : resolvedProviderId(options.customerIds, "customer", sourceId(order.customer.id));
-      if (order.customer?.id !== undefined && !customerId) {
-        warnings.push(`Order ${sourceFingerprint} has no imported customer mapping; retained as guest history`);
+      let customerId: string | null = null;
+      if (order.customer?.id !== undefined) {
+        const customerSource = sourceId(order.customer.id);
+        const customerFingerprint = providerFingerprint(SHOPIFY_PROVIDER, "customer", customerSource);
+        customerId = safeClerkUserId(options.customerIds?.get(customerFingerprint));
+        if (!customerId) {
+          if (options.unresolvedCustomer === "reject") {
+            throw new TypeError("Order customer requires a resolved Clerk user ID");
+          }
+          warnings.push(`Order ${sourceFingerprint} has no resolved Clerk customer; retained as explicit guest history`);
+        }
       }
       const shippingAddress = address(order.shipping_address);
       const billingAddress = address(order.billing_address);

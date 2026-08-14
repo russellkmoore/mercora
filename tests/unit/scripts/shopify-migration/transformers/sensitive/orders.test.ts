@@ -42,7 +42,7 @@ function order(overrides: Partial<ShopifyOrder> = {}): ShopifyOrder {
 
 function mappings() {
   return {
-    customerIds: new Map([[providerFingerprint("shopify", "customer", "customer-source-private"), "customer_target"]]),
+    customerIds: new Map([[providerFingerprint("shopify", "customer", "customer-source-private"), "user_1234567890"]]),
     productIds: new Map([[providerFingerprint("shopify", "product", "product-source-private"), "product_target"]]),
     variantIds: new Map([[providerFingerprint("shopify", "variant", "variant-source-private"), "variant_target"]]),
   };
@@ -50,7 +50,7 @@ function mappings() {
 
 describe("historical Shopify order transform", () => {
   it("emits deterministic exact Money, OrderItem, address, and timestamp shapes", () => {
-    const options = { generatedAt, ...mappings() };
+    const options = { generatedAt, unresolvedCustomer: "reject" as const, ...mappings() };
     const first = transformHistoricalOrders([order()], options);
     const second = transformHistoricalOrders([order()], options);
     expect(first).toEqual(second);
@@ -58,7 +58,7 @@ describe("historical Shopify order transform", () => {
 
     const record = first.records[0].order;
     expect(record.id).toMatch(/^shopify_order_[a-f0-9]{24}$/);
-    expect(record.customer_id).toBe("customer_target");
+    expect(record.customer_id).toBe("user_1234567890");
     expect(record.status).toBe("shipped");
     expect(record.total_amount).toBe(JSON.stringify({ amount: 2349, currency: "USD" }));
     expect(JSON.parse(record.items)).toEqual([{
@@ -85,7 +85,11 @@ describe("historical Shopify order transform", () => {
   });
 
   it("marks external history read-only and never Stripe-paid or effect-eligible", () => {
-    const result = transformHistoricalOrders([order()], { generatedAt, ...mappings() });
+    const result = transformHistoricalOrders([order()], {
+      generatedAt,
+      unresolvedCustomer: "reject",
+      ...mappings(),
+    });
     const record = result.records[0].order;
     const extensions = JSON.parse(record.extensions);
     const external = JSON.parse(record.external_references);
@@ -109,7 +113,7 @@ describe("historical Shopify order transform", () => {
       order({ id: "refunded", financial_status: "refunded", fulfillment_status: null }),
       order({ id: "voided", financial_status: "voided", cancelled_at: "2025-01-03T00:00:00Z" }),
       order({ id: "partial", financial_status: "partially_paid", fulfillment_status: "partial" }),
-    ], { generatedAt, ...mappings() });
+    ], { generatedAt, unresolvedCustomer: "reject", ...mappings() });
     expect(result.records.map(({ order: value }) => [value.status, value.payment_status])).toEqual([
       ["refunded", "refunded"],
       ["cancelled", "failed"],
@@ -118,7 +122,10 @@ describe("historical Shopify order transform", () => {
   });
 
   it("retains missing catalog identities as deterministic historical references", () => {
-    const result = transformHistoricalOrders([order()], { generatedAt });
+    const result = transformHistoricalOrders([order()], {
+      generatedAt,
+      unresolvedCustomer: "guest",
+    });
     const item = JSON.parse(result.records[0].order.items)[0];
     expect(item.product_id).toMatch(/^shopify_historical_product_/);
     expect(item.variant_id).toMatch(/^shopify_historical_variant_/);
@@ -132,7 +139,7 @@ describe("historical Shopify order transform", () => {
       order({ id: "quantity", line_items: [{ ...order().line_items[0], quantity: 0 }] }),
       order({ id: "discount", line_items: [{ ...order().line_items[0], total_discount: "99.00" }] }),
       order({ id: "oversized", line_items: Array.from({ length: 501 }, () => order().line_items[0]) }),
-    ], { generatedAt, ...mappings() });
+    ], { generatedAt, unresolvedCustomer: "reject", ...mappings() });
     expect(result.records).toEqual([]);
     expect(result.skipped.map(({ reason }) => reason)).toEqual([
       "Unsupported migration currency: ZZZ",
@@ -141,5 +148,38 @@ describe("historical Shopify order transform", () => {
       "Orders require 1-500 line items",
     ]);
     expect(result.skipped.every((entry) => !("record" in entry))).toBe(true);
+  });
+
+  it("never persists provisional customer IDs and requires explicit unresolved handling", () => {
+    const customerFingerprint = providerFingerprint("shopify", "customer", "customer-source-private");
+    const provisional = new Map([
+      [customerFingerprint, "shopify_customer_deadbeefdeadbeefdeadbeef"],
+    ]);
+    const rejected = transformHistoricalOrders([order()], {
+      generatedAt,
+      unresolvedCustomer: "reject",
+      ...mappings(),
+      customerIds: provisional,
+    });
+    const guest = transformHistoricalOrders([order()], {
+      generatedAt,
+      unresolvedCustomer: "guest",
+      ...mappings(),
+      customerIds: provisional,
+    });
+
+    expect(rejected.records).toEqual([]);
+    expect(rejected.skipped[0].reason).toBe("Order customer requires a resolved Clerk user ID");
+    expect(guest.records[0].order.customer_id).toBeNull();
+    expect(JSON.stringify(guest.records[0])).not.toContain("shopify_customer_deadbeef");
+  });
+
+  it("rejects a missing unresolved-customer policy at runtime", () => {
+    expect(() => transformHistoricalOrders([order()], {
+      generatedAt,
+      ...mappings(),
+    } as unknown as Parameters<typeof transformHistoricalOrders>[1])).toThrow(
+      "unresolvedCustomer must explicitly be reject or guest",
+    );
   });
 });

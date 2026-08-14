@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ReviewStatus } from "../../../../lib/types/review.js";
-import type { JudgeMeReview } from "../../lib/types.js";
+import type { JudgeMeFileRow, JudgeMeReview } from "../../lib/types.js";
 import { deterministicProviderId, providerFingerprint } from "../../lib/ids.js";
 import {
   SHOPIFY_PROVIDER,
@@ -18,6 +18,12 @@ import {
 } from "./_shared.js";
 
 const REVIEW_PROVIDER = "judge_me";
+
+export interface JudgeMeNormalizationResult {
+  records: JudgeMeReview[];
+  skipped: Array<{ sourceFingerprint: string | null; reason: string }>;
+  warnings: string[];
+}
 
 export interface ImportedReviewInsertRecord {
   id: string;
@@ -73,6 +79,68 @@ export function judgeMeReviewFingerprint(review: JudgeMeReview): string {
   ]);
   const materialDigest = createHash("sha256").update(material, "utf8").digest("hex");
   return providerFingerprint(REVIEW_PROVIDER, "review", materialDigest);
+}
+
+/**
+ * Convert one bounded CSV row into the typed input accepted by the review
+ * transform. Unknown CSV columns and raw row objects never cross this seam.
+ */
+export function normalizeJudgeMeFileRow(row: JudgeMeFileRow): JudgeMeReview {
+  const ratingText = boundedText(row.rating, 8, { required: true })!;
+  if (!/^[1-5]$/.test(ratingText)) {
+    throw new RangeError("Review rating must be an integer from 1 to 5");
+  }
+  const body = boundedText(row.body, 10_000, { required: true, multiline: true })!;
+  const reviewDate = boundedText(row.review_date ?? row.created_at, 100);
+  const title = boundedText(row.title, 200);
+  const reviewerName = boundedText(row.reviewer_name, 200);
+  const reviewerEmail = normalizedEmail(row.reviewer_email);
+  const productId = boundedText(row.product_id, 512);
+  const productHandle = boundedText(row.product_handle, 255);
+  if (!productId && !productHandle) {
+    throw new TypeError("Review product identity is missing");
+  }
+  const reply = boundedText(row.reply, 5_000, { multiline: true });
+  const pictureUrls = boundedText(row.picture_urls, 10_000, { multiline: true });
+  const source = boundedText(row.source, 100);
+  const status = boundedText(row.status, 64);
+
+  return {
+    body,
+    rating: Number(ratingText),
+    ...(title ? { title } : {}),
+    ...(reviewDate ? { review_date: reviewDate } : {}),
+    ...(reviewerName ? { reviewer_name: reviewerName } : {}),
+    ...(reviewerEmail ? { reviewer_email: reviewerEmail } : {}),
+    ...(productId ? { product_id: productId } : {}),
+    ...(productHandle ? { product_handle: productHandle } : {}),
+    ...(reply ? { reply } : {}),
+    ...(pictureUrls ? { picture_urls: pictureUrls } : {}),
+    ...(source ? { source } : {}),
+    ...(status ? { status } : {}),
+  };
+}
+
+/** Batch normalizer with privacy-safe failure reporting for operator tooling. */
+export function normalizeJudgeMeFileRows(
+  rows: readonly JudgeMeFileRow[],
+): JudgeMeNormalizationResult {
+  assertBatchSize(rows.length);
+  const records: JudgeMeReview[] = [];
+  const skipped: JudgeMeNormalizationResult["skipped"] = [];
+
+  for (const row of rows) {
+    try {
+      records.push(normalizeJudgeMeFileRow(row));
+    } catch (error) {
+      skipped.push({
+        sourceFingerprint: null,
+        reason: error instanceof Error ? error.message : "Judge.me file row is invalid",
+      });
+    }
+  }
+
+  return { records, skipped, warnings: [] };
 }
 
 function resolvedProductId(review: JudgeMeReview, mappings: ReadonlyMap<string, string>): string | null {
