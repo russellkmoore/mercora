@@ -76,9 +76,8 @@ export async function generateStaticParams() {
 /**
  * Page component
  */
-export default async function PublicPage({ params }: PageProps) {
+async function loadPublicPage(slug: string) {
   try {
-    const { slug } = await params;
     const page = await getPageBySlug(slug, false, { includeProtected: true });
     
     if (!page) {
@@ -97,20 +96,28 @@ export default async function PublicPage({ params }: PageProps) {
 
     const store = getStoreConfig();
     const customJsEnabled = await getCustomJsEnabled();
-    return (
-      <PageRenderer
-        page={page}
-        allowedImageOrigin={store.urls.imageCdn}
-        customJsEnabled={customJsEnabled}
-        storeName={store.identity.name}
-        supportEmail={store.contact.supportEmail}
-        assistantName={store.identity.assistantName}
-      />
-    );
-    
+    return { page, store, customJsEnabled };
   } catch (error) {
     unstable_rethrow(error);
     console.error("Error loading page:", error);
     throw error;
   }
+}
+
+export default async function PublicPage({ params }: PageProps) {
+  const { slug } = await params;
+  const { page, store, customJsEnabled } = await loadPublicPage(slug);
+  return (
+    <PageRenderer
+      page={page}
+      allowedImageOrigin={store.urls.imageCdn}
+      customJsEnabled={customJsEnabled}
+      storeName={store.identity.name}
+      supportEmail={store.contact.supportEmail}
+      assistantName={store.identity.assistantName}
+      privacyUrl={store.urls.privacy}
+      termsUrl={store.urls.terms}
+      returnsUrl={store.urls.returns}
+    />
+  );
 }

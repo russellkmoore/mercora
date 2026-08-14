@@ -11,7 +11,7 @@ describe('HTML sanitizer source and sink wiring', () => {
     const renderer = source('app/[slug]/PageRenderer.tsx');
 
     expect(renderer).toContain('sanitizePageHtmlServer(page.content, { allowedImageOrigin })');
-    expect(renderer).toContain('dangerouslySetInnerHTML={{ __html: sanitizedContent }}');
+    expect(renderer).toContain('parsePageHtml(sanitized');
     expect(renderer).not.toContain('dangerouslySetInnerHTML={{ __html: page.content }}');
   });
 
