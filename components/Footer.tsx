@@ -23,7 +23,7 @@ const GRID_CLASSES = {
 export default async function Footer() {
   const store = getStoreConfig();
   const [pagesResult, socialResult] = await Promise.allSettled([
-    getNavigationPages(),
+    getNavigationPages({ limit: 100 }),
     getSocialMediaSettings(),
   ]);
   const pages = pagesResult.status === "fulfilled" ? pagesResult.value : [];
@@ -42,6 +42,15 @@ export default async function Footer() {
     const href = safeSocialUrl(raw);
     return href ? [{ label, href }] : [];
   });
+  const availablePagePaths = new Set(pages.map((page) => `/${page.slug}`));
+  const policyLinks = [
+    ["Returns", store.urls.returns],
+    ["Privacy", store.urls.privacy],
+    ["Terms", store.urls.terms],
+  ].filter((entry): entry is [string, string] => {
+    const href = entry[1];
+    return /^https:\/\//.test(href) || availablePagePaths.has(href);
+  });
 
   const columns = [
     pages.length > 0 ? (
@@ -53,16 +62,14 @@ export default async function Footer() {
     ) : (
       <div key="pages" className="space-y-2">
         <h2 className="mb-3 font-semibold text-white">Explore</h2>
-        <Link href="/products" className="block hover:text-white">Products</Link>
+        <Link href="/" className="block hover:text-white">Home</Link>
         <Link href="/blog" className="block hover:text-white">Blog</Link>
       </div>
     ),
     <div key="support" className="space-y-2">
       <h2 className="mb-3 font-semibold text-white">Support</h2>
       <a href={`mailto:${store.contact.supportEmail}`} className="block hover:text-white">Contact support</a>
-      <Link href={store.urls.returns} className="block hover:text-white">Returns</Link>
-      <Link href={store.urls.privacy} className="block hover:text-white">Privacy</Link>
-      <Link href={store.urls.terms} className="block hover:text-white">Terms</Link>
+      {policyLinks.map(([label, href]) => <Link key={label} href={href} className="block hover:text-white">{label}</Link>)}
     </div>,
     ...(social.length > 0 ? [
       <div key="social" className="space-y-2">

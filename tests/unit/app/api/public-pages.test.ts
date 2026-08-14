@@ -58,6 +58,9 @@ describe("public CMS APIs", () => {
     const response = await listPages(new NextRequest("https://store.example.test/api/pages"));
     const body = await response.json() as { data: Array<Record<string, unknown>> };
     expect(body.data[0]).not.toHaveProperty("custom_js");
+    expect(body.data[0]).not.toHaveProperty("content");
+    expect(body.data[0]).not.toHaveProperty("custom_css");
+    expect(mocks.getPublishedPages).toHaveBeenCalledWith({ limit: 10, offset: 0 });
   });
 
   it("bounds search input before model access", async () => {
@@ -66,5 +69,15 @@ describe("public CMS APIs", () => {
     ));
     expect(response.status).toBe(400);
     expect(mocks.searchPages).not.toHaveBeenCalled();
+  });
+
+  it("passes bounded search pagination through to the model", async () => {
+    mocks.searchPages.mockResolvedValue([]);
+    await listPages(new NextRequest("https://store.example.test/api/pages?search=guide&limit=5&offset=25"));
+    expect(mocks.searchPages).toHaveBeenCalledWith("guide", {
+      includeUnpublished: false,
+      limit: 5,
+      offset: 25,
+    });
   });
 });

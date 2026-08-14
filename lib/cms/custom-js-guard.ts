@@ -33,14 +33,14 @@ export function customJsChanged(
 export function logCustomJsAudit(entry: {
   actorUserId?: string;
   pageId?: number;
-  action: "create" | "update";
+  action: "create" | "update" | "publish" | "enable" | "disable";
   allowed: boolean;
 }): void {
   console.warn("[audit][cms.custom_js]", JSON.stringify({
     event: "cms.custom_js.write",
     action: entry.action,
     allowed: entry.allowed,
-    actorUserId: entry.actorUserId ?? "unknown",
+    actorType: entry.actorUserId ? "authenticated" : "unknown",
     pageId: entry.pageId ?? null,
     at: new Date().toISOString(),
   }));

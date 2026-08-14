@@ -97,4 +97,26 @@ describe("admin CMS custom JavaScript writes", () => {
     expect(response.status).toBe(500);
     expect(mocks.logCustomJsAudit).not.toHaveBeenCalledWith(expect.objectContaining({ allowed: true }));
   });
+
+  it("requires a super-admin to publish a page containing stored JavaScript", async () => {
+    const denied = await PUT(request("PUT", { action: "publish" }), {
+      params: Promise.resolve({ id: "7" }),
+    });
+    expect(denied.status).toBe(403);
+    expect(mocks.publishPage).not.toHaveBeenCalled();
+    expect(mocks.logCustomJsAudit).toHaveBeenCalledWith(expect.objectContaining({
+      action: "publish", allowed: false,
+    }));
+
+    mocks.isSuperAdminActor.mockResolvedValue(true);
+    mocks.publishPage.mockResolvedValue({ ...currentPage, status: "published" });
+    const allowed = await PUT(request("PUT", { action: "publish" }), {
+      params: Promise.resolve({ id: "7" }),
+    });
+    expect(allowed.status).toBe(200);
+    expect(mocks.publishPage).toHaveBeenCalledWith(7, "admin_1");
+    expect(mocks.logCustomJsAudit).toHaveBeenCalledWith(expect.objectContaining({
+      action: "publish", allowed: true,
+    }));
+  });
 });

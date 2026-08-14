@@ -54,6 +54,18 @@ describe('page write sanitization', () => {
     expect(mocks.db.insert).not.toHaveBeenCalled();
   });
 
+  it('rejects reserved and generated-empty slugs before inserting', async () => {
+    await expect(createPage({
+      title: 'Blog', slug: 'blog', content: '<p>Body</p>', status: 'draft',
+    } as any)).rejects.toThrow('Slug conflicts with a storefront route');
+
+    mocks.db.select.mockReturnValue({ from: vi.fn().mockResolvedValue([]) });
+    await expect(createPage({
+      title: '!!!', content: '<p>Body</p>', status: 'draft',
+    } as any)).rejects.toThrow('Slug is required');
+    expect(mocks.db.insert).not.toHaveBeenCalled();
+  });
+
   it('persists sanitized create content in both the page and initial history version', async () => {
     const pageValues = vi.fn();
     const versionValues = vi.fn();

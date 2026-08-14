@@ -5,7 +5,8 @@ ledger. Reservations prevent parallel feature branches from reusing a number.
 
 | Migration | Owner | Purpose | State |
 | --- | --- | --- | --- |
-| `0018` | `O01` | Email preferences and unsubscribe suppression | Reserved on `agent/o01-customer-communications` |
+| `0018` | `O01` | Email preferences and unsubscribe suppression | Merged |
+| `0019` | `O02` | Blog and neutral structured content publishing | Reserved on `agent/o02-content-publishing` |
 
-After O01 merges, later schema work (including O02 and O05) must start after
-`0018` and reconcile against the then-current main branch.
+The next schema-bearing extraction must start at `0020` and reconcile against
+the then-current main branch before it commits a migration.

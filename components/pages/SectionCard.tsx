@@ -17,6 +17,12 @@ export default function SectionCard({ section, product }: { section: PageSection
             </ul>
           )}
           <div className="prose prose-invert prose-orange max-w-none" dangerouslySetInnerHTML={{ __html: section.html }} />
+          {!product && section.productFallbackHtml && (
+            <div
+              className="prose prose-invert prose-orange mt-4 max-w-none"
+              dangerouslySetInnerHTML={{ __html: section.productFallbackHtml }}
+            />
+          )}
           {section.callouts.map((callout) => (
             <p key={callout} className="mt-4 rounded-r-lg border-l-4 border-orange-500 bg-neutral-800 p-4 text-neutral-300">{callout}</p>
           ))}

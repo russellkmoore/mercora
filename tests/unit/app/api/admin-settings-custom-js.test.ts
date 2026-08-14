@@ -28,6 +28,19 @@ function request(value: boolean) {
   });
 }
 
+function duplicateRequest() {
+  return new NextRequest("https://store.example.test/api/admin/settings", {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: "https://store.example.test" },
+    body: JSON.stringify({
+      updates: [
+        { key: "cms.custom_js_enabled", value: false, category: "cms" },
+        { key: "cms.custom_js_enabled", value: true, category: "cms" },
+      ],
+    }),
+  });
+}
+
 describe("admin custom JavaScript setting", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -57,6 +70,13 @@ describe("admin custom JavaScript setting", () => {
       const response = await POST(request(true));
       expect(response.status).toBe(403);
     }
+    expect(mocks.getDbAsync).not.toHaveBeenCalled();
+  });
+
+  it("rejects duplicate kill-switch updates instead of accepting a hidden enable", async () => {
+    const response = await POST(duplicateRequest());
+    expect(response.status).toBe(400);
+    expect(mocks.isSuperAdminActor).not.toHaveBeenCalled();
     expect(mocks.getDbAsync).not.toHaveBeenCalled();
   });
 });
