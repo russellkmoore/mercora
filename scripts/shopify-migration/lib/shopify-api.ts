@@ -16,6 +16,28 @@ const DEFAULT_MAX_RECORDS = 50_000;
 const DEFAULT_MAX_RETRIES = 4;
 const DEFAULT_MAX_RETRY_AFTER_MS = 30_000;
 
+const PUBLIC_RESOURCES = new Set([
+  "blogs.json",
+  "collects.json",
+  "custom_collections.json",
+  "pages.json",
+  "products.json",
+  "redirects.json",
+  "smart_collections.json",
+]);
+const SENSITIVE_RESOURCES = new Set(["customers.json", "orders.json"]);
+
+function assertSupportedResource(resource: string, includeSensitive: boolean): void {
+  const articleResource = /^blogs\/\d+\/articles\.json$/u.test(resource);
+  if (SENSITIVE_RESOURCES.has(resource)) {
+    if (!includeSensitive) throw new Error("Sensitive Shopify extraction requires confirmed sensitive-data access");
+    return;
+  }
+  if (!PUBLIC_RESOURCES.has(resource) && !articleResource) {
+    throw new Error("Shopify resource is not supported by this migration toolkit");
+  }
+}
+
 export interface ShopifyClientOptions {
   origin: string;
   accessToken: string;
@@ -158,6 +180,7 @@ export class ShopifyClient {
     if (!/^[a-z][a-z0-9_-]*(?:\/[a-z0-9_-]+)*\.json$/.test(resource)) {
       throw new Error("Shopify resource must be a safe relative JSON endpoint");
     }
+    assertSupportedResource(resource, this.includeSensitive);
     if (!/^[a-z][a-z0-9_]*$/.test(key)) throw new Error("Shopify response key is invalid");
     const pageSize = boundedInteger(options.pageSize ?? 250, "pageSize", 250);
     const maxPages = boundedInteger(options.maxPages ?? this.maxPages, "maxPages", this.maxPages);

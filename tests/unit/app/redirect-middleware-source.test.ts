@@ -7,6 +7,7 @@ describe("legacy redirect middleware integration", () => {
     expect(source).toContain("resolveLegacyRedirect(req.url");
     expect(source).toContain("eq(redirectMap.sourcePath, sourcePath)");
     expect(source).toContain("NextResponse.redirect(redirect.url, redirect.statusCode)");
+    expect(source).toContain('"/(products|collections|pages|blogs|policies)/(.*)"');
     expect(source).not.toMatch(/pathname\.startsWith\('\/products\/\'[\s\S]*?destination/);
   });
 });
