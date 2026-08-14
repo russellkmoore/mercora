@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { ShopifyCustomer, ShopifyCustomerAddress } from "@/scripts/shopify-migration/lib/types";
-import { transformCustomers } from "@/scripts/shopify-migration/transformers/sensitive/customers";
+import {
+  materializeCustomers,
+  transformCustomers,
+} from "@/scripts/shopify-migration/transformers/sensitive/customers";
 
 const generatedAt = "2026-08-14T12:00:00.000Z";
 
@@ -45,8 +48,14 @@ describe("sensitive customer transform", () => {
     expect(first.skipped).toEqual([]);
 
     const transformed = first.records[0];
-    const record = transformed.customer;
-    expect(record.id).toMatch(/^shopify_customer_[a-f0-9]{24}$/);
+    expect(transformed).not.toHaveProperty("id");
+    expect(transformed).not.toHaveProperty("customer");
+    expect(transformed.provisioningReference).toMatch(/^shopify_customer_provisioning_[a-f0-9]{24}$/);
+    const materialized = materializeCustomers(first.records, new Map([
+      [transformed.sourceFingerprint, "user_1234567890"],
+    ]));
+    const record = materialized.records[0];
+    expect(record.id).toBe("user_1234567890");
     expect(record.status).toBe("active");
     expect(JSON.parse(record.person)).toEqual({
       email: "person@example.invalid",
@@ -77,8 +86,8 @@ describe("sensitive customer transform", () => {
     expect(JSON.parse(record.tags!)).toEqual(["Member", "Example"]);
     expect(transformed.sourceFingerprint).toMatch(/^[a-f0-9]{64}$/);
     expect(transformed.emailFingerprint).toMatch(/^[a-f0-9]{64}$/);
-    expect([...first.idMap.values()]).toEqual([record.id]);
-    expect([...first.emailIdMap.values()]).toEqual([record.id]);
+    expect([...materialized.idMap.values()]).toEqual([record.id]);
+    expect([...materialized.emailIdMap.values()]).toEqual([record.id]);
   });
 
   it("persists provider fingerprints instead of raw provider identifiers", () => {
@@ -86,7 +95,7 @@ describe("sensitive customer transform", () => {
     const serialized = JSON.stringify(result.records[0]);
     expect(serialized).not.toContain("customer-source-private");
     expect(serialized).not.toContain("address-source-private");
-    expect(JSON.parse(result.records[0].customer.external_references)).toEqual({
+    expect(JSON.parse(result.records[0].customerFields.external_references)).toEqual({
       shopify_fingerprint: result.records[0].sourceFingerprint,
     });
   });
@@ -96,9 +105,41 @@ describe("sensitive customer transform", () => {
       verified_email: false,
       addresses: [address({ country_code: undefined, country: "Long country name" })],
     })], { generatedAt });
-    expect(result.records[0].customer.status).toBe("pending_verification");
-    expect(result.records[0].customer.addresses).toBeNull();
+    expect(result.records[0].customerFields.status).toBe("pending_verification");
+    expect(result.records[0].customerFields.addresses).toBeNull();
     expect(result.warnings[0]).toContain("address omitted");
+  });
+
+  it("cannot materialize provisional or missing identities as customer primary keys", () => {
+    const plans = transformCustomers([customer()], { generatedAt }).records;
+    const fingerprint = plans[0].sourceFingerprint;
+    const missing = materializeCustomers(plans, new Map());
+    const provisional = materializeCustomers(plans, new Map([
+      [fingerprint, plans[0].provisioningReference],
+    ]));
+
+    expect(missing.records).toEqual([]);
+    expect(provisional.records).toEqual([]);
+    expect(provisional.skipped[0].reason).toBe("Customer requires a resolved Clerk user ID");
+    expect(JSON.stringify(provisional)).not.toContain('"id":"shopify_customer_');
+  });
+
+  it("cannot override a resolved Clerk ID through forged insert fields", () => {
+    const plans = transformCustomers([customer()], { generatedAt }).records;
+    const fingerprint = plans[0].sourceFingerprint;
+    const forged = [{
+      ...plans[0],
+      customerFields: {
+        ...plans[0].customerFields,
+        id: "shopify_customer_deadbeefdeadbeefdeadbeef",
+      },
+    }];
+
+    const result = materializeCustomers(forged, new Map([
+      [fingerprint, "user_1234567890"],
+    ]));
+    expect(result.records[0].id).toBe("user_1234567890");
+    expect(JSON.stringify(result.records[0])).not.toContain("shopify_customer_deadbeef");
   });
 
   it("skips invalid, duplicate, and over-bounded sensitive records", () => {

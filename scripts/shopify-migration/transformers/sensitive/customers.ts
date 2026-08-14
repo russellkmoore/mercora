@@ -13,6 +13,7 @@ import {
   boundedText,
   emailFingerprint,
   normalizedEmail,
+  safeClerkUserId,
   type SensitiveTransformResult,
   sourceId,
 } from "./_shared.js";
@@ -31,18 +32,28 @@ export interface CustomerInsertRecord {
   extensions: string;
 }
 
-export interface CustomerTransformRecord {
+export type CustomerInsertFields = Omit<CustomerInsertRecord, "id">;
+
+export interface CustomerProvisioningPlan {
   sourceFingerprint: string;
   emailFingerprint: string;
-  customer: CustomerInsertRecord;
+  /** Stable operator reference only. It is never a Mercora customer ID. */
+  provisioningReference: string;
+  customerFields: CustomerInsertFields;
 }
 
 export interface CustomerTransformOptions {
   generatedAt: string;
 }
 
-export interface CustomerTransformResult
-  extends SensitiveTransformResult<CustomerTransformRecord> {
+export interface CustomerProvisioningResult {
+  records: CustomerProvisioningPlan[];
+  skipped: Array<{ sourceFingerprint: string | null; reason: string }>;
+  warnings: string[];
+}
+
+export interface MaterializedCustomerResult
+  extends SensitiveTransformResult<CustomerInsertRecord> {
   emailIdMap: Map<string, string>;
 }
 
@@ -92,12 +103,10 @@ function customerAddress(
 export function transformCustomers(
   customers: readonly ShopifyCustomer[],
   options: CustomerTransformOptions,
-): CustomerTransformResult {
+): CustomerProvisioningResult {
   assertBatchSize(customers.length);
   const generatedAt = requiredMigrationTime(options.generatedAt);
-  const records: CustomerTransformRecord[] = [];
-  const idMap = new Map<string, string>();
-  const emailIdMap = new Map<string, string>();
+  const records: CustomerProvisioningPlan[] = [];
   const skipped: Array<{ sourceFingerprint: string | null; reason: string }> = [];
   const warnings: string[] = [];
   const seenSources = new Set<string>();
@@ -113,7 +122,11 @@ export function transformCustomers(
       if (seenSources.has(sourceFingerprint)) throw new TypeError("Duplicate customer source identity");
       if (seenEmails.has(email)) throw new TypeError("Duplicate normalized customer email");
 
-      const id = deterministicProviderId(SHOPIFY_PROVIDER, "customer", providerId);
+      const provisioningReference = deterministicProviderId(
+        SHOPIFY_PROVIDER,
+        "customer_provisioning",
+        providerId,
+      );
       const sourceAddresses = customer.addresses ?? (customer.default_address ? [customer.default_address] : []);
       if (sourceAddresses.length > MAX_ADDRESSES) throw new RangeError("Customer has too many addresses");
       const addresses = sourceAddresses.flatMap((address, position) => {
@@ -146,8 +159,8 @@ export function transformCustomers(
       records.push({
         sourceFingerprint,
         emailFingerprint: emailKey,
-        customer: {
-          id,
+        provisioningReference,
+        customerFields: {
           type: "person",
           status: customer.verified_email === true ? "active" : "pending_verification",
           external_references: JSON.stringify({ shopify_fingerprint: sourceFingerprint }),
@@ -185,8 +198,6 @@ export function transformCustomers(
       });
       seenSources.add(sourceFingerprint);
       seenEmails.add(email);
-      idMap.set(sourceFingerprint, id);
-      emailIdMap.set(emailKey, id);
     } catch (error) {
       skipped.push({
         sourceFingerprint: failedFingerprint,
@@ -195,5 +206,47 @@ export function transformCustomers(
     }
   }
 
-  return { records, idMap, emailIdMap, skipped, warnings };
+  return { records, skipped, warnings };
+}
+
+/**
+ * Materialize insertable rows only after the operator provisions Clerk users.
+ * A missing or non-Clerk mapping never becomes a customer primary key.
+ */
+export function materializeCustomers(
+  plans: readonly CustomerProvisioningPlan[],
+  clerkUserIds: ReadonlyMap<string, string>,
+): MaterializedCustomerResult {
+  assertBatchSize(plans.length);
+  const records: CustomerInsertRecord[] = [];
+  const idMap = new Map<string, string>();
+  const emailIdMap = new Map<string, string>();
+  const skipped: Array<{ sourceFingerprint: string | null; reason: string }> = [];
+  const seenClerkIds = new Set<string>();
+  const seenEmailFingerprints = new Set<string>();
+
+  for (const plan of plans) {
+    const clerkId = safeClerkUserId(clerkUserIds.get(plan.sourceFingerprint));
+    if (!clerkId) {
+      skipped.push({
+        sourceFingerprint: plan.sourceFingerprint,
+        reason: "Customer requires a resolved Clerk user ID",
+      });
+      continue;
+    }
+    if (seenClerkIds.has(clerkId) || seenEmailFingerprints.has(plan.emailFingerprint)) {
+      skipped.push({
+        sourceFingerprint: plan.sourceFingerprint,
+        reason: "Customer provisioning resolution is duplicated",
+      });
+      continue;
+    }
+    records.push({ ...plan.customerFields, id: clerkId });
+    idMap.set(plan.sourceFingerprint, clerkId);
+    emailIdMap.set(plan.emailFingerprint, clerkId);
+    seenClerkIds.add(clerkId);
+    seenEmailFingerprints.add(plan.emailFingerprint);
+  }
+
+  return { records, idMap, emailIdMap, skipped, warnings: [] };
 }
