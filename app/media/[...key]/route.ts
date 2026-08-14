@@ -7,7 +7,7 @@ interface RouteContext {
 const PUBLIC_MEDIA_PREFIXES = new Set(["products", "categories", "blog", "pages"]);
 const SAFE_KEY_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._~-]*$/;
 const MAX_KEY_LENGTH = 1024;
-const IMMUTABLE_CACHE = "public, max-age=31536000, immutable";
+const REVALIDATING_CACHE = "public, max-age=0, must-revalidate";
 const INERT_MEDIA_CSP = "default-src 'none'; sandbox";
 
 const CONTENT_TYPES_BY_EXTENSION: Readonly<Record<string, string>> = {
@@ -64,7 +64,7 @@ function verifiedContentType(object: R2Object): string | null {
 
 function responseHeaders(object: R2Object, contentType: string): Headers {
   const headers = new Headers({
-    "Cache-Control": IMMUTABLE_CACHE,
+    "Cache-Control": REVALIDATING_CACHE,
     "Content-Security-Policy": INERT_MEDIA_CSP,
     "Content-Length": String(object.size),
     "Content-Type": contentType,

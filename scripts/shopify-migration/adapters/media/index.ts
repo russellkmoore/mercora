@@ -4,7 +4,7 @@ import { parseWranglerJsonc, resolveMediaTarget } from "../../lib/wrangler-targe
 import type { MediaRewrite } from "../../transformers/_shared.js";
 import { downloadVerifiedMedia, validateMediaPlan, type MediaDownloadOptions } from "./security.js";
 import {
-  IMMUTABLE_MEDIA_CACHE_CONTROL,
+  REVALIDATING_MEDIA_CACHE_CONTROL,
   storedMediaMatchesExpected,
   type ExpectedMediaObject,
   type MediaObjectStore,
@@ -60,7 +60,7 @@ function describeMedia(plan: MediaRewrite, bytes: Uint8Array): ExpectedMediaObje
   const hash = createHash("sha256").update(bytes);
   return {
     contentType: plan.contentType,
-    cacheControl: IMMUTABLE_MEDIA_CACHE_CONTROL,
+    cacheControl: REVALIDATING_MEDIA_CACHE_CONTROL,
     byteLength: bytes.byteLength,
     sha256: hash.copy().digest("hex"),
     sha256Base64: hash.digest("base64"),

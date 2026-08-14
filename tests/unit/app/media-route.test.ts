@@ -67,13 +67,13 @@ describe("same-origin public media route", () => {
     expect(resolvePublicMediaKey(segments)).toBeNull();
   });
 
-  it("streams verified image metadata with immutable defensive headers", async () => {
+  it("streams verified image metadata with revalidating defensive headers", async () => {
     const response = await GET(new Request("https://shop.example/media/products/example.png"), context("products", "example.png"));
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("image/png");
     expect(response.headers.get("content-length")).toBe("4");
     expect(response.headers.get("etag")).toBe('"abc123"');
-    expect(response.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    expect(response.headers.get("cache-control")).toBe("public, max-age=0, must-revalidate");
     expect(response.headers.get("content-security-policy")).toBe("default-src 'none'; sandbox");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3, 4]));
