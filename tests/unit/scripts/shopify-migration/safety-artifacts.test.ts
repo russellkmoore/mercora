@@ -1,7 +1,7 @@
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { deterministicProviderId, providerFingerprint } from "@/scripts/shopify-migration/lib/ids";
 import { IdMap } from "@/scripts/shopify-migration/lib/id-map";
 import { MigrationLogger, redactForLog, type StructuredLogRecord } from "@/scripts/shopify-migration/lib/logger";
@@ -70,6 +70,39 @@ describe("migration identity and artifacts", () => {
 
     expect(readFileSync(path, "utf8")).toBe("prior-valid\n");
     expect(readdirSync(output)).toEqual(["manifest.json"]);
+  });
+
+  it("fsyncs the parent directory after the atomic rename", () => {
+    const output = mkdtempSync(join(tmpdir(), "mercora-shopify-map-"));
+    roots.push(output);
+    const path = join(output, "manifest.json");
+    const events: string[] = [];
+    const directorySync = vi.fn((directory: string) => {
+      events.push("directory-sync");
+      expect(directory).toBe(output);
+    });
+    atomicWritePrivateFile(path, "complete\n", {
+      operations: {
+        rename: (from, to) => { events.push("rename"); renameSync(from, to); },
+        fsyncDirectory: directorySync,
+      },
+    });
+    expect(events).toEqual(["rename", "directory-sync"]);
+    expect(readFileSync(path, "utf8")).toBe("complete\n");
+  });
+
+  it("rejects non-regular, symlinked, and oversized ID-map inputs before parsing", () => {
+    const output = mkdtempSync(join(tmpdir(), "mercora-shopify-map-"));
+    roots.push(output);
+    mkdirSync(join(output, "directory-map"));
+    expect(() => IdMap.load(output, "directory-map")).toThrow(/regular non-symlink/);
+
+    writeFileSync(join(output, "target.json"), "{}", { mode: 0o600 });
+    symlinkSync(join(output, "target.json"), join(output, "linked.json"));
+    expect(() => IdMap.load(output, "linked.json")).toThrow(/symbolic link/);
+
+    writeFileSync(join(output, "oversized.json"), Buffer.alloc(10 * 1024 * 1024 + 1), { mode: 0o600 });
+    expect(() => IdMap.load(output, "oversized.json")).toThrow(/too large/);
   });
 });
 
