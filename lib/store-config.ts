@@ -63,6 +63,7 @@ export type StoreConfig = {
     description: string;
   };
   commerce: {
+    locale: string;
     currency: string;
     freeShippingThresholdCents?: number;
     carriers: readonly StoreCarrierDefinition[];
@@ -118,6 +119,7 @@ export const storeDefaults: StoreConfig = {
     description: "Mercora MCP Server for commerce workflows.",
   },
   commerce: {
+    locale: "en-US",
     currency: "USD",
     carriers: [
       {
@@ -214,6 +216,17 @@ function policyUrl(env: Environment, key: string, fallback: string): string {
 
 function siteUrl(env: Environment) {
   return optionalHttpsUrl(env, "NEXT_PUBLIC_SITE_URL") ?? storeDefaults.urls.site;
+}
+
+function locale(env: Environment): string {
+  const candidate = env.STORE_LOCALE?.trim();
+  if (!candidate || candidate.length > 100) return storeDefaults.commerce.locale;
+
+  try {
+    return Intl.getCanonicalLocales(candidate)[0] ?? storeDefaults.commerce.locale;
+  } catch {
+    return storeDefaults.commerce.locale;
+  }
 }
 
 const CARRIER_CODE_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
@@ -386,6 +399,7 @@ export function resolveStoreConfig(env: Environment = {}): StoreConfig {
     },
     commerce: {
       ...storeDefaults.commerce,
+      locale: locale(env),
       currency: text(env, "STORE_CURRENCY", storeDefaults.commerce.currency),
       freeShippingThresholdCents: parseOptionalCents(env["STORE_FREE_SHIPPING_THRESHOLD_CENTS"]),
       carriers: parseCarrierDefinitions(env["STORE_CARRIERS_JSON"]),
