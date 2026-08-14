@@ -1,10 +1,11 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { deterministicProviderId, providerFingerprint } from "@/scripts/shopify-migration/lib/ids";
 import { IdMap } from "@/scripts/shopify-migration/lib/id-map";
 import { MigrationLogger, redactForLog, type StructuredLogRecord } from "@/scripts/shopify-migration/lib/logger";
+import { atomicWritePrivateFile } from "@/scripts/shopify-migration/lib/private-atomic-file";
 
 const roots: string[] = [];
 afterEach(() => {
@@ -37,6 +38,38 @@ describe("migration identity and artifacts", () => {
     const output = mkdtempSync(join(tmpdir(), "mercora-shopify-map-"));
     roots.push(output);
     expect(() => new IdMap("shopify").save(output, "../map.json")).toThrow(/escapes/);
+  });
+
+  it("atomically replaces permissive artifacts with mode 0600", () => {
+    const output = mkdtempSync(join(tmpdir(), "mercora-shopify-map-"));
+    roots.push(output);
+    mkdirSync(join(output, "state"));
+    const path = join(output, "state/id-map.json");
+    writeFileSync(path, "old", { mode: 0o644 });
+    chmodSync(path, 0o644);
+
+    const map = new IdMap("shopify");
+    map.register("product", "1", "product_1");
+    map.save(output, "state/id-map.json");
+
+    expect(statSync(path).mode & 0o777).toBe(0o600);
+    expect(readFileSync(path, "utf8")).toContain('"authoritative": false');
+  });
+
+  it.each(["write", "rename"] as const)("preserves the prior artifact when atomic %s fails", (failure) => {
+    const output = mkdtempSync(join(tmpdir(), "mercora-shopify-map-"));
+    roots.push(output);
+    const path = join(output, "manifest.json");
+    writeFileSync(path, "prior-valid\n", { mode: 0o600 });
+
+    expect(() => atomicWritePrivateFile(path, "replacement\n", {
+      operations: failure === "write"
+        ? { write: () => { throw new Error("simulated write failure"); } }
+        : { rename: () => { throw new Error("simulated rename failure"); } },
+    })).toThrow(`simulated ${failure} failure`);
+
+    expect(readFileSync(path, "utf8")).toBe("prior-valid\n");
+    expect(readdirSync(output)).toEqual(["manifest.json"]);
   });
 });
 
