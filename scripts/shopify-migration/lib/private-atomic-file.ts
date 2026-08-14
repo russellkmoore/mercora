@@ -21,7 +21,26 @@ export interface AtomicFileOperations {
   fsync(fd: number): void;
   close(fd: number): void;
   rename(from: string, to: string): void;
+  fsyncDirectory(path: string): void;
   unlink(path: string): void;
+}
+
+function isUnsupportedDirectorySync(error: unknown): boolean {
+  if (!error || typeof error !== "object" || !("code" in error) || typeof error.code !== "string") return false;
+  return ["EINVAL", "ENOTSUP", "ENOSYS"].includes(error.code) ||
+    process.platform === "win32" && ["EACCES", "EISDIR", "EPERM"].includes(error.code);
+}
+
+function fsyncDirectory(path: string): void {
+  let directoryFd: number | undefined;
+  try {
+    directoryFd = openSync(path, "r");
+    fsyncSync(directoryFd);
+  } catch (error) {
+    if (!isUnsupportedDirectorySync(error)) throw error;
+  } finally {
+    if (directoryFd !== undefined) closeSync(directoryFd);
+  }
 }
 
 const nodeOperations: AtomicFileOperations = {
@@ -30,6 +49,7 @@ const nodeOperations: AtomicFileOperations = {
   fsync: fsyncSync,
   close: closeSync,
   rename: renameSync,
+  fsyncDirectory,
   unlink: unlinkSync,
 };
 
@@ -97,6 +117,7 @@ export function atomicWritePrivateFile(
     fd = undefined;
     operations.rename(tempPath, path);
     renamed = true;
+    operations.fsyncDirectory(dirname(path));
   } finally {
     if (fd !== undefined) {
       try { operations.close(fd); } catch { /* preserve the original failure */ }

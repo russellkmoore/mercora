@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { closeSync, constants, fstatSync, lstatSync, openSync, readSync } from "node:fs";
 import { providerFingerprint } from "./ids.js";
 import { atomicWritePrivateFile, resolvePrivateArtifactPath } from "./private-atomic-file.js";
 
@@ -79,8 +79,27 @@ export class IdMap {
 
   static load(root: string, requestedPath: string): IdMap {
     const path = resolvePrivateArtifactPath(root, requestedPath);
-    const content = readFileSync(path, "utf8");
-    if (Buffer.byteLength(content) > MAX_ARTIFACT_BYTES) throw new Error("ID map artifact is too large");
+    const pathMetadata = lstatSync(path);
+    if (pathMetadata.isSymbolicLink() || !pathMetadata.isFile()) throw new Error("ID map artifact must be a regular non-symlink file");
+    if (pathMetadata.size > MAX_ARTIFACT_BYTES) throw new Error("ID map artifact is too large");
+    const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    let content: string;
+    try {
+      const descriptorMetadata = fstatSync(fd);
+      if (!descriptorMetadata.isFile()) throw new Error("ID map artifact must be a regular non-symlink file");
+      if (descriptorMetadata.size > MAX_ARTIFACT_BYTES) throw new Error("ID map artifact is too large");
+      const bytes = Buffer.allocUnsafe(MAX_ARTIFACT_BYTES + 1);
+      let offset = 0;
+      while (offset < bytes.byteLength) {
+        const read = readSync(fd, bytes, offset, bytes.byteLength - offset, null);
+        if (read === 0) break;
+        offset += read;
+      }
+      if (offset > MAX_ARTIFACT_BYTES) throw new Error("ID map artifact is too large");
+      content = bytes.toString("utf8", 0, offset);
+    } finally {
+      closeSync(fd);
+    }
     const raw: unknown = JSON.parse(content);
     if (!raw || typeof raw !== "object") throw new Error("ID map artifact is invalid");
     const artifact = raw as Partial<IdMapArtifact>;
