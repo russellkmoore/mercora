@@ -11,10 +11,11 @@ describe("Shopify migration config", () => {
       includeSensitive: false,
       overwrite: false,
       confirmedSensitiveData: false,
+      confirmedPreview: false,
       confirmedProduction: false,
+      confirmedOverwrite: false,
     });
-    expect(config).not.toHaveProperty("d1DatabaseName");
-    expect(config).not.toHaveProperty("r2BucketName");
+    expect(config).not.toHaveProperty("wranglerEnvironment");
     expect(config.inputRoot).toBe("/operator/imports");
   });
 
@@ -49,14 +50,22 @@ describe("Shopify migration config", () => {
     }, ["--source=api"])).toThrow(/quarterly version/);
   });
 
-  it("requires explicit confirmations for sensitive data and production writes", () => {
+  it("requires explicit confirmations for sensitive data and remote writes", () => {
     expect(() => parseMigrationConfig({ MIGRATION_INPUT_ROOT: "input" }, ["--include-sensitive"]))
       .toThrow("--confirm-sensitive-data");
     expect(() => parseMigrationConfig({ MIGRATION_INPUT_ROOT: "input" }, ["--apply", "--target=production"]))
       .toThrow("--confirm-production");
+    expect(() => parseMigrationConfig(
+      { MIGRATION_INPUT_ROOT: "input" },
+      ["--apply", "--target=production", "--confirm-production"],
+    )).toThrow("MERCORA_ALLOW_PRODUCTION_IMPORTS=1");
+    expect(() => parseMigrationConfig(
+      { MIGRATION_INPUT_ROOT: "input" },
+      ["--apply", "--target=preview"],
+    )).toThrow("--confirm-preview");
 
     const config = parseMigrationConfig(
-      { MIGRATION_INPUT_ROOT: "input" },
+      { MIGRATION_INPUT_ROOT: "input", MERCORA_ALLOW_PRODUCTION_IMPORTS: "1" },
       ["--apply", "--target=production", "--confirm-production", "--include-sensitive", "--confirm-sensitive-data"],
     );
     expect(config.execution).toMatchObject({
@@ -69,9 +78,40 @@ describe("Shopify migration config", () => {
     });
   });
 
+  it("requires an independent overwrite confirmation for writes", () => {
+    expect(() => parseMigrationConfig(
+      { MIGRATION_INPUT_ROOT: "input" },
+      ["--apply", "--overwrite"],
+    )).toThrow("--confirm-overwrite");
+    expect(parseMigrationConfig(
+      { MIGRATION_INPUT_ROOT: "input" },
+      ["--apply", "--overwrite", "--confirm-overwrite"],
+    ).execution).toMatchObject({ apply: true, overwrite: true, confirmedOverwrite: true });
+  });
+
+  it("accepts a bounded Wrangler environment without resource-name overrides", () => {
+    const config = parseMigrationConfig(
+      {
+        MIGRATION_INPUT_ROOT: "input",
+        MIGRATION_D1_DATABASE: "typo-database",
+        MIGRATION_R2_BUCKET: "typo-bucket",
+      },
+      ["--env=staging"],
+    );
+    expect(config.wranglerEnvironment).toBe("staging");
+    expect(config).not.toHaveProperty("d1DatabaseName");
+    expect(config).not.toHaveProperty("r2BucketName");
+    expect(() => parseMigrationConfig({ MIGRATION_INPUT_ROOT: "input" }, ["--env=../../prod"]))
+      .toThrow("environment name");
+  });
+
   it("rejects unknown options and contradictory execution modes", () => {
     expect(() => parseMigrationConfig({ MIGRATION_INPUT_ROOT: "input" }, ["--delete-all"])).toThrow("Unknown");
     expect(() => parseMigrationConfig({ MIGRATION_INPUT_ROOT: "input" }, ["--apply", "--dry-run"]))
       .toThrow("mutually exclusive");
+    expect(() => parseMigrationConfig(
+      { MIGRATION_INPUT_ROOT: "input" },
+      ["--confirm-sensitive-data"],
+    )).toThrow("requires --include-sensitive");
   });
 });

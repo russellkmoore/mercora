@@ -10,7 +10,9 @@ export interface ExecutionPlan {
   includeSensitive: boolean;
   overwrite: boolean;
   confirmedSensitiveData: boolean;
+  confirmedPreview: boolean;
   confirmedProduction: boolean;
+  confirmedOverwrite: boolean;
 }
 
 export interface MigrationConfig {
@@ -22,8 +24,7 @@ export interface MigrationConfig {
   };
   inputRoot?: string;
   outputRoot?: string;
-  d1DatabaseName?: string;
-  r2BucketName?: string;
+  wranglerEnvironment?: string;
   execution: ExecutionPlan;
 }
 
@@ -88,11 +89,13 @@ export function parseMigrationConfig(
     "--include-sensitive",
     "--confirm-sensitive-data",
     "--overwrite",
+    "--confirm-overwrite",
+    "--confirm-preview",
     "--confirm-production",
   ]);
   for (const argument of args) {
     if (supported.has(argument)) continue;
-    if (["--source=", "--target=", "--input-root=", "--output-root="].some((prefix) => argument.startsWith(prefix))) continue;
+    if (["--source=", "--target=", "--input-root=", "--output-root=", "--env="].some((prefix) => argument.startsWith(prefix))) continue;
     throw new Error(`Unknown migration option: ${argument}`);
   }
 
@@ -109,35 +112,62 @@ export function parseMigrationConfig(
 
   const includeSensitive = hasFlag(args, "--include-sensitive");
   const confirmedSensitiveData = hasFlag(args, "--confirm-sensitive-data");
+  const confirmedPreview = hasFlag(args, "--confirm-preview");
   const confirmedProduction = hasFlag(args, "--confirm-production");
+  const overwrite = hasFlag(args, "--overwrite");
+  const confirmedOverwrite = hasFlag(args, "--confirm-overwrite");
   if (includeSensitive && !confirmedSensitiveData) {
     throw new Error("--include-sensitive requires --confirm-sensitive-data");
   }
+  if (!includeSensitive && confirmedSensitiveData) {
+    throw new Error("--confirm-sensitive-data requires --include-sensitive");
+  }
+  if (apply && target === "preview" && !confirmedPreview) {
+    throw new Error("Preview apply requires --confirm-preview");
+  }
   if (apply && target === "production" && !confirmedProduction) {
     throw new Error("Production apply requires --confirm-production");
+  }
+  if (apply && target === "production" && env.MERCORA_ALLOW_PRODUCTION_IMPORTS !== "1") {
+    throw new Error("Production apply requires MERCORA_ALLOW_PRODUCTION_IMPORTS=1");
+  }
+  if (confirmedPreview && target !== "preview") {
+    throw new Error("--confirm-preview may only be used with --target=preview");
+  }
+  if (confirmedProduction && target !== "production") {
+    throw new Error("--confirm-production may only be used with --target=production");
+  }
+  if (overwrite && apply && !confirmedOverwrite) {
+    throw new Error("Applying overwrite mode requires --confirm-overwrite");
+  }
+  if (!overwrite && confirmedOverwrite) {
+    throw new Error("--confirm-overwrite requires --overwrite");
   }
 
   const inputRootValue = flagValue(args, "--input-root") ?? env.MIGRATION_INPUT_ROOT;
   const outputRootValue = flagValue(args, "--output-root") ?? env.MIGRATION_OUTPUT_ROOT;
   const inputRoot = inputRootValue ? resolve(cwd, inputRootValue) : undefined;
   const outputRoot = outputRootValue ? resolve(cwd, outputRootValue) : undefined;
-  const d1DatabaseName = env.MIGRATION_D1_DATABASE?.trim() || undefined;
-  const r2BucketName = env.MIGRATION_R2_BUCKET?.trim() || undefined;
+  const wranglerEnvironment = flagValue(args, "--env")?.trim() || undefined;
+  if (wranglerEnvironment && !/^[a-z][a-z0-9_-]{0,62}$/i.test(wranglerEnvironment)) {
+    throw new Error("Wrangler environment name is invalid");
+  }
 
   const config: MigrationConfig = {
     sourceMode,
     ...(inputRoot ? { inputRoot } : {}),
     ...(outputRoot ? { outputRoot } : {}),
-    ...(d1DatabaseName ? { d1DatabaseName } : {}),
-    ...(r2BucketName ? { r2BucketName } : {}),
+    ...(wranglerEnvironment ? { wranglerEnvironment } : {}),
     execution: {
       dryRun: !apply,
       apply,
       target,
       includeSensitive,
-      overwrite: hasFlag(args, "--overwrite"),
+      overwrite,
       confirmedSensitiveData,
+      confirmedPreview,
       confirmedProduction,
+      confirmedOverwrite,
     },
   };
 
