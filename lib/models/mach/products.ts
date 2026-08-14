@@ -1,3 +1,8 @@
+function rowMatchesSlug(row: any, slug: string): boolean {
+  if (row.status !== 'active' || !row.slug) return false;
+  if (typeof row.slug === 'string') return row.slug === slug;
+  return typeof row.slug === 'object' && row.slug !== null && Object.values(row.slug).includes(slug);
+}
 
 /**
  * Get a product by its slug (MACH-compliant)
@@ -9,15 +14,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
   
   // Get the product first
   const results = await db.select().from(products);
-  const match = results.find((p: any) => {
-    if (p.status !== 'active') return false;
-    if (!p.slug) return false;
-    if (typeof p.slug === 'string') return p.slug === slug;
-    if (typeof p.slug === 'object' && p.slug !== null) {
-      return Object.values(p.slug).includes(slug);
-    }
-    return false;
-  });
+  const match = results.find((row: any) => rowMatchesSlug(row, slug));
   
   if (!match) return null;
   
@@ -130,6 +127,67 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
   });
   
   return product;
+}
+
+function parseStoredJson<T>(value: unknown, fallback: T): T {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value !== 'string') return value as T;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function parseBatchVariant(row: any): ProductVariant {
+  const price = parseStoredJson(row.price, { amount: 0, currency: 'USD' });
+  const inventory = parseStoredJson(row.inventory, { quantity: 0, status: 'out_of_stock' });
+  return {
+    ...row,
+    option_values: parseStoredJson(row.option_values, []),
+    price,
+    compare_at_price: row.compare_at_price ? parseStoredJson(row.compare_at_price, undefined) : undefined,
+    cost: row.cost ? parseStoredJson(row.cost, undefined) : undefined,
+    weight: row.weight ? parseStoredJson(row.weight, undefined) : undefined,
+    dimensions: row.dimensions ? parseStoredJson(row.dimensions, undefined) : undefined,
+    inventory,
+    shipping_required: row.shipping_required !== 0,
+    media: parseStoredJson(row.media, []),
+    attributes: parseStoredJson(row.attributes, {}),
+  } as ProductVariant;
+}
+
+/** Resolve several public slugs with one product scan and one variants query. */
+export async function getProductsBySlugs(slugs: string[]): Promise<Map<string, Product>> {
+  const resolved = new Map<string, Product>();
+  const wanted = [...new Set(slugs)].filter(Boolean);
+  if (wanted.length === 0) return resolved;
+
+  const db = await getDb();
+  const rows = await db.select().from(products);
+  const matches = wanted.flatMap((slug) => {
+    const row = rows.find((candidate: any) => rowMatchesSlug(candidate, slug));
+    return row ? [{ slug, row }] : [];
+  });
+  if (matches.length === 0) return resolved;
+
+  const variantRows = await db.select().from(product_variants).where(inArray(
+    product_variants.product_id,
+    matches.map(({ row }) => row.id),
+  ));
+  const variantsByProduct = new Map<string, ProductVariant[]>();
+  for (const row of variantRows) {
+    const variants = variantsByProduct.get(row.product_id) ?? [];
+    variants.push(parseBatchVariant(row));
+    variantsByProduct.set(row.product_id, variants);
+  }
+
+  for (const { slug, row } of matches) {
+    const product = deserializeProduct(row);
+    product.variants = variantsByProduct.get(row.id) ?? [];
+    resolved.set(slug, product);
+  }
+  return resolved;
 }
 /**
  * MACH Alliance Product Entity - Business Model
