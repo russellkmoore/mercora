@@ -5,51 +5,30 @@
  * and responsive design. Handles different page templates and layouts.
  */
 
-"use client";
-
 import Link from "next/link";
-import { useEffect } from "react";
 import { PageSelect } from "@/lib/db/schema/pages";
 import { Calendar, User } from "lucide-react";
-import { sanitizePageHtml } from "@/lib/utils/sanitize-html";
+import { sanitizePageHtmlServer } from "@/lib/utils/sanitize-html-server";
 import { formatCmsTimestamp } from "@/lib/utils/cms-timestamp";
+import CustomPageAssets from "@/components/pages/CustomPageAssets";
 
 interface PageRendererProps {
   page: PageSelect;
   allowedImageOrigin?: string;
+  customJsEnabled?: boolean;
+  storeName: string;
+  supportEmail: string;
+  assistantName: string;
 }
 
-export default function PageRenderer({ page, allowedImageOrigin }: PageRendererProps) {
-  // Inject custom CSS and JS if present
-  useEffect(() => {
-    // Handle custom CSS
-    if (page.custom_css) {
-      const styleElement = document.createElement('style');
-      styleElement.id = `page-${page.id}-styles`;
-      styleElement.textContent = page.custom_css;
-      document.head.appendChild(styleElement);
-
-      // Cleanup on unmount
-      return () => {
-        const existingStyle = document.getElementById(`page-${page.id}-styles`);
-        if (existingStyle) {
-          existingStyle.remove();
-        }
-      };
-    }
-  }, [page.custom_css, page.id]);
-
-  useEffect(() => {
-    // Handle custom JavaScript
-    if (page.custom_js) {
-      try {
-        const scriptFunction = new Function(page.custom_js);
-        scriptFunction();
-      } catch (error) {
-        console.error("Error executing custom JavaScript for page:", error);
-      }
-    }
-  }, [page.custom_js]);
+export default function PageRenderer({
+  page,
+  allowedImageOrigin,
+  customJsEnabled = false,
+  storeName,
+  supportEmail,
+  assistantName,
+}: PageRendererProps) {
 
   // Get page template styling
   const getTemplateClasses = (template: string) => {
@@ -76,12 +55,18 @@ export default function PageRenderer({ page, allowedImageOrigin }: PageRendererP
   };
 
   const templateClasses = getTemplateClasses(page.template || 'default');
-  const sanitizedContent = sanitizePageHtml(page.content, { allowedImageOrigin });
+  const sanitizedContent = sanitizePageHtmlServer(page.content, { allowedImageOrigin });
   const publishedLabel = formatCmsTimestamp(page.published_at);
   const updatedLabel = formatCmsTimestamp(page.updated_at);
 
   return (
     <>
+      <CustomPageAssets
+        pageId={page.id}
+        customCss={page.custom_css}
+        customJs={page.custom_js}
+        customJsEnabled={customJsEnabled}
+      />
       {/* Background Pattern - only for this page content area */}
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_30%_80%,rgba(255,165,0,0.1),transparent_50%),radial-gradient(circle_at_80%_20%,rgba(255,165,0,0.05),transparent_50%)] pointer-events-none -z-10" />
       <div className="fixed inset-0 bg-[linear-gradient(to_bottom,transparent_0%,rgba(0,0,0,0.8)_100%)] pointer-events-none -z-10" />
@@ -143,17 +128,11 @@ export default function PageRenderer({ page, allowedImageOrigin }: PageRendererP
                   </p>
                   <div className="flex flex-wrap gap-4">
                     <a 
-                      href="mailto:support@voltique.com" 
+                      href={`mailto:${supportEmail}`}
                       className="text-orange-400 hover:text-orange-300 transition-colors"
                     >
                       Contact Support
                     </a>
-                    <Link
-                      href="/about"
-                      className="text-orange-400 hover:text-orange-300 transition-colors"
-                    >
-                      About Us
-                    </Link>
                   </div>
                 </div>
               </div>
@@ -170,7 +149,7 @@ export default function PageRenderer({ page, allowedImageOrigin }: PageRendererP
                   Ready to Explore?
                 </h2>
                 <p className="text-xl text-gray-300 mb-8">
-                  Discover our AI-powered outdoor gear recommendations and start your next adventure.
+                  Browse {storeName}&rsquo;s catalog or ask {assistantName} for help finding the right product.
                 </p>
                 <div className="flex flex-wrap justify-center gap-4">
                   <Link
