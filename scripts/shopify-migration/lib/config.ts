@@ -105,7 +105,8 @@ export function parseMigrationConfig(
   const sourceMode = (flagValue(args, "--source") ?? env.MIGRATION_SOURCE_MODE ?? "file") as SourceMode;
   if (sourceMode !== "api" && sourceMode !== "file") throw new Error("Migration source must be api or file");
 
-  const target = (flagValue(args, "--target") ?? env.MIGRATION_TARGET ?? "local") as MigrationTarget;
+  const targetArgument = flagValue(args, "--target");
+  const target = (targetArgument ?? env.MIGRATION_TARGET ?? "local") as MigrationTarget;
   if (!(["local", "preview", "production"] as const).includes(target)) {
     throw new Error("Migration target must be local, preview, or production");
   }
@@ -116,6 +117,9 @@ export function parseMigrationConfig(
   const confirmedProduction = hasFlag(args, "--confirm-production");
   const overwrite = hasFlag(args, "--overwrite");
   const confirmedOverwrite = hasFlag(args, "--confirm-overwrite");
+  if (apply && target !== "local" && !targetArgument) {
+    throw new Error("Remote apply requires an explicit --target=preview or --target=production option");
+  }
   if (includeSensitive && !confirmedSensitiveData) {
     throw new Error("--include-sensitive requires --confirm-sensitive-data");
   }
@@ -148,7 +152,11 @@ export function parseMigrationConfig(
   const outputRootValue = flagValue(args, "--output-root") ?? env.MIGRATION_OUTPUT_ROOT;
   const inputRoot = inputRootValue ? resolve(cwd, inputRootValue) : undefined;
   const outputRoot = outputRootValue ? resolve(cwd, outputRootValue) : undefined;
+  const environmentArgumentPresent = args.some((argument) => argument.startsWith("--env="));
   const wranglerEnvironment = flagValue(args, "--env")?.trim() || undefined;
+  if (environmentArgumentPresent && !wranglerEnvironment) {
+    throw new Error("--env requires a non-empty Wrangler environment name");
+  }
   if (wranglerEnvironment && !/^[a-z][a-z0-9_-]{0,62}$/i.test(wranglerEnvironment)) {
     throw new Error("Wrangler environment name is invalid");
   }
