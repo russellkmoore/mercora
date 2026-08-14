@@ -15,6 +15,8 @@ const DEFAULT_MAX_PAGES = 200;
 const DEFAULT_MAX_RECORDS = 50_000;
 const DEFAULT_MAX_RETRIES = 4;
 const DEFAULT_MAX_RETRY_AFTER_MS = 30_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+const DEFAULT_MAX_RESPONSE_BYTES = 25 * 1024 * 1024;
 
 const PUBLIC_RESOURCES = new Set([
   "blogs.json",
@@ -48,6 +50,8 @@ export interface ShopifyClientOptions {
   maxRecords?: number;
   maxRetries?: number;
   maxRetryAfterMs?: number;
+  timeoutMs?: number;
+  maxResponseBytes?: number;
   includeSensitive?: boolean;
 }
 
@@ -100,7 +104,13 @@ export function parseNextLink(header: string | null, currentUrl: URL): URL | und
       const match = /^rel\s*=\s*(?:"([^"]*)"|([^\s;]+))$/i.exec(parameter);
       if (match && (match[1] ?? match[2]).toLowerCase().split(/\s+/).includes("next")) next = true;
     }
-    if (next) matches.push(new URL(target, currentUrl));
+    if (next) {
+      try {
+        matches.push(new URL(target, currentUrl));
+      } catch {
+        throw new Error("Malformed Shopify Link header target");
+      }
+    }
   }
   if (matches.length > 1) throw new Error("Shopify Link header contains multiple rel=next targets");
   return matches[0];
@@ -114,6 +124,68 @@ function retryAfterMilliseconds(value: string | null, now = Date.now()): number 
   return Number.isFinite(date) ? Math.max(0, date - now) : 1_000;
 }
 
+class ShopifyTransportError extends Error {}
+
+function cancelBody(response: Response): void {
+  void response.body?.cancel().catch(() => undefined);
+}
+
+async function readBoundedJson(
+  response: Response,
+  maximumBytes: number,
+  expired: Promise<never>,
+): Promise<unknown> {
+  const declaredLength = response.headers.get("content-length");
+  if (declaredLength !== null) {
+    if (!/^(?:0|[1-9][0-9]*)$/u.test(declaredLength)) {
+      cancelBody(response);
+      throw new ShopifyTransportError("Shopify API response Content-Length is invalid");
+    }
+    const bytes = Number(declaredLength);
+    if (!Number.isSafeInteger(bytes) || bytes > maximumBytes) {
+      cancelBody(response);
+      throw new ShopifyTransportError(`Shopify API response exceeds ${maximumBytes} bytes`);
+    }
+  }
+  if (!response.body) throw new ShopifyTransportError("Shopify API response body is missing");
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (true) {
+      const { done, value } = await Promise.race([reader.read(), expired]);
+      if (done) break;
+      length += value.byteLength;
+      if (length > maximumBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new ShopifyTransportError(`Shopify API response exceeds ${maximumBytes} bytes`);
+      }
+      chunks.push(value);
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => undefined);
+    throw error;
+  } finally {
+    reader.releaseLock();
+  }
+
+  if (declaredLength !== null && Number(declaredLength) !== length) {
+    throw new ShopifyTransportError("Shopify API response Content-Length does not match its body");
+  }
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) as unknown;
+  } catch {
+    throw new ShopifyTransportError("Shopify API response is not valid JSON");
+  }
+}
+
 export class ShopifyClient {
   readonly origin: string;
   readonly apiVersion: string;
@@ -124,6 +196,8 @@ export class ShopifyClient {
   private readonly maxRecords: number;
   private readonly maxRetries: number;
   private readonly maxRetryAfterMs: number;
+  private readonly timeoutMs: number;
+  private readonly maxResponseBytes: number;
   private readonly includeSensitive: boolean;
   private readonly apiPathPrefix: string;
 
@@ -138,6 +212,12 @@ export class ShopifyClient {
     this.maxRecords = boundedInteger(options.maxRecords ?? DEFAULT_MAX_RECORDS, "maxRecords", 1_000_000);
     this.maxRetries = boundedInteger((options.maxRetries ?? DEFAULT_MAX_RETRIES) + 1, "maxRetries", 21) - 1;
     this.maxRetryAfterMs = boundedInteger(options.maxRetryAfterMs ?? DEFAULT_MAX_RETRY_AFTER_MS, "maxRetryAfterMs", 300_000);
+    this.timeoutMs = boundedInteger(options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS, "timeoutMs", 300_000);
+    this.maxResponseBytes = boundedInteger(
+      options.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES,
+      "maxResponseBytes",
+      100 * 1024 * 1024,
+    );
     this.includeSensitive = options.includeSensitive === true;
     this.apiPathPrefix = `/admin/api/${this.apiVersion}/`;
   }
@@ -154,25 +234,54 @@ export class ShopifyClient {
     }
   }
 
-  private async request(url: URL): Promise<Response> {
+  private async request(url: URL): Promise<{ payload: unknown; link: string | null }> {
     this.assertAllowedUrl(url);
     for (let attempt = 0; ; attempt += 1) {
-      const response = await this.fetcher(url, {
-        method: "GET",
-        redirect: "error",
-        headers: {
-          Accept: "application/json",
-          "X-Shopify-Access-Token": this.accessToken,
-        },
+      const controller = new AbortController();
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      const expired = new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          controller.abort();
+          reject(new ShopifyTransportError("Shopify API request timed out"));
+        }, this.timeoutMs);
       });
-      if (response.status !== 429) {
-        if (!response.ok) throw new Error(`Shopify API request failed with HTTP ${response.status}`);
-        return response;
+      try {
+        const pending = this.fetcher(url, {
+          method: "GET",
+          redirect: "error",
+          signal: controller.signal,
+          headers: {
+            Accept: "application/json",
+            "X-Shopify-Access-Token": this.accessToken,
+          },
+        });
+        void pending.then((lateResponse) => {
+          if (controller.signal.aborted) cancelBody(lateResponse);
+        }).catch(() => undefined);
+        const response = await Promise.race([pending, expired]);
+        if (response.status === 429) {
+          cancelBody(response);
+          if (attempt >= this.maxRetries) {
+            throw new ShopifyTransportError("Shopify API rate limit retry budget exhausted");
+          }
+          const delay = Math.min(retryAfterMilliseconds(response.headers.get("retry-after")), this.maxRetryAfterMs);
+          if (timeout) clearTimeout(timeout);
+          timeout = undefined;
+          await this.sleep(delay);
+          continue;
+        }
+        if (!response.ok) {
+          cancelBody(response);
+          throw new ShopifyTransportError(`Shopify API request failed with HTTP ${response.status}`);
+        }
+        const payload = await readBoundedJson(response, this.maxResponseBytes, expired);
+        return { payload, link: response.headers.get("link") };
+      } catch (error) {
+        if (error instanceof ShopifyTransportError) throw error;
+        throw new ShopifyTransportError("Shopify API request failed");
+      } finally {
+        if (timeout) clearTimeout(timeout);
       }
-      if (attempt >= this.maxRetries) throw new Error("Shopify API rate limit retry budget exhausted");
-      const delay = Math.min(retryAfterMilliseconds(response.headers.get("retry-after")), this.maxRetryAfterMs);
-      await response.body?.cancel();
-      await this.sleep(delay);
     }
   }
 
@@ -200,13 +309,13 @@ export class ShopifyClient {
       pages += 1;
 
       const response = await this.request(next);
-      const payload: unknown = await response.json();
+      const payload = response.payload;
       const page = payload && typeof payload === "object" ? (payload as Record<string, unknown>)[key] : undefined;
       if (!Array.isArray(page)) throw new Error(`Shopify response did not contain an array at ${key}`);
       if (records.length + page.length > maxRecords) throw new Error(`Shopify pagination exceeded ${maxRecords} records`);
       records.push(...(page as T[]));
 
-      const candidate = parseNextLink(response.headers.get("link"), next);
+      const candidate = parseNextLink(response.link, next);
       if (!candidate) break;
       this.assertAllowedUrl(candidate);
       next = candidate;

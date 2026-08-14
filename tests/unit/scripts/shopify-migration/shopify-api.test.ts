@@ -19,6 +19,15 @@ function json(body: unknown, init: ResponseInit = {}): Response {
   });
 }
 
+function streamedResponse(chunks: readonly Uint8Array[], headers: Record<string, string> = {}): Response {
+  return new Response(new ReadableStream<Uint8Array>({
+    start(controller) {
+      chunks.forEach((chunk) => controller.enqueue(chunk));
+      controller.close();
+    },
+  }), { status: 200, headers: { "content-type": "application/json", ...headers } });
+}
+
 describe("Shopify REST transport", () => {
   it("traverses RFC Link rel=next and preserves all records", async () => {
     const fetcher = vi.fn<typeof fetch>()
@@ -76,6 +85,72 @@ describe("Shopify REST transport", () => {
     expect(exhausted).toHaveBeenCalledTimes(2);
   });
 
+  it("aborts a request that stalls before response headers", async () => {
+    let signal: AbortSignal | undefined;
+    const fetcher = vi.fn<typeof fetch>(async (_url, init) => {
+      signal = init?.signal ?? undefined;
+      return await new Promise<Response>(() => undefined);
+    });
+
+    await expect(client(fetcher, { timeoutMs: 5 }).fetchProducts()).rejects.toThrow(/timed out/);
+    expect(signal?.aborted).toBe(true);
+  });
+
+  it("keeps the timeout active through the response body and cancels a stalled stream", async () => {
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      pull: () => new Promise<void>(() => undefined),
+      cancel,
+    });
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(body, {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+
+    await expect(client(fetcher, { timeoutMs: 5 }).fetchProducts()).rejects.toThrow(/timed out/);
+    expect(cancel).toHaveBeenCalled();
+  });
+
+  it("rejects oversized declared and streamed response bodies", async () => {
+    const declared = vi.fn<typeof fetch>().mockResolvedValue(json({ products: [] }, {
+      headers: { "content-length": "999" },
+    }));
+    await expect(client(declared, { maxResponseBytes: 32 }).fetchProducts()).rejects.toThrow(/exceeds 32 bytes/);
+
+    const streamed = vi.fn<typeof fetch>().mockResolvedValue(streamedResponse([
+      new TextEncoder().encode('{"products":["'),
+      new TextEncoder().encode("x".repeat(32)),
+      new TextEncoder().encode('"]}'),
+    ]));
+    await expect(client(streamed, { maxResponseBytes: 32 }).fetchProducts()).rejects.toThrow(/exceeds 32 bytes/);
+  });
+
+  it("rejects a declared Content-Length that does not match the streamed body", async () => {
+    const bytes = new TextEncoder().encode('{"products":[]}');
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(streamedResponse(
+      [bytes],
+      { "content-length": String(bytes.byteLength + 1) },
+    ));
+    await expect(client(fetcher).fetchProducts()).rejects.toThrow(/does not match its body/);
+  });
+
+  it("reports malformed JSON without echoing response data or credentials", async () => {
+    const privatePayload = "private-customer@example.test shpat_never-log-this";
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(`{${privatePayload}`, {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+    let message = "";
+    try {
+      await client(fetcher).fetchProducts();
+    } catch (error) {
+      message = String(error);
+    }
+    expect(message).toContain("not valid JSON");
+    expect(message).not.toContain(privatePayload);
+    expect(message).not.toContain("shpat_never-log-this");
+  });
+
   it("requests all order statuses on the first request", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(json({ orders: [] }));
     await client(fetcher, { includeSensitive: true }).fetchOrders({ query: { fields: "id", status: "open" } });
@@ -106,5 +181,13 @@ describe("Shopify REST transport", () => {
     let message = "";
     try { await client(fetcher).fetchProducts(); } catch (error) { message = String(error); }
     expect(message).not.toContain("shpat_never-log-this");
+
+    const thrown = vi.fn<typeof fetch>().mockRejectedValue(
+      new Error("network failed with shpat_never-log-this and private response text"),
+    );
+    message = "";
+    try { await client(thrown).fetchProducts(); } catch (error) { message = String(error); }
+    expect(message).toBe("Error: Shopify API request failed");
+    expect(message).not.toContain("private response text");
   });
 });
