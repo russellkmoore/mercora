@@ -99,55 +99,65 @@ export function getAIConfig(useCase: keyof typeof AI_MODELS): AIModelConfig {
   return AI_MODELS[useCase];
 }
 
+export interface AITextMessage {
+  role: string;
+  content: string;
+  name?: string;
+  tool_call_id?: string;
+}
+
+export interface RunAIOptions {
+  messages?: readonly AITextMessage[];
+  text?: string;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+function nativeChatMessage(message: AITextMessage, index: number): ChatCompletionMessageParam {
+  const name = message.name?.trim();
+  if (message.role === "system") {
+    return { role: "system", content: message.content, ...(name ? { name } : {}) };
+  }
+  if (message.role === "assistant") {
+    return { role: "assistant", content: message.content, ...(name ? { name } : {}) };
+  }
+  if (message.role === "tool") {
+    return {
+      role: "tool",
+      content: message.content,
+      tool_call_id: message.tool_call_id?.trim() || `history-tool-${index}`,
+    };
+  }
+  return { role: "user", content: message.content, ...(name ? { name } : {}) };
+}
+
 /**
  * Helper function to run AI with standardized configuration
  */
 export async function runAI(
-  ai: any,
+  ai: CloudflareEnv["AI"],
   useCase: keyof typeof AI_MODELS,
-  options: {
-    messages?: any[];
-    text?: string;
-    temperature?: number;
-    maxTokens?: number;
-  }
+  options: RunAIOptions,
 ) {
   const config = getAIConfig(useCase);
 
-  // Handle different model parameter formats
-  let params: any;
-
-  if (config.model.includes('@cf/openai/')) {
-    // OpenAI models (like GPT-OSS-20B) expect 'input' format
-    if (options.messages && options.messages.length > 0) {
-      // Convert messages to a single input string
-      const systemMessage = options.messages.find(m => m.role === 'system')?.content || '';
-      const userMessages = options.messages.filter(m => m.role !== 'system');
-      const lastUserMessage = userMessages[userMessages.length - 1]?.content || '';
-
-      params = {
-        instructions: systemMessage,
-        input: lastUserMessage,
-        max_tokens: options.maxTokens ?? config.maxTokens,
-        temperature: options.temperature ?? config.temperature,
-      };
-    } else {
-      params = {
-        input: options.text || '',
-        max_tokens: options.maxTokens ?? config.maxTokens,
-        temperature: options.temperature ?? config.temperature,
-      };
-    }
-  } else {
-    // Meta/Llama models expect 'messages' format
-    params = {
-      ...options,
-      max_tokens: options.maxTokens ?? config.maxTokens,
-      temperature: options.temperature ?? config.temperature,
-    };
+  if (isEmbeddingModel(config.model)) {
+    const text = options.text
+      ?? options.messages?.map((message) => message.content).join("\n")
+      ?? "";
+    return ai.run(EMBEDDING_MODEL.model, { text });
   }
 
-  return await ai.run(config.model, params);
+  const messages = options.messages?.length
+    ? options.messages.map(nativeChatMessage)
+    : [{ role: "user", content: options.text ?? "" } satisfies UserMessage];
+  const params: ChatCompletionsMessagesInput = {
+    messages,
+    max_tokens: options.maxTokens ?? config.maxTokens,
+    temperature: options.temperature ?? config.temperature,
+  };
+
+  return ai.run("@cf/openai/gpt-oss-20b", params);
 }
 
 /**
@@ -174,18 +184,70 @@ export function getCurrentEmbeddingModel(): typeof EMBEDDING_MODEL.model {
 /**
  * Extract text response from AI model output (handles different response formats)
  */
-export function extractAIResponse(response: any): string {
-  // Handle GPT-OSS-20B format
-  if (response.output && Array.isArray(response.output)) {
-    const messageOutput = response.output.find((item: any) => item.type === 'message');
-    if (messageOutput && messageOutput.content && Array.isArray(messageOutput.content)) {
-      const textContent = messageOutput.content.find((content: any) => content.type === 'output_text');
-      if (textContent && textContent.text) {
-        return textContent.text;
-      }
+const MAX_OUTPUT_ITEMS = 100;
+const MAX_CONTENT_ITEMS = 100;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isReadableStreamOutput(value: unknown): boolean {
+  return typeof ReadableStream !== "undefined" && value instanceof ReadableStream;
+}
+
+function contentText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (!Array.isArray(value) || value.length > MAX_CONTENT_ITEMS) return "";
+
+  const parts: string[] = [];
+  for (const part of value) {
+    if (!isRecord(part)) continue;
+    if ((part.type === "output_text" || part.type === "text") && typeof part.text === "string") {
+      parts.push(part.text);
     }
   }
+  return parts.join("");
+}
 
-  // Handle traditional formats (Llama, etc.)
-  return response.response || response.content || response.text || "";
+function chatCompletionText(value: unknown): string {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_OUTPUT_ITEMS) return "";
+  for (const choice of value) {
+    if (!isRecord(choice) || !isRecord(choice.message)) continue;
+    const text = contentText(choice.message.content);
+    if (text) return text;
+  }
+  return "";
+}
+
+function responsesMessageText(value: unknown): string {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_OUTPUT_ITEMS) return "";
+  const messages: string[] = [];
+  for (const item of value) {
+    if (!isRecord(item) || item.type !== "message") continue;
+    const text = contentText(item.content);
+    if (text) messages.push(text);
+  }
+  return messages.join("");
+}
+
+export function extractAIResponse(response: unknown): string {
+  try {
+    if (isReadableStreamOutput(response) || !isRecord(response)) return "";
+
+    if (typeof response.response === "string") return response.response;
+
+    const completion = chatCompletionText(response.choices);
+    if (completion) return completion;
+
+    if (typeof response.output_text === "string") return response.output_text;
+
+    const output = responsesMessageText(response.output);
+    if (output) return output;
+
+    if (typeof response.content === "string") return response.content;
+    if (typeof response.text === "string") return response.text;
+    return "";
+  } catch {
+    return "";
+  }
 }
