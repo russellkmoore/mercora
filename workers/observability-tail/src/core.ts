@@ -52,6 +52,7 @@ export const TAIL_ROUTE_PATHS: ReadonlySet<string> = new Set([
   '/api/admin/orders/:id/ship',
   '/api/admin/orders/:id/shipping-email',
   '/api/admin/orders/:id/tracking',
+  '/api/agent-chat',
   '/api/orders',
   '/api/orders/:id',
   '/api/orders/refund',
