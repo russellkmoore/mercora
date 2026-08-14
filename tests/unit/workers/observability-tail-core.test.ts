@@ -111,6 +111,26 @@ describe('observability Tail Worker parser and renderer', () => {
     );
   });
 
+  it('preserves the merchant notification effect in its own cooldown bucket', () => {
+    const alert = extractCriticalAlerts([trace(envelope({
+      event: 'paid_effect.repeated_failure',
+      area: 'paid_effect',
+      fields: {
+        effect_type: 'merchant_notification',
+        outcome: 'needs_review',
+        retryable: false,
+      },
+    }))]).alerts[0];
+    expect(alert.fields).toEqual({
+      effect_type: 'merchant_notification',
+      outcome: 'needs_review',
+      retryable: false,
+    });
+    expect(alert.bucket).toBe(
+      'paid_effect.repeated_failure|StripeConnectionError|none|merchant_notification|needs_review',
+    );
+  });
+
   it('deduplicates by a closed low-cardinality bucket and caps scanning work', () => {
     const repeated = Array.from({ length: MAX_CANDIDATE_ALERTS + 20 }, () => trace(envelope()));
     const distinct = trace(envelope({

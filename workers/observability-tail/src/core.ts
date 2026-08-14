@@ -61,8 +61,8 @@ export const TAIL_ROUTE_PATHS: ReadonlySet<string> = new Set([
 
 const ENUM_FIELDS: Record<string, ReadonlySet<string>> = {
   effect_type: new Set([
-    'confirmation_email', 'coupon', 'gift_card', 'inventory', 'subscription',
-    'paid_decrement', 'refund_restock',
+    'confirmation_email', 'coupon', 'gift_card', 'inventory', 'merchant_notification',
+    'subscription', 'paid_decrement', 'refund_restock',
   ]),
   operation: new Set([
     'audit_write', 'claim', 'complete', 'create', 'finalize', 'persist',
