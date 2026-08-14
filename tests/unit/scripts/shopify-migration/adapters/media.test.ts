@@ -1,14 +1,25 @@
+import { createHash } from "node:crypto";
+import { HeadObjectCommand, PutObjectCommand, type HeadObjectCommandOutput, type PutObjectCommandOutput } from "@aws-sdk/client-s3";
 import { describe, expect, it, vi } from "vitest";
 import type { ExecutionPlan } from "@/scripts/shopify-migration/lib/config";
 import type { MediaRewrite } from "@/scripts/shopify-migration/transformers/_shared";
 import {
   downloadVerifiedMedia,
+  fingerprintMediaSource,
   importMediaPlans,
   R2BindingMediaStore,
+  R2S3MediaStore,
   wranglerR2GetArguments,
   wranglerR2PutArguments,
 } from "@/scripts/shopify-migration/adapters/media";
-import type { MediaObjectStore } from "@/scripts/shopify-migration/adapters/media/r2";
+import {
+  IMMUTABLE_MEDIA_CACHE_CONTROL,
+  MEDIA_IMPORTER_VERSION,
+  type ExpectedMediaObject,
+  type MediaObjectStore,
+  type S3CommandSender,
+  type StoredMediaObject,
+} from "@/scripts/shopify-migration/adapters/media/r2";
 
 const JPEG = new Uint8Array([
   0xff, 0xd8, 0xff, 0xc0, 0x00, 0x08, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01, 0xff, 0xd9,
@@ -53,8 +64,34 @@ function execution(overrides: Partial<ExecutionPlan> = {}): ExecutionPlan {
 
 function store(overrides: Partial<MediaObjectStore> = {}): MediaObjectStore {
   return {
-    head: vi.fn(async () => false),
+    inspect: vi.fn(async () => null),
     put: vi.fn(async () => "written" as const),
+    ...overrides,
+  };
+}
+
+function expectedMedia(source = plan(), bytes = JPEG): ExpectedMediaObject {
+  return {
+    contentType: source.contentType,
+    cacheControl: IMMUTABLE_MEDIA_CACHE_CONTROL,
+    byteLength: bytes.byteLength,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+    sha256Base64: createHash("sha256").update(bytes).digest("base64"),
+    sourceFingerprint: fingerprintMediaSource(source.sourceUrl),
+  };
+}
+
+function storedMedia(overrides: Partial<StoredMediaObject> = {}): StoredMediaObject {
+  const expected = expectedMedia();
+  return {
+    contentType: expected.contentType,
+    cacheControl: expected.cacheControl,
+    byteLength: expected.byteLength,
+    sha256: expected.sha256,
+    importer: MEDIA_IMPORTER_VERSION,
+    sourceFingerprint: expected.sourceFingerprint,
+    importerContentSha256: expected.sha256,
+    importerByteLength: String(expected.byteLength),
     ...overrides,
   };
 }
@@ -176,7 +213,7 @@ describe("safe media downloader", () => {
 });
 
 describe("media import execution", () => {
-  it("performs zero network, head, or writes in dry-run mode", async () => {
+  it("performs zero network, inspection, or writes in dry-run mode", async () => {
     const targetStore = store();
     const fetcher = vi.fn<typeof fetch>();
     const resolver = vi.fn(async () => PUBLIC_IP);
@@ -186,26 +223,83 @@ describe("media import execution", () => {
       allowedHosts: ["cdn.shopify.com"],
       store: targetStore,
       download: { fetcher, resolveHost: resolver },
-    })).resolves.toEqual([{ objectKey: plan().objectKey, status: "planned", bytes: 0 }]);
+    })).resolves.toEqual([{
+      objectKey: plan().objectKey,
+      publicPath: plan().publicPath,
+      contentType: "image/jpeg",
+      status: "planned",
+      byteLength: null,
+      sha256: null,
+    }]);
     expect(fetcher).not.toHaveBeenCalled();
     expect(resolver).not.toHaveBeenCalled();
-    expect(targetStore.head).not.toHaveBeenCalled();
+    expect(targetStore.inspect).not.toHaveBeenCalled();
     expect(targetStore.put).not.toHaveBeenCalled();
   });
 
-  it("skips an existing object without downloading or overwriting", async () => {
-    const targetStore = store({ head: vi.fn(async () => true) });
-    const fetcher = vi.fn<typeof fetch>();
+  it("downloads first and accepts a conditional-write race only after exact verification", async () => {
+    const inspect = vi.fn(async () => storedMedia());
+    const put = vi.fn(async () => "exists" as const);
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(imageResponse());
     const result = await importMediaPlans([plan()], {
       execution: execution({ dryRun: false, apply: true }),
       wranglerConfigText: WRANGLER_CONFIG,
       allowedHosts: ["cdn.shopify.com"],
-      store: targetStore,
+      store: store({ inspect, put }),
       download: { fetcher, resolveHost: async () => PUBLIC_IP },
     });
-    expect(result[0].status).toBe("exists");
-    expect(fetcher).not.toHaveBeenCalled();
-    expect(targetStore.put).not.toHaveBeenCalled();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(put).toHaveBeenCalledTimes(1);
+    expect(inspect).toHaveBeenCalledTimes(1);
+    expect(result[0]).toEqual({
+      objectKey: plan().objectKey,
+      publicPath: plan().publicPath,
+      contentType: "image/jpeg",
+      status: "verified-existing",
+      byteLength: JPEG.byteLength,
+      sha256: expectedMedia().sha256,
+    });
+  });
+
+  it("rejects changed-source collisions and wrong importer metadata without overwriting", async () => {
+    const changedSource = plan({ sourceUrl: "https://cdn.shopify.com/files/replaced-image.jpg" });
+    const put = vi.fn(async () => "exists" as const);
+    await expect(importMediaPlans([changedSource], {
+      execution: execution({ dryRun: false, apply: true }),
+      wranglerConfigText: WRANGLER_CONFIG,
+      allowedHosts: ["cdn.shopify.com"],
+      store: store({ put, inspect: vi.fn(async () => storedMedia()) }),
+      download: { fetcher: vi.fn<typeof fetch>().mockResolvedValue(imageResponse()), resolveHost: async () => PUBLIC_IP },
+    })).rejects.toThrow(/explicit overwrite review/);
+    expect(put).toHaveBeenCalledWith("store-media", changedSource.objectKey, JPEG, expect.objectContaining({ overwrite: false }));
+
+    await expect(importMediaPlans([plan()], {
+      execution: execution({ dryRun: false, apply: true }),
+      wranglerConfigText: WRANGLER_CONFIG,
+      allowedHosts: ["cdn.shopify.com"],
+      store: store({
+        put: vi.fn(async () => "exists" as const),
+        inspect: vi.fn(async () => storedMedia({ importer: "untrusted-importer" })),
+      }),
+      download: { fetcher: vi.fn<typeof fetch>().mockResolvedValue(imageResponse()), resolveHost: async () => PUBLIC_IP },
+    })).rejects.toThrow(/explicit overwrite review/);
+  });
+
+  it("rejects corrupt, partial, or content-type-mismatched existing objects", async () => {
+    for (const existing of [
+      storedMedia({ sha256: "0".repeat(64) }),
+      storedMedia({ byteLength: JPEG.byteLength - 1 }),
+      storedMedia({ contentType: "image/png" }),
+      storedMedia({ importerContentSha256: undefined }),
+    ]) {
+      await expect(importMediaPlans([plan()], {
+        execution: execution({ dryRun: false, apply: true }),
+        wranglerConfigText: WRANGLER_CONFIG,
+        allowedHosts: ["cdn.shopify.com"],
+        store: store({ put: vi.fn(async () => "exists" as const), inspect: vi.fn(async () => existing) }),
+        download: { fetcher: vi.fn<typeof fetch>().mockResolvedValue(imageResponse()), resolveHost: async () => PUBLIC_IP },
+      })).rejects.toThrow(/explicit overwrite review/);
+    }
   });
 
   it("requires target and overwrite confirmations independently", async () => {
@@ -219,8 +313,8 @@ describe("media import execution", () => {
     })).rejects.toThrow(/overwrite confirmation/);
   });
 
-  it("uses the canonical preview bucket and preserves conditional create results", async () => {
-    const put = vi.fn(async () => "exists" as const);
+  it("uses the canonical preview bucket and returns verified persistence details", async () => {
+    const put = vi.fn(async () => "written" as const);
     const targetStore = store({ put });
     const result = await importMediaPlans([plan()], {
       execution: execution({ target: "preview", dryRun: false, apply: true, confirmedPreview: true }),
@@ -232,8 +326,37 @@ describe("media import execution", () => {
         resolveHost: async () => PUBLIC_IP,
       },
     });
-    expect(put).toHaveBeenCalledWith("store-media-preview", plan().objectKey, JPEG, expect.objectContaining({ overwrite: false }));
-    expect(result[0]).toMatchObject({ status: "exists", bytes: 0 });
+    expect(put).toHaveBeenCalledWith("store-media-preview", plan().objectKey, JPEG, expect.objectContaining({
+      overwrite: false,
+      byteLength: JPEG.byteLength,
+      sha256: expectedMedia().sha256,
+      sourceFingerprint: expectedMedia().sourceFingerprint,
+    }));
+    expect(result[0]).toMatchObject({
+      status: "written",
+      byteLength: JPEG.byteLength,
+      sha256: expectedMedia().sha256,
+      publicPath: plan().publicPath,
+    });
+  });
+
+  it("overwrites only after both overwrite flags are explicit", async () => {
+    const put = vi.fn(async () => "written" as const);
+    const inspect = vi.fn(async () => storedMedia({ sha256: "0".repeat(64) }));
+    await importMediaPlans([plan()], {
+      execution: execution({
+        dryRun: false,
+        apply: true,
+        overwrite: true,
+        confirmedOverwrite: true,
+      }),
+      wranglerConfigText: WRANGLER_CONFIG,
+      allowedHosts: ["cdn.shopify.com"],
+      store: store({ put, inspect }),
+      download: { fetcher: vi.fn<typeof fetch>().mockResolvedValue(imageResponse()), resolveHost: async () => PUBLIC_IP },
+    });
+    expect(put).toHaveBeenCalledWith("store-media", plan().objectKey, JPEG, expect.objectContaining({ overwrite: true }));
+    expect(inspect).not.toHaveBeenCalled();
   });
 });
 
@@ -271,11 +394,111 @@ describe("R2 adapters and command construction", () => {
     } as unknown as R2Bucket;
     const adapter = new R2BindingMediaStore("store-media", bucket);
     await expect(adapter.put("store-media", plan().objectKey, JPEG, {
-      contentType: "image/jpeg", cacheControl: "public, max-age=1", overwrite: false,
+      ...expectedMedia(), cacheControl: "public, max-age=1", overwrite: false,
     })).resolves.toBe("exists");
     expect(bucket.put).toHaveBeenCalledWith(plan().objectKey, JPEG, expect.objectContaining({
       onlyIf: { etagDoesNotMatch: "*" },
       httpMetadata: { contentType: "image/jpeg", cacheControl: "public, max-age=1" },
+      customMetadata: expect.objectContaining({
+        "mercora-importer": MEDIA_IMPORTER_VERSION,
+        "mercora-content-sha256": expectedMedia().sha256,
+      }),
+      sha256: expect.any(Uint8Array),
     }));
+  });
+
+  it("inspects binding objects using actual R2 checksum and importer-owned metadata", async () => {
+    const expected = expectedMedia();
+    const bucket = {
+      head: vi.fn(async () => ({
+        size: expected.byteLength,
+        checksums: { sha256: Uint8Array.from(Buffer.from(expected.sha256, "hex")).buffer },
+        httpMetadata: { contentType: expected.contentType, cacheControl: expected.cacheControl },
+        customMetadata: {
+          "mercora-importer": MEDIA_IMPORTER_VERSION,
+          "mercora-source-sha256": expected.sourceFingerprint,
+          "mercora-content-sha256": expected.sha256,
+          "mercora-byte-length": String(expected.byteLength),
+        },
+      })),
+    } as unknown as R2Bucket;
+    const adapter = new R2BindingMediaStore("store-media", bucket);
+    await expect(adapter.inspect("store-media", plan().objectKey)).resolves.toEqual(storedMedia());
+  });
+
+  it("uses S3 conditional PutObject with checksum and importer metadata", async () => {
+    const send = vi.fn(async (command: HeadObjectCommand | PutObjectCommand) => {
+      if (command instanceof PutObjectCommand) return {} as PutObjectCommandOutput;
+      return {} as HeadObjectCommandOutput;
+    });
+    const adapter = new R2S3MediaStore("store-media", { send } as S3CommandSender);
+    await expect(adapter.put("store-media", plan().objectKey, JPEG, {
+      ...expectedMedia(), overwrite: false,
+    })).resolves.toBe("written");
+    const command = send.mock.calls[0][0];
+    expect(command).toBeInstanceOf(PutObjectCommand);
+    expect((command as PutObjectCommand).input).toMatchObject({
+      Bucket: "store-media",
+      Key: plan().objectKey,
+      ContentLength: JPEG.byteLength,
+      ContentType: "image/jpeg",
+      CacheControl: IMMUTABLE_MEDIA_CACHE_CONTROL,
+      ChecksumSHA256: expectedMedia().sha256Base64,
+      IfNoneMatch: "*",
+      Metadata: expect.objectContaining({
+        "mercora-importer": MEDIA_IMPORTER_VERSION,
+        "mercora-source-sha256": expectedMedia().sourceFingerprint,
+      }),
+    });
+  });
+
+  it.each([
+    [409, "ConditionalRequestConflict"],
+    [412, "PreconditionFailed"],
+  ])("maps an S3 conditional race (%s) to exists and re-heads verifiable metadata", async (status, name) => {
+    const expected = expectedMedia();
+    const send = vi.fn(async (command: HeadObjectCommand | PutObjectCommand) => {
+      if (command instanceof PutObjectCommand) {
+        throw Object.assign(new Error("redacted"), { name, $metadata: { httpStatusCode: status } });
+      }
+      return {
+        ContentLength: expected.byteLength,
+        ContentType: expected.contentType,
+        CacheControl: expected.cacheControl,
+        ChecksumSHA256: expected.sha256Base64,
+        Metadata: {
+          "mercora-importer": MEDIA_IMPORTER_VERSION,
+          "mercora-source-sha256": expected.sourceFingerprint,
+          "mercora-content-sha256": expected.sha256,
+          "mercora-byte-length": String(expected.byteLength),
+        },
+      } as unknown as HeadObjectCommandOutput;
+    });
+    const adapter = new R2S3MediaStore("store-media", { send } as S3CommandSender);
+    await expect(adapter.put("store-media", plan().objectKey, JPEG, {
+      ...expected, overwrite: false,
+    })).resolves.toBe("exists");
+    await expect(adapter.inspect("store-media", plan().objectKey)).resolves.toEqual(storedMedia());
+    const head = send.mock.calls[1][0];
+    expect(head).toBeInstanceOf(HeadObjectCommand);
+    expect((head as HeadObjectCommand).input.ChecksumMode).toBe("ENABLED");
+  });
+
+  it("never silently overwrites through either object adapter", async () => {
+    const binding = {
+      put: vi.fn(async () => null),
+    } as unknown as R2Bucket;
+    await new R2BindingMediaStore("store-media", binding).put("store-media", plan().objectKey, JPEG, {
+      ...expectedMedia(), overwrite: false,
+    });
+    expect(binding.put).toHaveBeenCalledWith(expect.any(String), expect.any(Uint8Array), expect.objectContaining({
+      onlyIf: { etagDoesNotMatch: "*" },
+    }));
+
+    const send = vi.fn(async (_command: HeadObjectCommand | PutObjectCommand) => ({} as PutObjectCommandOutput));
+    await new R2S3MediaStore("store-media", { send } as S3CommandSender).put(
+      "store-media", plan().objectKey, JPEG, { ...expectedMedia(), overwrite: false },
+    );
+    expect((send.mock.calls[0][0] as PutObjectCommand).input.IfNoneMatch).toBe("*");
   });
 });

@@ -1,14 +1,34 @@
+import { createHash } from "node:crypto";
 import type { ExecutionPlan } from "../../lib/config.js";
 import { parseWranglerJsonc, resolveMediaTarget } from "../../lib/wrangler-target.js";
 import type { MediaRewrite } from "../../transformers/_shared.js";
 import { downloadVerifiedMedia, validateMediaPlan, type MediaDownloadOptions } from "./security.js";
-import { IMMUTABLE_MEDIA_CACHE_CONTROL, type MediaObjectStore } from "./r2.js";
+import {
+  IMMUTABLE_MEDIA_CACHE_CONTROL,
+  storedMediaMatchesExpected,
+  type ExpectedMediaObject,
+  type MediaObjectStore,
+} from "./r2.js";
 
-export interface MediaImportResult {
+export interface PlannedMediaImportResult {
   objectKey: string;
-  status: "planned" | "written" | "exists";
-  bytes: number;
+  publicPath: string;
+  contentType: MediaRewrite["contentType"];
+  status: "planned";
+  byteLength: null;
+  sha256: null;
 }
+
+export interface AppliedMediaImportResult {
+  objectKey: string;
+  publicPath: string;
+  contentType: MediaRewrite["contentType"];
+  status: "written" | "verified-existing";
+  byteLength: number;
+  sha256: string;
+}
+
+export type MediaImportResult = PlannedMediaImportResult | AppliedMediaImportResult;
 
 export interface MediaImportOptions {
   execution: ExecutionPlan;
@@ -32,6 +52,22 @@ function assertExecution(execution: ExecutionPlan): void {
   }
 }
 
+export function fingerprintMediaSource(sourceUrl: string): string {
+  return createHash("sha256").update(sourceUrl, "utf8").digest("hex");
+}
+
+function describeMedia(plan: MediaRewrite, bytes: Uint8Array): ExpectedMediaObject {
+  const hash = createHash("sha256").update(bytes);
+  return {
+    contentType: plan.contentType,
+    cacheControl: IMMUTABLE_MEDIA_CACHE_CONTROL,
+    byteLength: bytes.byteLength,
+    sha256: hash.copy().digest("hex"),
+    sha256Base64: hash.digest("base64"),
+    sourceFingerprint: fingerprintMediaSource(plan.sourceUrl),
+  };
+}
+
 export async function importMediaPlans(
   plans: readonly MediaRewrite[],
   options: MediaImportOptions,
@@ -49,28 +85,56 @@ export async function importMediaPlans(
   }
 
   if (options.execution.dryRun) {
-    return plans.map((plan) => ({ objectKey: plan.objectKey, status: "planned", bytes: 0 }));
+    return plans.map((plan) => ({
+      objectKey: plan.objectKey,
+      publicPath: plan.publicPath,
+      contentType: plan.contentType,
+      status: "planned" as const,
+      byteLength: null,
+      sha256: null,
+    }));
   }
 
   const results: MediaImportResult[] = [];
   for (const plan of plans) {
-    if (!options.execution.overwrite && await options.store.head(target.bucketName, plan.objectKey)) {
-      results.push({ objectKey: plan.objectKey, status: "exists", bytes: 0 });
-      continue;
-    }
     const media = await downloadVerifiedMedia(plan, {
       ...options.download,
       allowedHosts: options.allowedHosts,
     });
+    const descriptor = describeMedia(plan, media.bytes);
     const status = await options.store.put(target.bucketName, media.objectKey, media.bytes, {
-      contentType: media.contentType,
-      cacheControl: IMMUTABLE_MEDIA_CACHE_CONTROL,
+      ...descriptor,
       overwrite: options.execution.overwrite,
     });
-    results.push({ objectKey: media.objectKey, status, bytes: status === "written" ? media.bytes.byteLength : 0 });
+    if (status === "exists") {
+      const stored = await options.store.inspect(target.bucketName, media.objectKey);
+      if (!storedMediaMatchesExpected(stored, descriptor)) {
+        throw new Error("Existing media object does not match the verified import; explicit overwrite review is required");
+      }
+    }
+    results.push({
+      objectKey: media.objectKey,
+      publicPath: media.publicPath,
+      contentType: media.contentType,
+      status: status === "written" ? "written" : "verified-existing",
+      byteLength: media.bytes.byteLength,
+      sha256: descriptor.sha256,
+    });
   }
   return results;
 }
 
 export { downloadVerifiedMedia, validateMediaPlan } from "./security.js";
-export { R2BindingMediaStore, wranglerR2GetArguments, wranglerR2PutArguments } from "./r2.js";
+export {
+  createR2S3MediaStore,
+  R2BindingMediaStore,
+  R2S3MediaStore,
+  wranglerR2GetArguments,
+  wranglerR2PutArguments,
+} from "./r2.js";
+export type {
+  ExpectedMediaObject,
+  MediaObjectStore,
+  R2S3Credentials,
+  StoredMediaObject,
+} from "./r2.js";
