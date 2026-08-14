@@ -202,6 +202,9 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
  */
 export const config = {
   matcher: [
+    // Legacy commerce paths must reach the exact redirect resolver even when a
+    // historical handle ends in a file-like extension such as `.html`.
+    "/(products|collections|pages|blogs|policies)/(.*)",
     // Match all routes except static assets and Next.js internals
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     // Include all API and tRPC routes for protection

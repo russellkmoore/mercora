@@ -92,6 +92,15 @@ describe("Shopify REST transport", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
+  it("cannot bypass sensitive transport through the generic paginator", async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    const transport = client(fetcher);
+    await expect(transport.fetchPaginated("customers.json", "customers")).rejects.toThrow(/sensitive-data/);
+    await expect(transport.fetchPaginated("orders.json", "orders")).rejects.toThrow(/sensitive-data/);
+    await expect(transport.fetchPaginated("metafields.json", "metafields")).rejects.toThrow(/not supported/);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it("never includes the access token in transport errors", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 500 }));
     let message = "";
