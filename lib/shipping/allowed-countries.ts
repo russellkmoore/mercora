@@ -19,7 +19,12 @@ export const DEFAULT_FREE_SHIPPING_THRESHOLD = 75;
 export const DEFAULT_FREE_SHIPPING_METHODS = ['standard'] as const;
 
 export function freeShippingThreshold(settings: Record<string, unknown>): number {
-  const configured = Number(settings['store.free_shipping_threshold']);
+  const raw = settings['store.free_shipping_threshold'];
+  const configured = typeof raw === 'number'
+    ? raw
+    : typeof raw === 'string' && raw.trim() !== ''
+      ? Number(raw)
+      : Number.NaN;
   return Number.isFinite(configured) && configured >= 0
     ? configured
     : DEFAULT_FREE_SHIPPING_THRESHOLD;
