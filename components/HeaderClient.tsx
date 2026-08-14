@@ -11,7 +11,7 @@
  * - **Expandable Categories**: Mobile menu with expand/collapse functionality
  * - **User Authentication**: Clerk integration for login/logout
  * - **Shopping Cart**: Quick access to cart with item count
- * - **AI Assistant**: Integrated Volt AI chat drawer
+ * - **AI Assistant**: Integrated configured assistant drawer
  * - **Interactive Elements**: Hover effects and smooth transitions
  *
  * === Category Navigation ===
@@ -61,7 +61,7 @@ import { Home, Search, LogIn, ChevronDown, ChevronRight, ShoppingCart, Menu, X, 
 import AgentDrawer from "@/components/agent/AgentDrawer";
 import ClerkLogin from "@/components/login/ClerkLogin";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import CartDrawer from "@/components/cart/CartDrawer";
+import CartDrawer, { CartTrigger } from "@/components/cart/CartDrawer";
 import ClientOnly from "@/components/ClientOnly";
 import { useStoreConfig } from "@/lib/store";
 import type { MACHCategory } from '@/lib/types/mach';
@@ -406,12 +406,12 @@ export default function HeaderClient({
           <AgentDrawer />
         </ClientOnly>
         <ClerkLogin />
-        <CartDrawer />
+        <CartTrigger />
       </div>
 
       {/* Mobile Navigation */}
       <div className="flex shrink-0 items-center gap-1 sm:gap-2 md:hidden">
-        <CartDrawer />
+        <CartTrigger />
         
         <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
           <SheetTrigger asChild>
@@ -440,7 +440,7 @@ export default function HeaderClient({
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-neutral-700">
               <div>
                 <h2 className="text-xl font-bold text-white">Menu</h2>
-                <p className="text-sm text-gray-400">Browse our outdoor gear</p>
+                <p className="text-sm text-gray-400">{store.identity.tagline}</p>
               </div>
               <div className="w-8 h-8 bg-orange-500/20 rounded-full flex items-center justify-center">
                 <Grid3X3 className="w-4 h-4 text-orange-400" />
@@ -485,6 +485,7 @@ export default function HeaderClient({
           </SheetContent>
         </Sheet>
       </div>
+      <CartDrawer />
     </div>
   );
 }

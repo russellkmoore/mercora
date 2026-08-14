@@ -31,12 +31,16 @@ import {
   Search
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useUser } from "@clerk/nextjs";
 
 /**
  * Admin Header Component
  */
 export default function AdminHeader() {
   const { breadcrumbs, pageTitle, sidebarCollapsed } = useAdminLayout();
+  const { user, isLoaded } = useUser();
+  const email = user?.primaryEmailAddress?.emailAddress ?? "Signed-in administrator";
+  const displayName = user?.fullName || user?.firstName || email;
 
   return (
     <header className={`
@@ -112,8 +116,8 @@ export default function AdminHeader() {
                   <User className="w-4 h-4 text-gray-400" />
                 </div>
                 <div className="hidden md:block">
-                  <div className="text-sm font-medium text-white">Admin User</div>
-                  <div className="text-xs text-gray-400">admin@voltique.com</div>
+                  <div className="text-sm font-medium text-white">{isLoaded ? displayName : "Loading…"}</div>
+                  <div className="max-w-48 truncate text-xs text-gray-400">{isLoaded ? email : ""}</div>
                 </div>
               </div>
             </div>

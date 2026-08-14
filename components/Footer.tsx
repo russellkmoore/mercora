@@ -3,107 +3,85 @@ import { getNavigationPages } from "@/lib/models/pages";
 import { getSocialMediaSettings } from "@/lib/utils/settings";
 import { getStoreConfig } from "@/lib/store-config";
 
+function safeSocialUrl(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+const GRID_CLASSES = {
+  1: "lg:grid-cols-1",
+  2: "lg:grid-cols-2",
+  3: "lg:grid-cols-3",
+  4: "lg:grid-cols-4",
+} as const;
+
 export default async function Footer() {
   const store = getStoreConfig();
-  const [navigationPages, socialMedia] = await Promise.all([
+  const [pagesResult, socialResult] = await Promise.allSettled([
     getNavigationPages(),
-    getSocialMediaSettings()
+    getSocialMediaSettings(),
   ]);
+  const pages = pagesResult.status === "fulfilled" ? pagesResult.value : [];
+  const configuredSocial: Record<string, unknown> = socialResult.status === "fulfilled"
+    ? socialResult.value
+    : {};
+  const socialSources: Array<[string, unknown]> = [
+    ["Instagram", configuredSocial.instagram],
+    ["YouTube", configuredSocial.youtube],
+    ["LinkedIn", configuredSocial.linkedin],
+    ["X", configuredSocial.twitter],
+    ["Facebook", configuredSocial.facebook],
+    ["TikTok", configuredSocial.tiktok],
+  ];
+  const social = socialSources.flatMap(([label, raw]) => {
+    const href = safeSocialUrl(raw);
+    return href ? [{ label, href }] : [];
+  });
+
+  const columns = [
+    pages.length > 0 ? (
+      <div key="pages" className="space-y-2">
+        <h2 className="mb-3 font-semibold text-white">Explore</h2>
+        {pages.map((page) => <Link key={page.id} href={`/${page.slug}`} className="block hover:text-white">{page.nav_title || page.title}</Link>)}
+        {!pages.some(({ slug }) => slug === "blog") && <Link href="/blog" className="block hover:text-white">Blog</Link>}
+      </div>
+    ) : (
+      <div key="pages" className="space-y-2">
+        <h2 className="mb-3 font-semibold text-white">Explore</h2>
+        <Link href="/products" className="block hover:text-white">Products</Link>
+        <Link href="/blog" className="block hover:text-white">Blog</Link>
+      </div>
+    ),
+    <div key="support" className="space-y-2">
+      <h2 className="mb-3 font-semibold text-white">Support</h2>
+      <a href={`mailto:${store.contact.supportEmail}`} className="block hover:text-white">Contact support</a>
+      <Link href={store.urls.returns} className="block hover:text-white">Returns</Link>
+      <Link href={store.urls.privacy} className="block hover:text-white">Privacy</Link>
+      <Link href={store.urls.terms} className="block hover:text-white">Terms</Link>
+    </div>,
+    ...(social.length > 0 ? [
+      <div key="social" className="space-y-2">
+        <h2 className="mb-3 font-semibold text-white">Follow</h2>
+        {social.map((item) => <a key={item.href} href={item.href} target="_blank" rel="noopener noreferrer" className="block hover:text-white">{item.label}</a>)}
+      </div>,
+    ] : []),
+  ];
+  const grid = GRID_CLASSES[Math.min(4, columns.length) as keyof typeof GRID_CLASSES];
 
   return (
-    <footer className="bg-neutral-950 text-white mt-16 relative z-10">
-      <div className="ml-0 sm:ml-[100px] lg:ml-[200px] px-4 sm:px-6 py-12 sm:py-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 sm:gap-8 text-sm text-gray-400 z-10 relative">
-        <div className="space-y-2">
-          {/* Navigation Pages from CMS */}
-          {navigationPages.map((page) => (
-            <Link
-              key={page.id}
-              href={`/${page.slug}`}
-              className="block hover:text-white"
-            >
-              {page.nav_title || page.title}
-            </Link>
-          ))}
-        </div>
-        <div className="space-y-2">
-          <a href="#" className="block hover:text-white">Contact us</a>
-          <a href="#" className="block hover:text-white">Keep in touch</a>
-          <a href="#" className="block hover:text-white">Careers</a>
-        </div>
-        <div className="space-y-2">
-          <a href="#" className="block hover:text-white">News & media</a>
-          <a href="#" className="block hover:text-white">Community</a>
-          <a href="#" className="block hover:text-white">Events</a>
-          <a href="#" className="block hover:text-white">Specs</a>
-        </div>
-        <div className="space-y-2">
-          {/* Social Media Links from Settings */}
-          {socialMedia.instagram && (
-            <a 
-              href={socialMedia.instagram} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="block hover:text-white"
-            >
-              Instagram
-            </a>
-          )}
-          {socialMedia.youtube && (
-            <a 
-              href={socialMedia.youtube} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="block hover:text-white"
-            >
-              YouTube
-            </a>
-          )}
-          {socialMedia.linkedin && (
-            <a 
-              href={socialMedia.linkedin} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="block hover:text-white"
-            >
-              LinkedIn
-            </a>
-          )}
-          {socialMedia.twitter && (
-            <a 
-              href={socialMedia.twitter} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="block hover:text-white"
-            >
-              Twitter
-            </a>
-          )}
-          {socialMedia.facebook && (
-            <a 
-              href={socialMedia.facebook} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="block hover:text-white"
-            >
-              Facebook
-            </a>
-          )}
-          {socialMedia.tiktok && (
-            <a 
-              href={socialMedia.tiktok} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="block hover:text-white"
-            >
-              TikTok
-            </a>
-          )}
-        </div>
+    <footer className="relative z-10 mt-16 overflow-hidden bg-neutral-950 text-white">
+      <div className={`relative z-10 mx-auto grid max-w-6xl grid-cols-1 gap-8 px-4 py-12 text-sm text-neutral-400 sm:grid-cols-2 sm:px-6 sm:py-16 ${grid}`}>
+        {columns}
       </div>
-      <div className="text-center text-xs text-neutral-500 pb-4 pt-2 relative z-10">
+      <div className="relative z-10 pb-4 pt-2 text-center text-xs text-neutral-500">
         ©{new Date().getFullYear()} {store.identity.name}. All rights reserved.
       </div>
-      <div className="absolute bottom-0 left-[10px] sm:left-[20px] text-[60px] sm:text-[100px] lg:text-[140px] font-bold text-neutral-900 leading-none z-0 select-none">
+      <div aria-hidden className="absolute bottom-0 left-4 select-none whitespace-nowrap text-6xl font-bold leading-none text-neutral-900 sm:text-8xl lg:text-9xl">
         {store.identity.name.toUpperCase()}
       </div>
     </footer>
