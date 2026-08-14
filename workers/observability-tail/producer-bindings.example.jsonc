@@ -1,0 +1,15 @@
+{
+  // Copy only the bindings you intend to enable into a producer's wrangler.jsonc.
+  // The Tail Worker service MUST already exist before tail_consumers is added.
+  "tail_consumers": [
+    { "service": "commerce-observability-tail" }
+  ],
+
+  // Optional. The producer helper works normally when this binding is absent.
+  "analytics_engine_datasets": [
+    {
+      "binding": "COMMERCE_ANALYTICS",
+      "dataset": "configure_commerce_telemetry_dataset"
+    }
+  ]
+}

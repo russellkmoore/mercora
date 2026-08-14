@@ -14,9 +14,11 @@ describe("PDP recommendation boundary", () => {
 
   it("routes the daily cron through the app worker", () => {
     const worker = readFileSync(resolve("worker.ts"), "utf8");
+    const scheduled = readFileSync(resolve("lib/observability/scheduled.ts"), "utf8");
     const config = readFileSync(resolve("wrangler.jsonc"), "utf8");
-    expect(worker).toContain('controller.cron === "15 8 * * *"');
-    expect(worker).toContain("runRecommendationCron(env)");
+    expect(worker).toContain("handleScheduled(controller, env, ctx)");
+    expect(scheduled).toContain("controller.cron === '15 8 * * *'");
+    expect(scheduled).toContain("runRecommendationCron(env)");
     expect(config).toContain('"15 8 * * *"');
   });
 

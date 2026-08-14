@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   buildShippingConfirmationData: vi.fn(),
   initialShippingEmailKey: vi.fn(),
   isConcurrentShippingEmailAttempt: vi.fn(),
+  recordTelemetry: vi.fn(),
   sendShippingConfirmationEmail: vi.fn(),
 }));
 
@@ -24,6 +25,8 @@ vi.mock("@/lib/fulfillment/shipping-email", () => ({
   buildShippingConfirmationData: mocks.buildShippingConfirmationData,
   initialShippingEmailKey: mocks.initialShippingEmailKey,
   isConcurrentShippingEmailAttempt: mocks.isConcurrentShippingEmailAttempt,
+  shippingEmailTelemetryProvider: (provider: string | undefined) =>
+    provider === "cloudflare" ? "cloudflare_email" : provider,
   sendShippingConfirmationEmail: mocks.sendShippingConfirmationEmail,
   shippingEmailFailureDetails: (key: string, result: Record<string, unknown>) => ({
     idempotencyKey: key,
@@ -36,6 +39,9 @@ vi.mock("@/lib/fulfillment/shipping-email", () => ({
   }),
   shippingEmailSuccessfulEventTypes: ["shipping_email_sent", "shipping_email_resent"],
   SHIPPING_EMAIL_TEMPLATE_VERSION: 1,
+}));
+vi.mock("@/lib/observability/telemetry", () => ({
+  recordTelemetry: mocks.recordTelemetry,
 }));
 
 import { GET, POST } from "@/app/api/admin/orders/[id]/shipping-email/route";
@@ -266,6 +272,7 @@ describe("POST /api/admin/orders/[id]/shipping-email", () => {
     mocks.sendShippingConfirmationEmail.mockResolvedValue({
       success: false,
       needsReview: true,
+      provider: "cloudflare",
       error: "Accepted-state unknown",
       errorCode: "E_DELIVERY_INDETERMINATE",
     });
@@ -282,6 +289,17 @@ describe("POST /api/admin/orders/[id]/shipping-email", () => {
       "shipping_email_failed",
       { type: "admin", id: "admin-1" },
       expect.objectContaining({ needsReview: true }),
+    );
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      "email.delivery_failed",
+      {
+        operation: "send",
+        outcome: "needs_review",
+        provider: "cloudflare_email",
+        retryable: false,
+        path: "/api/admin/orders/:id/shipping-email",
+        trigger: "manual",
+      },
     );
   });
 

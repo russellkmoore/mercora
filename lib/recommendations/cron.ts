@@ -2,6 +2,7 @@ import {
   rebuildProductRecommendations,
   type RecommendationRebuildSummary,
 } from "./batch/rebuild";
+import { recordTelemetry } from "@/lib/observability/telemetry";
 
 type RecommendationBindings = Pick<CloudflareEnv, "AI" | "DB" | "VECTORIZE">;
 type Rebuild = (
@@ -22,19 +23,24 @@ export async function runRecommendationCron(
     };
 
     if (summary.errors.length > 0) {
-      console.error(JSON.stringify({ ...details, outcome: "partial_failure" }));
       throw new Error(
         `Recommendation rebuild failed for ${summary.errors.length} product(s)`,
       );
     }
 
     if (summary.rowsWritten === 0) {
-      console.warn(JSON.stringify({ ...details, outcome: "no_rows_written" }));
+      recordTelemetry("recommendation.no_rows_written", {
+        operation: "rebuild", count: summary.catalogProducts,
+        duration_ms: details.durationMs, trigger: "scheduled",
+      });
       return;
     }
 
     if (summary.staleRowCount > 0) {
-      console.warn(JSON.stringify({ ...details, outcome: "stale_rows" }));
+      recordTelemetry("recommendation.stale_rows", {
+        operation: "rebuild", count: summary.staleRowCount,
+        duration_ms: details.durationMs, trigger: "scheduled",
+      });
     }
 
     if (summary.productsDeferred > 0) {
@@ -43,14 +49,10 @@ export async function runRecommendationCron(
 
     console.log(JSON.stringify({ ...details, outcome: "success" }));
   } catch (error) {
-    console.error(
-      JSON.stringify({
-        event: "recommendations.rebuild",
-        outcome: "failure",
-        durationMs: Date.now() - startedAt,
-        error: error instanceof Error ? error.message : String(error),
-      }),
-    );
+    recordTelemetry("recommendation.rebuild_failed", {
+      operation: "rebuild", outcome: "failed", duration_ms: Date.now() - startedAt,
+      retryable: true, trigger: "scheduled",
+    }, error);
     throw error;
   }
 }

@@ -6,6 +6,7 @@ import { buildShipmentView } from "@/lib/fulfillment/shipment-view";
 import { parseShipmentInput } from "@/lib/fulfillment/transitions";
 import type { Actor } from "@/lib/fulfillment/types";
 import { toAdminOrder } from "@/lib/models/mach/order-serializer";
+import { recordTelemetry } from "@/lib/observability/telemetry";
 
 const MAX_JSON_BODY_BYTES = 4 * 1_024;
 
@@ -117,7 +118,10 @@ export async function PATCH(
         );
     }
   } catch (error) {
-    console.error("PATCH /api/admin/orders/[id]/tracking failed", error);
+    recordTelemetry("fulfillment.transition_failed", {
+      operation: "transition", outcome: "failed", provider: "d1",
+      retryable: true, path: "/api/admin/orders/:id/tracking", trigger: "request",
+    }, error);
     return NextResponse.json(
       { code: "tracking_update_failed", error: "Failed to update tracking" },
       { status: 500 },

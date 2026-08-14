@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   latestOrderEvent: vi.fn(),
   recordEmailEvent: vi.fn(),
   getStoreConfig: vi.fn(),
+  recordTelemetry: vi.fn(),
 }));
 
 vi.mock("@/lib/email/sender", () => ({ sendEmail: mocks.send }));
@@ -15,6 +16,9 @@ vi.mock("@/lib/fulfillment/service", () => ({
   recordEmailEvent: mocks.recordEmailEvent,
 }));
 vi.mock("@/lib/store-config", () => ({ getStoreConfig: mocks.getStoreConfig }));
+vi.mock("@/lib/observability/telemetry", () => ({
+  recordTelemetry: mocks.recordTelemetry,
+}));
 
 import {
   buildShippingConfirmationData,
@@ -252,6 +256,7 @@ describe("shipping email idempotency and delivery", () => {
     mocks.send.mockResolvedValue({
       success: false,
       needsReview: true,
+      provider: "cloudflare",
       errorCode: "E_DELIVERY_INDETERMINATE",
       error: "Accepted-state unknown",
     });
@@ -267,6 +272,13 @@ describe("shipping email idempotency and delivery", () => {
       "shipping_email_failed",
       actor,
       expect.objectContaining({ needsReview: true }),
+    );
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      "email.delivery_failed",
+      {
+        operation: "send", outcome: "needs_review", provider: "cloudflare_email",
+        retryable: false, trigger: "request",
+      },
     );
   });
 
@@ -323,6 +335,35 @@ describe("shipping email idempotency and delivery", () => {
       "shipping_email_failed",
       actor,
       expect.objectContaining({ error: "network down" }),
+    );
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      "email.delivery_failed",
+      {
+        operation: "send", outcome: "failed",
+        retryable: true, trigger: "request",
+      },
+    );
+  });
+
+  it("reports an audit failure without turning provider success into delivery failure", async () => {
+    const auditError = new Error("D1 audit unavailable");
+    mocks.recordEmailEvent.mockRejectedValue(auditError);
+
+    const result = await sendInitialShippingEmail("ORD-1", actor);
+
+    expect(result).toMatchObject({ attempted: true, success: true, eventId: null });
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      "email.audit_write_failed",
+      {
+        operation: "audit_write", outcome: "failed", provider: "d1",
+        retryable: true, trigger: "request",
+      },
+      auditError,
+    );
+    expect(mocks.recordTelemetry).not.toHaveBeenCalledWith(
+      "email.delivery_failed",
+      expect.anything(),
+      expect.anything(),
     );
   });
 });

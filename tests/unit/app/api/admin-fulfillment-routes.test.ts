@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
     trackingNumber: order.tracking_number ?? null,
     trackingUrl: null,
   })),
+  recordTelemetry: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/admin-middleware", () => ({
@@ -42,6 +43,9 @@ vi.mock("@/lib/models/mach/orders", () => ({
   getOrderById: mocks.getOrderById,
 }));
 vi.mock("@/lib/db", () => ({ getDbAsync: vi.fn() }));
+vi.mock("@/lib/observability/telemetry", () => ({
+  recordTelemetry: mocks.recordTelemetry,
+}));
 
 import { POST as ship } from "@/app/api/admin/orders/[id]/ship/route";
 import { PATCH as tracking } from "@/app/api/admin/orders/[id]/tracking/route";
@@ -144,13 +148,13 @@ describe("admin ship route", () => {
   });
 
   it("keeps a committed shipment successful when the email seam throws", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    const deliveryError = new Error("transport unavailable");
     mocks.shipOrder.mockResolvedValue({
       outcome: "shipped",
       order: shippedOrder,
       eventId: "evt-committed",
     });
-    mocks.sendInitialShippingEmail.mockRejectedValue(new Error("transport unavailable"));
+    mocks.sendInitialShippingEmail.mockRejectedValue(deliveryError);
 
     const response = await ship(
       new NextRequest("https://store.test/api/admin/orders/ORD-1/ship", {
@@ -164,6 +168,39 @@ describe("admin ship route", () => {
       eventId: "evt-committed",
       email: { attempted: false, success: false, error: "shipping_email_failed" },
     });
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      "email.delivery_failed",
+      {
+        operation: "send", outcome: "failed", retryable: true,
+        path: "/api/admin/orders/:id/ship", trigger: "request",
+      },
+      deliveryError,
+    );
+  });
+
+  it("reports transition infrastructure failures and preserves the structured 500", async () => {
+    const transitionError = new Error("D1 transition unavailable");
+    mocks.shipOrder.mockRejectedValue(transitionError);
+
+    const response = await ship(
+      new NextRequest("https://store.test/api/admin/orders/ORD-1/ship", {
+        method: "POST",
+      }),
+      context,
+    );
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      code: "shipment_failed", error: "Failed to ship order",
+    });
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      "fulfillment.transition_failed",
+      {
+        operation: "transition", outcome: "failed", provider: "d1", retryable: true,
+        path: "/api/admin/orders/:id/ship", trigger: "request",
+      },
+      transitionError,
+    );
   });
 
   it("returns a structured refund hold", async () => {

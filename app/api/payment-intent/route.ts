@@ -13,6 +13,7 @@ import {
   assertCheckoutInventoryAvailable,
   InventoryUnavailableError,
 } from '@/lib/services/inventory-adjustments';
+import { recordTelemetry } from '@/lib/observability/telemetry';
 
 interface PaymentIntentRequest {
   items: CheckoutLineInput[];
@@ -97,7 +98,9 @@ export async function POST(request: NextRequest) {
       customerId: userId ?? undefined,
     });
   } catch (error) {
-    console.error('[checkout] Server-authoritative pricing failed:', error);
+    recordTelemetry('payment.pricing_rejected', {
+      operation: 'validate', outcome: 'rejected', path: '/api/payment-intent',
+    }, error);
     return NextResponse.json(
       { error: 'Checkout details are invalid or unavailable' },
       { status: 400 }
@@ -116,12 +119,19 @@ export async function POST(request: NextRequest) {
     await assertCheckoutInventoryAvailable(quote.items);
   } catch (error) {
     if (error instanceof InventoryUnavailableError) {
+      recordTelemetry('payment.inventory_unavailable', {
+        operation: 'validate', outcome: 'unavailable',
+        count: error.variantIds.length, path: '/api/payment-intent',
+      }, error);
       return NextResponse.json(
         { error: 'One or more items are no longer available in the requested quantity' },
         { status: 409 }
       );
     }
-    console.error('[checkout] Authoritative inventory check failed:', error);
+    recordTelemetry('payment.inventory_check_failed', {
+      operation: 'validate', outcome: 'failed', provider: 'd1',
+      retryable: true, path: '/api/payment-intent',
+    }, error);
     return NextResponse.json({ error: 'Inventory is temporarily unavailable' }, { status: 503 });
   }
 
@@ -144,7 +154,10 @@ export async function POST(request: NextRequest) {
         });
       }
     } catch (error) {
-      console.error(`[checkout] Could not ensure customer ${userId}:`, error);
+      recordTelemetry('payment.customer_prepare_failed', {
+        operation: 'persist', outcome: 'failed', provider: 'd1',
+        retryable: true, path: '/api/payment-intent',
+      }, error);
       return NextResponse.json({ error: 'Could not prepare authenticated checkout' }, { status: 503 });
     }
   }
@@ -175,7 +188,10 @@ export async function POST(request: NextRequest) {
       description: `Order ${orderId}`,
     });
   } catch (error) {
-    console.error('[checkout] PaymentIntent creation failed:', error);
+    recordTelemetry('payment.intent_create_failed', {
+      operation: 'create', outcome: 'failed', provider: 'stripe',
+      retryable: true, path: '/api/payment-intent',
+    }, error);
     return NextResponse.json({ error: 'Payment provider is unavailable' }, { status: 503 });
   }
 
@@ -187,9 +203,16 @@ export async function POST(request: NextRequest) {
     providerCurrency !== total.currency ||
     !paymentIntent.client_secret
   ) {
-    await cancelPaymentIntent(paymentIntent.id).catch((error) =>
-      console.error(`[checkout] Failed to cancel invalid PaymentIntent ${paymentIntent.id}:`, error)
-    );
+    recordTelemetry('payment.intent_invalid', {
+      operation: 'validate', outcome: 'invalid', provider: 'stripe',
+      http_status: 502, path: '/api/payment-intent',
+    });
+    await cancelPaymentIntent(paymentIntent.id).catch((error) => {
+      recordTelemetry('payment.intent_cancel_failed', {
+        operation: 'process', outcome: 'failed', provider: 'stripe',
+        retryable: true, path: '/api/payment-intent',
+      }, error);
+    });
     return NextResponse.json({ error: 'Payment provider returned an invalid intent' }, { status: 502 });
   }
 
@@ -237,10 +260,16 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString(),
     });
   } catch (error) {
-    console.error(`[checkout] Pending order ${orderId} could not be persisted:`, error);
-    await cancelPaymentIntent(paymentIntent.id).catch((cancelError) =>
-      console.error(`[checkout] Failed to cancel orphaned PaymentIntent ${paymentIntent.id}:`, cancelError)
-    );
+    recordTelemetry('payment.order_persist_failed', {
+      operation: 'persist', outcome: 'failed', provider: 'd1',
+      retryable: true, path: '/api/payment-intent',
+    }, error);
+    await cancelPaymentIntent(paymentIntent.id).catch((cancelError) => {
+      recordTelemetry('payment.intent_cancel_failed', {
+        operation: 'process', outcome: 'failed', provider: 'stripe',
+        retryable: true, path: '/api/payment-intent',
+      }, cancelError);
+    });
     // The client secret is deliberately withheld: without a durable, immutable
     // order binding the intent must never be confirmable by this checkout.
     return NextResponse.json(
