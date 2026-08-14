@@ -19,6 +19,7 @@ describe("getProductsBySlugs", () => {
     ];
     const variants = [
       { id: "v1", product_id: "p1", sku: "ONE", price: '{"amount":1000,"currency":"USD"}', option_values: "[]", status: "active" },
+      { id: "v1-draft", product_id: "p1", sku: "ONE-DRAFT", price: '{"amount":500,"currency":"USD"}', option_values: "[]", status: "draft" },
       { id: "v2", product_id: "p2", sku: "TWO", price: { amount: 2000, currency: "USD" }, option_values: [], status: "active" },
     ];
     mocks.select
@@ -30,6 +31,7 @@ describe("getProductsBySlugs", () => {
     expect(mocks.select).toHaveBeenCalledTimes(2);
     expect([...result.keys()]).toEqual(["one", "two"]);
     expect(result.get("one")?.variants?.[0].price).toEqual({ amount: 1000, currency: "USD" });
+    expect(result.get("one")?.variants?.map(({ id }) => id)).toEqual(["v1"]);
   });
 
   it("does no database work for an empty request", async () => {
