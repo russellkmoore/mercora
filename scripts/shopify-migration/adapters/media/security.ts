@@ -144,13 +144,58 @@ export function validateMediaPlan(plan: MediaRewrite, allowedHosts: readonly str
   return url;
 }
 
+function crc32(bytes: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+const MAX_IMAGE_DIMENSION = 16_384;
+const MAX_IMAGE_PIXELS = 40_000_000;
+
+function hasBoundedDimensions(width: number, height: number): boolean {
+  return Number.isSafeInteger(width) && Number.isSafeInteger(height) &&
+    width > 0 && height > 0 && width <= MAX_IMAGE_DIMENSION && height <= MAX_IMAGE_DIMENSION &&
+    width * height <= MAX_IMAGE_PIXELS;
+}
+
 function isPng(bytes: Uint8Array): boolean {
   const signature = [137, 80, 78, 71, 13, 10, 26, 10];
-  return bytes.length >= 33 && signature.every((byte, index) => bytes[index] === byte) &&
-    bytes[8] === 0 && bytes[9] === 0 && bytes[10] === 0 && bytes[11] === 13 &&
-    String.fromCharCode(...bytes.slice(12, 16)) === "IHDR" &&
-    bytes.slice(16, 20).some((byte) => byte !== 0) && bytes.slice(20, 24).some((byte) => byte !== 0) &&
-    bytes[26] === 0 && bytes[27] === 0 && bytes[28] <= 1;
+  if (bytes.length < 57 || !signature.every((byte, index) => bytes[index] === byte)) return false;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let offset = 8;
+  let chunkIndex = 0;
+  let sawIdat = false;
+  while (offset + 12 <= bytes.length) {
+    const length = view.getUint32(offset);
+    const typeStart = offset + 4;
+    const dataStart = typeStart + 4;
+    const dataEnd = dataStart + length;
+    const chunkEnd = dataEnd + 4;
+    if (dataEnd < dataStart || chunkEnd > bytes.length) return false;
+    const type = ascii(bytes, typeStart, dataStart);
+    if (view.getUint32(dataEnd) !== crc32(bytes.subarray(typeStart, dataEnd))) return false;
+    if (chunkIndex === 0) {
+      if (type !== "IHDR" || length !== 13) return false;
+      const width = view.getUint32(dataStart);
+      const height = view.getUint32(dataStart + 4);
+      const bitDepth = bytes[dataStart + 8];
+      const colorType = bytes[dataStart + 9];
+      const permittedDepths: Record<number, readonly number[]> = {
+        0: [1, 2, 4, 8, 16], 2: [8, 16], 3: [1, 2, 4, 8], 4: [8, 16], 6: [8, 16],
+      };
+      if (!hasBoundedDimensions(width, height) || !permittedDepths[colorType]?.includes(bitDepth) ||
+        bytes[dataStart + 10] !== 0 || bytes[dataStart + 11] !== 0 || bytes[dataStart + 12] > 1) return false;
+    } else if (type === "IHDR") return false;
+    if (type === "IDAT") sawIdat = true;
+    if (type === "IEND") return length === 0 && sawIdat && chunkEnd === bytes.length;
+    offset = chunkEnd;
+    chunkIndex += 1;
+  }
+  return false;
 }
 
 function isJpeg(bytes: Uint8Array): boolean {
@@ -161,18 +206,26 @@ function isJpeg(bytes: Uint8Array): boolean {
     if (bytes[offset] !== 0xff) return false;
     while (bytes[offset] === 0xff) offset += 1;
     const marker = bytes[offset++];
-    if (marker === 0xd9) return dimensions;
+    if (marker === 0xd9) return dimensions && offset === bytes.length;
     if (marker === 0xda) {
-      for (let index = offset; index + 1 < bytes.length; index += 1) {
-        if (bytes[index] === 0xff && bytes[index + 1] === 0xd9) return dimensions;
+      if (offset + 1 >= bytes.length) return false;
+      const scanHeaderLength = (bytes[offset] << 8) | bytes[offset + 1];
+      if (scanHeaderLength < 2 || offset + scanHeaderLength > bytes.length) return false;
+      for (let index = offset + scanHeaderLength; index + 1 < bytes.length; index += 1) {
+        if (bytes[index] === 0xff && bytes[index + 1] === 0x00) { index += 1; continue; }
+        if (bytes[index] === 0xff && bytes[index + 1] === 0xd9) return dimensions && index + 2 === bytes.length;
       }
       return false;
     }
+    if (marker === 0x01 || marker >= 0xd0 && marker <= 0xd7) continue;
     if (offset + 1 >= bytes.length) return false;
     const length = (bytes[offset] << 8) | bytes[offset + 1];
     if (length < 2 || offset + length > bytes.length) return false;
     if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
-      if (length < 8 || bytes[offset + 3] === 0 && bytes[offset + 4] === 0 || bytes[offset + 5] === 0 && bytes[offset + 6] === 0) return false;
+      if (length < 8 || !hasBoundedDimensions(
+        (bytes[offset + 5] << 8) | bytes[offset + 6],
+        (bytes[offset + 3] << 8) | bytes[offset + 4],
+      )) return false;
       dimensions = true;
     }
     offset += length;
@@ -188,9 +241,39 @@ function isWebp(bytes: Uint8Array): boolean {
   if (bytes.length < 20 || ascii(bytes, 0, 4) !== "RIFF" || ascii(bytes, 8, 12) !== "WEBP") return false;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (view.getUint32(4, true) + 8 !== bytes.length) return false;
-  const chunk = ascii(bytes, 12, 16);
-  const chunkLength = view.getUint32(16, true);
-  return ["VP8 ", "VP8L", "VP8X"].includes(chunk) && 20 + chunkLength + (chunkLength % 2) <= bytes.length;
+  let offset = 12;
+  let chunkIndex = 0;
+  let sawImageHeader = false;
+  while (offset + 8 <= bytes.length) {
+    const chunk = ascii(bytes, offset, offset + 4);
+    const chunkLength = view.getUint32(offset + 4, true);
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + chunkLength;
+    const chunkEnd = dataEnd + (chunkLength % 2);
+    if (dataEnd < dataStart || chunkEnd > bytes.length) return false;
+    if (chunkIndex === 0) {
+      if (chunk === "VP8 ") {
+        if (chunkLength < 10 || bytes[dataStart + 3] !== 0x9d || bytes[dataStart + 4] !== 0x01 ||
+          bytes[dataStart + 5] !== 0x2a || !hasBoundedDimensions(
+          view.getUint16(dataStart + 6, true) & 0x3fff,
+          view.getUint16(dataStart + 8, true) & 0x3fff,
+        )) return false;
+      } else if (chunk === "VP8L") {
+        if (chunkLength < 5 || bytes[dataStart] !== 0x2f) return false;
+        const dimensions = view.getUint32(dataStart + 1, true);
+        if (!hasBoundedDimensions((dimensions & 0x3fff) + 1, ((dimensions >>> 14) & 0x3fff) + 1)) return false;
+      } else if (chunk === "VP8X") {
+        if (chunkLength !== 10) return false;
+        const width = bytes[dataStart + 4] | bytes[dataStart + 5] << 8 | bytes[dataStart + 6] << 16;
+        const height = bytes[dataStart + 7] | bytes[dataStart + 8] << 8 | bytes[dataStart + 9] << 16;
+        if (!hasBoundedDimensions(width + 1, height + 1)) return false;
+      } else return false;
+      sawImageHeader = true;
+    }
+    offset = chunkEnd;
+    chunkIndex += 1;
+  }
+  return sawImageHeader && offset === bytes.length;
 }
 
 export function verifyImageSignature(bytes: Uint8Array, contentType: MediaContentType): void {

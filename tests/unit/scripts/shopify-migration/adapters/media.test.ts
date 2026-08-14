@@ -9,6 +9,7 @@ import {
   importMediaPlans,
   R2BindingMediaStore,
   R2S3MediaStore,
+  verifyImageSignature,
   wranglerR2GetArguments,
   wranglerR2PutArguments,
 } from "@/scripts/shopify-migration/adapters/media";
@@ -21,9 +22,15 @@ import {
   type StoredMediaObject,
 } from "@/scripts/shopify-migration/adapters/media/r2";
 
-const JPEG = new Uint8Array([
-  0xff, 0xd8, 0xff, 0xc0, 0x00, 0x08, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01, 0xff, 0xd9,
-]);
+const JPEG = Uint8Array.from(Buffer.from(
+  "/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAf/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AJXAIf/Z",
+  "base64",
+));
+const PNG = Uint8Array.from(Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADElEQVQImWNgZGIGAAAOAAeCcsnOAAAAAElFTkSuQmCC",
+  "base64",
+));
+const WEBP = Uint8Array.from(Buffer.from("UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAUAmJaQAA3AA/v0gUAA=", "base64"));
 const PUBLIC_IP = ["93.184.216.34"];
 const WRANGLER_CONFIG = `{
   "r2_buckets": [{
@@ -228,6 +235,53 @@ describe("safe media downloader", () => {
       allowedHosts: ["cdn.shopify.com"], fetcher: fakeJpeg, resolveHost: async () => PUBLIC_IP,
     }))
       .rejects.toThrow(/unsupported/);
+  });
+
+  it("accepts structurally complete JPEG, PNG, and WebP images", async () => {
+    for (const [bytes, extension, contentType] of [
+      [JPEG, "jpg", "image/jpeg"],
+      [PNG, "png", "image/png"],
+      [WEBP, "webp", "image/webp"],
+    ] as const) {
+      const mediaPlan = plan({
+        sourceUrl: `https://cdn.shopify.com/files/image.${extension}`,
+        objectKey: `products/shopify_product_abc/1.${extension}`,
+        publicPath: `/media/products/shopify_product_abc/1.${extension}`,
+        contentType,
+      });
+      await expect(downloadVerifiedMedia(mediaPlan, {
+        allowedHosts: ["cdn.shopify.com"],
+        fetcher: vi.fn<typeof fetch>().mockResolvedValue(imageResponse(bytes, { "content-type": contentType })),
+        resolveHost: async () => PUBLIC_IP,
+      })).resolves.toMatchObject({ bytes, contentType });
+    }
+  });
+
+  it("rejects truncated, trailing-polyglot, and structurally corrupt image containers", () => {
+    for (const [bytes, contentType] of [
+      [JPEG, "image/jpeg"], [PNG, "image/png"], [WEBP, "image/webp"],
+    ] as const) {
+      expect(() => verifyImageSignature(bytes.slice(0, -1), contentType)).toThrow(/signature/);
+      const polyglot = new Uint8Array(bytes.byteLength + 8);
+      polyglot.set(bytes);
+      polyglot.set(Buffer.from("<script>"), bytes.byteLength);
+      expect(() => verifyImageSignature(polyglot, contentType)).toThrow(/signature/);
+    }
+
+    const badPngCrc = PNG.slice();
+    badPngCrc[29] ^= 1;
+    expect(() => verifyImageSignature(badPngCrc, "image/png")).toThrow(/signature/);
+
+    const badWebpSync = WEBP.slice();
+    badWebpSync[23] ^= 1;
+    expect(() => verifyImageSignature(badWebpSync, "image/webp")).toThrow(/signature/);
+
+    const excessiveWebpPixels = WEBP.slice();
+    excessiveWebpPixels[26] = 0xff;
+    excessiveWebpPixels[27] = 0x3f;
+    excessiveWebpPixels[28] = 0xff;
+    excessiveWebpPixels[29] = 0x3f;
+    expect(() => verifyImageSignature(excessiveWebpPixels, "image/webp")).toThrow(/signature/);
   });
 });
 
