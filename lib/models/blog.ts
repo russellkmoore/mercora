@@ -37,6 +37,8 @@ export interface BlogPost extends BlogPostSummary {
   updatedBy: string | null;
 }
 
+export type PublicBlogPost = Omit<BlogPost, "editorJson" | "createdBy" | "updatedBy">;
+
 export interface BlogPostInput {
   title: string;
   slug?: string;
@@ -148,6 +150,11 @@ function toPost(row: BlogPostRow): BlogPost {
   };
 }
 
+function toPublicPost(row: BlogPostRow): PublicBlogPost {
+  const { editorJson: _editorJson, createdBy: _createdBy, updatedBy: _updatedBy, ...post } = toPost(row);
+  return post;
+}
+
 function sanitizeBody(html: string): string {
   const config = getStoreConfig();
   return sanitizeRichHtmlServer(html, { allowedImageOrigin: config.urls.imageCdn });
@@ -199,7 +206,7 @@ export async function getPublishedBlogPosts(options: {
 export const getPublishedBlogPost = cache(async (
   slug: string,
   now = Math.floor(Date.now() / 1000),
-): Promise<BlogPost | null> => {
+): Promise<PublicBlogPost | null> => {
   const db = await getDbAsync();
   const rows = await db.select().from(blogPosts)
     .where(and(
@@ -207,7 +214,7 @@ export const getPublishedBlogPost = cache(async (
       eq(blogPosts.status, "published"),
       lte(blogPosts.publishedAt, now),
     )).limit(1);
-  return rows[0] ? toPost(rows[0]) : null;
+  return rows[0] ? toPublicPost(rows[0]) : null;
 });
 
 export async function adminListBlogPosts(options: {
@@ -289,6 +296,9 @@ export async function adminUpdateBlogPost(
   const publishedAt = publishedAtInput !== undefined
     ? publishedAtInput
     : status === "published" ? existing.publishedAt ?? now : existing.publishedAt;
+  if (status === "published" && publishedAt === null) {
+    throw new Error("Published posts require a publication time");
+  }
   const db = await getDbAsync();
   const rows = await db.update(blogPosts).set({
     ...(input.title !== undefined && { title: requiredText(input.title, "Title", 200) }),

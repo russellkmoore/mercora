@@ -40,7 +40,8 @@ import {
   X,
   ClipboardList,
   FileEdit,
-  MessageSquare
+  MessageSquare,
+  Newspaper
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -93,6 +94,12 @@ const navItems: NavItem[] = [
     href: "/admin/pages",
     icon: FileEdit,
     description: "Content pages and CMS"
+  },
+  {
+    label: "Blog",
+    href: "/admin/blog",
+    icon: Newspaper,
+    description: "Editorial posts and publishing"
   },
   {
     label: "Knowledge",
