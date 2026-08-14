@@ -9,30 +9,71 @@ export interface StructuredLogRecord {
 
 export type LogSink = (record: StructuredLogRecord) => void;
 
-const sensitiveKey = /(?:access.?token|authorization|cookie|secret|password|email|phone|address|first.?name|last.?name|customer.?name)/i;
-const emailLike = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+const REDACTED = "[REDACTED]";
+const numericField = /^(?:count|sourceCount|recordCount|transformed|written|inserted|migrated|skipped|errors|warnings|retries|attempt|page|pages|maxPages|maxRecords|durationMs|bytes)$/;
+const booleanField = /^(?:dryRun|apply|overwrite|success|completed)$/;
+const labelField = /^(?:entity|entityType|provider|stage|mode|sourceMode|target|operation|resource|status|errorClass)$/;
+const containerField = /^(?:metrics|summary|execution|retry|pagination|result)$/;
+const errorField = /^(?:error|exception)$/;
+const safeLabel = /^[a-zA-Z][a-zA-Z0-9._-]{0,79}$/;
 
-function redactString(value: string, secrets: readonly string[]): string {
-  let redacted = value.replace(emailLike, "[REDACTED]");
-  for (const secret of secrets) {
-    if (secret) redacted = redacted.split(secret).join("[REDACTED]");
-  }
-  return redacted;
+function containsSecret(value: string, secrets: readonly string[]): boolean {
+  return secrets.some((secret) => secret !== "" && value.includes(secret));
 }
 
-export function redactForLog(value: unknown, secrets: readonly string[] = [], key = ""): unknown {
-  if (sensitiveKey.test(key)) return "[REDACTED]";
-  if (typeof value === "string") return redactString(value, secrets);
-  if (Array.isArray(value)) return value.map((item) => redactForLog(item, secrets));
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([childKey, child]) => [
-        redactString(childKey, secrets),
-        redactForLog(child, secrets, childKey),
-      ]),
-    );
+function redactValue(
+  value: unknown,
+  secrets: readonly string[],
+  key: string,
+  seen: WeakSet<object>,
+  depth: number,
+): unknown {
+  if (depth > 5) return REDACTED;
+  if (value instanceof Error) {
+    return { errorClass: safeLabel.test(value.name) ? value.name : "Error" };
   }
-  return value;
+  if (numericField.test(key)) {
+    return typeof value === "number" && Number.isFinite(value) ? value : REDACTED;
+  }
+  if (booleanField.test(key)) return typeof value === "boolean" ? value : REDACTED;
+  if (labelField.test(key)) {
+    return typeof value === "string" && safeLabel.test(value) && !containsSecret(value, secrets)
+      ? value
+      : REDACTED;
+  }
+  if (Array.isArray(value)) return REDACTED;
+  if (value && typeof value === "object") {
+    if (key && !containerField.test(key)) return REDACTED;
+    if (seen.has(value)) return REDACTED;
+    seen.add(value);
+    const output: Record<string, unknown> = {};
+    let unknown = false;
+    for (const [childKey, child] of Object.entries(value as Record<string, unknown>).slice(0, 50)) {
+      if (
+        numericField.test(childKey) ||
+        booleanField.test(childKey) ||
+        labelField.test(childKey) ||
+        containerField.test(childKey) ||
+        (errorField.test(childKey) && child instanceof Error)
+      ) {
+        output[childKey] = redactValue(child, secrets, childKey, seen, depth + 1);
+      } else {
+        unknown = true;
+      }
+    }
+    if (unknown) output.redacted = REDACTED;
+    seen.delete(value);
+    return output;
+  }
+  return value === null ? null : REDACTED;
+}
+
+/**
+ * Admit only operational metadata. Unknown keys and all record payloads are
+ * redacted, so customer/order/provider values cannot cross the log boundary.
+ */
+export function redactForLog(value: unknown, secrets: readonly string[] = [], key = ""): unknown {
+  return redactValue(value, secrets, key, new WeakSet<object>(), 0);
 }
 
 function consoleSink(record: StructuredLogRecord): void {
