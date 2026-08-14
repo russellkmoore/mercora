@@ -3,6 +3,7 @@ import { deterministicProviderId, providerFingerprint } from "../lib/ids.js";
 import {
   SHOPIFY_PROVIDER,
   UNKNOWN_SOURCE_UNIX_TIMESTAMP,
+  canonicalProviderRecords,
   excerptFromHtml,
   fitsEscapedSqlText,
   isReservedPageSlug,
@@ -83,9 +84,10 @@ export function transformPages(
   const idMap = new Map<string, string>();
   const skipped: Array<{ record: ShopifyPage; reason: string }> = [];
   const warnings: string[] = [];
-  const slugs = new Set<string>();
+  const sourceByFingerprint = new Map<string, ShopifyPage>();
 
-  for (const source of pages) {
+  const canonical = canonicalProviderRecords(pages, "page", (page) => page.id);
+  for (const source of canonical.records) {
     const sourceId = String(source.id ?? "").trim();
     const title = source.title?.trim();
     const slug = normalizeSlug(source.handle ?? "");
@@ -96,16 +98,16 @@ export function transformPages(
       skipped.push({ record: source, reason: "Page requires an id, title, and valid handle" });
       continue;
     }
+    const sourceFingerprint = providerFingerprint(SHOPIFY_PROVIDER, "page", sourceId);
+    if (canonical.duplicateFingerprints.has(sourceFingerprint)) {
+      skipped.push({ record: source, reason: "Duplicate page source identity" });
+      continue;
+    }
     if (isReservedPageSlug(slug)) {
       skipped.push({ record: source, reason: `Page slug is reserved by the storefront: ${slug}` });
       continue;
     }
-    if (slugs.has(slug)) {
-      skipped.push({ record: source, reason: `Duplicate page slug: ${slug}` });
-      continue;
-    }
     const pageReferenceId = deterministicProviderId(SHOPIFY_PROVIDER, "page", sourceId);
-    const sourceFingerprint = providerFingerprint(SHOPIFY_PROVIDER, "page", sourceId);
     const { html, media } = rewriteAndSanitizeHtml(
       source.body_html ?? "",
       allowedMediaHosts,
@@ -116,7 +118,7 @@ export function transformPages(
       skipped.push({ record: source, reason: "Page content is empty or exceeds the SQL-safe text limit" });
       continue;
     }
-    slugs.add(slug);
+    sourceByFingerprint.set(sourceFingerprint, source);
     const publishedAt = unixTimestamp(source.published_at);
     if (source.published_at && publishedAt === null) {
       warnings.push(`Page ${sourceFingerprint} has an invalid publication time and was imported as draft`);
@@ -174,7 +176,14 @@ export function transformPages(
         },
       },
     });
-    idMap.set(sourceFingerprint, slug);
   }
-  return { records, idMap, skipped, warnings };
+  const slugCounts = new Map<string, number>();
+  for (const { page } of records) slugCounts.set(page.slug, (slugCounts.get(page.slug) ?? 0) + 1);
+  const accepted = records.flatMap((record) => {
+    if (slugCounts.get(record.page.slug) === 1) return [record];
+    skipped.push({ record: sourceByFingerprint.get(record.sourceFingerprint)!, reason: `Ambiguous duplicate page slug: ${record.page.slug}` });
+    return [];
+  });
+  for (const record of accepted) idMap.set(record.sourceFingerprint, record.page.slug);
+  return { records: accepted, idMap, skipped, warnings };
 }

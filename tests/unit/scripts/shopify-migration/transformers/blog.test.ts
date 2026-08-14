@@ -134,4 +134,26 @@ describe("blog transform", () => {
     expect(result.records[0].record.html).toBe("<p>Text remains.</p>");
     expect(result.records[0].record.cover_image_url).toBeNull();
   });
+
+  it("resolves category and post slug conflicts identically for permuted provider input", () => {
+    const blogs = [
+      { id: 30, title: "Thirty", handle: "shared" },
+      { id: 10, title: "Ten", handle: "shared" },
+      { id: 20, title: "Twenty", handle: "other" },
+    ];
+    const articles = [
+      { id: 300, blog_id: 20, title: "Three", handle: "same-post", body_html: "<p>Three</p>" },
+      { id: 100, blog_id: 20, title: "One", handle: "same-post", body_html: "<p>One</p>" },
+      { id: 200, blog_id: 20, title: "Two", handle: "other-post", body_html: "<p>Two</p>" },
+    ];
+    const first = transformBlogContent(blogs, articles, options);
+    const second = transformBlogContent([...blogs].reverse(), [...articles].reverse(), options);
+    expect(first.categories).toEqual(second.categories);
+    expect(first.records).toEqual(second.records);
+    expect(first.categories.map(({ record }) => record.slug)).toEqual(["other"]);
+    expect(first.records.map(({ record }) => record.slug)).toEqual(["other-post"]);
+    expect(first.skipped.map(({ record, reason }) => [record.id, reason])).toEqual(
+      second.skipped.map(({ record, reason }) => [record.id, reason]),
+    );
+  });
 });

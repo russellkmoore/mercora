@@ -4,6 +4,7 @@ import {
   SHOPIFY_PROVIDER,
   UNKNOWN_SOURCE_TIMESTAMP,
   boundedPositiveInteger,
+  canonicalProviderRecords,
   clampInventory,
   excerptFromHtml,
   fitsEscapedSqlText,
@@ -60,10 +61,12 @@ export function transformCollections(
   const idMap = new Map<string, string>();
   const skipped: Array<{ record: ShopifyCollection; reason: string }> = [];
   const warnings: string[] = [];
-  const slugs = new Set<string>();
+  const sourceByFingerprint = new Map<string, ShopifyCollection>();
 
-  collections.forEach((collection, position) => {
+  const canonical = canonicalProviderRecords(collections, "category", (collection) => collection.id);
+  canonical.records.forEach((collection) => {
     const sourceId = String(collection.id ?? "").trim();
+    const sourceFingerprint = sourceId ? providerFingerprint(SHOPIFY_PROVIDER, "category", sourceId) : "";
     const slug = normalizeSlug(collection.handle ?? "");
     const title = collection.title?.trim();
     if (
@@ -73,8 +76,8 @@ export function transformCollections(
       skipped.push({ record: collection, reason: "Collection requires an id, title, and valid handle" });
       return;
     }
-    if (slugs.has(slug)) {
-      skipped.push({ record: collection, reason: `Duplicate category slug: ${slug}` });
+    if (canonical.duplicateFingerprints.has(sourceFingerprint)) {
+      skipped.push({ record: collection, reason: "Duplicate collection source identity" });
       return;
     }
     const id = deterministicProviderId(SHOPIFY_PROVIDER, "category", sourceId);
@@ -85,8 +88,7 @@ export function transformCollections(
       skipped.push({ record: collection, reason: "Category description exceeds the SQL-safe text limit" });
       return;
     }
-    slugs.add(slug);
-    idMap.set(providerFingerprint(SHOPIFY_PROVIDER, "category", sourceId), id);
+    sourceByFingerprint.set(sourceFingerprint, collection);
     const image = collection.image?.src
       ? mediaRewrite(collection.image.src, allowedMediaHosts, id, "category", 1, {
         altText: (collection.image.alt?.trim() || title).slice(0, 300),
@@ -116,7 +118,7 @@ export function transformCollections(
     } : null;
 
     records.push({
-      sourceFingerprint: providerFingerprint(SHOPIFY_PROVIDER, "category", sourceId),
+      sourceFingerprint,
       media: image ? [image] : [],
       category: {
         id,
@@ -125,10 +127,10 @@ export function transformCollections(
         slug,
         status: hasValidTimestamp(collection.published_at) ? "active" : "inactive",
         parent_id: null,
-        position: position + 1,
+        position: 0,
         path: `/${slug}`,
         external_references: JSON.stringify({
-          shopify_fingerprint: providerFingerprint(SHOPIFY_PROVIDER, "category", sourceId),
+          shopify_fingerprint: sourceFingerprint,
         }),
         created_at: isoTimestamp(collection.published_at, UNKNOWN_SOURCE_TIMESTAMP),
         updated_at: isoTimestamp(collection.updated_at, UNKNOWN_SOURCE_TIMESTAMP),
@@ -144,5 +146,16 @@ export function transformCollections(
     });
   });
 
-  return { records, idMap, skipped, warnings };
+  const slugCounts = new Map<string, number>();
+  for (const { category } of records) slugCounts.set(category.slug, (slugCounts.get(category.slug) ?? 0) + 1);
+  const accepted = records.flatMap((record) => {
+    if (slugCounts.get(record.category.slug) === 1) return [record];
+    skipped.push({ record: sourceByFingerprint.get(record.sourceFingerprint)!, reason: `Ambiguous duplicate category slug: ${record.category.slug}` });
+    return [];
+  }).map((record, position) => ({
+    ...record,
+    category: { ...record.category, position: position + 1 },
+  }));
+  for (const record of accepted) idMap.set(record.sourceFingerprint, record.category.id);
+  return { records: accepted, idMap, skipped, warnings };
 }

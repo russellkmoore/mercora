@@ -46,11 +46,12 @@ describe("page transform", () => {
       duplicate,
     ], options);
 
-    expect(result.records).toHaveLength(1);
-    expect(result.skipped.map(({ reason }) => reason)).toEqual([
+    expect(result.records).toEqual([]);
+    expect(result.skipped.map(({ reason }) => reason)).toEqual(expect.arrayContaining([
       "Page slug is reserved by the storefront: checkout",
-      "Duplicate page slug: safe-page",
-    ]);
+      "Ambiguous duplicate page slug: safe-page",
+      "Ambiguous duplicate page slug: safe-page",
+    ]));
   });
 
   it("fails closed to draft when publication time is absent or invalid", () => {
@@ -158,5 +159,21 @@ describe("page transform", () => {
       expect(result.records).toEqual([]);
       expect(result.skipped[0].reason).toContain("SQL-safe");
     }
+  });
+
+  it("resolves duplicate slugs identically for permuted provider input", () => {
+    const sources = [
+      { id: 300, title: "Three", handle: "same-page", body_html: "<p>Three</p>" },
+      { id: 100, title: "One", handle: "same-page", body_html: "<p>One</p>" },
+      { id: 200, title: "Two", handle: "other-page", body_html: "<p>Two</p>" },
+    ];
+    const first = transformPages(sources, options);
+    const second = transformPages([...sources].reverse(), options);
+    expect(first.records).toEqual(second.records);
+    expect(first.records.map(({ page }) => page.slug)).toEqual(["other-page"]);
+    expect(first.skipped).toHaveLength(2);
+    expect(first.skipped.map(({ record, reason }) => [record.id, reason])).toEqual(
+      second.skipped.map(({ record, reason }) => [record.id, reason]),
+    );
   });
 });

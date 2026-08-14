@@ -9,6 +9,7 @@ import {
   SHOPIFY_PROVIDER,
   UNKNOWN_SOURCE_TIMESTAMP,
   boundedPositiveInteger,
+  canonicalProviderRecords,
   clampInventory,
   escapedSqlUtf8Bytes,
   fitsEscapedSqlText,
@@ -188,7 +189,8 @@ export function collectionMembershipByProduct(
   categoryIdBySourceFingerprint: ReadonlyMap<string, string>,
 ): Map<string, string[]> {
   const result = new Map<string, string[]>();
-  for (const collect of collects) {
+  const canonical = canonicalProviderRecords(collects, "collect", (collect) => collect.id);
+  for (const collect of canonical.records) {
     const categoryId = categoryIdBySourceFingerprint.get(
       providerFingerprint(SHOPIFY_PROVIDER, "category", collect.collection_id),
     );
@@ -198,6 +200,7 @@ export function collectionMembershipByProduct(
     if (!existing.includes(categoryId) && existing.length < MAX_PRODUCT_CATEGORIES) existing.push(categoryId);
     result.set(productId, existing);
   }
+  for (const categories of result.values()) categories.sort();
   return result;
 }
 
@@ -216,10 +219,10 @@ export function transformProducts(
   const idMap = new Map<string, string>();
   const skipped: Array<{ record: ShopifyProduct; reason: string }> = [];
   const warnings: string[] = [];
-  const slugs = new Set<string>();
-  const skus = new Set<string>();
+  const sourceByFingerprint = new Map<string, ShopifyProduct>();
 
-  for (const source of products) {
+  const canonical = canonicalProviderRecords(products, "product", (product) => product.id);
+  for (const source of canonical.records) {
     const sourceId = String(source.id ?? "").trim();
     const slug = normalizeSlug(source.handle ?? "");
     const name = source.title?.trim();
@@ -245,22 +248,27 @@ export function transformProducts(
       skipped.push({ record: source, reason: "Product requires an id, title, and valid handle" });
       continue;
     }
-    if (slugs.has(slug)) {
-      skipped.push({ record: source, reason: `Duplicate product slug: ${slug}` });
+    const sourceFingerprint = providerFingerprint(SHOPIFY_PROVIDER, "product", sourceId);
+    if (canonical.duplicateFingerprints.has(sourceFingerprint)) {
+      skipped.push({ record: source, reason: "Duplicate product source identity" });
       continue;
     }
-
     const productId = deterministicProviderId(SHOPIFY_PROVIDER, "product", sourceId);
-    const sourceFingerprint = providerFingerprint(SHOPIFY_PROVIDER, "product", sourceId);
     const status = productStatus(source);
-    const optionDefinitions = (source.options ?? []).slice(0, 3).map((option, position) => ({
+    const sourceOptions = [...(source.options ?? [])].sort((left, right) =>
+      (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER) ||
+      String(left.id ?? left.name).localeCompare(String(right.id ?? right.name)));
+    const optionDefinitions = sourceOptions.slice(0, 3).map((option, position) => ({
       id: deterministicProviderId(SHOPIFY_PROVIDER, "option", `${sourceId}:${String(option.id ?? position + 1)}`),
       name: option.name.trim(),
       values: uniqueStrings(option.values ?? []),
       position: boundedPositiveInteger(option.position, 3) ?? position + 1,
     })).filter((option) => option.name && option.values.length > 0);
 
-    const imageResults = (source.images ?? []).flatMap((image, index) => {
+    const sourceImages = [...(source.images ?? [])].sort((left, right) =>
+      (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER) ||
+      String(left.id ?? left.src).localeCompare(String(right.id ?? right.src)));
+    const imageResults = sourceImages.flatMap((image, index) => {
       const result = machMedia(image, allowedMediaHosts, sourceId, productId, index + 1);
       if (!result) {
         warnings.push(
@@ -276,8 +284,11 @@ export function transformProducts(
     const variants: VariantInsertRecord[] = [];
     const inventory: InventoryInsertRecord[] = [];
     const candidateSkus = new Set<string>();
-    for (let index = 0; index < source.variants.length; index += 1) {
-      const variant = source.variants[index];
+    const sourceVariants = [...source.variants].sort((left, right) =>
+      (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER) ||
+      String(left.id ?? left.sku ?? left.barcode ?? "").localeCompare(String(right.id ?? right.sku ?? right.barcode ?? "")));
+    for (let index = 0; index < sourceVariants.length; index += 1) {
+      const variant = sourceVariants[index];
       const sku = variant.sku?.trim() || `${slug}-${index + 1}`;
       const rawValues = [variant.option1, variant.option2, variant.option3].filter(
         (value): value is string => value !== null && value !== undefined,
@@ -302,7 +313,7 @@ export function transformProducts(
       const variantSourceId = String(variant.id ?? `${sourceId}:${naturalKey}`);
       const variantFingerprint = providerFingerprint(SHOPIFY_PROVIDER, "variant", variantSourceId);
       const normalizedSku = sku.toLocaleLowerCase("en-US");
-      if (skus.has(normalizedSku) || candidateSkus.has(normalizedSku)) {
+      if (candidateSkus.has(normalizedSku)) {
         warnings.push(`Product ${sourceFingerprint} variant ${variantFingerprint} omitted: duplicate SKU`);
         continue;
       }
@@ -419,8 +430,7 @@ export function transformProducts(
       continue;
     }
 
-    slugs.add(slug);
-    candidateSkus.forEach((sku) => skus.add(sku));
+    sourceByFingerprint.set(sourceFingerprint, source);
     records.push({
       sourceFingerprint,
       variants,
@@ -451,8 +461,31 @@ export function transformProducts(
         updated_at: isoTimestamp(source.updated_at, UNKNOWN_SOURCE_TIMESTAMP),
       },
     });
-    idMap.set(sourceFingerprint, productId);
   }
-
-  return { records, idMap, skipped, warnings };
+  const slugCounts = new Map<string, number>();
+  const skuProducts = new Map<string, Set<string>>();
+  for (const record of records) {
+    slugCounts.set(record.product.slug, (slugCounts.get(record.product.slug) ?? 0) + 1);
+    for (const variant of record.variants) {
+      const normalizedSku = variant.sku.toLocaleLowerCase("en-US");
+      const productsForSku = skuProducts.get(normalizedSku) ?? new Set<string>();
+      productsForSku.add(record.sourceFingerprint);
+      skuProducts.set(normalizedSku, productsForSku);
+    }
+  }
+  const accepted = records.flatMap((record) => {
+    const ambiguousSlug = (slugCounts.get(record.product.slug) ?? 0) > 1;
+    const ambiguousSku = record.variants.some((variant) =>
+      (skuProducts.get(variant.sku.toLocaleLowerCase("en-US"))?.size ?? 0) > 1);
+    if (!ambiguousSlug && !ambiguousSku) return [record];
+    const reason = ambiguousSlug && ambiguousSku
+      ? "Product participates in ambiguous duplicate slug and cross-product SKU conflicts"
+      : ambiguousSlug
+        ? `Ambiguous duplicate product slug: ${record.product.slug}`
+        : "Product participates in an ambiguous cross-product SKU conflict";
+    skipped.push({ record: sourceByFingerprint.get(record.sourceFingerprint)!, reason });
+    return [];
+  });
+  for (const record of accepted) idMap.set(record.sourceFingerprint, record.product.id);
+  return { records: accepted, idMap, skipped, warnings };
 }
