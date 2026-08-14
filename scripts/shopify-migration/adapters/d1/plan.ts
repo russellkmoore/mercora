@@ -133,7 +133,7 @@ const REQUIRED_COLUMNS: Readonly<Record<TableName, readonly string[]>> = {
   products: ["id", "name", "default_variant_id"],
   product_variants: ["id", "product_id", "sku", "option_values", "price"],
   inventory: ["id", "sku_id", "location_id", "quantities"],
-  pages: ["title", "slug", "content", "created_by"],
+  pages: ["title", "slug", "content", "template", "created_by", "updated_by", "version"],
   page_versions: ["title", "content", "version", "created_by"],
   blog_categories: ["name", "slug"],
   blog_posts: ["title", "slug", "author", "tags", "html", "reading_time"],
@@ -456,6 +456,19 @@ export function buildD1ImportPlan(input: MaterializedD1Input, options: D1PlanOpt
       throw new TypeError("Page version reference or conflict policy is invalid");
     }
     if (page.parent_id !== null) throw new TypeError("Imported pages cannot use unresolved auto-ID parents");
+    const pageSnapshotColumns = ["excerpt", "meta_title", "meta_description", "meta_keywords", "custom_css", "custom_js"];
+    const versionSnapshotColumns = ["excerpt", "meta_title", "meta_description", "meta_keywords"];
+    if (!pageSnapshotColumns.every((column) => Object.hasOwn(page, column)) ||
+        !versionSnapshotColumns.every((column) => Object.hasOwn(version, column)) ||
+        page.version !== 1 || version.version !== 1 ||
+        page.created_by !== version.created_by || page.updated_by !== version.created_by ||
+        page.title !== version.title || page.content !== version.content ||
+        page.excerpt !== version.excerpt || page.meta_title !== version.meta_title ||
+        page.meta_description !== version.meta_description || page.meta_keywords !== version.meta_keywords ||
+        typeof page.template !== "string" || !page.template.trim() || page.template.length > 100 ||
+        page.custom_css !== null || page.custom_js !== null) {
+      throw new TypeError("Initial page version must exactly match the supported page snapshot contract");
+    }
     pageSlugs.push(slug);
     pageVersionReferences.push({ slug, actor: requiredText(page, "created_by") });
     allRows.push(page, version);

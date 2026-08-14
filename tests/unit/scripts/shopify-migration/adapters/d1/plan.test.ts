@@ -39,10 +39,19 @@ function product(productId = "shopify_product_one", variantId = "shopify_variant
 function page(clock = 100, title = "Page"): NonNullable<MaterializedD1Input["pages"]>[number] {
   return {
     sourceFingerprint: "fingerprint",
-    page: { title, slug: "page", content: "<p>Safe</p>", created_by: "importer", parent_id: null, created_at: clock, updated_at: clock },
+    page: {
+      title, slug: "page", content: "<p>Safe</p>", excerpt: null,
+      meta_title: title, meta_description: null, meta_keywords: null,
+      template: "default", created_by: "importer", updated_by: "importer", version: 1,
+      custom_css: null, custom_js: null, parent_id: null, created_at: clock, updated_at: clock,
+    },
     initialVersion: {
       pageReference: { provider: "shopify", sourceFingerprint: "fingerprint", slug: "page" },
-      record: { title, content: "<p>Safe</p>", version: 1, created_by: "importer" },
+      record: {
+        title, content: "<p>Safe</p>", excerpt: null,
+        meta_title: title, meta_description: null, meta_keywords: null,
+        version: 1, created_by: "importer",
+      },
     },
     conflict: { strategy: "insert-only", key: "slug", onConflict: "skip" },
     media: [],
@@ -136,6 +145,24 @@ describe("D1 import plan", () => {
     expect(first).toContain('ELSE NULL END WHERE "slug"');
   });
 
+  it("rejects an initial page version that cannot exactly represent the page snapshot", () => {
+    const wrongVersion = page();
+    (wrongVersion.initialVersion.record as { version: number }).version = 2;
+    expect(() => buildD1ImportPlan({ pages: [wrongVersion] })).toThrow(/page snapshot contract/);
+
+    const wrongActor = page();
+    (wrongActor.initialVersion.record as { created_by: string }).created_by = "other";
+    expect(() => buildD1ImportPlan({ pages: [wrongActor] })).toThrow(/page snapshot contract/);
+
+    const wrongContent = page();
+    (wrongContent.initialVersion.record as { content: string }).content = "<p>Other</p>";
+    expect(() => buildD1ImportPlan({ pages: [wrongContent] })).toThrow(/page snapshot contract/);
+
+    const unsupportedStyling = page();
+    (unsupportedStyling.page as { custom_css: string | null }).custom_css = "body{}";
+    expect(() => buildD1ImportPlan({ pages: [unsupportedStyling] })).toThrow(/page snapshot contract/);
+  });
+
   it("rejects unresolved or duplicated semantic references before execution", () => {
     const broken = product();
     (broken.variants[0] as { product_id: string }).product_id = "missing";
@@ -202,11 +229,14 @@ describe("D1 import plan", () => {
       PRAGMA foreign_keys = ON;
       CREATE TABLE pages (
         id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, slug TEXT NOT NULL UNIQUE,
-        content TEXT NOT NULL, created_by TEXT, parent_id INTEGER, created_at INTEGER, updated_at INTEGER
+        content TEXT NOT NULL, excerpt TEXT, meta_title TEXT, meta_description TEXT, meta_keywords TEXT,
+        template TEXT, created_by TEXT, updated_by TEXT, version INTEGER, custom_css TEXT, custom_js TEXT,
+        parent_id INTEGER, created_at INTEGER, updated_at INTEGER
       );
       CREATE TABLE page_versions (
         id INTEGER PRIMARY KEY AUTOINCREMENT, page_id INTEGER NOT NULL REFERENCES pages(id),
-        title TEXT NOT NULL, content TEXT NOT NULL, version INTEGER NOT NULL, created_by TEXT NOT NULL
+        title TEXT NOT NULL, content TEXT NOT NULL, excerpt TEXT, meta_title TEXT, meta_description TEXT,
+        meta_keywords TEXT, version INTEGER NOT NULL, created_by TEXT NOT NULL
       );
       CREATE TABLE blog_categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE,
