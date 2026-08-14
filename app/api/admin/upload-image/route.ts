@@ -9,7 +9,7 @@ const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 /**
  * POST /api/admin/upload-image
  * 
- * Uploads images to Cloudflare R2 bucket for products/categories.
+ * Uploads images to Cloudflare R2 for supported merchant-owned content.
  * Handles file validation, path generation, and R2 storage.
  */
 export async function POST(request: NextRequest) {
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validFolders = [R2_FOLDERS.PRODUCTS, R2_FOLDERS.CATEGORIES];
+    const validFolders = [R2_FOLDERS.PRODUCTS, R2_FOLDERS.CATEGORIES, R2_FOLDERS.BLOG];
     if (typeof folder !== 'string' || !validFolders.includes(folder as any)) {
       return NextResponse.json(
         { error: `Invalid folder. Must be one of: ${validFolders.join(', ')}` },

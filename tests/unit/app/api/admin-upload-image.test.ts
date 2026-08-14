@@ -14,6 +14,7 @@ vi.mock('@/lib/utils/r2', () => ({
   R2_FOLDERS: {
     PRODUCTS: 'products',
     CATEGORIES: 'categories',
+    BLOG: 'blog',
   },
 }));
 
@@ -134,4 +135,10 @@ describe('admin image upload validation', () => {
       expect(body.type).toBe(storedType);
     }
   );
+
+  it('uses the same verified upload pipeline for blog media', async () => {
+    const response = await POST(uploadRequest({ folder: 'blog', filename: 'launch-update' }));
+    expect(response.status).toBe(200);
+    expect(uploadToR2.mock.calls[0][1]).toMatch(/^blog\/launch-update-/);
+  });
 });
