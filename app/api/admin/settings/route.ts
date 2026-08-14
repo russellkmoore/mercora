@@ -14,7 +14,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbAsync } from "@/lib/db";
 import { admin_settings, defaultSettings } from "@/lib/db/schema/settings";
-import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
+import { checkAdminPermissions, isSuperAdminActor } from "@/lib/auth/admin-middleware";
+import { CUSTOM_JS_ENABLED_SETTING } from "@/lib/cms/custom-js-guard";
 import { eq, inArray } from "drizzle-orm";
 
 /**
@@ -82,6 +83,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Updates array is required' },
         { status: 400 }
+      );
+    }
+
+    const enablesCustomJs = updates.some((update: unknown) => {
+      if (!update || typeof update !== "object") return false;
+      const candidate = update as Record<string, unknown>;
+      return candidate.key === CUSTOM_JS_ENABLED_SETTING && candidate.value === true;
+    });
+    if (enablesCustomJs && !(await isSuperAdminActor(authResult))) {
+      return NextResponse.json(
+        { error: "Only a database super-admin may enable custom JavaScript." },
+        { status: 403 },
       );
     }
 

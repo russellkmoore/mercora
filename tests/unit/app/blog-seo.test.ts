@@ -55,7 +55,6 @@ describe("Blog SEO surfaces", () => {
     mocks.getSitemapCatalogEntries.mockRejectedValue(new Error("D1 unavailable"));
     expect((await sitemap()).map(({ url }) => url)).toEqual([
       "https://store.example.test/",
-      "https://store.example.test/products",
       "https://store.example.test/blog",
     ]);
   });

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
 import { uploadToR2, generateR2Path, R2_FOLDERS } from "@/lib/utils/r2";
 import { EXT_BY_MIME, matchesImageSignature } from "@/lib/utils/image-signature";
@@ -82,9 +83,10 @@ export async function POST(request: NextRequest) {
     const r2Path = generateR2Path(folder, storedFilename);
     const storedContentType = file.type === 'image/jpg' ? 'image/jpeg' : file.type;
 
-    // Get R2 bucket from environment
-    const env = process.env as any;
-    const bucket = env.MEDIA as R2Bucket;
+    // Use the generated CloudflareEnv binding type rather than treating
+    // process.env strings as runtime service bindings.
+    const { env } = await getCloudflareContext({ async: true });
+    const bucket = env.MEDIA;
     
     if (!bucket) {
       return NextResponse.json(
