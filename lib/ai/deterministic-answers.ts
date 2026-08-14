@@ -57,7 +57,7 @@ const RULES: CategoryRule[] = [
   {
     category: 'business_address',
     patterns: [
-      /\b(mailing|postal|physical|business|company|return|street) address\b/i,
+      /\b(mailing|postal|physical|business|company|street) address\b/i,
       /\bwhere (are|is) (you|your (company|business|office|warehouse))\b.{0,20}\b(located|based|headquartered|ship(ped)? from)\b/i,
       /\byour (headquarters|hq|office|address)\b/i,
       /\bwhat('?s| is) your address\b/i,
@@ -169,7 +169,7 @@ async function refundWindowAnswer(
     }
     const details = facts.returnsUrl ? ` Full details: ${facts.returnsUrl}.` : '';
     const contact = facts.supportEmail ? ` Questions can go to ${facts.supportEmail}.` : '';
-    return `The return window is ${returnWindowDays} days from delivery.${details}${contact}`;
+    return `The configured return window is ${returnWindowDays} days.${details}${contact}`;
   } catch {
     return policyFallback(facts);
   }
