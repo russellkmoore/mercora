@@ -6,7 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
+import { checkAdminPermissions, isSuperAdminActor } from "@/lib/auth/admin-middleware";
+import { customJsChanged, isNonEmptyScript, logCustomJsAudit } from "@/lib/cms/custom-js-guard";
 import { errorDetails } from "@/lib/utils/error-response";
 import {
   getPageById,
@@ -119,10 +120,27 @@ export async function PUT(
     // Handle special actions
     if (action) {
       let result;
+      let auditPublishedScript = false;
       switch (action) {
-        case 'publish':
+        case 'publish': {
+          const currentPage = await getPageById(id);
+          if (!currentPage) {
+            return NextResponse.json({ success: false, error: "Page not found" }, { status: 404 });
+          }
+          if (isNonEmptyScript(currentPage.custom_js)) {
+            const allowed = await isSuperAdminActor(authResult);
+            if (!allowed) {
+              logCustomJsAudit({ actorUserId: authResult.userId, pageId: id, action: "publish", allowed: false });
+              return NextResponse.json(
+                { success: false, error: "Only a database super-admin may publish a page containing custom JavaScript." },
+                { status: 403 },
+              );
+            }
+            auditPublishedScript = true;
+          }
           result = await publishPage(id, authResult.userId);
           break;
+        }
         case 'unpublish':
           result = await unpublishPage(id, authResult.userId);
           break;
@@ -143,11 +161,44 @@ export async function PUT(
         );
       }
 
+      if (auditPublishedScript) {
+        logCustomJsAudit({ actorUserId: authResult.userId, pageId: id, action: "publish", allowed: true });
+      }
+
       return NextResponse.json({
         success: true,
         data: result,
         message: `Page ${action}ed successfully`
       });
+    }
+
+    let auditCustomJsWrite = false;
+    if ("custom_js" in updateData) {
+      const currentPage = await getPageById(id);
+      if (!currentPage) {
+        return NextResponse.json(
+          { success: false, error: "Page not found" },
+          { status: 404 },
+        );
+      }
+      if (customJsChanged(updateData, currentPage)) {
+        if (isNonEmptyScript(updateData.custom_js)) {
+          const allowed = await isSuperAdminActor(authResult);
+          if (!allowed) {
+            logCustomJsAudit({
+              actorUserId: authResult.userId,
+              pageId: id,
+              action: "update",
+              allowed: false,
+            });
+            return NextResponse.json(
+              { success: false, error: "Only a database super-admin may change custom JavaScript." },
+              { status: 403 },
+            );
+          }
+        }
+        auditCustomJsWrite = true;
+      }
     }
 
     // Regular update
@@ -163,6 +214,15 @@ export async function PUT(
         { success: false, error: "Page not found" },
         { status: 404 }
       );
+    }
+
+    if (auditCustomJsWrite) {
+      logCustomJsAudit({
+        actorUserId: authResult.userId,
+        pageId: id,
+        action: "update",
+        allowed: true,
+      });
     }
 
     return NextResponse.json({

@@ -6,7 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
+import { checkAdminPermissions, isSuperAdminActor } from "@/lib/auth/admin-middleware";
+import { customJsChanged, isNonEmptyScript, logCustomJsAudit } from "@/lib/cms/custom-js-guard";
 import { errorDetails } from "@/lib/utils/error-response";
 import {
   getPages,
@@ -113,6 +114,22 @@ export async function POST(request: NextRequest) {
   try {
     const data = await request.json() as Record<string, any>;
 
+    const customJsWrite = customJsChanged(data, null);
+    if (customJsWrite && isNonEmptyScript(data.custom_js)) {
+      const allowed = await isSuperAdminActor(authResult);
+      if (!allowed) {
+        logCustomJsAudit({
+          actorUserId: authResult.userId,
+          action: "create",
+          allowed: false,
+        });
+        return NextResponse.json(
+          { success: false, error: "Only a database super-admin may set custom JavaScript." },
+          { status: 403 },
+        );
+      }
+    }
+
     // Add creator information
     const pageData = {
       ...data,
@@ -121,6 +138,15 @@ export async function POST(request: NextRequest) {
     };
 
     const newPage = await createPage(pageData as any);
+
+    if (customJsWrite) {
+      logCustomJsAudit({
+        actorUserId: authResult.userId,
+        pageId: newPage.id,
+        action: "create",
+        allowed: true,
+      });
+    }
 
     return NextResponse.json({
       success: true,

@@ -129,7 +129,7 @@ export default async function CategoryPage({ params }: any) {
                 {typeof category.name === 'string' ? category.name : (category.name?.en || 'Category')}
               </h1>
               {category.description && (
-                <p className="text-gray-200 text-lg max-w-2xl">
+                <p className="line-clamp-3 max-w-2xl whitespace-pre-line text-lg text-gray-200">
                   {typeof category.description === 'string' ? category.description : (category.description?.en || '')}
                 </p>
               )}
@@ -145,7 +145,7 @@ export default async function CategoryPage({ params }: any) {
             {typeof category.name === 'string' ? category.name : (category.name?.en || 'Category')}
           </h1>
           {category.description && (
-            <p className="text-gray-400 max-w-2xl mx-auto">
+            <p className="mx-auto max-w-2xl whitespace-pre-line text-gray-400">
               {typeof category.description === 'string' ? category.description : (category.description?.en || '')}
             </p>
           )}

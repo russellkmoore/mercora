@@ -10,8 +10,8 @@ describe('HTML sanitizer source and sink wiring', () => {
   it('sanitizes CMS content before the public dangerouslySetInnerHTML sink', () => {
     const renderer = source('app/[slug]/PageRenderer.tsx');
 
-    expect(renderer).toContain('sanitizePageHtml(page.content, { allowedImageOrigin })');
-    expect(renderer).toContain('dangerouslySetInnerHTML={{ __html: sanitizedContent }}');
+    expect(renderer).toContain('sanitizePageHtmlServer(page.content, { allowedImageOrigin })');
+    expect(renderer).toContain('parsePageHtml(sanitized');
     expect(renderer).not.toContain('dangerouslySetInnerHTML={{ __html: page.content }}');
   });
 

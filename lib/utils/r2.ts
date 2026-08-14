@@ -83,6 +83,7 @@ export async function deleteFromR2(bucket: R2Bucket, path: string) {
 export const R2_FOLDERS = {
   PRODUCTS: 'products',
   CATEGORIES: 'categories', 
+  BLOG: 'blog',
   PRODUCTS_MD: 'products_md',
   KNOWLEDGE_MD: 'knowledge_md'
 } as const;

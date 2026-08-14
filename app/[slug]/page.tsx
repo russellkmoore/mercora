@@ -6,8 +6,9 @@
  */
 
 import { Metadata } from "next";
-import { notFound, redirect } from "next/navigation";
+import { notFound, redirect, unstable_rethrow } from "next/navigation";
 import { getPageBySlug } from "@/lib/models/pages";
+import { getCustomJsEnabled } from "@/lib/cms/custom-js-guard";
 import PageRenderer from "./PageRenderer";
 import { auth } from "@clerk/nextjs/server";
 import { getStoreConfig } from "@/lib/store-config";
@@ -36,14 +37,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
     const publishedAt = parseCmsTimestamp(page.published_at ?? page.created_at);
     const modifiedAt = parseCmsTimestamp(page.updated_at);
+    const storeName = getStoreConfig().identity.name;
 
     return {
       title: page.meta_title || page.title,
-      description: page.meta_description || page.excerpt || `${page.title} - Mercora`,
+      description: page.meta_description || page.excerpt || `${page.title} - ${storeName}`,
       keywords: page.meta_keywords?.split(',').map((k: string) => k.trim()),
       openGraph: {
         title: page.meta_title || page.title,
-        description: page.meta_description || page.excerpt || `${page.title} - Mercora`,
+        description: page.meta_description || page.excerpt || `${page.title} - ${storeName}`,
         type: 'article',
         ...(publishedAt && { publishedTime: publishedAt.toISOString() }),
         ...(modifiedAt && { modifiedTime: modifiedAt.toISOString() }),
@@ -54,10 +56,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   } catch (error) {
     console.error("Error generating page metadata:", error);
-    return {
-      title: "Page Not Found",
-      description: "The requested page could not be found.",
-    };
+    return { title: getStoreConfig().identity.name };
   }
 }
 
@@ -78,10 +77,9 @@ export async function generateStaticParams() {
 /**
  * Page component
  */
-export default async function PublicPage({ params }: PageProps) {
+async function loadPublicPage(slug: string) {
   try {
-    const { slug } = await params;
-    const page = await getPageBySlug(slug);
+    const page = await getPageBySlug(slug, false, { includeProtected: true });
     
     if (!page) {
       notFound();
@@ -98,10 +96,30 @@ export default async function PublicPage({ params }: PageProps) {
     }
 
     const store = getStoreConfig();
-    return <PageRenderer page={page} allowedImageOrigin={store.urls.imageCdn} />;
-    
+    const customJsEnabled = await getCustomJsEnabled();
+    return { page, store, customJsEnabled };
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Error loading page:", error);
-    notFound();
+    throw error;
   }
+}
+
+export default async function PublicPage({ params }: PageProps) {
+  const { slug } = await params;
+  const { page, store, customJsEnabled } = await loadPublicPage(slug);
+  return (
+    <PageRenderer
+      page={page}
+      allowedImageOrigin={store.urls.imageCdn}
+      customJsEnabled={customJsEnabled}
+      storeName={store.identity.name}
+      supportEmail={store.contact.supportEmail}
+      assistantName={store.identity.assistantName}
+      privacyUrl={store.urls.privacy}
+      termsUrl={store.urls.terms}
+      returnsUrl={store.urls.returns}
+      returnsConfigured={store.urls.returnsConfigured}
+    />
+  );
 }

@@ -127,3 +127,6 @@ export * from "./order-effects";
 export * from "./inventory-adjustments";
 export * from "./email-preferences";
 export * from "./email-deliveries";
+
+// Store-neutral content publishing
+export * from "./blog";

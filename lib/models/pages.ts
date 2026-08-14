@@ -5,7 +5,7 @@
  * Integrates with the existing Cloudflare D1/Drizzle ORM architecture.
  */
 
-import { desc, eq, and, or, isNull, count, like, inArray } from "drizzle-orm";
+import { desc, eq, and, or, isNull, lte, count, like, inArray, notInArray } from "drizzle-orm";
 import { getDbAsync } from "@/lib/db";
 import { getStoreConfig } from "@/lib/store-config";
 import { sanitizePageHtmlServer } from "@/lib/utils/sanitize-html-server";
@@ -36,6 +36,8 @@ export async function getPages(options: {
   limit?: number;
   offset?: number;
   searchTerm?: string;
+  visibleAt?: number;
+  excludeReservedSlugs?: boolean;
 } = {}): Promise<PageSelect[]> {
   const db = await getDbAsync();
   
@@ -49,6 +51,10 @@ export async function getPages(options: {
     } else {
       conditions.push(eq(pages.status, options.status));
     }
+  }
+
+  if (options.visibleAt !== undefined) {
+    conditions.push(or(isNull(pages.published_at), lte(pages.published_at, options.visibleAt)));
   }
   
   // Filter protected pages
@@ -71,6 +77,10 @@ export async function getPages(options: {
       )
     );
   }
+
+  if (options.excludeReservedSlugs) {
+    conditions.push(notInArray(pages.slug, [...RESERVED_PAGE_SLUGS]));
+  }
   
   // Apply conditions
   if (conditions.length > 0) {
@@ -82,10 +92,10 @@ export async function getPages(options: {
   
   // Apply pagination
   if (options.limit) {
-    query = query.limit(options.limit) as any;
+    query = query.limit(Math.min(100, Math.max(1, Math.trunc(options.limit)))) as any;
   }
   if (options.offset) {
-    query = query.offset(options.offset) as any;
+    query = query.offset(Math.min(10_000, Math.max(0, Math.trunc(options.offset)))) as any;
   }
   
   return query;
@@ -94,22 +104,30 @@ export async function getPages(options: {
 /**
  * Get published pages for public display
  */
-export async function getPublishedPages(): Promise<PageSelect[]> {
-  return getPages({ 
-    status: PAGE_STATUS.PUBLISHED, 
-    includeProtected: false 
-  });
+export async function getPublishedPages(options: { limit?: number; offset?: number } = {}): Promise<PageSelect[]> {
+  return (await getPages({
+    status: PAGE_STATUS.PUBLISHED,
+    includeProtected: false,
+    visibleAt: Math.floor(Date.now() / 1000),
+    excludeReservedSlugs: true,
+    limit: options.limit,
+    offset: options.offset,
+  }));
 }
 
 /**
  * Get navigation pages
  */
-export async function getNavigationPages(): Promise<PageSelect[]> {
-  return getPages({ 
-    status: PAGE_STATUS.PUBLISHED, 
+export async function getNavigationPages(options: { limit?: number; offset?: number } = {}): Promise<PageSelect[]> {
+  return (await getPages({
+    status: PAGE_STATUS.PUBLISHED,
     includeNavOnly: true,
-    includeProtected: false 
-  });
+    includeProtected: false,
+    visibleAt: Math.floor(Date.now() / 1000),
+    excludeReservedSlugs: true,
+    limit: options.limit,
+    offset: options.offset,
+  }));
 }
 
 /**
@@ -129,21 +147,25 @@ export async function getPageById(id: number): Promise<PageSelect | null> {
 /**
  * Get page by slug
  */
-export async function getPageBySlug(slug: string, includeUnpublished = false): Promise<PageSelect | null> {
+export async function getPageBySlug(
+  slug: string,
+  includeUnpublished = false,
+  options: { includeProtected?: boolean; now?: number } = {},
+): Promise<PageSelect | null> {
   const db = await getDbAsync();
-  
-  let query = db.select()
-    .from(pages)
-    .where(eq(pages.slug, slug));
-  
+
+  const conditions = [eq(pages.slug, slug)];
   if (!includeUnpublished) {
-    query = (query as any).where(and(
-      eq(pages.slug, slug),
-      eq(pages.status, PAGE_STATUS.PUBLISHED)
-    ));
+    conditions.push(eq(pages.status, PAGE_STATUS.PUBLISHED));
+    conditions.push(notInArray(pages.slug, [...RESERVED_PAGE_SLUGS]));
+    conditions.push(or(
+      isNull(pages.published_at),
+      lte(pages.published_at, options.now ?? Math.floor(Date.now() / 1000)),
+    )!);
   }
-  
-  const result = await query.limit(1);
+  if (!options.includeProtected) conditions.push(eq(pages.is_protected, false));
+
+  const result = await db.select().from(pages).where(and(...conditions)).limit(1);
   return result[0] || null;
 }
 
@@ -171,6 +193,10 @@ export async function createPage(data: Omit<PageInsert, 'id' | 'created_at' | 'u
   if (!data.slug && data.title) {
     const existingSlugs = await getExistingSlugs();
     data.slug = generatePageSlug(data.title, existingSlugs);
+  }
+  const finalSlugError = pageSlugError(data.slug);
+  if (finalSlugError) {
+    throw new Error(`Invalid page data: ${finalSlugError}`);
   }
 
   data.content = sanitizePageHtmlServer(data.content, {
@@ -248,6 +274,12 @@ export async function updatePage(
     if (cleanData.title && cleanData.title !== currentPage.title && !cleanData.slug) {
       const existingSlugs = await getExistingSlugs();
       cleanData.slug = generatePageSlug(cleanData.title, existingSlugs);
+    }
+    if (cleanData.slug !== undefined) {
+      const finalSlugError = pageSlugError(cleanData.slug);
+      if (finalSlugError) {
+        throw new Error(`Invalid page data: ${finalSlugError}`);
+      }
     }
 
     if (cleanData.content !== undefined) {
@@ -452,11 +484,8 @@ export function validatePageData(data: Partial<PageInsert>): { valid: boolean; e
   
   // Slug validation
   if (data.slug !== undefined) {
-    if (!data.slug || data.slug.trim().length === 0) {
-      errors.push("Slug is required");
-    } else if (!/^[a-z0-9-]+$/.test(data.slug)) {
-      errors.push("Slug can only contain lowercase letters, numbers, and hyphens");
-    }
+    const error = pageSlugError(data.slug);
+    if (error) errors.push(error);
   }
   
   // Content validation
@@ -473,6 +502,23 @@ export function validatePageData(data: Partial<PageInsert>): { valid: boolean; e
     valid: errors.length === 0,
     errors
   };
+}
+
+export const RESERVED_PAGE_SLUGS = new Set([
+  "account", "admin", "api", "blog", "cart", "category", "checkout",
+  "order-status", "orders", "product", "robots.txt", "sign-in", "sign-up",
+  "sitemap.xml",
+]);
+
+export function isReservedPageSlug(slug: string): boolean {
+  return RESERVED_PAGE_SLUGS.has(slug.trim().toLowerCase());
+}
+
+function pageSlugError(slug: unknown): string | null {
+  if (typeof slug !== "string" || !slug.trim()) return "Slug is required";
+  if (!/^[a-z0-9-]+$/.test(slug)) return "Slug can only contain lowercase letters, numbers, and hyphens";
+  if (isReservedPageSlug(slug)) return "Slug conflicts with a storefront route";
+  return null;
 }
 
 
@@ -495,13 +541,19 @@ export async function searchPages(
     includeUnpublished?: boolean;
     includeContent?: boolean;
     limit?: number;
+    offset?: number;
   } = {}
 ): Promise<PageSelect[]> {
-  return getPages({
+  const results = await getPages({
     searchTerm,
     status: options.includeUnpublished ? undefined : PAGE_STATUS.PUBLISHED,
-    limit: options.limit || 10
+    includeProtected: options.includeUnpublished === true,
+    visibleAt: options.includeUnpublished ? undefined : Math.floor(Date.now() / 1000),
+    excludeReservedSlugs: options.includeUnpublished !== true,
+    limit: options.limit || 10,
+    offset: options.offset,
   });
+  return results;
 }
 
 /**

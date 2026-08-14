@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
 import { uploadToR2, generateR2Path, R2_FOLDERS } from "@/lib/utils/r2";
 import { EXT_BY_MIME, matchesImageSignature } from "@/lib/utils/image-signature";
 import { normalizeSafeFilenameSegment } from "@/lib/utils/safe-filename";
+import { getStoreConfig } from "@/lib/store-config";
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 
 /**
  * POST /api/admin/upload-image
  * 
- * Uploads images to Cloudflare R2 bucket for products/categories.
+ * Uploads images to Cloudflare R2 for supported merchant-owned content.
  * Handles file validation, path generation, and R2 storage.
  */
 export async function POST(request: NextRequest) {
@@ -35,7 +37,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validFolders = [R2_FOLDERS.PRODUCTS, R2_FOLDERS.CATEGORIES];
+    const validFolders = [R2_FOLDERS.PRODUCTS, R2_FOLDERS.CATEGORIES, R2_FOLDERS.BLOG];
     if (typeof folder !== 'string' || !validFolders.includes(folder as any)) {
       return NextResponse.json(
         { error: `Invalid folder. Must be one of: ${validFolders.join(', ')}` },
@@ -82,9 +84,10 @@ export async function POST(request: NextRequest) {
     const r2Path = generateR2Path(folder, storedFilename);
     const storedContentType = file.type === 'image/jpg' ? 'image/jpeg' : file.type;
 
-    // Get R2 bucket from environment
-    const env = process.env as any;
-    const bucket = env.MEDIA as R2Bucket;
+    // Use the generated CloudflareEnv binding type rather than treating
+    // process.env strings as runtime service bindings.
+    const { env } = await getCloudflareContext({ async: true });
+    const bucket = env.MEDIA;
     
     if (!bucket) {
       return NextResponse.json(
@@ -105,10 +108,13 @@ export async function POST(request: NextRequest) {
 
     // Generate the path format for database storage
     const storedPath = `/${r2Path}`;
+    const imageCdn = getStoreConfig().urls.imageCdn;
+    const publicUrl = imageCdn ? new URL(r2Path, `${imageCdn}/`).href : undefined;
 
     return NextResponse.json({
       success: true,
       path: storedPath, // This gets saved in database and used with image-loader.ts
+      ...(publicUrl && { url: publicUrl }),
       filename: storedFilename,
       size: file.size,
       type: storedContentType

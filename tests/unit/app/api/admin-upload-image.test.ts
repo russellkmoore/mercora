@@ -1,6 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { uploadToR2 } = vi.hoisted(() => ({ uploadToR2: vi.fn() }));
+const { bucket, getCloudflareContext, uploadToR2 } = vi.hoisted(() => ({
+  bucket: { put: vi.fn() },
+  getCloudflareContext: vi.fn(),
+  uploadToR2: vi.fn(),
+}));
+
+vi.mock('@opennextjs/cloudflare', () => ({ getCloudflareContext }));
 
 vi.mock('@/lib/auth/admin-middleware', () => ({
   checkAdminPermissions: vi.fn().mockResolvedValue({
@@ -14,7 +20,11 @@ vi.mock('@/lib/utils/r2', () => ({
   R2_FOLDERS: {
     PRODUCTS: 'products',
     CATEGORIES: 'categories',
+    BLOG: 'blog',
   },
+}));
+vi.mock('@/lib/store-config', () => ({
+  getStoreConfig: () => ({ urls: { imageCdn: 'https://images.example.test' } }),
 }));
 
 import { NextRequest } from 'next/server';
@@ -59,10 +69,8 @@ function uploadRequest(options: {
 describe('admin image upload validation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv('MEDIA', 'configured-test-bucket');
+    getCloudflareContext.mockResolvedValue({ env: { MEDIA: bucket } });
   });
-
-  afterEach(() => vi.unstubAllEnvs());
 
   it('rejects unsafe filename segments before an R2 write', async () => {
     const response = await POST(uploadRequest({ filename: '../escape' }));
@@ -130,8 +138,15 @@ describe('admin image upload validation', () => {
       expect(key).not.toContain('.svg');
       expect(options).toMatchObject({ contentType: storedType });
       expect(body.path).toBe(`/${key}`);
+      expect(body.url).toBe(`https://images.example.test/${key}`);
       expect(body.filename).toBe(key.slice('products/'.length));
       expect(body.type).toBe(storedType);
     }
   );
+
+  it('uses the same verified upload pipeline for blog media', async () => {
+    const response = await POST(uploadRequest({ folder: 'blog', filename: 'launch-update' }));
+    expect(response.status).toBe(200);
+    expect(uploadToR2.mock.calls[0][1]).toMatch(/^blog\/launch-update-/);
+  });
 });
