@@ -231,4 +231,44 @@ describe("catalog transforms", () => {
       handle: "oversized",
     }], { generatedAt, allowedMediaHosts: [] }).records).toEqual([]);
   });
+
+  it("does not reserve category slugs when an earlier record fails later validation", () => {
+    const result = transformCollections([
+      {
+        id: 1,
+        title: "Rejected",
+        handle: "shared-category",
+        body_html: `<p>${"界".repeat(11_000)}</p>`,
+      },
+      { id: 2, title: "Accepted", handle: "shared-category" },
+    ], { generatedAt, allowedMediaHosts: [] });
+
+    expect(result.records).toHaveLength(1);
+    expect(result.records[0].category.name).toBe(JSON.stringify({ en: "Accepted" }));
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0].reason).toContain("SQL-safe");
+  });
+
+  it("does not reserve product slugs or SKUs when an earlier product fails later validation", () => {
+    const rejected = product("1.00", "shared-product");
+    rejected.id = 100;
+    rejected.body_html = `<p>${"😀".repeat(21_000)}</p>`;
+    const accepted = product("2.00", "shared-product");
+    accepted.id = 101;
+    accepted.variants[0].id = 102;
+
+    const result = transformProducts([rejected, accepted], {
+      currency: "USD",
+      generatedAt,
+      inventoryLocationId: "warehouse-main",
+      fulfillmentType: "physical",
+      allowedMediaHosts: ["cdn.example.test"],
+    });
+
+    expect(result.records).toHaveLength(1);
+    expect(result.records[0].product.name).toBe("Configurable product");
+    expect(result.records[0].variants[0].sku).toBe("SKU-ONE");
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0].reason).toContain("SQL-safe");
+  });
 });

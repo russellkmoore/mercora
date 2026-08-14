@@ -275,6 +275,7 @@ export function transformProducts(
 
     const variants: VariantInsertRecord[] = [];
     const inventory: InventoryInsertRecord[] = [];
+    const candidateSkus = new Set<string>();
     for (let index = 0; index < source.variants.length; index += 1) {
       const variant = source.variants[index];
       const sku = variant.sku?.trim() || `${slug}-${index + 1}`;
@@ -300,7 +301,8 @@ export function transformProducts(
         .join("|") || variant.barcode?.trim() || `position:${index + 1}`;
       const variantSourceId = String(variant.id ?? `${sourceId}:${naturalKey}`);
       const variantFingerprint = providerFingerprint(SHOPIFY_PROVIDER, "variant", variantSourceId);
-      if (skus.has(sku.toLocaleLowerCase("en-US"))) {
+      const normalizedSku = sku.toLocaleLowerCase("en-US");
+      if (skus.has(normalizedSku) || candidateSkus.has(normalizedSku)) {
         warnings.push(`Product ${sourceFingerprint} variant ${variantFingerprint} omitted: duplicate SKU`);
         continue;
       }
@@ -320,7 +322,7 @@ export function transformProducts(
         }
       }
 
-      skus.add(sku.toLocaleLowerCase("en-US"));
+      candidateSkus.add(normalizedSku);
       const variantId = deterministicProviderId(SHOPIFY_PROVIDER, "variant", variantSourceId);
       const quantity = clampInventory(variant.inventory_quantity);
       const allowBackorder = variant.inventory_policy === "continue";
@@ -388,7 +390,6 @@ export function transformProducts(
       skipped.push({ record: source, reason: "Product has no importable variants" });
       continue;
     }
-    slugs.add(slug);
     const categoryIds = uniqueStrings([...(options.categoryIdsByProduct?.get(sourceFingerprint) ?? [])]);
     if (
       categoryIds.length > MAX_PRODUCT_CATEGORIES ||
@@ -418,6 +419,8 @@ export function transformProducts(
       continue;
     }
 
+    slugs.add(slug);
+    candidateSkus.forEach((sku) => skus.add(sku));
     records.push({
       sourceFingerprint,
       variants,
