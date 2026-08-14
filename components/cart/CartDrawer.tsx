@@ -40,15 +40,15 @@
  */
 
 import { useCartStore } from "@/lib/stores/cart-store";
-import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription, SheetClose } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle, SheetDescription, SheetClose } from "@/components/ui/sheet";
 import CartItemCard from "./CartItemCard";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart, X } from "lucide-react";
-import { useState } from "react";
 import Link from "next/link";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { cartSubtotal, Money } from "@/lib/money";
 import { useCartHydration } from "@/lib/hooks/useCartHydration";
+import { useCartUIStore } from "@/lib/stores/cart-ui-store";
 
 /**
  * CartDrawer component providing shopping cart functionality
@@ -56,7 +56,8 @@ import { useCartHydration } from "@/lib/hooks/useCartHydration";
  * @returns JSX element representing a sliding cart drawer with items and totals
  */
 export default function CartDrawer() {
-  const [isOpen, setIsOpen] = useState(false);
+  const isOpen = useCartUIStore((state) => state.isOpen);
+  const setCartOpen = useCartUIStore((state) => state.setCartOpen);
   const isHydrated = useCartHydration();
   const items = useCartStore((state) => state.items) || [];
 
@@ -67,22 +68,7 @@ export default function CartDrawer() {
   const itemCount = isHydrated ? items.length : 0;
 
   return (
-    <Sheet open={isOpen} onOpenChange={setIsOpen}>
-      <SheetTrigger asChild>
-        <Button
-          variant="ghost"
-          aria-label={`Cart (${itemCount} ${itemCount === 1 ? "item" : "items"})`}
-          className="text-white hover:bg-white hover:text-orange-500 relative"
-        >
-          <ShoppingCart className="h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">Cart ({itemCount})</span>
-          {itemCount > 0 && (
-            <span className="absolute -top-2 -right-2 bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
-              {itemCount}
-            </span>
-          )}
-        </Button>
-      </SheetTrigger>
+    <Sheet open={isOpen} onOpenChange={setCartOpen}>
       <SheetContent 
         side="right"
         className="bg-[#fdfdfb] text-black  transition-all ease-in-out px-3 w-full sm:w-[400px] max-w-[400px]! duration-600! data-[state=closed]:duration-600! data-[state=open]:duration-600! flex flex-col h-full border-neutral-800"
@@ -134,7 +120,7 @@ export default function CartDrawer() {
                   asChild
                   className="w-full bg-orange-500 hover:bg-orange-600 mt-4"
                 >
-                  <Link href="/checkout" onClick={() => setIsOpen(false)}>
+                  <Link href="/checkout" onClick={() => setCartOpen(false)}>
                     Proceed to Checkout
                   </Link>
                 </Button>
@@ -144,5 +130,25 @@ export default function CartDrawer() {
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+export function CartTrigger() {
+  const isHydrated = useCartHydration();
+  const itemCount = useCartStore((state) => state.items)?.length ?? 0;
+  const openCart = useCartUIStore((state) => state.openCart);
+  const count = isHydrated ? itemCount : 0;
+  return (
+    <Button
+      variant="ghost"
+      type="button"
+      onClick={openCart}
+      aria-label={`Cart (${count} ${count === 1 ? "item" : "items"})`}
+      className="relative text-white hover:bg-white hover:text-orange-500"
+    >
+      <ShoppingCart className="h-4 w-4 sm:mr-2" />
+      <span className="hidden sm:inline">Cart ({count})</span>
+      {count > 0 && <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-xs text-white">{count}</span>}
+    </Button>
   );
 }

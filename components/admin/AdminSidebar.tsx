@@ -40,9 +40,11 @@ import {
   X,
   ClipboardList,
   FileEdit,
-  MessageSquare
+  MessageSquare,
+  Newspaper
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useStoreConfig } from "@/lib/store";
 
 interface NavItem {
   label: string;
@@ -95,6 +97,12 @@ const navItems: NavItem[] = [
     description: "Content pages and CMS"
   },
   {
+    label: "Blog",
+    href: "/admin/blog",
+    icon: Newspaper,
+    description: "Editorial posts and publishing"
+  },
+  {
     label: "Knowledge",
     href: "/admin/knowledge",
     icon: FileText,
@@ -113,6 +121,7 @@ const navItems: NavItem[] = [
  */
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const store = useStoreConfig();
   const { sidebarCollapsed, toggleSidebar, isMobile } = useAdminLayout();
 
   // Check if a nav item is active
@@ -146,10 +155,10 @@ export default function AdminSidebar() {
           {!sidebarCollapsed && (
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">V</span>
+                <span className="text-white font-bold text-lg">{store.identity.name.slice(0, 1).toUpperCase()}</span>
               </div>
               <div>
-                <h1 className="text-white font-semibold text-lg">Voltique</h1>
+                <h1 className="truncate text-lg font-semibold text-white">{store.identity.name}</h1>
                 <p className="text-gray-400 text-xs">Admin Panel</p>
               </div>
             </div>
@@ -207,7 +216,7 @@ export default function AdminSidebar() {
         {!sidebarCollapsed && (
           <div className="p-4 border-t border-neutral-700">
             <div className="text-xs text-gray-500">
-              <div className="mb-1">Voltique Admin v1.0</div>
+              <div className="mb-1">{store.identity.name} Admin</div>
               <div>Powered by MACH Alliance</div>
             </div>
           </div>

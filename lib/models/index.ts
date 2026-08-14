@@ -11,3 +11,4 @@ export * from './auth';
 export * from './admin';
 export * from './pages';
 export * from './reviews';
+export * from './blog';

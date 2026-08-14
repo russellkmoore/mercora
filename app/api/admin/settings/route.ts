@@ -14,7 +14,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDbAsync } from "@/lib/db";
 import { admin_settings, defaultSettings } from "@/lib/db/schema/settings";
-import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
+import { checkAdminPermissions, isSuperAdminActor } from "@/lib/auth/admin-middleware";
+import { CUSTOM_JS_ENABLED_SETTING, logCustomJsAudit } from "@/lib/cms/custom-js-guard";
 import { eq, inArray } from "drizzle-orm";
 
 /**
@@ -85,6 +86,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const customJsSettings = updates.filter((update: unknown) => {
+      if (!update || typeof update !== "object") return false;
+      const candidate = update as Record<string, unknown>;
+      return candidate.key === CUSTOM_JS_ENABLED_SETTING;
+    });
+    if (customJsSettings.length > 1) {
+      return NextResponse.json(
+        { error: "Each setting key may be updated only once per request." },
+        { status: 400 },
+      );
+    }
+    const customJsSetting = customJsSettings[0] as Record<string, unknown> | undefined;
+    const enablesCustomJs = customJsSetting?.value === true;
+    if (enablesCustomJs && !(await isSuperAdminActor(authResult))) {
+      return NextResponse.json(
+        { error: "Only a database super-admin may enable custom JavaScript." },
+        { status: 403 },
+      );
+    }
+
     const db = await getDbAsync();
     
     // Process each setting update
@@ -125,6 +146,14 @@ export async function POST(request: NextRequest) {
     const updatedKeys = updates.map(u => u.key);
     const updatedSettings = await db.select().from(admin_settings)
       .where(inArray(admin_settings.key, updatedKeys));
+
+    if (customJsSetting) {
+      logCustomJsAudit({
+        actorUserId: authResult.userId,
+        action: enablesCustomJs ? "enable" : "disable",
+        allowed: true,
+      });
+    }
     
     return NextResponse.json({ 
       success: true, 

@@ -45,6 +45,13 @@ describe("resolveStoreConfig", () => {
     expect(config.urls.privacy).toBe("https://policies.example.com/privacy");
   });
 
+  it("distinguishes the unresolved default returns route from configured policies", () => {
+    expect(resolveStoreConfig({}).urls.returnsConfigured).toBe(false);
+    expect(resolveStoreConfig({ NEXT_PUBLIC_RETURNS_URL: "/returns" }).urls.returnsConfigured).toBe(true);
+    expect(resolveStoreConfig({ NEXT_PUBLIC_RETURNS_URL: "https://policies.example.com/returns" }).urls.returnsConfigured).toBe(true);
+    expect(resolveStoreConfig({ NEXT_PUBLIC_RETURNS_URL: "javascript:alert(1)" }).urls.returnsConfigured).toBe(false);
+  });
+
   it("parses a validated runtime carrier registry", () => {
     const carriers = [
       {

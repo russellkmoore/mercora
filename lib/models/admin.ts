@@ -28,6 +28,25 @@ export async function isUserAdmin(userId: string): Promise<boolean> {
   }
 }
 
+/** Arbitrary CMS JavaScript requires an active, database-backed super-admin. */
+export async function isUserSuperAdmin(userId: string): Promise<boolean> {
+  try {
+    const db = await getDbAsync();
+    const result = await db
+      .select({ id: adminUsers.id })
+      .from(adminUsers)
+      .where(and(
+        eq(adminUsers.userId, userId),
+        eq(adminUsers.isActive, true),
+        eq(adminUsers.role, "super_admin"),
+      ))
+      .limit(1);
+    return result.length === 1;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Get admin user by user ID
  */

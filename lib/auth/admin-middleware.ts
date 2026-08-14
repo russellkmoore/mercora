@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { isUserAdmin, updateAdminLastLogin } from "../models/admin";
+import { isUserAdmin, isUserSuperAdmin, updateAdminLastLogin } from "../models/admin";
 import { timingSafeEqual } from "./crypto";
 import { hasSameOrigin } from "./same-origin";
 
@@ -96,6 +96,14 @@ export async function checkAdminPermissions(request: NextRequest): Promise<Admin
       error: "Authentication error. Please try again." 
     };
   }
+}
+
+/** Service credentials and development bypasses cannot authorize stored code. */
+export async function isSuperAdminActor(result: AdminAuthResult): Promise<boolean> {
+  if (!result.success || !result.userId || result.isServiceToken || result.isDevMode) {
+    return false;
+  }
+  return isUserSuperAdmin(result.userId);
 }
 
 export const ADMIN_PERMISSIONS = {

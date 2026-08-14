@@ -1,195 +1,94 @@
-/**
- * Page Renderer Component - Content Management System
- * 
- * Renders the content of a CMS page with proper styling, custom CSS/JS,
- * and responsive design. Handles different page templates and layouts.
- */
+import type { PageSelect } from "@/lib/db/schema/pages";
+import { sanitizePageHtmlServer } from "@/lib/utils/sanitize-html-server";
+import { parsePageHtml } from "@/lib/cms/page-sections";
+import { resolveSectionProducts } from "@/lib/cms/page-products";
+import { resolveTemplate, shouldShowRail } from "@/lib/cms/page-template";
+import ContactGrid from "@/components/pages/ContactGrid";
+import CustomPageAssets from "@/components/pages/CustomPageAssets";
+import FaqAccordion from "@/components/pages/FaqAccordion";
+import LegalDocument from "@/components/pages/LegalDocument";
+import PageCta from "@/components/pages/PageCta";
+import PageHero from "@/components/pages/PageHero";
+import PageRail from "@/components/pages/PageRail";
+import SectionCard from "@/components/pages/SectionCard";
+import StoryBody from "@/components/pages/StoryBody";
 
-"use client";
-
-import Link from "next/link";
-import { useEffect } from "react";
-import { PageSelect } from "@/lib/db/schema/pages";
-import { Calendar, User } from "lucide-react";
-import { sanitizePageHtml } from "@/lib/utils/sanitize-html";
-import { formatCmsTimestamp } from "@/lib/utils/cms-timestamp";
-
-interface PageRendererProps {
+type PageRendererProps = {
   page: PageSelect;
   allowedImageOrigin?: string;
-}
+  customJsEnabled?: boolean;
+  storeName: string;
+  supportEmail: string;
+  assistantName: string;
+  privacyUrl: string;
+  termsUrl: string;
+  returnsUrl: string;
+  returnsConfigured: boolean;
+};
 
-export default function PageRenderer({ page, allowedImageOrigin }: PageRendererProps) {
-  // Inject custom CSS and JS if present
-  useEffect(() => {
-    // Handle custom CSS
-    if (page.custom_css) {
-      const styleElement = document.createElement('style');
-      styleElement.id = `page-${page.id}-styles`;
-      styleElement.textContent = page.custom_css;
-      document.head.appendChild(styleElement);
+export default async function PageRenderer({
+  page,
+  allowedImageOrigin,
+  customJsEnabled = false,
+  storeName,
+  supportEmail,
+  assistantName,
+  privacyUrl,
+  termsUrl,
+  returnsUrl,
+  returnsConfigured,
+}: PageRendererProps) {
+  const template = resolveTemplate(page.template, {
+    storeName, assistantName, supportEmail, privacyUrl, termsUrl, returnsUrl, returnsConfigured,
+  });
+  const sanitized = sanitizePageHtmlServer(page.content, { allowedImageOrigin });
+  const parsed = parsePageHtml(sanitized, {
+    pageTitle: page.title,
+    promoteLede: !page.excerpt,
+    extractConventions: template.kind === "guide",
+    liftUpdatedLabel: template.kind === "legal",
+  });
+  const lede = page.excerpt || parsed.lede;
+  const products = template.kind === "guide"
+    ? await resolveSectionProducts(parsed.sections)
+    : new Map();
+  const showRail = shouldShowRail(template, parsed.sections.length);
 
-      // Cleanup on unmount
-      return () => {
-        const existingStyle = document.getElementById(`page-${page.id}-styles`);
-        if (existingStyle) {
-          existingStyle.remove();
-        }
-      };
+  const body = (() => {
+    switch (template.kind) {
+      case "guide":
+        return (
+          <div>
+            {parsed.lead && <div className="prose prose-invert prose-orange mb-5 max-w-none" dangerouslySetInnerHTML={{ __html: parsed.lead }} />}
+            {parsed.sections.map((section) => <SectionCard key={section.id} section={section} product={products.get(section.id)} />)}
+          </div>
+        );
+      case "faq":
+        return <FaqAccordion sections={parsed.sections} lead={parsed.lead} />;
+      case "contact":
+        return <ContactGrid sections={parsed.sections} lead={parsed.lead} />;
+      case "legal":
+        return <LegalDocument updatedLabel={parsed.updatedLabel} lead={parsed.lead} sections={parsed.sections} />;
+      case "story":
+        return <StoryBody lead={parsed.lead} sections={parsed.sections} />;
     }
-  }, [page.custom_css, page.id]);
-
-  useEffect(() => {
-    // Handle custom JavaScript
-    if (page.custom_js) {
-      try {
-        const scriptFunction = new Function(page.custom_js);
-        scriptFunction();
-      } catch (error) {
-        console.error("Error executing custom JavaScript for page:", error);
-      }
-    }
-  }, [page.custom_js]);
-
-  // Get page template styling
-  const getTemplateClasses = (template: string) => {
-    switch (template) {
-      case 'legal':
-        return {
-          container: 'max-w-4xl',
-          content: 'prose prose-invert prose-orange max-w-none prose-headings:text-white prose-p:text-gray-300 prose-li:text-gray-300 prose-a:text-orange-400 prose-strong:text-white',
-          header: 'border-b border-neutral-700 pb-6 mb-8'
-        };
-      case 'about':
-        return {
-          container: 'max-w-6xl',
-          content: 'prose prose-invert prose-orange max-w-none prose-headings:text-white prose-p:text-gray-300 prose-li:text-gray-300 prose-a:text-orange-400 prose-strong:text-white',
-          header: 'text-center pb-8 mb-12 border-b border-neutral-700'
-        };
-      default:
-        return {
-          container: 'max-w-4xl',
-          content: 'prose prose-invert prose-orange max-w-none prose-headings:text-white prose-p:text-gray-300 prose-li:text-gray-300 prose-a:text-orange-400 prose-strong:text-white',
-          header: 'pb-6 mb-8'
-        };
-    }
-  };
-
-  const templateClasses = getTemplateClasses(page.template || 'default');
-  const sanitizedContent = sanitizePageHtml(page.content, { allowedImageOrigin });
-  const publishedLabel = formatCmsTimestamp(page.published_at);
-  const updatedLabel = formatCmsTimestamp(page.updated_at);
+  })();
 
   return (
     <>
-      {/* Background Pattern - only for this page content area */}
-      <div className="fixed inset-0 bg-[radial-gradient(circle_at_30%_80%,rgba(255,165,0,0.1),transparent_50%),radial-gradient(circle_at_80%_20%,rgba(255,165,0,0.05),transparent_50%)] pointer-events-none -z-10" />
-      <div className="fixed inset-0 bg-[linear-gradient(to_bottom,transparent_0%,rgba(0,0,0,0.8)_100%)] pointer-events-none -z-10" />
-      
-      {/* Page Content */}
-      <div className="container mx-auto px-4 py-12 relative">
-          <div className={`mx-auto ${templateClasses.container}`}>
-            {/* Page Header */}
-            <div className={templateClasses.header}>
-              <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-                {page.title}
-              </h1>
-              
-              {page.excerpt && (
-                <p className="text-xl text-gray-400 mb-6">
-                  {page.excerpt}
-                </p>
-              )}
-
-              {/* Page Meta Information */}
-              <div className="flex flex-wrap items-center gap-6 text-sm text-gray-500">
-                {publishedLabel && (
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    <span>Published {publishedLabel}</span>
-                  </div>
-                )}
-                
-                {updatedLabel && page.updated_at !== page.created_at && (
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    <span>Updated {updatedLabel}</span>
-                  </div>
-                )}
-
-                {page.version > 1 && (
-                  <div className="flex items-center gap-2">
-                    <User className="w-4 h-4" />
-                    <span>Version {page.version}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Page Content */}
-            <div 
-              className={templateClasses.content}
-              dangerouslySetInnerHTML={{ __html: sanitizedContent }}
-            />
-
-            {/* Page Footer */}
-            {(page.template || 'default') === 'legal' && (
-              <div className="mt-12 pt-8 border-t border-neutral-700">
-                <div className="bg-neutral-900 border border-neutral-700 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-white mb-2">Need Help?</h3>
-                  <p className="text-gray-400 mb-4">
-                    If you have any questions about this document or our policies,
-                    please don&rsquo;t hesitate to contact us.
-                  </p>
-                  <div className="flex flex-wrap gap-4">
-                    <a 
-                      href="mailto:support@voltique.com" 
-                      className="text-orange-400 hover:text-orange-300 transition-colors"
-                    >
-                      Contact Support
-                    </a>
-                    <Link
-                      href="/about"
-                      className="text-orange-400 hover:text-orange-300 transition-colors"
-                    >
-                      About Us
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Related Pages or CTA Section (for about page) */}
-        {(page.template || 'default') === 'about' && (
-          <div className="bg-linear-to-r from-orange-900/20 to-orange-800/20 py-16 mt-16">
-            <div className="container mx-auto px-4">
-              <div className="max-w-4xl mx-auto text-center">
-                <h2 className="text-3xl font-bold text-white mb-6">
-                  Ready to Explore?
-                </h2>
-                <p className="text-xl text-gray-300 mb-8">
-                  Discover our AI-powered outdoor gear recommendations and start your next adventure.
-                </p>
-                <div className="flex flex-wrap justify-center gap-4">
-                  <Link
-                    href="/products"
-                    className="bg-orange-600 hover:bg-orange-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
-                  >
-                    Shop Products
-                  </Link>
-                  <Link
-                    href="/agent"
-                    className="bg-transparent border-2 border-orange-600 text-orange-400 hover:bg-orange-600 hover:text-white px-8 py-3 rounded-lg font-semibold transition-colors"
-                  >
-                    Chat with Volt AI
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </>
+      <CustomPageAssets
+        pageId={page.id}
+        customCss={page.custom_css}
+        customJsPath={customJsEnabled && page.custom_js
+          ? `/api/pages/${encodeURIComponent(page.slug)}/script`
+          : null}
+      />
+      <PageHero eyebrow={template.eyebrow} title={page.title} lede={lede} />
+      <div className={`mx-auto max-w-5xl px-4 py-10 sm:px-6 ${showRail ? "lg:grid lg:grid-cols-[180px_1fr] lg:gap-10" : ""}`}>
+        {showRail && <PageRail sections={parsed.sections} />}
+        <div className="min-w-0">{body}</div>
+      </div>
+      {template.cta && <PageCta config={template.cta} />}
+    </>
   );
 }

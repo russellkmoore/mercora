@@ -42,6 +42,7 @@ import { useCartStore } from "@/lib/stores/cart-store";
 import { Money } from "@/lib/money";
 import { normalizeProductRating } from "@/lib/utils/ratings";
 import { toast } from "sonner";
+import { useCartUIStore } from "@/lib/stores/cart-ui-store";
 import type { Product, Review, ProductReviewEligibility } from "@/lib/types";
 import { isVariantAvailable } from "@/lib/inventory/availability";
 import {
@@ -324,6 +325,10 @@ export default function ProductDisplay({
                   toast("Added to Cart", {
                     description: `${fullName} has been added to your cart.`,
                     icon: "🔥",
+                    action: {
+                      label: "View Cart",
+                      onClick: () => useCartUIStore.getState().openCart(),
+                    },
                   });
                 }}
               >
