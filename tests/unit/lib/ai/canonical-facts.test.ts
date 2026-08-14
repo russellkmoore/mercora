@@ -81,4 +81,18 @@ describe("canonicalFactsFromConfig", () => {
       allowedEmails: [],
     });
   });
+
+  it("omits placeholder and malformed contact facts and rejects unknown currencies", () => {
+    const config = resolveStoreConfig({
+      STORE_SUPPORT_EMAIL: storeDefaults.contact.supportEmail,
+      STORE_CURRENCY: "ZZZ",
+    });
+    expect(canonicalFactsFromConfig(config).allowedEmails).toEqual([]);
+    expect(canonicalFactsFromConfig(config).supportEmail).toBeUndefined();
+    expect(canonicalFactsFromConfig(config).currency).toBe(storeDefaults.commerce.currency);
+
+    const malformedEmail = structuredClone(config);
+    malformedEmail.contact.supportEmail = "bad..mail@example..com";
+    expect(canonicalFactsFromConfig(malformedEmail).supportEmail).toBeUndefined();
+  });
 });
