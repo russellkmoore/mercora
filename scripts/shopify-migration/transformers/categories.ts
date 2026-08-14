@@ -2,9 +2,13 @@ import type { ShopifyCollection } from "../lib/types.js";
 import { deterministicProviderId, providerFingerprint } from "../lib/ids.js";
 import {
   SHOPIFY_PROVIDER,
+  boundedPositiveInteger,
+  clampInventory,
   excerptFromHtml,
+  fitsEscapedSqlText,
   hasValidTimestamp,
   isoTimestamp,
+  mediaHostAllowlist,
   mediaRewrite,
   normalizeSlug,
   requiredMigrationTime,
@@ -42,6 +46,7 @@ export interface CategoryTransformRecord {
 
 export interface CategoryTransformOptions {
   generatedAt: string;
+  allowedMediaHosts: readonly string[];
 }
 
 export function transformCollections(
@@ -49,6 +54,7 @@ export function transformCollections(
   options: CategoryTransformOptions,
 ): PureTransformResult<ShopifyCollection, CategoryTransformRecord> {
   const generatedAt = requiredMigrationTime(options.generatedAt);
+  const allowedMediaHosts = mediaHostAllowlist(options.allowedMediaHosts);
   const records: CategoryTransformRecord[] = [];
   const idMap = new Map<string, string>();
   const skipped: Array<{ record: ShopifyCollection; reason: string }> = [];
@@ -59,7 +65,10 @@ export function transformCollections(
     const sourceId = String(collection.id ?? "").trim();
     const slug = normalizeSlug(collection.handle ?? "");
     const title = collection.title?.trim();
-    if (!sourceId || !slug || !title) {
+    if (
+      !sourceId || sourceId.length > 256 || !slug || slug.length > 160 || !title || title.length > 120 ||
+      (collection.body_html?.length ?? 0) > 100_000
+    ) {
       skipped.push({ record: collection, reason: "Collection requires an id, title, and valid handle" });
       return;
     }
@@ -70,12 +79,19 @@ export function transformCollections(
     slugs.add(slug);
 
     const id = deterministicProviderId(SHOPIFY_PROVIDER, "category", sourceId);
+    const description = collection.body_html
+      ? JSON.stringify({ en: excerptFromHtml(collection.body_html, 10_000) ?? "" })
+      : null;
+    if (description && !fitsEscapedSqlText(description, 24 * 1024)) {
+      skipped.push({ record: collection, reason: "Category description exceeds the SQL-safe text limit" });
+      return;
+    }
     idMap.set(providerFingerprint(SHOPIFY_PROVIDER, "category", sourceId), id);
     const image = collection.image?.src
-      ? mediaRewrite(collection.image.src, id, "category", 1, {
-        altText: collection.image.alt?.trim() || title,
-        width: collection.image.width,
-        height: collection.image.height,
+      ? mediaRewrite(collection.image.src, allowedMediaHosts, id, "category", 1, {
+        altText: (collection.image.alt?.trim() || title).slice(0, 300),
+        width: boundedPositiveInteger(collection.image.width),
+        height: boundedPositiveInteger(collection.image.height),
       })
       : null;
     if (collection.image?.src && !image) {
@@ -105,9 +121,7 @@ export function transformCollections(
       category: {
         id,
         name: JSON.stringify({ en: title }),
-        description: collection.body_html
-          ? JSON.stringify({ en: excerptFromHtml(collection.body_html, 10_000) ?? "" })
-          : null,
+        description,
         slug,
         status: hasValidTimestamp(collection.published_at) ? "active" : "inactive",
         parent_id: null,
@@ -119,7 +133,7 @@ export function transformCollections(
         created_at: isoTimestamp(collection.published_at, generatedAt),
         updated_at: isoTimestamp(collection.updated_at, generatedAt),
         children: "[]",
-        product_count: Math.max(0, Math.trunc(collection.products_count ?? 0)),
+        product_count: clampInventory(collection.products_count),
         attributes: "{}",
         tags: "[]",
         primary_image: primaryImage ? JSON.stringify(primaryImage) : null,

@@ -49,6 +49,7 @@ describe("catalog transforms", () => {
     const result = transformProducts([product(major, `product-${currency.toLowerCase()}`)], {
       currency,
       generatedAt,
+      allowedMediaHosts: ["cdn.example.test"],
       inventoryLocationId: "warehouse-main",
       fulfillmentType: "physical",
     });
@@ -65,7 +66,7 @@ describe("catalog transforms", () => {
       published_at: "2025-01-01T00:00:00Z",
       products_count: 1,
     };
-    const categories = transformCollections([collection], { generatedAt });
+    const categories = transformCollections([collection], { generatedAt, allowedMediaHosts: ["cdn.example.test"] });
     const memberships = collectionMembershipByProduct(
       [{ id: 60, collection_id: 50, product_id: 10 }],
       categories.idMap,
@@ -75,6 +76,7 @@ describe("catalog transforms", () => {
       generatedAt,
       inventoryLocationId: "warehouse-main",
       fulfillmentType: "physical" as const,
+      allowedMediaHosts: ["cdn.example.test"],
       categoryIdsByProduct: memberships,
     };
     const first = transformProducts([source], options);
@@ -102,6 +104,7 @@ describe("catalog transforms", () => {
       objectKey: expect.stringMatching(/^products\/[a-z0-9_]+\/1\.jpg$/),
       publicPath: expect.stringMatching(/^\/media\/products\//),
       contentType: "image/jpeg",
+      requiredBeforePersistence: true,
     });
     expect(JSON.parse(transformed.product.external_references)).toHaveProperty("shopify_fingerprint");
     expect(transformed.product.external_references).not.toContain('"10"');
@@ -111,6 +114,7 @@ describe("catalog transforms", () => {
     expect(() => transformProducts([product("1")], {
       currency: "ZZZ",
       generatedAt,
+      allowedMediaHosts: [],
       inventoryLocationId: "warehouse-main",
       fulfillmentType: "physical",
     })).toThrow("Unsupported migration currency");
@@ -121,6 +125,7 @@ describe("catalog transforms", () => {
     const result = transformProducts([duplicateVariants, duplicateProduct], {
       currency: "USD",
       generatedAt,
+      allowedMediaHosts: [],
       inventoryLocationId: "warehouse-main",
       fulfillmentType: "physical",
     });
@@ -131,6 +136,7 @@ describe("catalog transforms", () => {
     expect(transformProducts([bad], {
       currency: "USD",
       generatedAt,
+      allowedMediaHosts: [],
       inventoryLocationId: "warehouse-main",
       fulfillmentType: "physical",
     }).skipped[0].reason).toBe("Product has no importable variants");
@@ -145,7 +151,7 @@ describe("catalog transforms", () => {
       image: { src: "https://cdn.example.test/collection.webp", alt: "Seasonal" },
       published_at: null,
       updated_at: "bad-date",
-    }], { generatedAt });
+    }], { generatedAt, allowedMediaHosts: ["cdn.example.test"] });
 
     expect(result.records[0].category).toMatchObject({
       name: JSON.stringify({ en: "Summer & More" }),
@@ -156,5 +162,48 @@ describe("catalog transforms", () => {
     expect(result.records[0].category.description).not.toContain("<script>");
     expect(result.records[0].media[0]).toMatchObject({ contentType: "image/webp" });
     expect([...result.idMap.keys()][0]).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("does not plan product or category media outside the explicit allowlist", () => {
+    const deniedProduct = transformProducts([product("1")], {
+      currency: "USD",
+      generatedAt,
+      inventoryLocationId: "warehouse-main",
+      fulfillmentType: "physical",
+      allowedMediaHosts: [],
+    });
+    expect(deniedProduct.records[0].media).toEqual([]);
+    expect(deniedProduct.records[0].product.primary_image).toBeNull();
+
+    const deniedCategory = transformCollections([{
+      id: 1,
+      title: "Denied image",
+      handle: "denied-image",
+      image: { src: "https://cdn.example.test/category.png" },
+    }], { generatedAt, allowedMediaHosts: [] });
+    expect(deniedCategory.records[0].media).toEqual([]);
+    expect(deniedCategory.records[0].category.primary_image).toBeNull();
+  });
+
+  it("rejects oversized catalog fields and per-product collections", () => {
+    const oversized = product("1");
+    oversized.title = "x".repeat(501);
+    oversized.images = Array.from({ length: 251 }, (_, index) => ({
+      id: index,
+      src: `https://cdn.example.test/${index}.png`,
+    }));
+    expect(transformProducts([oversized], {
+      currency: "USD",
+      generatedAt,
+      inventoryLocationId: "warehouse-main",
+      fulfillmentType: "physical",
+      allowedMediaHosts: ["cdn.example.test"],
+    }).records).toEqual([]);
+
+    expect(transformCollections([{
+      id: 1,
+      title: "x".repeat(121),
+      handle: "oversized",
+    }], { generatedAt, allowedMediaHosts: [] }).records).toEqual([]);
   });
 });

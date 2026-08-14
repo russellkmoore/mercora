@@ -7,10 +7,14 @@ import type {
 import { deterministicProviderId, providerFingerprint } from "../lib/ids.js";
 import {
   SHOPIFY_PROVIDER,
+  boundedPositiveInteger,
   clampInventory,
+  escapedSqlUtf8Bytes,
+  fitsEscapedSqlText,
   hasValidTimestamp,
   isoTimestamp,
   majorToStoredMoney,
+  mediaHostAllowlist,
   mediaRewrite,
   normalizeSlug,
   plainText,
@@ -23,6 +27,16 @@ import {
 
 type ProductStatus = "active" | "inactive" | "archived" | "draft";
 type VariantStatus = "active" | "inactive" | "discontinued";
+
+const MAX_PRODUCT_TITLE = 500;
+const MAX_PRODUCT_BODY = 100_000;
+const MAX_PRODUCT_VARIANTS = 2_048;
+const MAX_PRODUCT_IMAGES = 250;
+const MAX_PRODUCT_CATEGORIES = 100;
+const MAX_TAGS = 100;
+const MAX_TAG_LENGTH = 100;
+const MAX_OPTION_VALUES = 250;
+const MAX_OPTION_TEXT = 200;
 
 export interface ProductInsertRecord {
   id: string;
@@ -103,6 +117,7 @@ export interface ProductTransformOptions {
   inventoryLocationId: string;
   fulfillmentType: "physical" | "digital" | "service";
   taxCategory?: string;
+  allowedMediaHosts: readonly string[];
   categoryIdsByProduct?: ReadonlyMap<string, readonly string[]>;
 }
 
@@ -124,7 +139,7 @@ function variantStatus(status: ProductStatus): VariantStatus {
 
 function weight(variant: ShopifyProductVariant): string | null {
   const value = variant.grams ?? variant.weight;
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return null;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1_000_000_000) return null;
   const unit = variant.grams !== undefined ? "g" : variant.weight_unit?.trim().toLowerCase();
   if (!unit || !["g", "kg", "oz", "lb"].includes(unit)) return null;
   return JSON.stringify({ value, unit });
@@ -132,14 +147,15 @@ function weight(variant: ShopifyProductVariant): string | null {
 
 function machMedia(
   image: ShopifyProductImage,
+  allowedMediaHosts: ReturnType<typeof mediaHostAllowlist>,
   sourceId: string,
   ownerId: string,
   position: number,
 ): { embedded: Record<string, unknown>; plan: MediaRewrite } | null {
-  const plan = mediaRewrite(image.src, ownerId, "product", position, {
-    altText: image.alt?.trim() || undefined,
-    width: image.width,
-    height: image.height,
+  const plan = mediaRewrite(image.src, allowedMediaHosts, ownerId, "product", position, {
+    altText: image.alt?.trim().slice(0, 300) || undefined,
+    width: boundedPositiveInteger(image.width),
+    height: boundedPositiveInteger(image.height),
   });
   if (!plan) return null;
   return {
@@ -178,7 +194,7 @@ export function collectionMembershipByProduct(
     if (!categoryId) continue;
     const productId = providerFingerprint(SHOPIFY_PROVIDER, "product", collect.product_id);
     const existing = result.get(productId) ?? [];
-    if (!existing.includes(categoryId)) existing.push(categoryId);
+    if (!existing.includes(categoryId) && existing.length < MAX_PRODUCT_CATEGORIES) existing.push(categoryId);
     result.set(productId, existing);
   }
   return result;
@@ -190,8 +206,10 @@ export function transformProducts(
 ): PureTransformResult<ShopifyProduct, ProductTransformRecord> {
   const currency = requireSupportedCurrency(options.currency);
   const generatedAt = requiredMigrationTime(options.generatedAt);
+  const allowedMediaHosts = mediaHostAllowlist(options.allowedMediaHosts);
   const locationId = options.inventoryLocationId.trim();
-  if (!locationId) throw new TypeError("inventoryLocationId is required");
+  if (!locationId || locationId.length > 200) throw new TypeError("inventoryLocationId must be 1-200 characters");
+  if ((options.taxCategory?.trim().length ?? 0) > 200) throw new TypeError("taxCategory must not exceed 200 characters");
 
   const records: ProductTransformRecord[] = [];
   const idMap = new Map<string, string>();
@@ -204,7 +222,25 @@ export function transformProducts(
     const sourceId = String(source.id ?? "").trim();
     const slug = normalizeSlug(source.handle ?? "");
     const name = source.title?.trim();
-    if (!sourceId || !slug || !name) {
+    const rawTags = source.tags ?? "";
+    const tags = rawTags.length <= 20_000 ? uniqueStrings(rawTags.split(",")) : [];
+    const optionsAreBounded = (source.options ?? []).every((option) =>
+      (option.id === undefined || String(option.id).length <= 128) &&
+      option.name.trim().length > 0 && option.name.trim().length <= 120 &&
+      option.values.length <= MAX_OPTION_VALUES &&
+      option.values.every((value) => value.trim().length > 0 && value.trim().length <= MAX_OPTION_TEXT));
+    const imagesAreBounded = source.images.every((image) =>
+      (image.id === undefined || String(image.id).length <= 128) &&
+      image.src.length <= 2_048 && (image.alt?.length ?? 0) <= 10_000);
+    if (
+      !sourceId || sourceId.length > 256 || !slug || slug.length > 160 || !name || name.length > MAX_PRODUCT_TITLE ||
+      (source.body_html?.length ?? 0) > MAX_PRODUCT_BODY || (source.vendor?.length ?? 0) > 200 ||
+      (source.product_type?.length ?? 0) > 200 || (source.tags?.length ?? 0) > 20_000 ||
+      (source.seo_title?.length ?? 0) > 200 || (source.seo_description?.length ?? 0) > 500 ||
+      tags.length > MAX_TAGS || tags.some((tag) => tag.length > MAX_TAG_LENGTH) ||
+      source.variants.length > MAX_PRODUCT_VARIANTS || source.images.length > MAX_PRODUCT_IMAGES ||
+      (source.options?.length ?? 0) > 3 || !optionsAreBounded || !imagesAreBounded
+    ) {
       skipped.push({ record: source, reason: "Product requires an id, title, and valid handle" });
       continue;
     }
@@ -220,11 +256,11 @@ export function transformProducts(
       id: deterministicProviderId(SHOPIFY_PROVIDER, "option", `${sourceId}:${String(option.id ?? position + 1)}`),
       name: option.name.trim(),
       values: uniqueStrings(option.values ?? []),
-      position: option.position ?? position + 1,
+      position: boundedPositiveInteger(option.position, 3) ?? position + 1,
     })).filter((option) => option.name && option.values.length > 0);
 
     const imageResults = (source.images ?? []).flatMap((image, index) => {
-      const result = machMedia(image, sourceId, productId, index + 1);
+      const result = machMedia(image, allowedMediaHosts, sourceId, productId, index + 1);
       if (!result) {
         warnings.push(
           `Product ${sourceFingerprint} image ${index + 1} omitted: invalid or unsupported image URL`,
@@ -241,6 +277,23 @@ export function transformProducts(
     for (let index = 0; index < source.variants.length; index += 1) {
       const variant = source.variants[index];
       const sku = variant.sku?.trim() || `${slug}-${index + 1}`;
+      const rawValues = [variant.option1, variant.option2, variant.option3].filter(
+        (value): value is string => value !== null && value !== undefined,
+      );
+      const rawVariantId = variant.id === undefined ? "" : String(variant.id);
+      const identity = rawVariantId && rawVariantId.length <= 256
+        ? rawVariantId
+        : `${sourceId}:position:${index + 1}`;
+      const preliminaryFingerprint = providerFingerprint(SHOPIFY_PROVIDER, "variant", identity);
+      if (
+        rawVariantId.length > 256 || sku.length > 255 || (variant.barcode?.length ?? 0) > 255 ||
+        (variant.price?.length ?? 0) > 100 || (variant.compare_at_price?.length ?? 0) > 100 ||
+        rawValues.some((value) => value.trim().length > MAX_OPTION_TEXT) ||
+        (variant.fulfillment_service?.length ?? 0) > 200
+      ) {
+        warnings.push(`Product ${sourceFingerprint} variant ${preliminaryFingerprint} omitted: fields exceed limits`);
+        continue;
+      }
       const naturalKey = variant.sku?.trim() || [variant.option1, variant.option2, variant.option3]
         .filter((value): value is string => Boolean(value?.trim()))
         .join("|") || variant.barcode?.trim() || `position:${index + 1}`;
@@ -284,7 +337,7 @@ export function transformProducts(
         product_id: productId,
         sku,
         status: variantStatus(status),
-        position: variant.position ?? index + 1,
+        position: boundedPositiveInteger(variant.position, MAX_PRODUCT_VARIANTS) ?? index + 1,
         option_values: JSON.stringify(optionValues),
         price: JSON.stringify(price),
         compare_at_price: compareAt,
@@ -310,7 +363,7 @@ export function transformProducts(
         updated_at: updatedAt,
       });
       inventory.push({
-        id: deterministicProviderId(SHOPIFY_PROVIDER, "inventory", `${variantSourceId}:${locationId}`),
+        id: deterministicProviderId(SHOPIFY_PROVIDER, "inventory", `${variantFingerprint}:${locationId}`),
         sku_id: variantId,
         location_id: locationId,
         quantities: JSON.stringify({ on_hand: quantity, reserved: 0, available: quantity }),
@@ -335,12 +388,34 @@ export function transformProducts(
       continue;
     }
     slugs.add(slug);
-    const tags = uniqueStrings((source.tags ?? "").split(","));
     const categoryIds = uniqueStrings([...(options.categoryIdsByProduct?.get(sourceFingerprint) ?? [])]);
+    if (
+      categoryIds.length > MAX_PRODUCT_CATEGORIES ||
+      categoryIds.some((categoryId) => categoryId.length > 200)
+    ) {
+      skipped.push({ record: source, reason: "Product category references exceed migration limits" });
+      continue;
+    }
     const embeddedMedia = imageResults.map(({ embedded }) => embedded);
     const seo = source.seo_title || source.seo_description
       ? { meta_title: source.seo_title?.trim() || name, meta_description: source.seo_description?.trim() || undefined }
       : null;
+    const description = source.body_html ? JSON.stringify({ en: plainText(source.body_html) }) : null;
+    const categoriesJson = categoryIds.length ? JSON.stringify(categoryIds) : null;
+    const tagsJson = tags.length ? JSON.stringify(tags) : null;
+    const optionsJson = optionDefinitions.length ? JSON.stringify(optionDefinitions) : null;
+    const primaryImageJson = embeddedMedia[0] ? JSON.stringify(embeddedMedia[0]) : null;
+    const mediaJson = embeddedMedia.length ? JSON.stringify(embeddedMedia) : null;
+    const seoJson = seo ? JSON.stringify(seo) : null;
+    const boundedJson = [description, categoriesJson, tagsJson, optionsJson, primaryImageJson, mediaJson, seoJson]
+      .filter((value): value is string => value !== null);
+    if (
+      boundedJson.some((value) => !fitsEscapedSqlText(value)) ||
+      boundedJson.reduce((total, value) => total + escapedSqlUtf8Bytes(value), 0) > 80 * 1024
+    ) {
+      skipped.push({ record: source, reason: "Product record exceeds SQL-safe text limits" });
+      continue;
+    }
 
     records.push({
       sourceFingerprint,
@@ -350,20 +425,20 @@ export function transformProducts(
       product: {
         id: productId,
         name,
-        description: source.body_html ? JSON.stringify({ en: plainText(source.body_html) }) : null,
+        description,
         type: source.product_type?.trim() || null,
         status,
         slug,
         brand: source.vendor?.trim() || null,
-        categories: categoryIds.length ? JSON.stringify(categoryIds) : null,
-        tags: tags.length ? JSON.stringify(tags) : null,
-        options: optionDefinitions.length ? JSON.stringify(optionDefinitions) : null,
+        categories: categoriesJson,
+        tags: tagsJson,
+        options: optionsJson,
         default_variant_id: variants[0].id,
         fulfillment_type: options.fulfillmentType,
         tax_category: options.taxCategory?.trim() || null,
-        primary_image: embeddedMedia[0] ? JSON.stringify(embeddedMedia[0]) : null,
-        media: embeddedMedia.length ? JSON.stringify(embeddedMedia) : null,
-        seo: seo ? JSON.stringify(seo) : null,
+        primary_image: primaryImageJson,
+        media: mediaJson,
+        seo: seoJson,
         rating: null,
         related_products: null,
         external_references: JSON.stringify({ shopify_fingerprint: sourceFingerprint }),

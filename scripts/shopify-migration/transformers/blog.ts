@@ -3,7 +3,10 @@ import type { ShopifyArticle, ShopifyBlog } from "../lib/types.js";
 import { deterministicProviderId, providerFingerprint } from "../lib/ids.js";
 import {
   SHOPIFY_PROVIDER,
+  boundedPositiveInteger,
   excerptFromHtml,
+  fitsEscapedSqlText,
+  mediaHostAllowlist,
   mediaRewrite,
   normalizeSlug,
   requiredMigrationTime,
@@ -62,6 +65,7 @@ export interface BlogTransformOptions {
   generatedAt: string;
   actorId: string;
   fallbackAuthor: string;
+  allowedMediaHosts: readonly string[];
 }
 
 export interface BlogTransformResult {
@@ -81,8 +85,9 @@ export function transformBlogContent(
   const generatedAt = unixTimestamp(requiredMigrationTime(options.generatedAt))!;
   const actorId = options.actorId.trim();
   const fallbackAuthor = options.fallbackAuthor.trim();
-  if (!actorId) throw new TypeError("actorId is required for blog attribution");
-  if (!fallbackAuthor) throw new TypeError("fallbackAuthor is required");
+  const allowedMediaHosts = mediaHostAllowlist(options.allowedMediaHosts);
+  if (!actorId || actorId.length > 255) throw new TypeError("actorId must be 1-255 characters for blog attribution");
+  if (!fallbackAuthor || fallbackAuthor.length > 160) throw new TypeError("fallbackAuthor must be 1-160 characters");
 
   const categories: BlogCategoryPlan[] = [];
   const records: BlogPostPlan[] = [];
@@ -100,7 +105,7 @@ export function transformBlogContent(
     const slug = normalizeSlug(blog.handle ?? "");
     const exactHandle = blog.handle?.trim();
     if (
-      !sourceId || !name || name.length > 120 || !slug || slug.length > 160 ||
+      !sourceId || sourceId.length > 256 || !name || name.length > 120 || !slug || slug.length > 160 ||
       exactHandle !== slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(exactHandle)
     ) {
       skipped.push({ record: blog, reason: "Blog requires an id, title, and valid handle" });
@@ -129,17 +134,22 @@ export function transformBlogContent(
 
   for (const article of articles) {
     const sourceId = String(article.id ?? "").trim();
-    const sourceFingerprint = sourceId
+    const sourceFingerprint = sourceId && sourceId.length <= 256
       ? providerFingerprint(SHOPIFY_PROVIDER, "article", sourceId)
       : "";
-    const blogFingerprint = providerFingerprint(SHOPIFY_PROVIDER, "blog", article.blog_id);
+    const blogSourceId = String(article.blog_id ?? "").trim();
+    const blogFingerprint = blogSourceId && blogSourceId.length <= 256
+      ? providerFingerprint(SHOPIFY_PROVIDER, "blog", blogSourceId)
+      : "";
     const category = blogByFingerprint.get(blogFingerprint);
     const title = article.title?.trim();
     const slug = normalizeSlug(article.handle ?? "");
     const exactHandle = article.handle?.trim();
     const author = article.author?.trim() || fallbackAuthor;
     if (
-      !sourceFingerprint || !category || !title || title.length > 200 || !slug || slug.length > 160 || !author ||
+      !sourceFingerprint || sourceId.length > 256 || !category || !title || title.length > 200 || !slug || slug.length > 160 || !author ||
+      author.length > 160 || (article.body_html?.length ?? 0) > 100_000 ||
+      (article.summary_html?.length ?? 0) > 10_000 || (article.tags?.length ?? 0) > 4_000 ||
       exactHandle !== slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(exactHandle)
     ) {
       skipped.push({
@@ -154,15 +164,17 @@ export function transformBlogContent(
       skipped.push({ record: article, reason: `Duplicate blog post slug: ${slug}` });
       continue;
     }
-    postSlugs.add(slug);
-
     const ownerId = deterministicProviderId(SHOPIFY_PROVIDER, "article", sourceId);
-    const body = rewriteAndSanitizeHtml(article.body_html ?? "", ownerId, "blog-inline");
+    const body = rewriteAndSanitizeHtml(article.body_html ?? "", allowedMediaHosts, ownerId, "blog-inline");
+    if (body.html.length > 100_000 || !fitsEscapedSqlText(body.html)) {
+      skipped.push({ record: article, reason: "Article content exceeds the SQL-safe text limit" });
+      continue;
+    }
     const cover = article.image?.src
-      ? mediaRewrite(article.image.src, ownerId, "blog-cover", 1, {
-        altText: article.image.alt?.trim() || title,
-        width: article.image.width,
-        height: article.image.height,
+      ? mediaRewrite(article.image.src, allowedMediaHosts, ownerId, "blog-cover", 1, {
+        altText: (article.image.alt?.trim() || title).slice(0, 300),
+        width: boundedPositiveInteger(article.image.width),
+        height: boundedPositiveInteger(article.image.height),
       })
       : null;
     if (article.image?.src && !cover) {
@@ -172,9 +184,21 @@ export function transformBlogContent(
     if (article.published_at && publishedAt === null) {
       warnings.push(`Article ${sourceFingerprint} has an invalid publication time and was imported as draft`);
     }
-    const status = article.published !== false && publishedAt !== null ? "published" : "draft";
+    const requestedPublished = article.published !== false && publishedAt !== null;
+    const status = requestedPublished && body.html.trim() ? "published" : "draft";
+    if (requestedPublished && !body.html.trim()) {
+      warnings.push(`Article ${sourceFingerprint} has no safe content and was imported as draft`);
+    }
     const summary = article.summary_html ? excerptFromHtml(article.summary_html) : excerptFromHtml(body.html);
-    const tags = normalizeBlogTags((article.tags ?? "").split(",").filter((tag) => tag.trim()));
+    let tags: string[];
+    try {
+      tags = normalizeBlogTags((article.tags ?? "").split(",").filter((tag) => tag.trim()));
+    } catch {
+      skipped.push({ record: article, reason: "Article tags exceed the current blog limits" });
+      continue;
+    }
+
+    postSlugs.add(slug);
 
     records.push({
       sourceFingerprint,

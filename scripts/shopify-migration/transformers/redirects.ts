@@ -1,3 +1,7 @@
+import {
+  isLegacyRedirectLookupPath,
+  validateRedirectCandidate,
+} from "../../../lib/redirects/policy.js";
 import type { ShopifyRedirect } from "../lib/types.js";
 import { providerFingerprint } from "../lib/ids.js";
 import { SHOPIFY_PROVIDER, type TransformFailure } from "./_shared.js";
@@ -29,21 +33,6 @@ export interface RedirectTransformResult {
   idMap: Map<string, string>;
   skipped: Array<TransformFailure<ShopifyRedirect | RedirectCandidate>>;
   warnings: string[];
-}
-
-function validInternalPath(value: string, source: boolean): boolean {
-  if (value.length < (source ? 3 : 1) || value.length > 2_048) return false;
-  if (!value.startsWith("/") || value.startsWith("//")) return false;
-  if (/[\\?#\u0000-\u001f\u007f]/u.test(value)) return false;
-  if (/%(?:00|0[ad]|2e|2f|5c)/iu.test(value)) return false;
-  let decoded: string;
-  try {
-    decoded = decodeURIComponent(value);
-  } catch {
-    return false;
-  }
-  if (!decoded.startsWith("/") || decoded.startsWith("//") || decoded.includes("\\")) return false;
-  return !decoded.split("/").some((segment) => segment === "." || segment === "..");
 }
 
 function routeSegment(value: string): string {
@@ -124,7 +113,15 @@ export function transformRedirects(
   const candidates: Array<{ source: ShopifyRedirect | RedirectCandidate; record: RedirectCandidate }> = [];
 
   for (const source of redirects) {
-    const fingerprint = providerFingerprint(SHOPIFY_PROVIDER, "redirect", source.id);
+    const sourceId = source.id === null || source.id === undefined ? "" : String(source.id).trim();
+    if (
+      !sourceId || sourceId.length > 512 || typeof source.path !== "string" ||
+      typeof source.target !== "string"
+    ) {
+      skipped.push({ record: source, reason: "Shopify redirect requires a bounded source ID and text paths" });
+      continue;
+    }
+    const fingerprint = providerFingerprint(SHOPIFY_PROVIDER, "redirect", sourceId);
     const record: RedirectCandidate = {
       sourcePath: source.path.trim(),
       targetPath: source.target.trim(),
@@ -135,14 +132,21 @@ export function transformRedirects(
     candidates.push({ source, record });
   }
   for (const record of options.generated ?? []) candidates.push({ source: record, record: { ...record } });
+  const inputCycles = cyclicSources(candidates.map(({ record }) => record));
 
   const valid = candidates.filter(({ source, record }) => {
-    if (!validInternalPath(record.sourcePath, true) || !validInternalPath(record.targetPath, false)) {
-      skipped.push({ record: source, reason: "Redirect source and target must be safe internal paths" });
+    if (inputCycles.has(record.sourcePath)) {
+      skipped.push({ record: source, reason: `Redirect participates in a cycle: ${record.sourcePath}` });
       return false;
     }
-    if (record.sourcePath === record.targetPath) {
-      skipped.push({ record: source, reason: "Redirect cannot target itself" });
+    if (
+      !isLegacyRedirectLookupPath(record.sourcePath) ||
+      !validateRedirectCandidate(record.sourcePath, record)
+    ) {
+      skipped.push({
+        record: source,
+        reason: "Redirect must satisfy the exact legacy-source and safe-runtime target policy",
+      });
       return false;
     }
     if (options.protectedSourcePaths?.has(record.sourcePath)) {
@@ -178,7 +182,14 @@ export function transformRedirects(
     if (!cycles.has(record.sourcePath)) return [record];
     skipped.push({ record: source, reason: `Redirect participates in a cycle: ${record.sourcePath}` });
     return [];
-  }).sort((left, right) => left.sourcePath.localeCompare(right.sourcePath));
+  }).map((record) => ({
+    ...record,
+    sourceFingerprint: record.sourceFingerprint ?? providerFingerprint(
+      SHOPIFY_PROVIDER,
+      "redirect_path",
+      record.sourcePath,
+    ),
+  })).sort((left, right) => left.sourcePath.localeCompare(right.sourcePath));
 
   for (const record of records) {
     if (record.sourceFingerprint) idMap.set(record.sourceFingerprint, record.sourcePath);
