@@ -37,6 +37,13 @@ describe("assistant response guard adversarial destinations", () => {
     expect(guardAssistantReply("https://policies.example.net.evil.com/returns", facts).replacementCount).toBe(1);
   });
 
+  it.each(["evil.cloud/help", "evil.photography", "evil.museum", "evil.tech"])(
+    "rewrites an unconfigured modern bare domain %s",
+    (token) => {
+      expect(guardAssistantReply(`See ${token}.`, facts).text).toBe("See https://example.com.");
+    },
+  );
+
   it("keeps markdown structure while replacing its unsafe destination", () => {
     const result = guardAssistantReply("Read [our policy](https://evil.example/policy).", facts);
     expect(result.text).toBe("Read [our policy](https://example.com)." );

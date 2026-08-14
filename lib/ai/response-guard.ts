@@ -14,6 +14,14 @@ const BARE_DOMAIN_TLDS = [
   "shopping", "market", "buy", "sale", "deals", "gift", "gifts", "brand",
   "company", "global", "group", "team", "agency", "services", "solutions",
   "digital", "media", "news", "blog", "page", "link", "click", "one", "now",
+  "cloud", "tech", "technology", "software", "systems", "network", "computer",
+  "tools", "space", "art", "design", "fashion", "style", "boutique", "photo",
+  "photography", "museum", "travel", "pro", "mobi", "jobs", "aero", "asia",
+  "cat", "coop", "tel", "finance", "financial", "money", "law", "legal",
+  "lawyer", "doctor", "clinic", "dental", "insurance", "pharmacy", "social",
+  "community", "foundation", "church", "events", "works", "expert", "tips",
+  "center", "international", "capital", "ventures", "academy", "education",
+  "school", "coffee", "restaurant", "food", "farm", "pet", "pets", "zone",
 ].join("|");
 
 const CONTACT_PATTERN = new RegExp(

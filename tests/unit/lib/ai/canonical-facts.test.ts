@@ -72,12 +72,9 @@ describe("canonicalFactsFromConfig", () => {
     expect(canonicalFactsFromConfig(malformed)).toEqual({
       storeName: storeDefaults.identity.name,
       assistantName: storeDefaults.identity.assistantName,
-      siteUrl: storeDefaults.urls.site,
-      orderHistoryUrl: "https://mercora.example.com/account/orders",
-      returnsUrl: "https://mercora.example.com/returns",
       locale: storeDefaults.commerce.locale,
       currency: storeDefaults.commerce.currency,
-      allowedHosts: ["mercora.example.com"],
+      allowedHosts: [],
       allowedEmails: [],
     });
   });
@@ -89,6 +86,7 @@ describe("canonicalFactsFromConfig", () => {
     });
     expect(canonicalFactsFromConfig(config).allowedEmails).toEqual([]);
     expect(canonicalFactsFromConfig(config).supportEmail).toBeUndefined();
+    expect(canonicalFactsFromConfig(config).supportHours).toBeUndefined();
     expect(canonicalFactsFromConfig(config).currency).toBe(storeDefaults.commerce.currency);
 
     const malformedEmail = structuredClone(config);

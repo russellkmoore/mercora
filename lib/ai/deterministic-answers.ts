@@ -93,6 +93,7 @@ const RULES: CategoryRule[] = [
       /\bshipping address\b/i,
       /\b(do|does|can|could|will|would)\s+(you|they|the store)\b.{0,15}\bship (to|outside|overseas|abroad)\b/i,
       /\b(international(ly)?|overseas|abroad|customs|duties|tariffs?)\b/i,
+      /\b(shipping|delivery|postage)\b.{0,40}\bto\b/i,
     ],
   },
 ];
