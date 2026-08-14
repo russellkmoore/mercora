@@ -42,7 +42,7 @@ describe("assistant response guard", () => {
   });
 
   it("preserves ordinary dotted prose and versions", () => {
-    const text = "Steep for 5 min.Then wait. Version 2.0.1 is current.";
+    const text = "Steep for 5 min. Then wait. Version 2.0.1 is current.";
     expect(guardAssistantReply(text, facts).text).toBe(text);
   });
 

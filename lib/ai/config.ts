@@ -165,7 +165,10 @@ export async function runAI(
     temperature: options.temperature ?? config.temperature,
   };
 
-  return ai.run(TEXT_GENERATION_MODEL.model, params);
+  if (config.model !== TEXT_GENERATION_MODEL.model) {
+    throw new TypeError(`Unsupported text-generation model configuration: ${config.model}`);
+  }
+  return ai.run(config.model, params);
 }
 
 /**
@@ -220,7 +223,7 @@ function contentText(value: unknown): string {
 function chatCompletionText(value: unknown): string {
   if (!Array.isArray(value) || value.length === 0 || value.length > MAX_OUTPUT_ITEMS) return "";
   if (value.some((choice) => isRecord(choice) && (
-    choice.finish_reason === "tool_calls"
+    (typeof choice.finish_reason === "string" && choice.finish_reason !== "stop")
     || (isRecord(choice.message) && (
       (Array.isArray(choice.message.tool_calls) && choice.message.tool_calls.length > 0)
       || isRecord(choice.message.function_call)
@@ -250,11 +253,27 @@ function responsesMessageText(value: unknown): string {
   return messages.join("");
 }
 
+function hasTopLevelToolOutput(response: Record<string, unknown>): boolean {
+  return (
+    (Array.isArray(response.tool_calls) && response.tool_calls.length > 0)
+    || isRecord(response.function_call)
+    || (Array.isArray(response.output) && response.output.some((item) => isRecord(item) && (
+      item.type === "function_call"
+      || item.type === "custom_tool_call"
+      || item.type === "computer_call"
+    )))
+  );
+}
+
 export function extractAIResponse(response: unknown): string {
   try {
     if (isReadableStreamOutput(response) || !isRecord(response)) return "";
 
-    if (response.error !== undefined || response.status === "failed" || response.status === "incomplete") {
+    if (
+      (response.error !== undefined && response.error !== null)
+      || (Object.hasOwn(response, "status") && response.status !== "completed")
+      || hasTopLevelToolOutput(response)
+    ) {
       return "";
     }
 

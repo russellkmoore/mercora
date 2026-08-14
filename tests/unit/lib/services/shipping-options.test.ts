@@ -65,6 +65,15 @@ describe('resolveShippingOptions', () => {
     expect(result.options[0].cost.amount).toBe(599);
   });
 
+  it('treats a configured zero threshold as free for every eligible order', async () => {
+    withSettings({}, { 'store.free_shipping_threshold': 0 });
+    const result = await resolveShippingOptions(0, { currency: 'USD' });
+
+    expect(result.qualifiesForFreeShipping).toBe(true);
+    expect(result.options[0].cost).toEqual({ amount: 0, currency: 'USD' });
+    expect(result.options[1].cost).toEqual({ amount: 999, currency: 'USD' });
+  });
+
   it.each([null, '', ' ', false, [], 'not-a-number', -1])(
     'rejects an explicit malformed threshold (%j) instead of quoting a default',
     async (threshold) => {

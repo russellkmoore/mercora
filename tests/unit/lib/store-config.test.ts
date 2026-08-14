@@ -31,6 +31,14 @@ describe("resolveStoreConfig", () => {
       .toBe(storeDefaults.commerce.locale);
   });
 
+  it("accepts only currencies supported by Mercora Money precision", () => {
+    expect(resolveStoreConfig({ STORE_CURRENCY: "eur" }).commerce.currency).toBe("EUR");
+    expect(resolveStoreConfig({ STORE_CURRENCY: "JOD" }).commerce.currency)
+      .toBe(storeDefaults.commerce.currency);
+    expect(resolveStoreConfig({ STORE_CURRENCY: "not-a-currency" }).commerce.currency)
+      .toBe(storeDefaults.commerce.currency);
+  });
+
   it("derives sender identity from a renamed store", () => {
     const config = resolveStoreConfig({
       NEXT_PUBLIC_STORE_NAME: "Acme Store",

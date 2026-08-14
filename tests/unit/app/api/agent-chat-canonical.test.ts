@@ -163,6 +163,78 @@ describe("agent-chat guarded customer exits", () => {
       expectAnswerMatchesHistory(body);
     },
   );
+
+  it("does not turn retrieval matches into recommendations when generation fails", async () => {
+    const query = vi.fn().mockResolvedValue({
+      matches: [{
+        id: "match-1",
+        metadata: { text: "Example product", productId: "prod-1" },
+      }],
+    });
+    getCloudflareContext.mockResolvedValue({
+      env: {
+        AI: { run: vi.fn().mockResolvedValue({ data: [[0.1, 0.2]] }) },
+        VECTORIZE: { query },
+      },
+    });
+    runAI.mockRejectedValue(new Error("provider unavailable"));
+
+    const response = await post({ question: "Recommend something from the catalog" });
+    const body = await response.json() as ChatBody & { productIds: string[]; products: unknown[] };
+
+    expect(query).toHaveBeenCalledOnce();
+    expect(body.productIds).toEqual([]);
+    expect(body.products).toEqual([]);
+    expect(getDbAsync).not.toHaveBeenCalled();
+    expectAnswerMatchesHistory(body);
+  });
+
+  it("continues through malformed embeddings and Vectorize failures", async () => {
+    const query = vi.fn().mockRejectedValue(new Error("vector detail"));
+    const embeddingRun = vi.fn()
+      .mockResolvedValueOnce({})
+      .mockResolvedValue({ data: [[0.1, 0.2]] });
+    getCloudflareContext.mockResolvedValue({
+      env: { AI: { run: embeddingRun }, VECTORIZE: { query } },
+    });
+    runAI.mockResolvedValue({});
+    extractAIResponse.mockReturnValue("A safe answer");
+
+    const malformed = await post({ question: "Recommend a product" });
+    expect((await malformed.json() as ChatBody).answer).toBe("A safe answer");
+    expect(query).not.toHaveBeenCalled();
+
+    const vectorFailure = await post({ question: "Recommend another product" });
+    expect((await vectorFailure.json() as ChatBody).answer).toBe("A safe answer");
+    expect(query).toHaveBeenCalledOnce();
+  });
+
+  it("keeps a guarded answer when recommended-product lookup fails", async () => {
+    const query = vi.fn().mockResolvedValue({
+      matches: [{
+        id: "match-1",
+        metadata: { text: "Example product", productId: "prod-1" },
+      }],
+    });
+    getCloudflareContext.mockResolvedValue({
+      env: {
+        AI: { run: vi.fn().mockResolvedValue({ data: [[0.1, 0.2]] }) },
+        VECTORIZE: { query },
+      },
+    });
+    runAI.mockResolvedValue({});
+    extractAIResponse.mockReturnValue("Try **Example product**.");
+    getDbAsync.mockRejectedValue(new Error("private D1 detail"));
+
+    const response = await post({ question: "Recommend something" });
+    const body = await response.json() as ChatBody & { productIds: string[]; products: unknown[] };
+
+    expect(response.status).toBe(200);
+    expect(body.answer).toBe("Try Example product.");
+    expect(body.productIds).toEqual([]);
+    expect(body.products).toEqual([]);
+    expectAnswerMatchesHistory(body);
+  });
 });
 
 describe("agent-chat prompt trust boundaries", () => {
@@ -178,7 +250,7 @@ describe("agent-chat prompt trust boundaries", () => {
       orders: [{
         id: "order-1",
         items: 2,
-        total: 12.34,
+        total_amount: { amount: 12.34, currency: "USD" },
         shipping_address: { line1: "private address" },
       }],
     });
@@ -193,7 +265,7 @@ describe("agent-chat prompt trust boundaries", () => {
       .toBeLessThan(prompt.indexOf("BEGIN UNTRUSTED CUSTOMER PROFILE"));
     expect(prompt).toContain("BEGIN UNTRUSTED CUSTOMER PROFILE");
     expect(options.messages[1].content).toContain("BEGIN UNTRUSTED CONVERSATION MESSAGE 1");
-    expect(prompt).toContain("12,34 €");
+    expect(prompt).toContain("12,34 $");
     expect(prompt).not.toContain("private address");
   });
 });

@@ -109,12 +109,24 @@ describe("agent-chat abuse and privilege gates", () => {
     );
   });
 
-  it("denies raw content-generation signals before limiting or billable work", async () => {
+  it("rate-limits raw content-generation signals before admin database work", async () => {
     checkAdminPermissions.mockResolvedValue({ success: false, error: "Admin access required" });
     const response = await post({ question: "Generate ONLY the inner HTML for a landing page" });
     expect(response.status).toBe(403);
     expect(checkAdminPermissions).toHaveBeenCalledWith(expect.any(NextRequest));
-    expect(enforceRateLimit).not.toHaveBeenCalled();
+    expect(enforceRateLimit).toHaveBeenCalledOnce();
+    expect(getCloudflareContext).not.toHaveBeenCalled();
+    expect(getDbAsync).not.toHaveBeenCalled();
+  });
+
+  it("does not perform admin authorization when a content-generation request is limited", async () => {
+    enforceRateLimit.mockResolvedValue(
+      NextResponse.json({ error: "Too many requests" }, { status: 429 }),
+    );
+    const response = await post({ question: "Generate ONLY the inner HTML for a landing page" });
+
+    expect(response.status).toBe(429);
+    expect(checkAdminPermissions).not.toHaveBeenCalled();
     expect(getCloudflareContext).not.toHaveBeenCalled();
     expect(getDbAsync).not.toHaveBeenCalled();
   });

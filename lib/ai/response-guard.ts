@@ -1,36 +1,15 @@
 import type { CanonicalFacts } from "@/lib/ai/canonical-facts";
+import { parse as parseDomain } from "tldts";
 
 const MAX_GUARDED_REPLY_CHARS = 8_000;
-
-const BARE_DOMAIN_TLDS = [
-  "com", "net", "org", "edu", "gov", "int", "mil", "info", "biz", "name",
-  "io", "co", "ai", "app", "dev", "us", "uk", "ca", "au", "de", "fr", "es",
-  "it", "nl", "se", "no", "jp", "cn", "in", "br", "mx", "eu", "me", "tv",
-  "cc", "ly", "sh", "gg", "to", "fm", "am", "at", "be", "ch", "cz", "dk",
-  "fi", "gr", "hk", "ie", "il", "kr", "nz", "pl", "pt", "ro", "ru", "sg",
-  "za", "shop", "store", "online", "site", "website", "web", "xyz", "top",
-  "club", "life", "live", "world", "today", "email", "help", "support", "care",
-  "health", "beauty", "spa", "tea", "organic", "green", "eco", "natural",
-  "shopping", "market", "buy", "sale", "deals", "gift", "gifts", "brand",
-  "company", "global", "group", "team", "agency", "services", "solutions",
-  "digital", "media", "news", "blog", "page", "link", "click", "one", "now",
-  "cloud", "tech", "technology", "software", "systems", "network", "computer",
-  "tools", "space", "art", "design", "fashion", "style", "boutique", "photo",
-  "photography", "museum", "travel", "pro", "mobi", "jobs", "aero", "asia",
-  "cat", "coop", "tel", "finance", "financial", "money", "law", "legal",
-  "lawyer", "doctor", "clinic", "dental", "insurance", "pharmacy", "social",
-  "community", "foundation", "church", "events", "works", "expert", "tips",
-  "center", "international", "capital", "ventures", "academy", "education",
-  "school", "coffee", "restaurant", "food", "farm", "pet", "pets", "zone",
-].join("|");
 
 const CONTACT_PATTERN = new RegExp(
   [
     "(?<email>(?:mailto:)?[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,})",
-    "(?<url>(?:https?://|www\\.|//)[^\\s<>()\\[\\]\\\"'`]+)",
-    `(?<bare>(?:[A-Z0-9-]+\\.)+(?:${BARE_DOMAIN_TLDS})\\b(?:/[^\\s<>()\\[\\]"'\`]*)?)`,
+    "(?<url>(?:https?://|www\\.|//)[^\\s<>()\\[\\]\\x22'`]+)",
+    "(?<bare>(?:(?:[A-Z0-9\\p{L}\\p{N}-]+\\.)+(?:XN--[A-Z0-9-]{2,59}|[A-Z\\p{L}]{2,63})|(?:\\d{1,3}\\.){3}\\d{1,3}|\\[[0-9A-F:]+\\])(?:/[^\\s<>()\\[\\]\\x22'`]*)?)",
   ].join("|"),
-  "gi",
+  "giu",
 );
 
 const TRAILING_PUNCTUATION = /[.,;:!?]+$/;
@@ -49,12 +28,6 @@ function safeFallback(facts: CanonicalFacts): string {
   return facts.supportEmail
     ? `I couldn't safely format that response. Please contact ${facts.supportEmail}.`
     : "I couldn't safely format that response. Please try again.";
-}
-
-function isLikelyBareDomain(token: string): boolean {
-  const host = token.split(/[/?#]/)[0];
-  const tld = host.slice(host.lastIndexOf(".") + 1);
-  return !/^[A-Z][a-z]+$/.test(tld);
 }
 
 function normalizedEmail(value: string): string {
@@ -114,6 +87,21 @@ function isAllowedDestination(token: string, facts: CanonicalFacts): boolean {
   return !EMBEDDED_DESTINATION.test(remainder);
 }
 
+function isRecognizedBareDestination(token: string): boolean {
+  const destination = parsedDestination(token);
+  if (!destination) return false;
+  const parsed = parseDomain(destination.hostname, {
+    allowPrivateDomains: true,
+    detectIp: true,
+    validateHostname: true,
+  });
+  return parsed.isIp === true || (
+    parsed.domain !== null
+    && parsed.publicSuffix !== null
+    && (parsed.isIcann === true || parsed.isPrivate === true)
+  );
+}
+
 function replacementSite(facts: CanonicalFacts): string {
   return facts.siteUrl ?? "the store website";
 }
@@ -160,8 +148,8 @@ export function guardAssistantReply(reply: unknown, facts: CanonicalFacts): Guar
         return `${mailto && facts.supportEmail ? "mailto:" : ""}${replacement}${trailing}`;
       }
 
-      if (groups?.bare !== undefined && !isLikelyBareDomain(token)) return rawMatch;
       if (isAllowedDestination(token, facts)) return rawMatch;
+      if (groups?.bare !== undefined && !isRecognizedBareDestination(token)) return rawMatch;
       replacementCount += 1;
       replacementKinds.push("url");
       return `${replacementSite(facts)}${trailing}`;

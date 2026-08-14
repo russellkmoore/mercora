@@ -7,7 +7,7 @@
  *
  * === Features ===
  * - **Store Configuration**: Basic store information, currency, and policies
- * - **AI Assistant Settings**: Volt personality, response style, and features
+ * - **AI Assistant Settings**: Assistant behavior, response style, and features
  * - **System Configuration**: Debug mode, maintenance, and performance settings
  * - **Vector Index Management**: Reindex products and knowledge base
  * - **Real-time Updates**: Live status indicators and save confirmations
@@ -15,7 +15,7 @@
  *
  * === Settings Categories ===
  * - **Store Settings**: Store name, contact info, currency, tax rates
- * - **AI Settings**: Volt personality mode, response length, personalization
+ * - **AI Settings**: Assistant behavior, response length, personalization
  * - **System Settings**: Debug mode, maintenance mode, analytics, notifications
  *
  * === AI Configuration Options ===
@@ -60,6 +60,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { RecommendationSettingsCard } from "@/components/admin/RecommendationSettingsCard";
+import { useStoreConfig } from "@/lib/store";
 import { 
   Settings, Store, Bot, Mail, Database, 
   RefreshCw, Save, Globe, DollarSign,
@@ -123,6 +124,7 @@ interface VectorIndexStatus {
 }
 
 export default function AdminSettingsPage() {
+  const store = useStoreConfig();
   const [activeTab, setActiveTab] = useState<"system" | "store" | "shipping" | "refunds" | "promotions" | "social" | "admins">("system");
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -161,7 +163,7 @@ export default function AdminSettingsPage() {
   const [promotionSettings, setPromotionSettings] = useState<PromotionSettings>({
     site_wide_discount_percent: 0,
     banner_enabled: false,
-    banner_text: '🎉 Free shipping on orders over $75!',
+    banner_text: 'Free shipping is available on qualifying orders!',
     banner_type: 'info',
     new_customer_discount: 0
   });
@@ -598,7 +600,7 @@ export default function AdminSettingsPage() {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Free Shipping Threshold ($)</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Free Shipping Threshold ({store.commerce.currency})</label>
                 <Input
                   type="number"
                   value={storeSettings.free_shipping_threshold}
@@ -653,15 +655,15 @@ export default function AdminSettingsPage() {
               <div className="mt-3 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Store Name:</span>
-                  <span className="text-white font-medium">Voltique</span>
+                  <span className="text-white font-medium">{store.identity.name}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Currency:</span>
-                  <span className="text-white font-medium">USD</span>
+                  <span className="text-white font-medium">{store.commerce.currency}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Contact:</span>
-                  <span className="text-white font-medium">hello@voltique.com</span>
+                  <span className="text-white font-medium">{store.contact.supportEmail}</span>
                 </div>
               </div>
             </div>
@@ -695,7 +697,7 @@ export default function AdminSettingsPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Cost ($)</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Cost ({store.commerce.currency})</label>
                       <Input
                         type="number"
                         step="0.01"
