@@ -5,6 +5,9 @@ import { Money, type StoredMoney } from "../../../lib/money/money.js";
 import { sanitizeRichHtmlServer } from "../../../lib/utils/sanitize-html-core.js";
 
 export const SHOPIFY_PROVIDER = "shopify";
+/** Stable persistence fallback when Shopify provides no usable source timestamp. */
+export const UNKNOWN_SOURCE_TIMESTAMP = "1970-01-01T00:00:00.000Z";
+export const UNKNOWN_SOURCE_UNIX_TIMESTAMP = 0;
 
 // Kept identical to the O02 public CMS route reservation contract.
 const RESERVED_PAGE_SLUGS = new Set([

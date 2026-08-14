@@ -71,6 +71,23 @@ describe("blog transform", () => {
     expect(result.skipped[0].reason).toBe("Article references a blog that was not imported");
   });
 
+  it("keeps persisted rows identical across run clocks when source timestamps are unavailable", () => {
+    const blogs = [{ id: 1, title: "News", handle: "news" }];
+    const articles = [{
+      id: 2,
+      blog_id: 1,
+      title: "Stable",
+      handle: "stable",
+      body_html: "<p>Stable</p>",
+    }];
+    const first = transformBlogContent(blogs, articles, { ...options, generatedAt: "2026-01-01T00:00:00Z" });
+    const second = transformBlogContent(blogs, articles, { ...options, generatedAt: "2027-01-01T00:00:00Z" });
+    expect(first.categories).toEqual(second.categories);
+    expect(first.records).toEqual(second.records);
+    expect(first.categories[0].record).toMatchObject({ created_at: 0, updated_at: 0 });
+    expect(first.records[0].record).toMatchObject({ created_at: 0, updated_at: 0 });
+  });
+
   it("strips unapproved blog media instead of persisting remote sources", () => {
     const result = transformBlogContent(
       [{ id: 1, title: "News", handle: "news" }],

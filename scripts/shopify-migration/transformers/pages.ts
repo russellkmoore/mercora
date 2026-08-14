@@ -2,6 +2,7 @@ import type { ShopifyPage } from "../lib/types.js";
 import { deterministicProviderId, providerFingerprint } from "../lib/ids.js";
 import {
   SHOPIFY_PROVIDER,
+  UNKNOWN_SOURCE_UNIX_TIMESTAMP,
   excerptFromHtml,
   fitsEscapedSqlText,
   isReservedPageSlug,
@@ -74,8 +75,7 @@ export function transformPages(
   pages: readonly ShopifyPage[],
   options: PageTransformOptions,
 ): PureTransformResult<ShopifyPage, PageTransformRecord> {
-  const generatedAtIso = requiredMigrationTime(options.generatedAt);
-  const generatedAt = unixTimestamp(generatedAtIso)!;
+  requiredMigrationTime(options.generatedAt);
   const actorId = options.actorId.trim();
   const allowedMediaHosts = mediaHostAllowlist(options.allowedMediaHosts);
   if (!actorId || actorId.length > 255) throw new TypeError("actorId must be 1-255 characters for page version attribution");
@@ -121,8 +121,8 @@ export function transformPages(
     if (source.published_at && publishedAt === null) {
       warnings.push(`Page ${sourceFingerprint} has an invalid publication time and was imported as draft`);
     }
-    const createdAt = unixTimestamp(source.created_at) ?? generatedAt;
-    const updatedAt = unixTimestamp(source.updated_at) ?? generatedAt;
+    const createdAt = unixTimestamp(source.created_at) ?? UNKNOWN_SOURCE_UNIX_TIMESTAMP;
+    const updatedAt = unixTimestamp(source.updated_at) ?? UNKNOWN_SOURCE_UNIX_TIMESTAMP;
     const excerpt = excerptFromHtml(html);
     const page: PageInsertRecord = {
       title,

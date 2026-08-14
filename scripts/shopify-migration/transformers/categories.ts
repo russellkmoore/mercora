@@ -2,6 +2,7 @@ import type { ShopifyCollection } from "../lib/types.js";
 import { deterministicProviderId, providerFingerprint } from "../lib/ids.js";
 import {
   SHOPIFY_PROVIDER,
+  UNKNOWN_SOURCE_TIMESTAMP,
   boundedPositiveInteger,
   clampInventory,
   excerptFromHtml,
@@ -53,7 +54,7 @@ export function transformCollections(
   collections: readonly ShopifyCollection[],
   options: CategoryTransformOptions,
 ): PureTransformResult<ShopifyCollection, CategoryTransformRecord> {
-  const generatedAt = requiredMigrationTime(options.generatedAt);
+  requiredMigrationTime(options.generatedAt);
   const allowedMediaHosts = mediaHostAllowlist(options.allowedMediaHosts);
   const records: CategoryTransformRecord[] = [];
   const idMap = new Map<string, string>();
@@ -130,8 +131,8 @@ export function transformCollections(
         external_references: JSON.stringify({
           shopify_fingerprint: providerFingerprint(SHOPIFY_PROVIDER, "category", sourceId),
         }),
-        created_at: isoTimestamp(collection.published_at, generatedAt),
-        updated_at: isoTimestamp(collection.updated_at, generatedAt),
+        created_at: isoTimestamp(collection.published_at, UNKNOWN_SOURCE_TIMESTAMP),
+        updated_at: isoTimestamp(collection.updated_at, UNKNOWN_SOURCE_TIMESTAMP),
         children: "[]",
         product_count: clampInventory(collection.products_count),
         attributes: "{}",

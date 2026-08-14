@@ -3,6 +3,7 @@ import type { ShopifyArticle, ShopifyBlog } from "../lib/types.js";
 import { deterministicProviderId, providerFingerprint } from "../lib/ids.js";
 import {
   SHOPIFY_PROVIDER,
+  UNKNOWN_SOURCE_UNIX_TIMESTAMP,
   boundedPositiveInteger,
   excerptFromHtml,
   fitsEscapedSqlText,
@@ -82,7 +83,7 @@ export function transformBlogContent(
   articles: readonly ShopifyArticle[],
   options: BlogTransformOptions,
 ): BlogTransformResult {
-  const generatedAt = unixTimestamp(requiredMigrationTime(options.generatedAt))!;
+  requiredMigrationTime(options.generatedAt);
   const actorId = options.actorId.trim();
   const fallbackAuthor = options.fallbackAuthor.trim();
   const allowedMediaHosts = mediaHostAllowlist(options.allowedMediaHosts);
@@ -125,8 +126,8 @@ export function transformBlogContent(
         name,
         slug,
         description: null,
-        created_at: unixTimestamp(blog.created_at) ?? generatedAt,
-        updated_at: unixTimestamp(blog.updated_at) ?? generatedAt,
+        created_at: unixTimestamp(blog.created_at) ?? UNKNOWN_SOURCE_UNIX_TIMESTAMP,
+        updated_at: unixTimestamp(blog.updated_at) ?? UNKNOWN_SOURCE_UNIX_TIMESTAMP,
       },
       conflict: { strategy: "insert-only", key: "slug", onConflict: "reuse" },
     });
@@ -222,8 +223,8 @@ export function transformBlogContent(
         meta_title: title,
         meta_description: summary,
         published_at: status === "published" ? publishedAt : null,
-        created_at: unixTimestamp(article.created_at) ?? generatedAt,
-        updated_at: unixTimestamp(article.updated_at) ?? generatedAt,
+        created_at: unixTimestamp(article.created_at) ?? UNKNOWN_SOURCE_UNIX_TIMESTAMP,
+        updated_at: unixTimestamp(article.updated_at) ?? UNKNOWN_SOURCE_UNIX_TIMESTAMP,
         created_by: actorId,
         updated_by: actorId,
       },
