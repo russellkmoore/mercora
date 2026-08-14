@@ -119,6 +119,7 @@ export default async function PublicPage({ params }: PageProps) {
       privacyUrl={store.urls.privacy}
       termsUrl={store.urls.terms}
       returnsUrl={store.urls.returns}
+      returnsConfigured={store.urls.returnsConfigured}
     />
   );
 }

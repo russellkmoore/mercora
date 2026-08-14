@@ -42,6 +42,7 @@ export type StoreConfig = {
     privacy: string;
     terms: string;
     returns: string;
+    returnsConfigured: boolean;
   };
   persistence: {
     namespace: string;
@@ -97,6 +98,7 @@ export const storeDefaults: StoreConfig = {
     privacy: "/privacy-policy",
     terms: "/terms-of-service",
     returns: "/returns",
+    returnsConfigured: false,
   },
   persistence: {
     namespace: "mercora",
@@ -340,6 +342,10 @@ function parseCarrierDefinitions(value: string | undefined): readonly StoreCarri
 export function resolveStoreConfig(env: Environment = {}): StoreConfig {
   const name = text(env, "NEXT_PUBLIC_STORE_NAME", storeDefaults.identity.name);
   const supportEmail = text(env, "STORE_SUPPORT_EMAIL", storeDefaults.contact.supportEmail);
+  const rawReturnsUrl = env.NEXT_PUBLIC_RETURNS_URL?.trim();
+  const returnsUrl = policyUrl(env, "NEXT_PUBLIC_RETURNS_URL", storeDefaults.urls.returns);
+  const returnsConfigured = Boolean(rawReturnsUrl)
+    && (returnsUrl !== storeDefaults.urls.returns || rawReturnsUrl === storeDefaults.urls.returns);
 
   return {
     ...storeDefaults,
@@ -366,7 +372,8 @@ export function resolveStoreConfig(env: Environment = {}): StoreConfig {
       clerkHost: optionalHttpsUrl(env, "NEXT_PUBLIC_CLERK_HOST"),
       privacy: policyUrl(env, "NEXT_PUBLIC_PRIVACY_URL", storeDefaults.urls.privacy),
       terms: policyUrl(env, "NEXT_PUBLIC_TERMS_URL", storeDefaults.urls.terms),
-      returns: policyUrl(env, "NEXT_PUBLIC_RETURNS_URL", storeDefaults.urls.returns),
+      returns: returnsUrl,
+      returnsConfigured,
     },
     persistence: {
       ...storeDefaults.persistence,

@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { blogErrorStatus, isPlainObject, parseBlogId, parseBlogStatus, parseOffset, parsePositiveInt } from "@/lib/blog/http";
+import { blogErrorStatus, isPlainObject, parseBlogId, parseBlogPage, parseBlogStatus, parseOffset, parsePositiveInt } from "@/lib/blog/http";
 
 describe("Blog HTTP validation", () => {
   it("bounds pagination and IDs", () => {
     expect(parsePositiveInt("999", 20, 100)).toBe(100);
     expect(parsePositiveInt("-1", 20, 100)).toBe(20);
     expect(parseOffset("99999")).toBe(10_000);
+    expect(parseBlogPage("9999")).toBe(417);
+    expect(parseBlogPage("not-a-page")).toBe(1);
     expect(parseBlogId("01")).toBe(1);
     expect(parseBlogId("1x")).toBeNull();
   });

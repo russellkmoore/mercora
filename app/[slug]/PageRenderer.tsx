@@ -23,6 +23,7 @@ type PageRendererProps = {
   privacyUrl: string;
   termsUrl: string;
   returnsUrl: string;
+  returnsConfigured: boolean;
 };
 
 export default async function PageRenderer({
@@ -35,9 +36,10 @@ export default async function PageRenderer({
   privacyUrl,
   termsUrl,
   returnsUrl,
+  returnsConfigured,
 }: PageRendererProps) {
   const template = resolveTemplate(page.template, {
-    storeName, assistantName, supportEmail, privacyUrl, termsUrl, returnsUrl,
+    storeName, assistantName, supportEmail, privacyUrl, termsUrl, returnsUrl, returnsConfigured,
   });
   const sanitized = sanitizePageHtmlServer(page.content, { allowedImageOrigin });
   const parsed = parsePageHtml(sanitized, {

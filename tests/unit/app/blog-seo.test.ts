@@ -62,6 +62,17 @@ describe("Blog SEO surfaces", () => {
     ]);
   });
 
+  it("retains healthy sitemap sources when one content query fails", async () => {
+    mocks.getSitemapCatalogEntries.mockRejectedValue(new Error("catalog unavailable"));
+    mocks.getPublishedPages.mockResolvedValue([{ slug: "about", updated_at: 100 }]);
+    mocks.getPublishedBlogSitemapEntries.mockResolvedValue([{ slug: "launch", updatedAt: 100 }]);
+
+    expect((await sitemap()).map(({ url }) => url)).toEqual(expect.arrayContaining([
+      "https://store.example.test/about",
+      "https://store.example.test/blog/launch",
+    ]));
+  });
+
   it("serves escaped RSS with explicit content and cache headers", async () => {
     mocks.getPublishedBlogPosts.mockResolvedValue([{
       id: 1, title: "A & B", slug: "a-b", author: "Writer", excerpt: null, tags: [],

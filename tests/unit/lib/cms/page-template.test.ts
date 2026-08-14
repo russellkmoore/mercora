@@ -8,6 +8,7 @@ const context = {
   privacyUrl: "/privacy",
   termsUrl: "/terms",
   returnsUrl: "/returns",
+  returnsConfigured: false,
 };
 
 describe("page template registry", () => {
@@ -24,7 +25,9 @@ describe("page template registry", () => {
     expect(guide.cta?.actions).toContainEqual(expect.objectContaining({ href: "/" }));
     const legal = resolveTemplate("legal", context);
     expect(legal.cta?.policyLinks.map(({ href }) => href)).toEqual(["/privacy", "/terms"]);
-    expect(resolveTemplate("legal", { ...context, returnsUrl: "/refund-policy" })
+    expect(resolveTemplate("legal", { ...context, returnsUrl: "/returns", returnsConfigured: true })
+      .cta?.policyLinks.map(({ href }) => href)).toEqual(["/returns", "/privacy", "/terms"]);
+    expect(resolveTemplate("legal", { ...context, returnsUrl: "/refund-policy", returnsConfigured: true })
       .cta?.policyLinks.map(({ href }) => href)).toEqual(["/refund-policy", "/privacy", "/terms"]);
   });
 
