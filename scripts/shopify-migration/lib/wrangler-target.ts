@@ -141,7 +141,7 @@ export function resolveMediaTarget(config: WranglerConfig, options: WranglerTarg
 
 export function resolveDatabaseTarget(config: WranglerConfig, options: WranglerTargetOptions): {
   databaseName: string;
-  databaseId: string;
+  databaseId?: string;
   target: WranglerTarget;
   environment?: string;
 } {
@@ -149,7 +149,14 @@ export function resolveDatabaseTarget(config: WranglerConfig, options: WranglerT
   const databaseName = requiredName(binding.database_name, "DB database_name");
   const databaseId = options.target === "preview"
     ? requiredName(binding.preview_database_id, "DB preview_database_id")
-    : requiredName(binding.database_id, "DB database_id");
+    : options.target === "production"
+      ? requiredName(binding.database_id, "DB database_id")
+      : undefined;
   assertExpected(databaseName, options.expectedName, "DB database");
-  return { databaseName, databaseId, target: options.target, ...(options.environment ? { environment: options.environment } : {}) };
+  return {
+    databaseName,
+    ...(databaseId ? { databaseId } : {}),
+    target: options.target,
+    ...(options.environment ? { environment: options.environment } : {}),
+  };
 }

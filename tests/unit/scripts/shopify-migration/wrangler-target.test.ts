@@ -44,6 +44,15 @@ describe("canonical Wrangler migration targets", () => {
     }`);
     expect(() => resolveMediaTarget(noPreview, { target: "preview" })).toThrow("preview_bucket_name");
     expect(() => resolveDatabaseTarget(noPreview, { target: "preview" })).toThrow("preview_database_id");
+    expect(resolveDatabaseTarget(noPreview, { target: "local" })).toEqual({
+      databaseName: "store-db",
+      target: "local",
+    });
+    const nameOnly = parseWranglerJsonc(`{
+      "d1_databases": [{ "binding": "DB", "database_name": "local-db" }]
+    }`);
+    expect(resolveDatabaseTarget(nameOnly, { target: "local" })).toEqual({ databaseName: "local-db", target: "local" });
+    expect(() => resolveDatabaseTarget(nameOnly, { target: "production" })).toThrow("database_id");
   });
 
   it("treats an operator resource name only as an exact assertion", () => {
