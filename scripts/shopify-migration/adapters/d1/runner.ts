@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { isAbsolute, join } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
 import type { ExecutionPlan } from "../../lib/config.js";
 import type { AppliedMediaImportResult } from "../media/index.js";
@@ -30,6 +30,26 @@ export interface CommandRunner {
   run(file: string, args: readonly string[]): Promise<CommandResult>;
 }
 
+export interface SpawnedCommand {
+  stdout: { on(event: "data", listener: (chunk: Buffer) => void): unknown };
+  stderr: { on(event: "data", listener: (chunk: Buffer) => void): unknown };
+  once(event: "error", listener: () => void): unknown;
+  once(event: "close", listener: (code: number | null) => void): unknown;
+  kill(signal?: NodeJS.Signals): boolean;
+}
+
+export type SpawnCommand = (
+  file: string,
+  args: readonly string[],
+  options: { shell: false; stdio: ["ignore", "pipe", "pipe"] },
+) => SpawnedCommand;
+
+export interface NodeCommandRunnerOptions {
+  timeoutMs?: number;
+  killGraceMs?: number;
+  spawnCommand?: SpawnCommand;
+}
+
 export interface PrivateSqlFiles {
   createDirectory(): Promise<string>;
   write(directory: string, filename: string, contents: string): Promise<string>;
@@ -43,6 +63,8 @@ export interface RunD1ImportOptions {
   execution: ExecutionPlan;
   wranglerConfigText: string;
   wranglerConfigPath: string;
+  /** Explicit project-local binary; the runner never invokes npx or downloads tools. */
+  wranglerExecutablePath: string;
   wranglerEnvironment?: string;
   expectedDatabaseName?: string;
   mediaEvidence?: readonly D1MediaEvidence[];
@@ -168,21 +190,83 @@ const PREFLIGHT_EXPECTED: Readonly<Record<string, number>> = {
 };
 
 const OUTPUT_LIMIT = 1024 * 1024;
+export const DEFAULT_WRANGLER_TIMEOUT_MS = 120_000;
+export const MAX_WRANGLER_TIMEOUT_MS = 15 * 60_000;
+export const DEFAULT_WRANGLER_KILL_GRACE_MS = 5_000;
+export const MAX_WRANGLER_KILL_GRACE_MS = 30_000;
+
+function boundedMilliseconds(
+  value: number | undefined,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+  name: string,
+): number {
+  const resolved = value ?? fallback;
+  if (!Number.isSafeInteger(resolved) || resolved < minimum || resolved > maximum) {
+    throw new RangeError(`${name} must be an integer between ${minimum} and ${maximum}`);
+  }
+  return resolved;
+}
 
 /** A bounded no-shell backend. It is never selected implicitly by the runner. */
-export function createNodeCommandRunner(): CommandRunner {
+export function createNodeCommandRunner(options: NodeCommandRunnerOptions = {}): CommandRunner {
+  const timeoutMs = boundedMilliseconds(
+    options.timeoutMs,
+    DEFAULT_WRANGLER_TIMEOUT_MS,
+    1_000,
+    MAX_WRANGLER_TIMEOUT_MS,
+    "timeoutMs",
+  );
+  const killGraceMs = boundedMilliseconds(
+    options.killGraceMs,
+    DEFAULT_WRANGLER_KILL_GRACE_MS,
+    100,
+    MAX_WRANGLER_KILL_GRACE_MS,
+    "killGraceMs",
+  );
+  const spawnCommand: SpawnCommand = options.spawnCommand ?? ((file, args, spawnOptions) =>
+    spawn(file, [...args], spawnOptions) as SpawnedCommand);
   return {
     run(file, args) {
       return new Promise((resolve, reject) => {
-        const child = spawn(file, [...args], { shell: false, stdio: ["ignore", "pipe", "pipe"] });
+        let child: SpawnedCommand;
+        try {
+          child = spawnCommand(file, args, { shell: false, stdio: ["ignore", "pipe", "pipe"] });
+        } catch {
+          reject(new Error("Wrangler process could not be started"));
+          return;
+        }
         let stdout = "";
         let stderr = "";
-        let overflow = false;
+        let settled = false;
+        let terminationReason: "timeout" | "overflow" | undefined;
+        let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
+        let timeoutTimer: ReturnType<typeof setTimeout>;
+        const finish = (result: CommandResult | Error): void => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutTimer);
+          if (forceKillTimer) clearTimeout(forceKillTimer);
+          if (result instanceof Error) reject(result);
+          else resolve(result);
+        };
+        const terminate = (reason: "timeout" | "overflow"): void => {
+          if (settled || terminationReason) return;
+          terminationReason = reason;
+          try { child.kill("SIGTERM"); } catch { /* continue to the bounded hard-stop */ }
+          forceKillTimer = setTimeout(() => {
+            if (settled) return;
+            try { child.kill("SIGKILL"); } catch { /* rejection below remains generic */ }
+            finish(new Error(reason === "timeout" ? "Wrangler command timed out" : "Wrangler output exceeded the safety limit"));
+          }, killGraceMs);
+        };
+        timeoutTimer = setTimeout(() => terminate("timeout"), timeoutMs);
         const append = (target: "stdout" | "stderr", chunk: Buffer): void => {
+          if (settled || terminationReason) return;
           const current = target === "stdout" ? stdout : stderr;
           if (Buffer.byteLength(current, "utf8") + chunk.byteLength > OUTPUT_LIMIT) {
-            overflow = true;
-            child.kill();
+            terminate("overflow");
             return;
           }
           if (target === "stdout") stdout += chunk.toString("utf8");
@@ -190,10 +274,17 @@ export function createNodeCommandRunner(): CommandRunner {
         };
         child.stdout.on("data", (chunk: Buffer) => append("stdout", chunk));
         child.stderr.on("data", (chunk: Buffer) => append("stderr", chunk));
-        child.once("error", () => reject(new Error("Wrangler process could not be started")));
+        child.once("error", () => finish(new Error(
+          terminationReason === "timeout" ? "Wrangler command timed out"
+            : terminationReason === "overflow" ? "Wrangler output exceeded the safety limit"
+              : "Wrangler process could not be started",
+        )));
         child.once("close", (code) => {
-          if (overflow) reject(new Error("Wrangler output exceeded the safety limit"));
-          else resolve({ exitCode: code ?? -1, stdout, stderr });
+          if (terminationReason) {
+            finish(new Error(
+              terminationReason === "timeout" ? "Wrangler command timed out" : "Wrangler output exceeded the safety limit",
+            ));
+          } else finish({ exitCode: code ?? -1, stdout, stderr });
         });
       });
     },
@@ -232,7 +323,7 @@ function baseArgs(
   environment: string | undefined,
 ): string[] {
   return [
-    "wrangler", "d1", "execute", databaseName,
+    "d1", "execute", databaseName,
     ...targetArgs(target),
     "--config", configPath,
     ...(environment ? ["--env", environment] : []),
@@ -307,11 +398,12 @@ function assertMediaEvidence(paths: readonly string[], evidence: readonly D1Medi
 
 async function checkedRun(
   commandRunner: CommandRunner,
+  executable: string,
   args: readonly string[],
   stage: "preflight" | "chunk" | "validation",
 ): Promise<CommandResult> {
   try {
-    const result = await commandRunner.run("npx", args);
+    const result = await commandRunner.run(executable, args);
     if (result.exitCode !== 0) throw new Error("nonzero");
     return result;
   } catch {
@@ -325,6 +417,14 @@ export async function runD1Import(options: RunD1ImportOptions): Promise<D1DryRun
   if (!options.wranglerConfigPath || options.wranglerConfigPath.startsWith("-") ||
       options.wranglerConfigPath.length > 4_096 || /[\0\r\n]/.test(options.wranglerConfigPath)) {
     throw new Error("Wrangler config path is invalid");
+  }
+  const executableName = basename(options.wranglerExecutablePath ?? "");
+  const expectedExecutableDirectory = join(dirname(resolve(options.wranglerConfigPath)), "node_modules", ".bin");
+  if (!isAbsolute(options.wranglerExecutablePath ?? "") ||
+      (executableName !== "wrangler" && executableName !== "wrangler.cmd") ||
+      dirname(options.wranglerExecutablePath) !== expectedExecutableDirectory ||
+      options.wranglerExecutablePath.length > 4_096 || /[\0\r\n]/.test(options.wranglerExecutablePath)) {
+    throw new Error("Local Wrangler executable path is invalid");
   }
   const wranglerConfig = parseWranglerJsonc(options.wranglerConfigText);
   const target = resolveDatabaseTarget(wranglerConfig, {
@@ -350,6 +450,7 @@ export async function runD1Import(options: RunD1ImportOptions): Promise<D1DryRun
 
   const preflight = await checkedRun(
     options.commandRunner,
+    options.wranglerExecutablePath,
     [...commandBase, "--command", D1_PREFLIGHT_SQL],
     "preflight",
   );
@@ -362,7 +463,7 @@ export async function runD1Import(options: RunD1ImportOptions): Promise<D1DryRun
     directory = await files.createDirectory();
     for (let index = 0; index < plan.chunks.length; index += 1) {
       const path = await files.write(directory, `${String(index + 1).padStart(4, "0")}-chunk.sql`, plan.chunks[index]);
-      await checkedRun(options.commandRunner, [...commandBase, "--file", path], "chunk");
+      await checkedRun(options.commandRunner, options.wranglerExecutablePath, [...commandBase, "--file", path], "chunk");
     }
     for (let index = 0; index < plan.validation.length; index += 1) {
       const unit = plan.validation[index];
@@ -371,7 +472,12 @@ export async function runD1Import(options: RunD1ImportOptions): Promise<D1DryRun
         `${String(index + 1).padStart(4, "0")}-validation.sql`,
         `${unit.sql}\n`,
       );
-      const result = await checkedRun(options.commandRunner, [...commandBase, "--file", path], "validation");
+      const result = await checkedRun(
+        options.commandRunner,
+        options.wranglerExecutablePath,
+        [...commandBase, "--file", path],
+        "validation",
+      );
       try { assertValidation(result.stdout); } catch { throw new Error("D1 validation failed"); }
     }
   } catch (error) {

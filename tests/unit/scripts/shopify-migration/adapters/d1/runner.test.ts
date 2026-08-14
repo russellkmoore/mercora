@@ -1,12 +1,16 @@
+import { EventEmitter } from "node:events";
 import { stat } from "node:fs/promises";
+import { join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
 import {
   createPrivateSqlFiles,
+  createNodeCommandRunner,
   runD1Import,
   type CommandRunner,
   type PrivateSqlFiles,
+  type SpawnCommand,
 } from "@/scripts/shopify-migration/adapters/d1/runner";
 import type { ExecutionPlan } from "@/scripts/shopify-migration/lib/config";
 
@@ -25,6 +29,7 @@ const validation = JSON.stringify([{ success: true, results: [{ expected_count: 
 const wrangler = JSON.stringify({
   d1_databases: [{ binding: "DB", database_name: "local-db", database_id: "prod-id", preview_database_id: "preview-id" }],
 });
+const wranglerExecutablePath = join(process.cwd(), "node_modules", ".bin", "wrangler");
 
 function execution(overrides: Partial<ExecutionPlan> = {}): ExecutionPlan {
   return {
@@ -70,7 +75,7 @@ describe("D1 runner", () => {
     const { files } = memoryFiles();
     const result = await runD1Import({
       input: input(), execution: execution(), wranglerConfigText: wrangler,
-      wranglerConfigPath: "wrangler.jsonc", commandRunner, privateFiles: files,
+      wranglerConfigPath: "wrangler.jsonc", wranglerExecutablePath, commandRunner, privateFiles: files,
     });
     expect(result.dryRun).toBe(true);
     expect(commandRunner.run).not.toHaveBeenCalled();
@@ -91,15 +96,17 @@ describe("D1 runner", () => {
       input: input(),
       execution: execution({ dryRun: false, apply: true, target: "preview", confirmedPreview: true }),
       wranglerConfigText: wrangler,
-      wranglerConfigPath: "/repo/wrangler.jsonc",
+      wranglerConfigPath: "wrangler.jsonc",
+      wranglerExecutablePath,
       commandRunner,
       privateFiles: files,
     });
     expect(result.dryRun).toBe(false);
     expect(events).toEqual(["preflight", "temp", "chunk", "validation"]);
     const calls = (commandRunner.run as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>;
-    expect(calls[0][0]).toBe("npx");
-    expect(calls[0][1]).toEqual(expect.arrayContaining(["wrangler", "d1", "execute", "local-db", "--remote", "--preview", "--config", "/repo/wrangler.jsonc", "--json", "--command"]));
+    expect(calls[0][0]).toBe(wranglerExecutablePath);
+    expect(calls[0][1]).toEqual(expect.arrayContaining(["d1", "execute", "local-db", "--remote", "--preview", "--config", "wrangler.jsonc", "--json", "--command"]));
+    expect(calls.flatMap((call) => call[1])).not.toContain("wrangler");
     expect(calls.flatMap((call) => call[1])).not.toContain("--yes");
     expect(files.cleanup).toHaveBeenCalledOnce();
   });
@@ -114,7 +121,7 @@ describe("D1 runner", () => {
       const { files } = memoryFiles();
       await expect(runD1Import({
         input: input(), execution: execution({ dryRun: false, apply: true }), wranglerConfigText: wrangler,
-        wranglerConfigPath: "wrangler.jsonc", commandRunner, privateFiles: files,
+        wranglerConfigPath: "wrangler.jsonc", wranglerExecutablePath, commandRunner, privateFiles: files,
       })).rejects.toThrow(/^D1 preflight failed$/);
       expect(files.createDirectory).not.toHaveBeenCalled();
     }
@@ -130,7 +137,7 @@ describe("D1 runner", () => {
     const { files } = memoryFiles();
     await expect(runD1Import({
       input: input(), execution: execution({ dryRun: false, apply: true }), wranglerConfigText: wrangler,
-      wranglerConfigPath: "wrangler.jsonc", commandRunner, privateFiles: files,
+      wranglerConfigPath: "wrangler.jsonc", wranglerExecutablePath, commandRunner, privateFiles: files,
     })).resolves.toMatchObject({ dryRun: false });
   });
 
@@ -138,11 +145,11 @@ describe("D1 runner", () => {
     const commandRunner: CommandRunner = { run: vi.fn() };
     await expect(runD1Import({
       input: input(), execution: execution({ dryRun: false, apply: true, overwrite: true }),
-      wranglerConfigText: wrangler, wranglerConfigPath: "wrangler.jsonc", commandRunner,
+      wranglerConfigText: wrangler, wranglerConfigPath: "wrangler.jsonc", wranglerExecutablePath, commandRunner,
     })).rejects.toThrow(/Overwrite apply/);
     await expect(runD1Import({
       input: { customers: [{ id: "user_12345678", type: "person" }] },
-      execution: execution(), wranglerConfigText: wrangler, wranglerConfigPath: "wrangler.jsonc", commandRunner,
+      execution: execution(), wranglerConfigText: wrangler, wranglerConfigPath: "wrangler.jsonc", wranglerExecutablePath, commandRunner,
     })).rejects.toThrow(/Sensitive rows/);
   });
 
@@ -155,7 +162,7 @@ describe("D1 runner", () => {
     })) };
     const common = {
       input: input(path), execution: execution({ dryRun: false, apply: true }), wranglerConfigText: wrangler,
-      wranglerConfigPath: "wrangler.jsonc", commandRunner,
+      wranglerConfigPath: "wrangler.jsonc", wranglerExecutablePath, commandRunner,
     };
     await expect(runD1Import({ ...common, mediaEvidence: [{ objectKey: "categories/owner/1.jpg", publicPath: path, status: "planned" } as never] }))
       .rejects.toThrow(/cryptographically verified/);
@@ -191,6 +198,7 @@ describe("D1 runner", () => {
       execution: execution({ dryRun: false, apply: true }),
       wranglerConfigText: wrangler,
       wranglerConfigPath: "wrangler.jsonc",
+      wranglerExecutablePath,
       commandRunner,
       privateFiles: files,
       planOptions: { maxChunkStatements: 3, maxChunkBytes: 1024 },
@@ -206,5 +214,132 @@ describe("D1 runner", () => {
     expect((await stat(path)).mode & 0o777).toBe(0o600);
     await files.cleanup(directory);
     await expect(stat(directory)).rejects.toThrow();
+  });
+
+  it("fails closed instead of invoking npx or an arbitrary executable", async () => {
+    const commandRunner: CommandRunner = { run: vi.fn() };
+    await expect(runD1Import({
+      input: input(), execution: execution(), wranglerConfigText: wrangler,
+      wranglerConfigPath: "wrangler.jsonc", wranglerExecutablePath: "npx", commandRunner,
+    })).rejects.toThrow(/Local Wrangler executable path/);
+    await expect(runD1Import({
+      input: input(), execution: execution(), wranglerConfigText: wrangler,
+      wranglerConfigPath: "wrangler.jsonc",
+      wranglerExecutablePath: "/tmp/unrelated/node_modules/.bin/wrangler",
+      commandRunner,
+    })).rejects.toThrow(/Local Wrangler executable path/);
+    expect(commandRunner.run).not.toHaveBeenCalled();
+  });
+
+  it("times out stalled processes with TERM, bounded KILL, and exactly-once settlement", async () => {
+    vi.useFakeTimers();
+    try {
+      const stdout = new EventEmitter();
+      const stderr = new EventEmitter();
+      const process = new EventEmitter() as EventEmitter & {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+        kill: ReturnType<typeof vi.fn>;
+      };
+      process.stdout = stdout;
+      process.stderr = stderr;
+      process.kill = vi.fn(() => true);
+      const spawnCommand = vi.fn(() => process) as unknown as SpawnCommand;
+      const runner = createNodeCommandRunner({ timeoutMs: 1_000, killGraceMs: 100, spawnCommand });
+      let settlements = 0;
+      const result = runner.run(wranglerExecutablePath, ["d1"]).then(
+        (value) => { settlements += 1; return value; },
+        (error: unknown) => { settlements += 1; throw error; },
+      );
+      const rejected = expect(result).rejects.toThrow(/^Wrangler command timed out$/);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(process.kill).toHaveBeenCalledWith("SIGTERM");
+      await vi.advanceTimersByTimeAsync(100);
+      expect(process.kill).toHaveBeenCalledWith("SIGKILL");
+      await rejected;
+      process.emit("error", new Error("late private error"));
+      process.emit("close", 1);
+      expect(settlements).toBe(1);
+      expect(spawnCommand).toHaveBeenCalledWith(
+        wranglerExecutablePath,
+        ["d1"],
+        { shell: false, stdio: ["ignore", "pipe", "pipe"] },
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not hard-kill after a timeout-close race and bounds timeout options", async () => {
+    vi.useFakeTimers();
+    try {
+      const process = new EventEmitter() as EventEmitter & {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+        kill: ReturnType<typeof vi.fn>;
+      };
+      process.stdout = new EventEmitter();
+      process.stderr = new EventEmitter();
+      process.kill = vi.fn(() => true);
+      const runner = createNodeCommandRunner({
+        timeoutMs: 1_000,
+        killGraceMs: 100,
+        spawnCommand: (() => process) as unknown as SpawnCommand,
+      });
+      const result = runner.run(wranglerExecutablePath, ["d1"]);
+      const rejected = expect(result).rejects.toThrow(/^Wrangler command timed out$/);
+      await vi.advanceTimersByTimeAsync(1_000);
+      process.emit("close", null);
+      await rejected;
+      await vi.advanceTimersByTimeAsync(200);
+      expect(process.kill).toHaveBeenCalledTimes(1);
+      expect(process.kill).toHaveBeenCalledWith("SIGTERM");
+      expect(() => createNodeCommandRunner({ timeoutMs: 999 })).toThrow(/timeoutMs/);
+      expect(() => createNodeCommandRunner({ killGraceMs: 31_000 })).toThrow(/killGraceMs/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("settles once when output overflow races process error and close", async () => {
+    const process = new EventEmitter() as EventEmitter & {
+      stdout: EventEmitter;
+      stderr: EventEmitter;
+      kill: ReturnType<typeof vi.fn>;
+    };
+    process.stdout = new EventEmitter();
+    process.stderr = new EventEmitter();
+    process.kill = vi.fn(() => true);
+    const runner = createNodeCommandRunner({
+      spawnCommand: (() => process) as unknown as SpawnCommand,
+    });
+    let settlements = 0;
+    const result = runner.run(wranglerExecutablePath, ["d1"]).then(
+      (value) => { settlements += 1; return value; },
+      (error: unknown) => { settlements += 1; throw error; },
+    );
+    const rejected = expect(result).rejects.toThrow(/^Wrangler output exceeded the safety limit$/);
+    process.stdout.emit("data", Buffer.alloc(1024 * 1024 + 1));
+    expect(process.kill).toHaveBeenCalledWith("SIGTERM");
+    process.emit("error", new Error("private overflow detail"));
+    process.emit("close", 1);
+    await rejected;
+    expect(settlements).toBe(1);
+  });
+
+  it("cleans private SQL after a command timeout", async () => {
+    let calls = 0;
+    const commandRunner: CommandRunner = { run: vi.fn(async (_file: string, args: readonly string[]) => {
+      calls += 1;
+      if (args.includes("--command")) return { exitCode: 0, stdout: preflight, stderr: "" };
+      throw new Error("Wrangler command timed out");
+    }) };
+    const { files } = memoryFiles();
+    await expect(runD1Import({
+      input: input(), execution: execution({ dryRun: false, apply: true }), wranglerConfigText: wrangler,
+      wranglerConfigPath: "wrangler.jsonc", wranglerExecutablePath, commandRunner, privateFiles: files,
+    })).rejects.toThrow(/^D1 chunk failed$/);
+    expect(calls).toBe(2);
+    expect(files.cleanup).toHaveBeenCalledOnce();
   });
 });
