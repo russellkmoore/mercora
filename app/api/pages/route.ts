@@ -7,6 +7,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getPublishedPages, getNavigationPages, searchPages } from "@/lib/models/pages";
+import { toPublicPage } from "@/lib/cms/public-page";
+
+function boundedLimit(value: string | null): number {
+  if (!value || !/^\d+$/.test(value)) return 10;
+  return Math.min(50, Math.max(1, Number(value)));
+}
 
 /**
  * GET /api/pages - Get published pages for public access
@@ -16,18 +22,21 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
     const navOnly = searchParams.get('nav_only') === 'true';
-    const limit = searchParams.get('limit');
+    const limit = boundedLimit(searchParams.get('limit'));
 
     // Handle search
     if (search) {
+      if (search.length > 100) {
+        return NextResponse.json({ success: false, error: "Search is too long" }, { status: 400 });
+      }
       const results = await searchPages(search, {
         includeUnpublished: false, // Only published pages for public
-        limit: limit ? parseInt(limit) : 10
+        limit,
       });
       
       return NextResponse.json({
         success: true,
-        data: results
+        data: results.map(toPublicPage)
       });
     }
 
@@ -36,7 +45,7 @@ export async function GET(request: NextRequest) {
       const pages = await getNavigationPages();
       return NextResponse.json({
         success: true,
-        data: pages
+        data: pages.map(toPublicPage)
       });
     }
 
@@ -45,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: pages
+      data: pages.map(toPublicPage)
     });
 
   } catch (error) {

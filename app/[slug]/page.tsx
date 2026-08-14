@@ -6,8 +6,9 @@
  */
 
 import { Metadata } from "next";
-import { notFound, redirect } from "next/navigation";
+import { notFound, redirect, unstable_rethrow } from "next/navigation";
 import { getPageBySlug } from "@/lib/models/pages";
+import { getCustomJsEnabled } from "@/lib/cms/custom-js-guard";
 import PageRenderer from "./PageRenderer";
 import { auth } from "@clerk/nextjs/server";
 import { getStoreConfig } from "@/lib/store-config";
@@ -54,10 +55,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   } catch (error) {
     console.error("Error generating page metadata:", error);
-    return {
-      title: "Page Not Found",
-      description: "The requested page could not be found.",
-    };
+    return { title: getStoreConfig().identity.name };
   }
 }
 
@@ -81,7 +79,7 @@ export async function generateStaticParams() {
 export default async function PublicPage({ params }: PageProps) {
   try {
     const { slug } = await params;
-    const page = await getPageBySlug(slug);
+    const page = await getPageBySlug(slug, false, { includeProtected: true });
     
     if (!page) {
       notFound();
@@ -98,10 +96,21 @@ export default async function PublicPage({ params }: PageProps) {
     }
 
     const store = getStoreConfig();
-    return <PageRenderer page={page} allowedImageOrigin={store.urls.imageCdn} />;
+    const customJsEnabled = await getCustomJsEnabled();
+    return (
+      <PageRenderer
+        page={page}
+        allowedImageOrigin={store.urls.imageCdn}
+        customJsEnabled={customJsEnabled}
+        storeName={store.identity.name}
+        supportEmail={store.contact.supportEmail}
+        assistantName={store.identity.assistantName}
+      />
+    );
     
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Error loading page:", error);
-    notFound();
+    throw error;
   }
 }

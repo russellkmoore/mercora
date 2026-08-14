@@ -5,7 +5,7 @@
  * Integrates with the existing Cloudflare D1/Drizzle ORM architecture.
  */
 
-import { desc, eq, and, or, isNull, count, like, inArray } from "drizzle-orm";
+import { desc, eq, and, or, isNull, lte, count, like, inArray } from "drizzle-orm";
 import { getDbAsync } from "@/lib/db";
 import { getStoreConfig } from "@/lib/store-config";
 import { sanitizePageHtmlServer } from "@/lib/utils/sanitize-html-server";
@@ -36,6 +36,7 @@ export async function getPages(options: {
   limit?: number;
   offset?: number;
   searchTerm?: string;
+  visibleAt?: number;
 } = {}): Promise<PageSelect[]> {
   const db = await getDbAsync();
   
@@ -49,6 +50,10 @@ export async function getPages(options: {
     } else {
       conditions.push(eq(pages.status, options.status));
     }
+  }
+
+  if (options.visibleAt !== undefined) {
+    conditions.push(or(isNull(pages.published_at), lte(pages.published_at, options.visibleAt)));
   }
   
   // Filter protected pages
@@ -82,10 +87,10 @@ export async function getPages(options: {
   
   // Apply pagination
   if (options.limit) {
-    query = query.limit(options.limit) as any;
+    query = query.limit(Math.min(100, Math.max(1, Math.trunc(options.limit)))) as any;
   }
   if (options.offset) {
-    query = query.offset(options.offset) as any;
+    query = query.offset(Math.min(10_000, Math.max(0, Math.trunc(options.offset)))) as any;
   }
   
   return query;
@@ -97,7 +102,8 @@ export async function getPages(options: {
 export async function getPublishedPages(): Promise<PageSelect[]> {
   return getPages({ 
     status: PAGE_STATUS.PUBLISHED, 
-    includeProtected: false 
+    includeProtected: false,
+    visibleAt: Math.floor(Date.now() / 1000),
   });
 }
 
@@ -108,7 +114,8 @@ export async function getNavigationPages(): Promise<PageSelect[]> {
   return getPages({ 
     status: PAGE_STATUS.PUBLISHED, 
     includeNavOnly: true,
-    includeProtected: false 
+    includeProtected: false,
+    visibleAt: Math.floor(Date.now() / 1000),
   });
 }
 
@@ -129,21 +136,24 @@ export async function getPageById(id: number): Promise<PageSelect | null> {
 /**
  * Get page by slug
  */
-export async function getPageBySlug(slug: string, includeUnpublished = false): Promise<PageSelect | null> {
+export async function getPageBySlug(
+  slug: string,
+  includeUnpublished = false,
+  options: { includeProtected?: boolean; now?: number } = {},
+): Promise<PageSelect | null> {
   const db = await getDbAsync();
-  
-  let query = db.select()
-    .from(pages)
-    .where(eq(pages.slug, slug));
-  
+
+  const conditions = [eq(pages.slug, slug)];
   if (!includeUnpublished) {
-    query = (query as any).where(and(
-      eq(pages.slug, slug),
-      eq(pages.status, PAGE_STATUS.PUBLISHED)
-    ));
+    conditions.push(eq(pages.status, PAGE_STATUS.PUBLISHED));
+    conditions.push(or(
+      isNull(pages.published_at),
+      lte(pages.published_at, options.now ?? Math.floor(Date.now() / 1000)),
+    )!);
   }
-  
-  const result = await query.limit(1);
+  if (!options.includeProtected) conditions.push(eq(pages.is_protected, false));
+
+  const result = await db.select().from(pages).where(and(...conditions)).limit(1);
   return result[0] || null;
 }
 
@@ -500,7 +510,9 @@ export async function searchPages(
   return getPages({
     searchTerm,
     status: options.includeUnpublished ? undefined : PAGE_STATUS.PUBLISHED,
-    limit: options.limit || 10
+    includeProtected: options.includeUnpublished === true,
+    visibleAt: options.includeUnpublished ? undefined : Math.floor(Date.now() / 1000),
+    limit: options.limit || 10,
   });
 }
 

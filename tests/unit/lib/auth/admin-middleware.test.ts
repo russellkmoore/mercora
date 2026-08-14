@@ -3,13 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@clerk/nextjs/server', () => ({ auth: vi.fn() }));
 vi.mock('@/lib/models/admin', () => ({
   isUserAdmin: vi.fn(),
+  isUserSuperAdmin: vi.fn(),
   updateAdminLastLogin: vi.fn(),
 }));
 
 import { auth } from '@clerk/nextjs/server';
-import { isUserAdmin, updateAdminLastLogin } from '@/lib/models/admin';
+import { isUserAdmin, isUserSuperAdmin, updateAdminLastLogin } from '@/lib/models/admin';
 import { NextRequest } from 'next/server';
-import { checkAdminPermissions } from '@/lib/auth/admin-middleware';
+import { checkAdminPermissions, isSuperAdminActor } from '@/lib/auth/admin-middleware';
 
 describe('checkAdminPermissions credential transport', () => {
   beforeEach(() => {
@@ -18,6 +19,7 @@ describe('checkAdminPermissions credential transport', () => {
     vi.stubEnv('ADMIN_VECTORIZE_TOKEN', 'service-secret');
     vi.mocked(auth).mockResolvedValue({ userId: null, sessionClaims: null } as never);
     vi.mocked(isUserAdmin).mockResolvedValue(true);
+    vi.mocked(isUserSuperAdmin).mockResolvedValue(true);
     vi.mocked(updateAdminLastLogin).mockResolvedValue(undefined);
   });
 
@@ -125,5 +127,26 @@ describe('checkAdminPermissions credential transport', () => {
     );
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe('isSuperAdminActor', () => {
+  it('requires an active database-backed super-admin', async () => {
+    await expect(isSuperAdminActor({ success: true, userId: 'user_admin' })).resolves.toBe(true);
+    expect(isUserSuperAdmin).toHaveBeenCalledWith('user_admin');
+  });
+
+  it('does not elevate service tokens or development bypasses', async () => {
+    await expect(isSuperAdminActor({
+      success: true,
+      userId: 'admin-service',
+      isServiceToken: true,
+    })).resolves.toBe(false);
+    await expect(isSuperAdminActor({
+      success: true,
+      userId: 'dev-admin',
+      isDevMode: true,
+    })).resolves.toBe(false);
+    expect(isUserSuperAdmin).not.toHaveBeenCalled();
   });
 });

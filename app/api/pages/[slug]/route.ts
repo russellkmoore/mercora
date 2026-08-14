@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getPageBySlug } from "@/lib/models/pages";
+import { toPublicPage } from "@/lib/cms/public-page";
 
 /**
  * GET /api/pages/[slug] - Get published page by slug
@@ -34,27 +35,9 @@ export async function GET(
       );
     }
 
-    // Don't expose internal fields for public access
-    const publicPage = {
-      id: page.id,
-      title: page.title,
-      slug: page.slug,
-      content: page.content,
-      excerpt: page.excerpt,
-      meta_title: page.meta_title,
-      meta_description: page.meta_description,
-      meta_keywords: page.meta_keywords,
-      template: page.template,
-      published_at: page.published_at,
-      updated_at: page.updated_at,
-      nav_title: page.nav_title,
-      custom_css: page.custom_css,
-      custom_js: page.custom_js
-    };
-
     return NextResponse.json({
       success: true,
-      data: publicPage
+      data: toPublicPage(page)
     });
 
   } catch (error) {
