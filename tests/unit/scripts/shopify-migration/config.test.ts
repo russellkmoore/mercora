@@ -63,6 +63,10 @@ describe("Shopify migration config", () => {
       { MIGRATION_INPUT_ROOT: "input" },
       ["--apply", "--target=preview"],
     )).toThrow("--confirm-preview");
+    expect(() => parseMigrationConfig(
+      { MIGRATION_INPUT_ROOT: "input", MIGRATION_TARGET: "production", MERCORA_ALLOW_PRODUCTION_IMPORTS: "1" },
+      ["--apply", "--confirm-production"],
+    )).toThrow("explicit --target=preview or --target=production");
 
     const config = parseMigrationConfig(
       { MIGRATION_INPUT_ROOT: "input", MERCORA_ALLOW_PRODUCTION_IMPORTS: "1" },
@@ -103,6 +107,8 @@ describe("Shopify migration config", () => {
     expect(config).not.toHaveProperty("r2BucketName");
     expect(() => parseMigrationConfig({ MIGRATION_INPUT_ROOT: "input" }, ["--env=../../prod"]))
       .toThrow("environment name");
+    expect(() => parseMigrationConfig({ MIGRATION_INPUT_ROOT: "input" }, ["--env="]))
+      .toThrow("non-empty Wrangler environment");
   });
 
   it("rejects unknown options and contradictory execution modes", () => {
