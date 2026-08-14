@@ -4,12 +4,20 @@ import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { PageSection } from "@/lib/cms/page-sections";
 
+export function decodeFaqHash(hash: string): string | null {
+  try {
+    return decodeURIComponent(hash.replace(/^#/, ""));
+  } catch {
+    return null;
+  }
+}
+
 export default function FaqAccordion({ sections, lead }: { sections: PageSection[]; lead?: string }) {
   const [openId, setOpenId] = useState<string | null>(sections[0]?.id ?? null);
   useEffect(() => {
     const openFromHash = () => {
-      const id = decodeURIComponent(window.location.hash.replace(/^#/, ""));
-      if (sections.some((section) => section.id === id)) setOpenId(id);
+      const id = decodeFaqHash(window.location.hash);
+      if (id !== null && sections.some((section) => section.id === id)) setOpenId(id);
     };
     openFromHash();
     window.addEventListener("hashchange", openFromHash);

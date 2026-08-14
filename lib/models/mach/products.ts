@@ -171,12 +171,18 @@ export async function getProductsBySlugs(slugs: string[]): Promise<Map<string, P
   });
   if (matches.length === 0) return resolved;
 
-  const variantRows = await db.select().from(product_variants).where(inArray(
-    product_variants.product_id,
-    matches.map(({ row }) => row.id),
+  const variantRows = await db.select().from(product_variants).where(and(
+    inArray(
+      product_variants.product_id,
+      matches.map(({ row }) => row.id),
+    ),
+    eq(product_variants.status, 'active'),
   ));
   const variantsByProduct = new Map<string, ProductVariant[]>();
   for (const row of variantRows) {
+    // Keep this boundary safe even if a mock, stale replica, or future query
+    // change returns rows that do not satisfy the public catalog predicate.
+    if (row.status !== 'active') continue;
     const variants = variantsByProduct.get(row.product_id) ?? [];
     variants.push(parseBatchVariant(row));
     variantsByProduct.set(row.product_id, variants);

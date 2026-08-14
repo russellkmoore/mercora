@@ -26,14 +26,14 @@ export function buildBlogRss(options: {
       `<guid isPermaLink="true">${escapeXml(url)}</guid>`,
       ...(post.excerpt ? [`<description>${escapeXml(post.excerpt)}</description>`] : []),
       ...(date && !Number.isNaN(date.getTime()) ? [`<pubDate>${date.toUTCString()}</pubDate>`] : []),
-      `<author>${escapeXml(post.author)}</author>`,
+      `<dc:creator>${escapeXml(post.author)}</dc:creator>`,
       ...post.tags.map((tag) => `<category>${escapeXml(tag)}</category>`),
       "</item>",
     ].join("");
   };
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<rss version="2.0"><channel>',
+    '<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/"><channel>',
     `<title>${escapeXml(`${options.storeName} Blog`)}</title>`,
     `<link>${escapeXml(new URL("/blog", site).href)}</link>`,
     `<description>${escapeXml(options.description)}</description>`,

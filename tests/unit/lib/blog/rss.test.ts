@@ -18,7 +18,8 @@ describe("Blog RSS", () => {
       posts: [post],
     });
     expect(xml).toContain("News &lt;&amp;&gt;");
-    expect(xml).toContain("A &quot;Writer&quot;");
+    expect(xml).toContain("<dc:creator>A &quot;Writer&quot;</dc:creator>");
+    expect(xml).not.toContain("<author>");
     expect(xml).not.toContain("<title>News <&>");
   });
 
@@ -32,5 +33,6 @@ describe("Blog RSS", () => {
     expect(xml).toContain("https://store.example.test/blog/news");
     expect(xml).toContain("<pubDate>Thu, 01 Jan 1970 00:01:40 GMT</pubDate>");
     expect(xml).toContain('xmlns:atom="http://www.w3.org/2005/Atom"');
+    expect(xml).toContain('xmlns:dc="http://purl.org/dc/elements/1.1/"');
   });
 });

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ImagePlus, Save } from "lucide-react";
 import { toast } from "sonner";
+import { normalizeBlogSlug } from "@/lib/blog/values";
 import { sanitizeRichHtml } from "@/lib/utils/sanitize-html";
 import type { BlogPost, BlogPostStatus } from "@/lib/models/blog";
 
@@ -72,7 +73,14 @@ export default function BlogEditor({ postId }: { postId?: string }) {
     const data = new FormData();
     data.set("file", file);
     data.set("folder", "blog");
-    data.set("filename", form.slug || form.title || "post-image");
+    let filename = "post-image";
+    try {
+      filename = normalizeBlogSlug(form.slug || form.title || filename);
+    } catch {
+      // The upload route still receives a safe filename when the draft fields
+      // cannot yet produce a valid post slug.
+    }
+    data.set("filename", filename);
     const response = await fetch("/api/admin/upload-image", { method: "POST", body: data });
     const body = await response.json() as { path?: string; error?: string };
     if (!response.ok || !body.path) throw new Error(body.error || "Upload failed");
