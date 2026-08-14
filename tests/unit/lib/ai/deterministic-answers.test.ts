@@ -58,6 +58,15 @@ describe('classifyQuery', () => {
     'How much does return shipping cost?',
     'Do you ship internationally?',
     'How much is shipping to Canada?',
+    'What is the shipping cost for Canada?',
+    'shipping rates for France',
+    'delivery price in Mexico',
+    'Canada shipping rates',
+    'Shipping rates outside the United States',
+    'Shipping fees within Canada',
+    'What are shipping rates when ordering from Canada?',
+    'Where is your warehouse located?',
+    'Where is your company shipped from?',
     'Can I change my shipping address?',
     'Where should I send a return?',
     'Do you use plastic-free shipping materials?',
@@ -72,6 +81,10 @@ describe('classifyQuery', () => {
     expect(classifyQuery('Tell me about your newest product')).toBeNull();
     expect(deps.getRefundPolicy).not.toHaveBeenCalled();
     expect(deps.resolveShippingOptions).not.toHaveBeenCalled();
+  });
+
+  it('does not mistake generic phrasing for a destination qualifier', () => {
+    expect(classifyQuery('How much is shipping supposed to cost?')).toBe('shipping_rates');
   });
 
   it('exports the ordered category contract', () => {
@@ -140,7 +153,6 @@ describe('resolveDeterministicAnswer', () => {
     expect(answer).not.toMatch(/\bUS\b|United States/i);
     expect(deps.resolveShippingOptions).toHaveBeenCalledWith(0, {
       currency: 'EUR',
-      subtotalPriceable: false,
     });
   });
 

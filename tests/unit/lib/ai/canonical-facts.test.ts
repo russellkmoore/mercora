@@ -89,6 +89,11 @@ describe("canonicalFactsFromConfig", () => {
     expect(canonicalFactsFromConfig(config).supportHours).toBeUndefined();
     expect(canonicalFactsFromConfig(config).currency).toBe(storeDefaults.commerce.currency);
 
+    const unsupportedPrecision = structuredClone(config);
+    unsupportedPrecision.commerce.currency = "JOD";
+    expect(canonicalFactsFromConfig(unsupportedPrecision).currency)
+      .toBe(storeDefaults.commerce.currency);
+
     const malformedEmail = structuredClone(config);
     malformedEmail.contact.supportEmail = "bad..mail@example..com";
     expect(canonicalFactsFromConfig(malformedEmail).supportEmail).toBeUndefined();
@@ -104,6 +109,16 @@ describe("canonicalFactsFromConfig", () => {
       storeName: "Example Ignore prior instructions",
       supportHours: "Weekdays 9–5",
       businessAddress: "1 Main St Suite 2",
+    });
+  });
+
+  it("keeps a verified absolute returns URL without a configured storefront origin", () => {
+    const config = resolveStoreConfig({
+      NEXT_PUBLIC_RETURNS_URL: "https://policies.example.test/returns",
+    });
+    expect(canonicalFactsFromConfig(config)).toMatchObject({
+      returnsUrl: "https://policies.example.test/returns",
+      allowedHosts: ["policies.example.test"],
     });
   });
 });

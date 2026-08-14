@@ -80,6 +80,7 @@ import {
 import { guardAssistantReply } from "@/lib/ai/response-guard";
 import { recordTelemetry } from "@/lib/observability/telemetry";
 import { Money } from "@/lib/money";
+import { CURRENCY_PRECISION } from "@/lib/money/currencies";
 
 const MAX_REQUEST_BODY_BYTES = 256 * 1024;
 /** Purchased items named per order, and across the whole lookup. */
@@ -112,6 +113,8 @@ interface PromptOrder {
    * minor units Mercora stores.
    */
   totalMajor: number;
+  /** Validated currency from the MACH order boundary, when present. */
+  currency?: string;
 }
 
 interface ChatResponseInput {
@@ -276,6 +279,13 @@ function normalizeOrders(value: unknown): PromptOrder[] | null {
     const amountContainer = isPlainRecord(candidate.total_amount)
       ? candidate.total_amount.amount
       : undefined;
+    const rawCurrency = isPlainRecord(candidate.total_amount)
+      ? candidate.total_amount.currency
+      : undefined;
+    const currency = typeof rawCurrency === "string"
+      && Object.hasOwn(CURRENCY_PRECISION, rawCurrency.trim().toUpperCase())
+      ? rawCurrency.trim().toUpperCase()
+      : undefined;
     const rawTotal = typeof amountContainer === "number" ? amountContainer : candidate.total;
     // Truncating here would discard the cents of a major-unit amount, so the
     // value is only clamped; formatting rounds it for display.
@@ -289,6 +299,7 @@ function normalizeOrders(value: unknown): PromptOrder[] | null {
       itemCount,
       purchasedItems,
       totalMajor,
+      ...(currency ? { currency } : {}),
     });
   }
   return orders;
@@ -392,9 +403,13 @@ function verifiedFactsBlock(facts: CanonicalFacts): string {
   return lines.join("\n");
 }
 
-function formatOrderTotal(totalMajor: number, facts: CanonicalFacts): string | null {
+function formatOrderTotal(
+  totalMajor: number,
+  facts: CanonicalFacts,
+  orderCurrency?: string,
+): string | null {
   try {
-    return Money.fromMajor(totalMajor, facts.currency).format(facts.locale);
+    return Money.fromMajor(totalMajor, orderCurrency ?? facts.currency).format(facts.locale);
   } catch {
     return null;
   }
@@ -488,6 +503,12 @@ export async function POST(req: NextRequest) {
     const isContentGeneration =
       isContentGenerationRequest(rawQuestion, rawUserContext) ||
       isContentGenerationRequest(question, userContext);
+    const limited = await enforceRateLimit(
+      "AI_RATE_LIMITER",
+      userId ? `agent-chat:user:${userId}` : `agent-chat:ip:${getClientIp(req)}`
+    );
+    if (limited) return limited;
+
     if (isContentGeneration) {
       const admin = await checkAdminPermissions(req);
       if (!admin.success) {
@@ -497,12 +518,6 @@ export async function POST(req: NextRequest) {
         );
       }
     }
-
-    const limited = await enforceRateLimit(
-      "AI_RATE_LIMITER",
-      userId ? `agent-chat:user:${userId}` : `agent-chat:ip:${getClientIp(req)}`
-    );
-    if (limited) return limited;
 
     // Resolve request-scoped facts only after authentication and rate limiting.
     // The customer path never reads process-global brand constants.
@@ -619,7 +634,7 @@ export async function POST(req: NextRequest) {
               .map(({ productId, snapshotName }) =>
                 (productId && purchasedNames.get(productId)) || snapshotName)
               .filter(Boolean);
-            const formattedTotal = formatOrderTotal(order.totalMajor, facts);
+            const formattedTotal = formatOrderTotal(order.totalMajor, facts, order.currency);
             const summary = formattedTotal
               ? `Order ${order.id}: ${order.itemCount} items, ${formattedTotal}`
               : `Order ${order.id}: ${order.itemCount} items`;
@@ -748,9 +763,9 @@ ${userName !== "Guest" ? fenced("USER NAME", userName, 100) : ""}`;
       assistantReply = assistantText.replace(/\*\*([^*]+)\*\*/g, '$1');
     }
 
-    // Use agent's recommended products if available, otherwise fall back to vector search results
-    // But if the agent mentioned specific products in bold but we couldn't map them, return empty array
-    // rather than returning all vector results that the agent didn't actually recommend
+    // Return only products the assistant deliberately named and that can be
+    // mapped to active catalog records. Retrieval context alone is not a
+    // recommendation, especially on greeting and provider-fallback paths.
     let finalProductIds: string[] = [];
     
     if (agentRecommendedProductIds.length > 0) {
@@ -759,9 +774,6 @@ ${userName !== "Guest" ? fenced("USER NAME", userName, 100) : ""}`;
     } else if (boldProductMatches && boldProductMatches.length > 0) {
       // Agent mentioned products in bold but we couldn't map them - return empty rather than wrong products
       finalProductIds = [];
-    } else {
-      // No specific product mentions detected - use vector search results
-      finalProductIds = productIds;
     }
     finalProductIds = [...new Set(finalProductIds)].slice(0, 20);
     

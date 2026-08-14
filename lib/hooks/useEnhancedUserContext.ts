@@ -407,16 +407,6 @@ export function formatUserContextForAI(context: EnhancedUserContext): string {
   // Purchase behavior
   if (context.orders.length > 0) {
     parts.push(`${context.orders.length} previous orders`);
-    parts.push(`Total spent: $${context.totalOrderValue.toFixed(2)}`);
-    parts.push(`Average order: $${context.averageOrderValue.toFixed(2)}`);
-    
-    if (context.isVipCustomer) {
-      parts.push("VIP Customer");
-    }
-    
-    if (context.recentPurchases.length > 0) {
-      parts.push(`Recent purchases: ${context.recentPurchases.slice(0, 3).join(', ')}`);
-    }
   } else {
     parts.push("First-time customer");
   }

@@ -1,4 +1,5 @@
 import { storeDefaults, type StoreConfig } from "@/lib/store-config";
+import { CURRENCY_PRECISION } from "@/lib/money/currencies";
 
 const MAX_IDENTITY_LENGTH = 200;
 const MAX_SUPPORT_HOURS_LENGTH = 300;
@@ -76,7 +77,7 @@ function safeCurrency(value: unknown): string {
   const candidate = boundedText(value, 3)?.toUpperCase();
   if (!candidate || !/^[A-Z]{3}$/.test(candidate)) return storeDefaults.commerce.currency;
   try {
-    return Intl.supportedValuesOf("currency").includes(candidate)
+    return Object.hasOwn(CURRENCY_PRECISION, candidate)
       ? candidate
       : storeDefaults.commerce.currency;
   } catch {
@@ -128,9 +129,11 @@ export function canonicalFactsFromConfig(config: StoreConfig): CanonicalFacts {
     ? resolvedSiteUrl
     : undefined;
   const configuredReturns = nestedValue(rawConfig, "urls", "returns");
-  const returnsUrl = siteUrl && configuredReturns !== storeDefaults.urls.returns
-    ? httpsUrl(configuredReturns, siteUrl)?.href
-    : undefined;
+  const absoluteReturnsUrl = httpsUrl(configuredReturns)?.href;
+  const returnsUrl = absoluteReturnsUrl
+    ?? (siteUrl && configuredReturns !== storeDefaults.urls.returns
+      ? httpsUrl(configuredReturns, siteUrl)?.href
+      : undefined);
   const supportEmail = safeEmail(nestedValue(rawConfig, "contact", "supportEmail"));
   const supportHours = boundedText(
     nestedValue(rawConfig, "contact", "supportHours"),

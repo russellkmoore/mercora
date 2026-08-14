@@ -7,6 +7,8 @@
  * Call `getStoreConfig()` from a request/render instead.
  */
 
+import { CURRENCY_PRECISION } from "./money/currencies";
+
 export type Environment = Record<string, string | undefined>;
 
 export type StoreCarrierDefinition = {
@@ -229,6 +231,13 @@ function locale(env: Environment): string {
   }
 }
 
+function currency(env: Environment): string {
+  const candidate = env.STORE_CURRENCY?.trim().toUpperCase();
+  return candidate && Object.hasOwn(CURRENCY_PRECISION, candidate)
+    ? candidate
+    : storeDefaults.commerce.currency;
+}
+
 const CARRIER_CODE_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
 const MAX_CARRIER_LABEL_LENGTH = 80;
 const MAX_CARRIER_ALIAS_LENGTH = 80;
@@ -400,7 +409,7 @@ export function resolveStoreConfig(env: Environment = {}): StoreConfig {
     commerce: {
       ...storeDefaults.commerce,
       locale: locale(env),
-      currency: text(env, "STORE_CURRENCY", storeDefaults.commerce.currency),
+      currency: currency(env),
       freeShippingThresholdCents: parseOptionalCents(env["STORE_FREE_SHIPPING_THRESHOLD_CENTS"]),
       carriers: parseCarrierDefinitions(env["STORE_CARRIERS_JSON"]),
     },

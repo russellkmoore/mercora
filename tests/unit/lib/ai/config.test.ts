@@ -76,11 +76,23 @@ describe("extractAIResponse", () => {
     { tool_calls: [{ name: "lookup" }] },
     { response: "", choices: [] },
     { status: "incomplete", response: "unsafe partial" },
+    { status: "in_progress", response: "unsafe partial" },
+    { status: "queued", output_text: "unsafe partial" },
+    { status: "cancelled", content: "unsafe partial" },
+    { status: null, response: "unsafe partial" },
     { error: { message: "failed" }, response: "unsafe partial" },
+    { response: "partial", tool_calls: [{ id: "call-1" }] },
+    { output_text: "partial", output: [{ type: "function_call", arguments: "{}" }] },
+    { choices: [{ finish_reason: "length", message: { content: "truncated" } }] },
     { choices: [{ finish_reason: "tool_calls", message: { content: "mixed", tool_calls: [{ id: "call-1" }] } }] },
     { output: [{ type: "message", content: [{ type: "output_text", text: "mixed" }] }, { type: "function_call", arguments: "{}" }] },
   ])("returns an empty string for malformed or tool-only output", (value) => {
     expect(extractAIResponse(value)).toBe("");
+  });
+
+  it("accepts a completed response whose nullable error field is clear", () => {
+    expect(extractAIResponse({ status: "completed", error: null, response: "done" }))
+      .toBe("done");
   });
 
   it("does not consume streaming output", () => {

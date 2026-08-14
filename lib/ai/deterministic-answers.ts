@@ -29,6 +29,13 @@ const DEFAULT_DEPENDENCIES: DeterministicAnswerDependencies = {
   resolveShippingOptions,
 };
 
+const DESTINATION_QUALIFIED_SHIPPING = /\b(?:shipping|delivery|postage)(?:\s+(?:cost|costs|rate|rates|price|prices|fee|fees))?\s+(?:to|in|for)\s+(?!me\b|us\b|my\b|the\b|an?\b|orders?\b|shipping\b|delivery\b|postage\b|free\b|checkout\b|this\b|that\b)[\p{L}]/iu;
+const OTHER_DESTINATION_SHIPPING = [
+  /\b(?:shipping|delivery|postage)\b.{0,40}\b(?:outside|within|across|into|from)\b/iu,
+  /\b(?:ordering|orders?)\s+from\s+[\p{L}]/iu,
+  /^\s*(?!(?:what|how|which|where|when|why|do|does|can|could|will|would|are|is|standard|express|free|overnight)\b)(?:[\p{L}][\p{L}'-]*\s+){1,4}(?:shipping|delivery|postage)\b/iu,
+];
+
 /** First match wins: contact stays ahead of order for "email about my order". */
 const RULES: CategoryRule[] = [
   {
@@ -58,8 +65,7 @@ const RULES: CategoryRule[] = [
     category: 'business_address',
     patterns: [
       /\b(mailing|postal|physical|business|company|street) address\b/i,
-      /\bwhere (are|is) (you|your (company|business|office|warehouse))\b.{0,20}\b(located|based|headquartered|ship(ped)? from)\b/i,
-      /\byour (headquarters|hq|office|address)\b/i,
+      /\byour address\b/i,
       /\bwhat('?s| is) your address\b/i,
     ],
   },
@@ -93,7 +99,6 @@ const RULES: CategoryRule[] = [
       /\bshipping address\b/i,
       /\b(do|does|can|could|will|would)\s+(you|they|the store)\b.{0,15}\bship (to|outside|overseas|abroad)\b/i,
       /\b(international(ly)?|overseas|abroad|customs|duties|tariffs?)\b/i,
-      /\b(shipping|delivery|postage)\b.{0,40}\bto\b/i,
     ],
   },
 ];
@@ -104,6 +109,10 @@ export function classifyQuery(question: string): DeterministicCategory | null {
   const normalized = question.trim();
   if (!normalized) return null;
   const bounded = normalized.slice(0, 2_048);
+  if (
+    DESTINATION_QUALIFIED_SHIPPING.test(bounded)
+    || OTHER_DESTINATION_SHIPPING.some((pattern) => pattern.test(bounded))
+  ) return null;
   for (const rule of RULES) {
     if (rule.exclude?.some((pattern) => pattern.test(bounded))) continue;
     if (rule.patterns.some((pattern) => pattern.test(bounded))) return rule.category;
@@ -190,10 +199,7 @@ async function shippingRatesAnswer(
   deps: DeterministicAnswerDependencies,
 ): Promise<string | null> {
   try {
-    const resolved = await deps.resolveShippingOptions(0, {
-      currency: facts.currency,
-      subtotalPriceable: false,
-    });
+    const resolved = await deps.resolveShippingOptions(0, { currency: facts.currency });
     if (resolved.options.length === 0) return shippingFallback(facts);
 
     const rates = resolved.options
