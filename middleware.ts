@@ -70,14 +70,14 @@ import { isLegacyRedirectLookupPath } from "@/lib/redirects/policy";
 export default clerkMiddleware(async (auth, req: NextRequest) => {
   const { pathname } = req.nextUrl;
   const isLegacyRedirectPath = isLegacyRedirectLookupPath(pathname);
-  
+
   // Skip maintenance check for static assets and Next.js internals
-  if (!isLegacyRedirectPath && (pathname.includes('/_next') || 
-      pathname.includes('/favicon') || 
+  if (!isLegacyRedirectPath && (pathname.includes('/_next') ||
+      pathname.includes('/favicon') ||
       pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf)$/))) {
     return NextResponse.next();
   }
-  
+
   // Skip maintenance check for admin routes and MCP API - always accessible
   if (pathname.startsWith('/admin') || 
       pathname.startsWith('/api/admin') || 
