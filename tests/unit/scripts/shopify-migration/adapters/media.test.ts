@@ -107,6 +107,21 @@ function imageResponse(bytes = JPEG, headers: Record<string, string> = {}): Resp
   return new Response(bytes, { status: 200, headers: { "content-type": "image/jpeg", ...headers } });
 }
 
+function extendedWebp(includePayload: boolean): Uint8Array {
+  const extendedHeader = Buffer.alloc(18);
+  extendedHeader.write("VP8X", 0, "ascii");
+  extendedHeader.writeUInt32LE(10, 4);
+  const chunks = includePayload
+    ? Buffer.concat([extendedHeader, Buffer.from(WEBP).subarray(12)])
+    : extendedHeader;
+  const result = Buffer.alloc(12 + chunks.byteLength);
+  result.write("RIFF", 0, "ascii");
+  result.writeUInt32LE(result.byteLength - 8, 4);
+  result.write("WEBP", 8, "ascii");
+  chunks.copy(result, 12);
+  return Uint8Array.from(result);
+}
+
 describe("safe media downloader", () => {
   it("downloads an allowlisted HTTPS image without forwarding credentials", async () => {
     const fetcher = vi.fn<typeof fetch>(async (_url, init) => {
@@ -282,6 +297,9 @@ describe("safe media downloader", () => {
     excessiveWebpPixels[28] = 0xff;
     excessiveWebpPixels[29] = 0x3f;
     expect(() => verifyImageSignature(excessiveWebpPixels, "image/webp")).toThrow(/signature/);
+
+    expect(() => verifyImageSignature(extendedWebp(false), "image/webp")).toThrow(/signature/);
+    expect(() => verifyImageSignature(extendedWebp(true), "image/webp")).not.toThrow();
   });
 });
 

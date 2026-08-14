@@ -237,6 +237,45 @@ function ascii(bytes: Uint8Array, start: number, end: number): string {
   return String.fromCharCode(...bytes.slice(start, end));
 }
 
+function isVp8Payload(bytes: Uint8Array, view: DataView, dataStart: number, chunkLength: number): boolean {
+  return chunkLength >= 10 && bytes[dataStart + 3] === 0x9d && bytes[dataStart + 4] === 0x01 &&
+    bytes[dataStart + 5] === 0x2a && hasBoundedDimensions(
+    view.getUint16(dataStart + 6, true) & 0x3fff,
+    view.getUint16(dataStart + 8, true) & 0x3fff,
+  );
+}
+
+function isVp8lPayload(bytes: Uint8Array, view: DataView, dataStart: number, chunkLength: number): boolean {
+  if (chunkLength < 5 || bytes[dataStart] !== 0x2f) return false;
+  const dimensions = view.getUint32(dataStart + 1, true);
+  return hasBoundedDimensions((dimensions & 0x3fff) + 1, ((dimensions >>> 14) & 0x3fff) + 1);
+}
+
+function readUint24LittleEndian(bytes: Uint8Array, offset: number): number {
+  return bytes[offset] | bytes[offset + 1] << 8 | bytes[offset + 2] << 16;
+}
+
+function hasValidAnimatedFrame(bytes: Uint8Array, view: DataView, dataStart: number, dataEnd: number): boolean {
+  if (dataEnd - dataStart < 24 || !hasBoundedDimensions(
+    readUint24LittleEndian(bytes, dataStart + 6) + 1,
+    readUint24LittleEndian(bytes, dataStart + 9) + 1,
+  )) return false;
+  let offset = dataStart + 16;
+  let sawPayload = false;
+  while (offset + 8 <= dataEnd) {
+    const type = ascii(bytes, offset, offset + 4);
+    const length = view.getUint32(offset + 4, true);
+    const payloadStart = offset + 8;
+    const payloadEnd = payloadStart + length;
+    const chunkEnd = payloadEnd + (length % 2);
+    if (payloadEnd < payloadStart || chunkEnd > dataEnd) return false;
+    if (type === "VP8 ") sawPayload ||= isVp8Payload(bytes, view, payloadStart, length);
+    if (type === "VP8L") sawPayload ||= isVp8lPayload(bytes, view, payloadStart, length);
+    offset = chunkEnd;
+  }
+  return sawPayload && offset === dataEnd;
+}
+
 function isWebp(bytes: Uint8Array): boolean {
   if (bytes.length < 20 || ascii(bytes, 0, 4) !== "RIFF" || ascii(bytes, 8, 12) !== "WEBP") return false;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -244,6 +283,8 @@ function isWebp(bytes: Uint8Array): boolean {
   let offset = 12;
   let chunkIndex = 0;
   let sawImageHeader = false;
+  let requiresExtendedPayload = false;
+  let sawPayload = false;
   while (offset + 8 <= bytes.length) {
     const chunk = ascii(bytes, offset, offset + 4);
     const chunkLength = view.getUint32(offset + 4, true);
@@ -253,27 +294,28 @@ function isWebp(bytes: Uint8Array): boolean {
     if (dataEnd < dataStart || chunkEnd > bytes.length) return false;
     if (chunkIndex === 0) {
       if (chunk === "VP8 ") {
-        if (chunkLength < 10 || bytes[dataStart + 3] !== 0x9d || bytes[dataStart + 4] !== 0x01 ||
-          bytes[dataStart + 5] !== 0x2a || !hasBoundedDimensions(
-          view.getUint16(dataStart + 6, true) & 0x3fff,
-          view.getUint16(dataStart + 8, true) & 0x3fff,
-        )) return false;
+        if (!isVp8Payload(bytes, view, dataStart, chunkLength)) return false;
+        sawPayload = true;
       } else if (chunk === "VP8L") {
-        if (chunkLength < 5 || bytes[dataStart] !== 0x2f) return false;
-        const dimensions = view.getUint32(dataStart + 1, true);
-        if (!hasBoundedDimensions((dimensions & 0x3fff) + 1, ((dimensions >>> 14) & 0x3fff) + 1)) return false;
+        if (!isVp8lPayload(bytes, view, dataStart, chunkLength)) return false;
+        sawPayload = true;
       } else if (chunk === "VP8X") {
         if (chunkLength !== 10) return false;
-        const width = bytes[dataStart + 4] | bytes[dataStart + 5] << 8 | bytes[dataStart + 6] << 16;
-        const height = bytes[dataStart + 7] | bytes[dataStart + 8] << 8 | bytes[dataStart + 9] << 16;
+        const width = readUint24LittleEndian(bytes, dataStart + 4);
+        const height = readUint24LittleEndian(bytes, dataStart + 7);
         if (!hasBoundedDimensions(width + 1, height + 1)) return false;
+        requiresExtendedPayload = true;
       } else return false;
       sawImageHeader = true;
+    } else if (requiresExtendedPayload) {
+      if (chunk === "VP8 ") sawPayload ||= isVp8Payload(bytes, view, dataStart, chunkLength);
+      if (chunk === "VP8L") sawPayload ||= isVp8lPayload(bytes, view, dataStart, chunkLength);
+      if (chunk === "ANMF") sawPayload ||= hasValidAnimatedFrame(bytes, view, dataStart, dataEnd);
     }
     offset = chunkEnd;
     chunkIndex += 1;
   }
-  return sawImageHeader && offset === bytes.length;
+  return sawImageHeader && sawPayload && offset === bytes.length;
 }
 
 export function verifyImageSignature(bytes: Uint8Array, contentType: MediaContentType): void {
