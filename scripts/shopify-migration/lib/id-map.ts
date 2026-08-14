@@ -1,6 +1,6 @@
-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { readFileSync } from "node:fs";
 import { providerFingerprint } from "./ids.js";
+import { atomicWritePrivateFile, resolvePrivateArtifactPath } from "./private-atomic-file.js";
 
 const ARTIFACT_VERSION = 1;
 const MAX_ARTIFACT_BYTES = 10 * 1024 * 1024;
@@ -26,25 +26,6 @@ function normalizeLabel(value: string, field: string): string {
   const normalized = value.trim().toLowerCase();
   if (!safeLabel.test(normalized)) throw new Error(`${field} is invalid`);
   return normalized;
-}
-
-function outputPath(root: string, requestedPath: string): string {
-  if (!requestedPath || isAbsolute(requestedPath) || requestedPath.includes("\0")) {
-    throw new Error("Artifact path must be a relative path");
-  }
-  mkdirSync(resolve(root), { recursive: true, mode: 0o700 });
-  const absoluteRoot = realpathSync(root);
-  const candidate = resolve(absoluteRoot, requestedPath);
-  const child = relative(absoluteRoot, candidate);
-  if (child.startsWith("..") || isAbsolute(child)) throw new Error("Artifact path escapes the configured output root");
-  let cursor = absoluteRoot;
-  for (const part of child.split(sep)) {
-    cursor = resolve(cursor, part);
-    if (existsSync(cursor) && lstatSync(cursor).isSymbolicLink()) {
-      throw new Error("Artifact path may not traverse a symbolic link");
-    }
-  }
-  return candidate;
 }
 
 function validateTargetId(value: string): string {
@@ -92,13 +73,12 @@ export class IdMap {
   }
 
   save(root: string, requestedPath: string): void {
-    const path = outputPath(root, requestedPath);
-    mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-    writeFileSync(path, `${JSON.stringify(this.toArtifact(), null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+    const path = resolvePrivateArtifactPath(root, requestedPath);
+    atomicWritePrivateFile(path, `${JSON.stringify(this.toArtifact(), null, 2)}\n`, { maxBytes: MAX_ARTIFACT_BYTES });
   }
 
   static load(root: string, requestedPath: string): IdMap {
-    const path = outputPath(root, requestedPath);
+    const path = resolvePrivateArtifactPath(root, requestedPath);
     const content = readFileSync(path, "utf8");
     if (Buffer.byteLength(content) > MAX_ARTIFACT_BYTES) throw new Error("ID map artifact is too large");
     const raw: unknown = JSON.parse(content);
@@ -136,7 +116,6 @@ export function writeManifest(root: string, requestedPath: string, manifest: Mig
     }
     entities[entityName] = { ...counts };
   }
-  const path = outputPath(root, requestedPath);
-  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-  writeFileSync(path, `${JSON.stringify({ ...manifest, entities }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  const path = resolvePrivateArtifactPath(root, requestedPath);
+  atomicWritePrivateFile(path, `${JSON.stringify({ ...manifest, entities }, null, 2)}\n`, { maxBytes: MAX_ARTIFACT_BYTES });
 }
