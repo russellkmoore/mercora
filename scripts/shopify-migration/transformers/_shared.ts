@@ -40,6 +40,11 @@ const MAX_MEDIA_HOSTS = 16;
 const MAX_INLINE_MEDIA = 100;
 export const MAX_SQL_TEXT_BYTES = 48 * 1024;
 const DNS_HOSTNAME = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u;
+const MYSHOPIFY_HOST = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.myshopify\.com$/u;
+
+function isShopifyAssetHost(hostname: string): boolean {
+  return hostname === "cdn.shopify.com" || MYSHOPIFY_HOST.test(hostname);
+}
 
 /** Normalize a small exact-host allowlist. Empty explicitly disables media import. */
 export function mediaHostAllowlist(hosts: readonly string[]): MediaHostAllowlist {
@@ -60,9 +65,9 @@ export function mediaHostAllowlist(hosts: readonly string[]): MediaHostAllowlist
     }
     if (
       !DNS_HOSTNAME.test(hostname) || isIP(hostname) !== 0 || hostname === "localhost" ||
-      hostname.endsWith(".localhost")
+      hostname.endsWith(".localhost") || !isShopifyAssetHost(hostname)
     ) {
-      throw new TypeError(`Invalid allowed media hostname: ${raw}`);
+      throw new TypeError(`Invalid or non-Shopify allowed media hostname: ${raw}`);
     }
     normalized.add(hostname);
   }
@@ -189,7 +194,8 @@ function safeSourceUrl(
     const hostname = url.hostname.toLowerCase();
     if (
       url.protocol !== "https:" || url.username || url.password || url.port || isIP(hostname) !== 0 ||
-      hostname === "localhost" || hostname.endsWith(".localhost") || !allowedHosts.has(hostname)
+      hostname === "localhost" || hostname.endsWith(".localhost") || !allowedHosts.has(hostname) ||
+      !isShopifyAssetHost(hostname) || (MYSHOPIFY_HOST.test(hostname) && !url.pathname.startsWith("/cdn/"))
     ) return null;
     return { href: url.href, hostname };
   } catch {
