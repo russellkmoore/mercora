@@ -8,6 +8,7 @@ import {
 } from "../_shared.js";
 import {
   MAX_ADDRESSES,
+  UNKNOWN_SOURCE_TIMESTAMP,
   assertBatchSize,
   boundedTags,
   boundedText,
@@ -105,7 +106,7 @@ export function transformCustomers(
   options: CustomerTransformOptions,
 ): CustomerProvisioningResult {
   assertBatchSize(customers.length);
-  const generatedAt = requiredMigrationTime(options.generatedAt);
+  requiredMigrationTime(options.generatedAt);
   const records: CustomerProvisioningPlan[] = [];
   const skipped: Array<{ sourceFingerprint: string | null; reason: string }> = [];
   const warnings: string[] = [];
@@ -149,7 +150,7 @@ export function transformCustomers(
         return { ...address, is_default: isDefault };
       });
       const tags = boundedTags(customer.tags);
-      const createdAt = isoTimestamp(customer.created_at, generatedAt);
+      const createdAt = isoTimestamp(customer.created_at, UNKNOWN_SOURCE_TIMESTAMP);
       const updatedAt = isoTimestamp(customer.updated_at, createdAt);
       const firstName = boundedText(customer.first_name, 100);
       const lastName = boundedText(customer.last_name, 100);
@@ -185,7 +186,6 @@ export function transformCustomers(
             migration: {
               provider: SHOPIFY_PROVIDER,
               imported: true,
-              generated_at: generatedAt,
               source_fingerprint: sourceFingerprint,
             },
             source_summary: {

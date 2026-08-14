@@ -13,8 +13,10 @@ import {
   boundedText,
   emailFingerprint,
   normalizedEmail,
+  safeClerkUserId,
   safeTargetId,
   type SensitiveTransformResult,
+  UNKNOWN_SOURCE_TIMESTAMP,
 } from "./_shared.js";
 
 const REVIEW_PROVIDER = "judge_me";
@@ -61,10 +63,19 @@ export interface VerifiedReviewProvenance {
   orderItemId?: string;
 }
 
+export interface ImportedReviewAttribution {
+  productId: string;
+  orderId: string;
+  customerId: string;
+  orderItemId?: string;
+}
+
 export interface ReviewTransformOptions {
   generatedAt: string;
   productIds: ReadonlyMap<string, string>;
   customerIdsByEmailFingerprint?: ReadonlyMap<string, string>;
+  /** Real imported IDs keyed by judgeMeReviewFingerprint; synthetic IDs are forbidden. */
+  reviewAttributions: ReadonlyMap<string, ImportedReviewAttribution>;
   verifiedPurchases?: ReadonlyMap<string, VerifiedReviewProvenance>;
 }
 
@@ -164,17 +175,39 @@ function reviewStatus(value: string | undefined): ReviewStatus {
 
 function validProof(
   proof: VerifiedReviewProvenance | undefined,
-  productId: string,
-  customerId: string | null,
+  attribution: ImportedReviewAttribution,
 ): VerifiedReviewProvenance | null {
   if (!proof || proof.verified !== true) return null;
   const product = safeTargetId(proof.productId);
   const order = safeTargetId(proof.orderId);
-  const customer = safeTargetId(proof.customerId);
+  const customer = safeClerkUserId(proof.customerId);
   const item = proof.orderItemId === undefined ? null : safeTargetId(proof.orderItemId);
-  if (!product || !order || !customer || product !== productId || (customerId && customer !== customerId)) return null;
+  if (
+    !product || !order || !customer ||
+    product !== attribution.productId || order !== attribution.orderId || customer !== attribution.customerId
+  ) return null;
+  if ((item ?? null) !== (attribution.orderItemId ?? null)) return null;
   if (proof.orderItemId !== undefined && !item) return null;
   return { verified: true, productId: product, orderId: order, customerId: customer, ...(item ? { orderItemId: item } : {}) };
+}
+
+function validAttribution(
+  attribution: ImportedReviewAttribution | undefined,
+  productId: string,
+  emailCustomerId: string | null,
+): ImportedReviewAttribution | null {
+  if (!attribution) return null;
+  const product = safeTargetId(attribution.productId);
+  const order = safeTargetId(attribution.orderId);
+  const customer = safeClerkUserId(attribution.customerId);
+  const item = attribution.orderItemId === undefined ? null : safeTargetId(attribution.orderItemId);
+  if (
+    !product || !order || !customer || product !== productId ||
+    order.startsWith(`${REVIEW_PROVIDER}_imported_order_`)
+  ) return null;
+  if (emailCustomerId && emailCustomerId !== customer) return null;
+  if (attribution.orderItemId !== undefined && !item) return null;
+  return { productId: product, orderId: order, customerId: customer, ...(item ? { orderItemId: item } : {}) };
 }
 
 export function transformJudgeMeReviews(
@@ -182,7 +215,7 @@ export function transformJudgeMeReviews(
   options: ReviewTransformOptions,
 ): SensitiveTransformResult<ImportedReviewTransformRecord> {
   assertBatchSize(reviews.length);
-  const generatedAt = requiredMigrationTime(options.generatedAt);
+  requiredMigrationTime(options.generatedAt);
   const records: ImportedReviewTransformRecord[] = [];
   const idMap = new Map<string, string>();
   const skipped: Array<{ sourceFingerprint: string | null; reason: string }> = [];
@@ -201,10 +234,20 @@ export function transformJudgeMeReviews(
       const productId = resolvedProductId(review, options.productIds);
       if (!productId) throw new TypeError("Review product mapping is missing or ambiguous");
       const email = normalizedEmail(review.reviewer_email);
-      const customerId = email
-        ? safeTargetId(options.customerIdsByEmailFingerprint?.get(emailFingerprint(email)))
-        : null;
-      const proof = validProof(options.verifiedPurchases?.get(sourceFingerprint), productId, customerId);
+      const mappedEmailCustomer = email
+        ? options.customerIdsByEmailFingerprint?.get(emailFingerprint(email))
+        : undefined;
+      const emailCustomerId = safeClerkUserId(mappedEmailCustomer);
+      if (mappedEmailCustomer !== undefined && !emailCustomerId) {
+        throw new TypeError("Review email mapping must resolve to a Clerk user ID");
+      }
+      const attribution = validAttribution(
+        options.reviewAttributions.get(sourceFingerprint),
+        productId,
+        emailCustomerId,
+      );
+      if (!attribution) throw new TypeError("Review requires real matching order and Clerk customer attribution");
+      const proof = validProof(options.verifiedPurchases?.get(sourceFingerprint), attribution);
       if (options.verifiedPurchases?.has(sourceFingerprint) && !proof) {
         warnings.push(`Review ${sourceFingerprint} has invalid verified-purchase provenance; imported unverified`);
       }
@@ -212,22 +255,18 @@ export function transformJudgeMeReviews(
         warnings.push(`Review ${sourceFingerprint} has external media that requires a separate verified media import; media omitted`);
       }
       const status = reviewStatus(review.status);
-      const submittedAt = isoTimestamp(review.review_date, generatedAt);
+      const submittedAt = isoTimestamp(review.review_date, UNKNOWN_SOURCE_TIMESTAMP);
       const id = deterministicProviderId(REVIEW_PROVIDER, "review", sourceFingerprint);
       const reviewerName = boundedText(review.reviewer_name, 200);
-      const orderId = proof?.orderId
-        ?? deterministicProviderId(REVIEW_PROVIDER, "imported_order", sourceFingerprint);
-      const resolvedCustomerId = proof?.customerId ?? customerId
-        ?? deterministicProviderId(REVIEW_PROVIDER, "imported_customer", sourceFingerprint);
 
       records.push({
         sourceFingerprint,
         review: {
           id,
           product_id: productId,
-          order_id: orderId,
-          order_item_id: proof?.orderItemId ?? null,
-          customer_id: resolvedCustomerId,
+          order_id: attribution.orderId,
+          order_item_id: attribution.orderItemId ?? null,
+          customer_id: attribution.customerId,
           rating: review.rating,
           title: boundedText(review.title, 200),
           body: boundedText(review.body, 10_000, { required: true, multiline: true })!,
@@ -241,12 +280,11 @@ export function transformJudgeMeReviews(
           submitted_at: submittedAt,
           published_at: status === "published" ? submittedAt : null,
           created_at: submittedAt,
-          updated_at: generatedAt,
+          updated_at: submittedAt,
           metadata: JSON.stringify({
             migration: {
               provider: REVIEW_PROVIDER,
               imported: true,
-              generated_at: generatedAt,
               source_fingerprint: sourceFingerprint,
             },
             verified_purchase_provenance: proof ? "explicit_order_match" : "none",
