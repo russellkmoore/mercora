@@ -57,6 +57,7 @@ describe('classifyQuery', () => {
     'Which products are caffeine free?',
     'How much does return shipping cost?',
     'Do you ship internationally?',
+    'How much is shipping to Canada?',
     'Can I change my shipping address?',
     'Where should I send a return?',
     'Do you use plastic-free shipping materials?',

@@ -12,7 +12,7 @@ export interface CanonicalFacts {
   supportEmail?: string;
   supportHours?: string;
   businessAddress?: string;
-  siteUrl: string;
+  siteUrl?: string;
   orderHistoryUrl?: string;
   returnsUrl?: string;
   locale: string;
@@ -123,16 +123,22 @@ function publicAddress(value: unknown): string | undefined {
  */
 export function canonicalFactsFromConfig(config: StoreConfig): CanonicalFacts {
   const rawConfig: unknown = config;
-  const siteUrl = httpsOrigin(nestedValue(rawConfig, "urls", "site"))
-    ?? storeDefaults.urls.site;
+  const resolvedSiteUrl = httpsOrigin(nestedValue(rawConfig, "urls", "site"));
+  const siteUrl = resolvedSiteUrl && resolvedSiteUrl !== storeDefaults.urls.site
+    ? resolvedSiteUrl
+    : undefined;
   const configuredReturns = nestedValue(rawConfig, "urls", "returns");
-  const returnsUrl = httpsUrl(configuredReturns, siteUrl)?.href
-    ?? new URL(storeDefaults.urls.returns, siteUrl).href;
+  const returnsUrl = siteUrl && configuredReturns !== storeDefaults.urls.returns
+    ? httpsUrl(configuredReturns, siteUrl)?.href
+    : undefined;
   const supportEmail = safeEmail(nestedValue(rawConfig, "contact", "supportEmail"));
   const supportHours = boundedText(
     nestedValue(rawConfig, "contact", "supportHours"),
     MAX_SUPPORT_HOURS_LENGTH,
   );
+  const verifiedSupportHours = supportHours === storeDefaults.contact.supportHours
+    ? undefined
+    : supportHours;
   const businessAddress = publicAddress(nestedValue(rawConfig, "contact", "postalAddress"));
 
   const hosts = new Set<string>();
@@ -158,11 +164,13 @@ export function canonicalFactsFromConfig(config: StoreConfig): CanonicalFacts {
       MAX_IDENTITY_LENGTH,
     ) ?? storeDefaults.identity.assistantName,
     ...(supportEmail ? { supportEmail } : {}),
-    ...(supportHours ? { supportHours } : {}),
+    ...(verifiedSupportHours ? { supportHours: verifiedSupportHours } : {}),
     ...(businessAddress ? { businessAddress } : {}),
-    siteUrl,
-    orderHistoryUrl: new URL("/account/orders", siteUrl).href,
-    returnsUrl,
+    ...(siteUrl ? {
+      siteUrl,
+      orderHistoryUrl: new URL("/account/orders", siteUrl).href,
+    } : {}),
+    ...(returnsUrl ? { returnsUrl } : {}),
     locale: safeLocale(nestedValue(rawConfig, "commerce", "locale")),
     currency: safeCurrency(nestedValue(rawConfig, "commerce", "currency")),
     allowedHosts: [...hosts],
