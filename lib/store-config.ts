@@ -94,8 +94,8 @@ export const storeDefaults: StoreConfig = {
   },
   urls: {
     site: "https://mercora.example.com",
-    privacy: "/privacy",
-    terms: "/terms",
+    privacy: "/privacy-policy",
+    terms: "/terms-of-service",
     returns: "/returns",
   },
   persistence: {

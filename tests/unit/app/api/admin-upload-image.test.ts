@@ -23,6 +23,9 @@ vi.mock('@/lib/utils/r2', () => ({
     BLOG: 'blog',
   },
 }));
+vi.mock('@/lib/store-config', () => ({
+  getStoreConfig: () => ({ urls: { imageCdn: 'https://images.example.test' } }),
+}));
 
 import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/admin/upload-image/route';
@@ -135,6 +138,7 @@ describe('admin image upload validation', () => {
       expect(key).not.toContain('.svg');
       expect(options).toMatchObject({ contentType: storedType });
       expect(body.path).toBe(`/${key}`);
+      expect(body.url).toBe(`https://images.example.test/${key}`);
       expect(body.filename).toBe(key.slice('products/'.length));
       expect(body.type).toBe(storedType);
     }

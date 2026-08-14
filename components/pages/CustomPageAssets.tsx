@@ -5,15 +5,13 @@ import { useEffect } from "react";
 type CustomPageAssetsProps = {
   pageId: number;
   customCss: string | null;
-  customJs: string | null;
-  customJsEnabled: boolean;
+  customJsPath: string | null;
 };
 
 export default function CustomPageAssets({
   pageId,
   customCss,
-  customJs,
-  customJsEnabled,
+  customJsPath,
 }: CustomPageAssetsProps) {
   useEffect(() => {
     if (!customCss) return;
@@ -27,14 +25,16 @@ export default function CustomPageAssets({
   }, [customCss, pageId]);
 
   useEffect(() => {
-    if (!customJsEnabled || !customJs) return;
-    try {
-      new Function(customJs)();
-    } catch {
-      // Stored scripts are isolated from the rendering path. Runtime failures
-      // must not take the page down or expose the script/error in logs.
-    }
-  }, [customJs, customJsEnabled]);
+    if (!customJsPath) return;
+    const script = document.createElement("script");
+    script.id = `page-${pageId}-script`;
+    script.src = customJsPath;
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      script.remove();
+    };
+  }, [customJsPath, pageId]);
 
   return null;
 }

@@ -35,27 +35,22 @@ function deepFreeze<T>(value: T): T {
 }
 
 function templates(context: PageTemplateContext): Record<PageTemplateKind, PageTemplateConfig> {
-  const browse: PageCtaAction = { label: "Browse products", href: "/products", variant: "primary" };
-  const ask: PageCtaAction = {
-    label: `Ask ${context.assistantName}`,
-    href: "/agent",
-    variant: "secondary",
-  };
+  const browse: PageCtaAction = { label: "Browse products", href: "/", variant: "primary" };
   const policyLinks = [
-    { label: "Returns", href: context.returnsUrl },
+    ...(context.returnsUrl !== "/returns" ? [{ label: "Returns", href: context.returnsUrl }] : []),
     { label: "Privacy", href: context.privacyUrl },
     { label: "Terms", href: context.termsUrl },
   ];
   return deepFreeze({
     guide: {
       kind: "guide", eyebrow: "GUIDE", showRail: true,
-      cta: { heading: "Continue exploring", body: `Browse ${context.storeName} products.`, actions: [browse, ask], policyLinks: [] },
+      cta: { heading: "Continue exploring", body: `Browse ${context.storeName} products.`, actions: [browse], policyLinks: [] },
     },
     faq: {
       kind: "faq", eyebrow: "FREQUENTLY ASKED QUESTIONS", showRail: true,
       cta: {
         heading: "Still have a question?", body: "We are happy to help.",
-        actions: [{ label: "Contact support", href: `mailto:${context.supportEmail}`, variant: "primary" }, ask],
+        actions: [{ label: "Contact support", href: `mailto:${context.supportEmail}`, variant: "primary" }],
         policyLinks: [],
       },
     },
@@ -70,7 +65,7 @@ function templates(context: PageTemplateContext): Record<PageTemplateKind, PageT
     contact: { kind: "contact", eyebrow: "CONTACT", showRail: false, cta: null },
     story: {
       kind: "story", eyebrow: "OUR STORY", showRail: false,
-      cta: { heading: `Explore ${context.storeName}`, body: "", actions: [browse, ask], policyLinks: [] },
+      cta: { heading: `Explore ${context.storeName}`, body: "", actions: [browse], policyLinks: [] },
     },
   });
 }

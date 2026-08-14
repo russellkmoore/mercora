@@ -6,30 +6,52 @@ import { getPublishedBlogPost, getPublishedBlogPosts, getRelatedBlogPosts } from
 import { getStoreConfig } from "@/lib/store-config";
 import { sanitizeRichHtmlServer } from "@/lib/utils/sanitize-html-server";
 import { formatCmsTimestamp } from "@/lib/utils/cms-timestamp";
+import { absoluteBlogImageUrl } from "@/lib/blog/image-url";
+import { normalizeBlogSlug } from "@/lib/blog/values";
 
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ slug: string }> };
 
+function validSlug(value: string): boolean {
+  try {
+    return normalizeBlogSlug(value) === value;
+  } catch {
+    return false;
+  }
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const post = await getPublishedBlogPost((await params).slug);
+  const slug = (await params).slug;
+  if (!validSlug(slug)) return { title: "Post not found" };
+  const post = await getPublishedBlogPost(slug);
   if (!post) return { title: "Post not found" };
   const store = getStoreConfig();
   const title = post.metaTitle || post.title;
   const description = post.metaDescription || post.excerpt || `${post.title} — ${store.identity.name}`;
+  const coverImage = absoluteBlogImageUrl(post.coverImageUrl, {
+    imageCdn: store.urls.imageCdn,
+    siteUrl: store.urls.site,
+  });
   return {
     title,
     description,
     alternates: { canonical: `/blog/${post.slug}` },
-    openGraph: { title, description, type: "article", images: post.coverImageUrl ? [post.coverImageUrl] : [] },
-    twitter: { card: post.coverImageUrl ? "summary_large_image" : "summary", title, description },
+    openGraph: { title, description, type: "article", images: coverImage ? [coverImage] : [] },
+    twitter: { card: coverImage ? "summary_large_image" : "summary", title, description, ...(coverImage && { images: [coverImage] }) },
   };
 }
 
 export default async function BlogPostPage({ params }: Props) {
-  const post = await getPublishedBlogPost((await params).slug);
+  const slug = (await params).slug;
+  if (!validSlug(slug)) notFound();
+  const post = await getPublishedBlogPost(slug);
   if (!post) notFound();
   const store = getStoreConfig();
   const html = sanitizeRichHtmlServer(post.html, { allowedImageOrigin: store.urls.imageCdn });
+  const coverImage = absoluteBlogImageUrl(post.coverImageUrl, {
+    imageCdn: store.urls.imageCdn,
+    siteUrl: store.urls.site,
+  });
   const related = getRelatedBlogPosts(await getPublishedBlogPosts({ limit: 100 }), post.slug, post.tags);
   const structured = JSON.stringify({
     "@context": "https://schema.org",
@@ -41,7 +63,7 @@ export default async function BlogPostPage({ params }: Props) {
     author: { "@type": "Person", name: post.author },
     publisher: { "@type": "Organization", name: store.identity.name },
     mainEntityOfPage: new URL(`/blog/${post.slug}`, store.urls.site).href,
-    image: post.coverImageUrl || undefined,
+    image: coverImage || undefined,
   }).replace(/</g, "\\u003c");
   return (
     <article className="mx-auto max-w-4xl px-4 py-12 sm:px-6">

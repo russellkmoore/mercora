@@ -7,7 +7,7 @@ import { ImagePlus, Save } from "lucide-react";
 import { toast } from "sonner";
 import { normalizeBlogSlug } from "@/lib/blog/values";
 import { sanitizeRichHtml } from "@/lib/utils/sanitize-html";
-import type { BlogPost, BlogPostStatus } from "@/lib/models/blog";
+import type { BlogCategory, BlogPost, BlogPostStatus } from "@/lib/models/blog";
 
 type FormState = {
   title: string;
@@ -22,11 +22,12 @@ type FormState = {
   metaTitle: string;
   metaDescription: string;
   publishedAt: string;
+  categoryId: string;
 };
 
 const emptyForm: FormState = {
   title: "", slug: "", author: "", excerpt: "", tags: "", coverImageUrl: "",
-  coverImageAlt: "", status: "draft", html: "", metaTitle: "", metaDescription: "", publishedAt: "",
+  coverImageAlt: "", status: "draft", html: "", metaTitle: "", metaDescription: "", publishedAt: "", categoryId: "",
 };
 
 function localDateTime(timestamp: number | null): string {
@@ -41,6 +42,8 @@ export default function BlogEditor({ postId }: { postId?: string }) {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [loading, setLoading] = useState(Boolean(postId));
   const [saving, setSaving] = useState(false);
+  const [categories, setCategories] = useState<BlogCategory[]>([]);
+  const [newCategoryName, setNewCategoryName] = useState("");
   const preview = useMemo(() => sanitizeRichHtml(form.html), [form.html]);
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -59,7 +62,7 @@ export default function BlogEditor({ postId }: { postId?: string }) {
           tags: post.tags.join(", "), coverImageUrl: post.coverImageUrl ?? "",
           coverImageAlt: post.coverImageAlt ?? "", status: post.status, html: post.html,
           metaTitle: post.metaTitle ?? "", metaDescription: post.metaDescription ?? "",
-          publishedAt: localDateTime(post.publishedAt),
+          publishedAt: localDateTime(post.publishedAt), categoryId: post.categoryId?.toString() ?? "",
         });
       })
       .catch((error) => {
@@ -68,6 +71,35 @@ export default function BlogEditor({ postId }: { postId?: string }) {
       .finally(() => setLoading(false));
     return () => controller.abort();
   }, [postId]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/admin/blog/categories", { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        const body = await response.json() as { data?: BlogCategory[]; error?: string };
+        if (!response.ok) throw new Error(body.error || "Unable to load categories");
+        setCategories(body.data ?? []);
+      })
+      .catch((error) => {
+        if (error instanceof Error && error.name !== "AbortError") toast.error(error.message);
+      });
+    return () => controller.abort();
+  }, []);
+
+  const createCategory = async () => {
+    const name = newCategoryName.trim();
+    if (!name) return;
+    const response = await fetch("/api/admin/blog/categories", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const body = await response.json() as { data?: BlogCategory; error?: string };
+    if (!response.ok || !body.data) throw new Error(body.error || "Unable to create category");
+    setCategories((current) => [...current, body.data!].sort((a, b) => a.name.localeCompare(b.name)));
+    update("categoryId", body.data.id.toString());
+    setNewCategoryName("");
+  };
 
   const upload = async (file: File) => {
     const data = new FormData();
@@ -82,9 +114,9 @@ export default function BlogEditor({ postId }: { postId?: string }) {
     }
     data.set("filename", filename);
     const response = await fetch("/api/admin/upload-image", { method: "POST", body: data });
-    const body = await response.json() as { path?: string; error?: string };
+    const body = await response.json() as { path?: string; url?: string; error?: string };
     if (!response.ok || !body.path) throw new Error(body.error || "Upload failed");
-    update("coverImageUrl", body.path);
+    update("coverImageUrl", body.url ?? body.path);
   };
 
   const save = async (status: BlogPostStatus) => {
@@ -102,6 +134,7 @@ export default function BlogEditor({ postId }: { postId?: string }) {
         coverImageUrl: form.coverImageUrl || null,
         coverImageAlt: form.coverImageAlt || null,
         status,
+        categoryId: form.categoryId ? Number(form.categoryId) : null,
         html: form.html,
         metaTitle: form.metaTitle || null,
         metaDescription: form.metaDescription || null,
@@ -160,6 +193,18 @@ export default function BlogEditor({ postId }: { postId?: string }) {
         </div>
 
         <aside className="space-y-5 rounded-xl border border-neutral-700 bg-neutral-900 p-6 self-start">
+          <Field label="Category">
+            <select value={form.categoryId} onChange={(event) => update("categoryId", event.target.value)} className="admin-input w-full rounded-lg border px-3 py-2">
+              <option value="">No category</option>
+              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Create category" hint="Creates and selects it">
+            <span className="flex gap-2">
+              <input value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} className="admin-input min-w-0 flex-1 rounded-lg border px-3 py-2" />
+              <button type="button" disabled={!newCategoryName.trim()} onClick={() => void createCategory().catch((error) => toast.error(error instanceof Error ? error.message : "Unable to create category"))} className="rounded-lg border border-neutral-600 px-3 py-2 text-neutral-200 disabled:opacity-50">Add</button>
+            </span>
+          </Field>
           <Field label="Tags" hint="Comma-separated"><input value={form.tags} onChange={(event) => update("tags", event.target.value)} className="admin-input w-full rounded-lg border px-3 py-2" /></Field>
           <Field label="Publish at"><input type="datetime-local" value={form.publishedAt} onChange={(event) => update("publishedAt", event.target.value)} className="admin-input w-full rounded-lg border px-3 py-2" /></Field>
           <Field label="Cover image path"><input value={form.coverImageUrl} onChange={(event) => update("coverImageUrl", event.target.value)} className="admin-input w-full rounded-lg border px-3 py-2" /></Field>

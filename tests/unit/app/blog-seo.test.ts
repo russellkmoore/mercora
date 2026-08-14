@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getPublishedBlogPosts: vi.fn(),
+  getPublishedBlogSitemapEntries: vi.fn(),
   getPublishedBlogPost: vi.fn(),
   getPublishedPages: vi.fn(),
   getSitemapCatalogEntries: vi.fn(),
@@ -9,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/models/blog", () => ({
   getPublishedBlogPosts: mocks.getPublishedBlogPosts,
+  getPublishedBlogSitemapEntries: mocks.getPublishedBlogSitemapEntries,
   getPublishedBlogPost: mocks.getPublishedBlogPost,
   getRelatedBlogPosts: vi.fn(() => []),
 }));
@@ -29,6 +31,7 @@ describe("Blog SEO surfaces", () => {
       urls: { site: "https://store.example.test", imageCdn: undefined },
     });
     mocks.getPublishedBlogPosts.mockResolvedValue([]);
+    mocks.getPublishedBlogSitemapEntries.mockResolvedValue([]);
     mocks.getPublishedPages.mockResolvedValue([]);
     mocks.getSitemapCatalogEntries.mockResolvedValue({ products: [], categories: [] });
   });
@@ -39,7 +42,7 @@ describe("Blog SEO surfaces", () => {
       categories: [{ slug: "new" }],
     });
     mocks.getPublishedPages.mockResolvedValue([{ slug: "about", updated_at: 100 }]);
-    mocks.getPublishedBlogPosts.mockResolvedValue([{ slug: "launch", updatedAt: 100 }]);
+    mocks.getPublishedBlogSitemapEntries.mockResolvedValue([{ slug: "launch", updatedAt: 100 }]);
     const entries = await sitemap();
     expect(entries.map(({ url }) => url)).toEqual(expect.arrayContaining([
       "https://store.example.test/",
@@ -83,5 +86,19 @@ describe("Blog SEO surfaces", () => {
       description: "Read this",
       alternates: { canonical: "/blog/launch" },
     });
+  });
+
+  it("resolves relative Blog covers through the configured image CDN for social cards", async () => {
+    mocks.getStoreConfig.mockReturnValue({
+      identity: { name: "Example Store" },
+      urls: { site: "https://store.example.test", imageCdn: "https://images.example.test" },
+    });
+    mocks.getPublishedBlogPost.mockResolvedValue({
+      slug: "launch", title: "Launch", metaTitle: null, metaDescription: null,
+      excerpt: "Read this", coverImageUrl: "/blog/cover.png",
+    });
+    const metadata = await generateMetadata({ params: Promise.resolve({ slug: "launch" }) });
+    expect(metadata.openGraph).toMatchObject({ images: ["https://images.example.test/blog/cover.png"] });
+    expect(metadata.twitter).toMatchObject({ images: ["https://images.example.test/blog/cover.png"] });
   });
 });

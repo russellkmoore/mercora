@@ -21,9 +21,18 @@ describe("page template registry", () => {
   it("derives merchant-facing actions from configured identity and URLs", () => {
     const guide = resolveTemplate("guide", context);
     expect(guide.cta?.body).toContain("Example Store");
-    expect(guide.cta?.actions).toContainEqual(expect.objectContaining({ label: "Ask Helper" }));
+    expect(guide.cta?.actions).toContainEqual(expect.objectContaining({ href: "/" }));
     const legal = resolveTemplate("legal", context);
-    expect(legal.cta?.policyLinks.map(({ href }) => href)).toEqual(["/returns", "/privacy", "/terms"]);
+    expect(legal.cta?.policyLinks.map(({ href }) => href)).toEqual(["/privacy", "/terms"]);
+    expect(resolveTemplate("legal", { ...context, returnsUrl: "/refund-policy" })
+      .cta?.policyLinks.map(({ href }) => href)).toEqual(["/refund-policy", "/privacy", "/terms"]);
+  });
+
+  it("uses only routes and interactions that the storefront actually provides", () => {
+    const actions = ["guide", "faq", "legal", "contact", "story"]
+      .flatMap((name) => resolveTemplate(name, context).cta?.actions ?? []);
+    expect(actions.map(({ href }) => href)).not.toContain("/products");
+    expect(actions.map(({ href }) => href)).not.toContain("/agent");
   });
 
   it("contains no inherited demo-store product/category copy", () => {

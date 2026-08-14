@@ -35,6 +35,7 @@ describe("page section parsing", () => {
     expect(parsed.sections[0]).toMatchObject({
       specs: ["Fast"], callouts: ["Remember this."], productSlug: "widget", html: "<p>Body.</p>",
     });
+    expect(parsed.sections[0].productFallbackHtml).toContain("/product/widget");
   });
 
   it("supports legacy blend markup without requiring it", () => {
@@ -66,5 +67,23 @@ describe("page section parsing", () => {
     const html = "<p><strong>Last Updated:</strong> 2026-08-13</p><p>Policy.</p>";
     expect(parsePageHtml(html).updatedLabel).toBe("Last Updated: 2026-08-13");
     expect(parsePageHtml(html, { liftUpdatedLabel: false, promoteLede: false }).lead).toContain("Last Updated");
+  });
+
+  it("deduplicates a seeded page-title heading before parsing legal metadata", () => {
+    const parsed = parsePageHtml(
+      "<h1>Privacy Policy</h1><p><strong>Last Updated:</strong> 2026-08-13</p><h2>Scope</h2><p>Terms.</p>",
+      { pageTitle: "privacy policy", promoteLede: false },
+    );
+    expect(parsed.updatedLabel).toBe("Last Updated: 2026-08-13");
+    expect(parsed.lead).not.toContain("<h1");
+    expect(parsed.sections[0]).toMatchObject({ heading: "Scope", html: "<p>Terms.</p>" });
+  });
+
+  it("preserves a leading heading that is not the rendered page title", () => {
+    const parsed = parsePageHtml("<h1>Distinct authored heading</h1><p>Body.</p>", {
+      pageTitle: "Page title",
+      promoteLede: false,
+    });
+    expect(parsed.lead).toContain("Distinct authored heading");
   });
 });

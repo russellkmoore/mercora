@@ -41,6 +41,7 @@ export default async function PageRenderer({
   });
   const sanitized = sanitizePageHtmlServer(page.content, { allowedImageOrigin });
   const parsed = parsePageHtml(sanitized, {
+    pageTitle: page.title,
     promoteLede: !page.excerpt,
     extractConventions: template.kind === "guide",
     liftUpdatedLabel: template.kind === "legal",
@@ -73,7 +74,13 @@ export default async function PageRenderer({
 
   return (
     <>
-      <CustomPageAssets pageId={page.id} customCss={page.custom_css} customJs={page.custom_js} customJsEnabled={customJsEnabled} />
+      <CustomPageAssets
+        pageId={page.id}
+        customCss={page.custom_css}
+        customJsPath={customJsEnabled && page.custom_js
+          ? `/api/pages/${encodeURIComponent(page.slug)}/script`
+          : null}
+      />
       <PageHero eyebrow={template.eyebrow} title={page.title} lede={lede} />
       <div className={`mx-auto max-w-5xl px-4 py-10 sm:px-6 ${showRail ? "lg:grid lg:grid-cols-[180px_1fr] lg:gap-10" : ""}`}>
         {showRail && <PageRail sections={parsed.sections} />}

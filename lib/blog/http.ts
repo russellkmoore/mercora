@@ -28,7 +28,7 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
 
 export function blogErrorStatus(error: unknown): 400 | 409 | 500 {
   if (!(error instanceof Error)) return 500;
-  if (/UNIQUE constraint failed: blog_posts\.slug|unique.*blog_posts.*slug/i.test(error.message)) return 409;
+  if (/UNIQUE constraint failed: blog_(?:posts|categories)\.slug|unique.*blog_(?:posts|categories).*slug/i.test(error.message)) return 409;
   if (/required|must be|is too long|is invalid|publication time|content|slug/i.test(error.message)) return 400;
   return 500;
 }

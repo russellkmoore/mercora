@@ -23,3 +23,10 @@ export function toPublicPage(page: PageSelect): PublicPage {
     custom_css: page.custom_css,
   };
 }
+
+export type PublicPageSummary = Omit<PublicPage, "content" | "custom_css">;
+
+export function toPublicPageSummary(page: PageSelect): PublicPageSummary {
+  const { content: _content, custom_css: _customCss, ...summary } = toPublicPage(page);
+  return summary;
+}

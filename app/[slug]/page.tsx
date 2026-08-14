@@ -37,14 +37,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
     const publishedAt = parseCmsTimestamp(page.published_at ?? page.created_at);
     const modifiedAt = parseCmsTimestamp(page.updated_at);
+    const storeName = getStoreConfig().identity.name;
 
     return {
       title: page.meta_title || page.title,
-      description: page.meta_description || page.excerpt || `${page.title} - Mercora`,
+      description: page.meta_description || page.excerpt || `${page.title} - ${storeName}`,
       keywords: page.meta_keywords?.split(',').map((k: string) => k.trim()),
       openGraph: {
         title: page.meta_title || page.title,
-        description: page.meta_description || page.excerpt || `${page.title} - Mercora`,
+        description: page.meta_description || page.excerpt || `${page.title} - ${storeName}`,
         type: 'article',
         ...(publishedAt && { publishedTime: publishedAt.toISOString() }),
         ...(modifiedAt && { modifiedTime: modifiedAt.toISOString() }),

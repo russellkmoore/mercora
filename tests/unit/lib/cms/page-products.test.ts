@@ -8,7 +8,7 @@ import type { PageSection } from "@/lib/cms/page-sections";
 
 const lookup = vi.mocked(getProductsBySlugs);
 const section = (id: string, productSlug: string | null): PageSection => ({
-  id, heading: id, html: "", specs: [], productSlug, callouts: [],
+  id, heading: id, html: "", specs: [], productSlug, productFallbackHtml: null, callouts: [],
 });
 const product = (overrides: Record<string, unknown> = {}) => ({
   id: "p1",

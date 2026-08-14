@@ -7,11 +7,16 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getPublishedPages, getNavigationPages, searchPages } from "@/lib/models/pages";
-import { toPublicPage } from "@/lib/cms/public-page";
+import { toPublicPageSummary } from "@/lib/cms/public-page";
 
 function boundedLimit(value: string | null): number {
   if (!value || !/^\d+$/.test(value)) return 10;
   return Math.min(50, Math.max(1, Number(value)));
+}
+
+function boundedOffset(value: string | null): number {
+  if (!value || !/^\d+$/.test(value)) return 0;
+  return Math.min(10_000, Number(value));
 }
 
 /**
@@ -23,6 +28,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search');
     const navOnly = searchParams.get('nav_only') === 'true';
     const limit = boundedLimit(searchParams.get('limit'));
+    const offset = boundedOffset(searchParams.get('offset'));
 
     // Handle search
     if (search) {
@@ -32,29 +38,30 @@ export async function GET(request: NextRequest) {
       const results = await searchPages(search, {
         includeUnpublished: false, // Only published pages for public
         limit,
+        offset,
       });
       
       return NextResponse.json({
         success: true,
-        data: results.map(toPublicPage)
+        data: results.map(toPublicPageSummary)
       });
     }
 
     // Get navigation pages only
     if (navOnly) {
-      const pages = await getNavigationPages();
+      const pages = await getNavigationPages({ limit, offset });
       return NextResponse.json({
         success: true,
-        data: pages.map(toPublicPage)
+        data: pages.map(toPublicPageSummary)
       });
     }
 
     // Get all published pages
-    const pages = await getPublishedPages();
+    const pages = await getPublishedPages({ limit, offset });
 
     return NextResponse.json({
       success: true,
-      data: pages.map(toPublicPage)
+      data: pages.map(toPublicPageSummary)
     });
 
   } catch (error) {

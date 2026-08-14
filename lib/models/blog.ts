@@ -37,6 +37,14 @@ export interface BlogPost extends BlogPostSummary {
   updatedBy: string | null;
 }
 
+export type BlogCategory = BlogCategoryRow;
+
+export interface BlogCategoryInput {
+  name: string;
+  slug?: string;
+  description?: string | null;
+}
+
 export type PublicBlogPost = Omit<BlogPost, "editorJson" | "createdBy" | "updatedBy">;
 
 export interface BlogPostInput {
@@ -203,6 +211,17 @@ export async function getPublishedBlogPosts(options: {
   return rows.map(toSummary);
 }
 
+export async function getPublishedBlogSitemapEntries(
+  now = Math.floor(Date.now() / 1000),
+): Promise<Array<{ slug: string; updatedAt: number }>> {
+  const db = await getDbAsync();
+  return db.select({ slug: blogPosts.slug, updatedAt: blogPosts.updatedAt })
+    .from(blogPosts)
+    .where(and(eq(blogPosts.status, "published"), lte(blogPosts.publishedAt, now)))
+    .orderBy(desc(blogPosts.updatedAt), desc(blogPosts.id))
+    .limit(49_000);
+}
+
 export const getPublishedBlogPost = cache(async (
   slug: string,
   now = Math.floor(Date.now() / 1000),
@@ -343,4 +362,24 @@ export async function getBlogStats(): Promise<{ total: number; published: number
 export async function getBlogCategories(): Promise<BlogCategoryRow[]> {
   const db = await getDbAsync();
   return db.select().from(blogCategories).orderBy(blogCategories.name);
+}
+
+function normalizeCategoryInput(input: BlogCategoryInput) {
+  const name = requiredText(input.name, "Category name", 120);
+  return {
+    name,
+    slug: normalizeBlogSlug(input.slug || name),
+    description: optionalText(input.description, "Category description", 1000),
+  };
+}
+
+export async function adminCreateBlogCategory(input: BlogCategoryInput): Promise<BlogCategory> {
+  const now = Math.floor(Date.now() / 1000);
+  const db = await getDbAsync();
+  const rows = await db.insert(blogCategories).values({
+    ...normalizeCategoryInput(input),
+    createdAt: now,
+    updatedAt: now,
+  }).returning();
+  return rows[0];
 }

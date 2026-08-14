@@ -99,24 +99,28 @@ export async function getPages(options: {
 /**
  * Get published pages for public display
  */
-export async function getPublishedPages(): Promise<PageSelect[]> {
-  return getPages({ 
-    status: PAGE_STATUS.PUBLISHED, 
+export async function getPublishedPages(options: { limit?: number; offset?: number } = {}): Promise<PageSelect[]> {
+  return (await getPages({
+    status: PAGE_STATUS.PUBLISHED,
     includeProtected: false,
     visibleAt: Math.floor(Date.now() / 1000),
-  });
+    limit: options.limit,
+    offset: options.offset,
+  })).filter((page) => !isReservedPageSlug(page.slug));
 }
 
 /**
  * Get navigation pages
  */
-export async function getNavigationPages(): Promise<PageSelect[]> {
-  return getPages({ 
-    status: PAGE_STATUS.PUBLISHED, 
+export async function getNavigationPages(options: { limit?: number; offset?: number } = {}): Promise<PageSelect[]> {
+  return (await getPages({
+    status: PAGE_STATUS.PUBLISHED,
     includeNavOnly: true,
     includeProtected: false,
     visibleAt: Math.floor(Date.now() / 1000),
-  });
+    limit: options.limit,
+    offset: options.offset,
+  })).filter((page) => !isReservedPageSlug(page.slug));
 }
 
 /**
@@ -181,6 +185,10 @@ export async function createPage(data: Omit<PageInsert, 'id' | 'created_at' | 'u
   if (!data.slug && data.title) {
     const existingSlugs = await getExistingSlugs();
     data.slug = generatePageSlug(data.title, existingSlugs);
+  }
+  const finalSlugError = pageSlugError(data.slug);
+  if (finalSlugError) {
+    throw new Error(`Invalid page data: ${finalSlugError}`);
   }
 
   data.content = sanitizePageHtmlServer(data.content, {
@@ -258,6 +266,12 @@ export async function updatePage(
     if (cleanData.title && cleanData.title !== currentPage.title && !cleanData.slug) {
       const existingSlugs = await getExistingSlugs();
       cleanData.slug = generatePageSlug(cleanData.title, existingSlugs);
+    }
+    if (cleanData.slug !== undefined) {
+      const finalSlugError = pageSlugError(cleanData.slug);
+      if (finalSlugError) {
+        throw new Error(`Invalid page data: ${finalSlugError}`);
+      }
     }
 
     if (cleanData.content !== undefined) {
@@ -462,11 +476,8 @@ export function validatePageData(data: Partial<PageInsert>): { valid: boolean; e
   
   // Slug validation
   if (data.slug !== undefined) {
-    if (!data.slug || data.slug.trim().length === 0) {
-      errors.push("Slug is required");
-    } else if (!/^[a-z0-9-]+$/.test(data.slug)) {
-      errors.push("Slug can only contain lowercase letters, numbers, and hyphens");
-    }
+    const error = pageSlugError(data.slug);
+    if (error) errors.push(error);
   }
   
   // Content validation
@@ -483,6 +494,23 @@ export function validatePageData(data: Partial<PageInsert>): { valid: boolean; e
     valid: errors.length === 0,
     errors
   };
+}
+
+export const RESERVED_PAGE_SLUGS = new Set([
+  "account", "admin", "api", "blog", "cart", "category", "checkout",
+  "order-status", "orders", "product", "robots.txt", "sign-in", "sign-up",
+  "sitemap.xml",
+]);
+
+export function isReservedPageSlug(slug: string): boolean {
+  return RESERVED_PAGE_SLUGS.has(slug.trim().toLowerCase());
+}
+
+function pageSlugError(slug: unknown): string | null {
+  if (typeof slug !== "string" || !slug.trim()) return "Slug is required";
+  if (!/^[a-z0-9-]+$/.test(slug)) return "Slug can only contain lowercase letters, numbers, and hyphens";
+  if (isReservedPageSlug(slug)) return "Slug conflicts with a storefront route";
+  return null;
 }
 
 
@@ -505,6 +533,7 @@ export async function searchPages(
     includeUnpublished?: boolean;
     includeContent?: boolean;
     limit?: number;
+    offset?: number;
   } = {}
 ): Promise<PageSelect[]> {
   return getPages({
@@ -513,6 +542,7 @@ export async function searchPages(
     includeProtected: options.includeUnpublished === true,
     visibleAt: options.includeUnpublished ? undefined : Math.floor(Date.now() / 1000),
     limit: options.limit || 10,
+    offset: options.offset,
   });
 }
 

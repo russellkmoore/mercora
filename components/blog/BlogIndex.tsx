@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import type { BlogPostSummary } from "@/lib/blog/values";
 import { formatCmsTimestamp } from "@/lib/utils/cms-timestamp";
 
-export default function BlogIndex({ posts }: { posts: BlogPostSummary[] }) {
+export default function BlogIndex({ posts, page, hasMore }: { posts: BlogPostSummary[]; page: number; hasMore: boolean }) {
   const [tag, setTag] = useState<string | null>(null);
   const tags = useMemo(() => [...new Set(posts.flatMap((post) => post.tags))].sort(), [posts]);
   const visible = tag ? posts.filter((post) => post.tags.includes(tag)) : posts;
@@ -39,6 +39,13 @@ export default function BlogIndex({ posts }: { posts: BlogPostSummary[] }) {
             </article>
           ))}
         </div>
+      )}
+      {(page > 1 || hasMore) && (
+        <nav aria-label="Blog pages" className="mt-8 flex items-center justify-center gap-4">
+          {page > 1 && <Link href={page === 2 ? "/blog" : `/blog?page=${page - 1}`} className="rounded-lg border border-neutral-700 px-4 py-2 text-neutral-300 hover:border-orange-500">Previous</Link>}
+          <span className="text-sm text-neutral-500">Page {page}</span>
+          {hasMore && <Link href={`/blog?page=${page + 1}`} className="rounded-lg border border-neutral-700 px-4 py-2 text-neutral-300 hover:border-orange-500">Next</Link>}
+        </nav>
       )}
     </>
   );
