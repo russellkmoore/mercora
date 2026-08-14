@@ -20,6 +20,7 @@ export type PageTemplateContext = {
   privacyUrl: string;
   termsUrl: string;
   returnsUrl: string;
+  returnsConfigured: boolean;
 };
 
 export const MIN_SECTIONS_FOR_RAIL = 3;
@@ -37,7 +38,7 @@ function deepFreeze<T>(value: T): T {
 function templates(context: PageTemplateContext): Record<PageTemplateKind, PageTemplateConfig> {
   const browse: PageCtaAction = { label: "Browse products", href: "/", variant: "primary" };
   const policyLinks = [
-    ...(context.returnsUrl !== "/returns" ? [{ label: "Returns", href: context.returnsUrl }] : []),
+    ...(context.returnsConfigured ? [{ label: "Returns", href: context.returnsUrl }] : []),
     { label: "Privacy", href: context.privacyUrl },
     { label: "Terms", href: context.termsUrl },
   ];

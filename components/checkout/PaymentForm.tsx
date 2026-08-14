@@ -178,7 +178,10 @@ export default function PaymentForm({
             )}
           </Button>
           <p className="text-center text-xs text-gray-500">
-            By completing payment, you agree to the <a className="underline" href={store.urls.terms}>terms</a> and acknowledge the <a className="underline" href={store.urls.privacy}>privacy policy</a>. Review the <a className="underline" href={store.urls.returns}>returns policy</a> before ordering.
+            By completing payment, you agree to the <a className="underline" href={store.urls.terms}>terms</a> and acknowledge the <a className="underline" href={store.urls.privacy}>privacy policy</a>.
+            {store.urls.returnsConfigured && (
+              <> Review the <a className="underline" href={store.urls.returns}>returns policy</a> before ordering.</>
+            )}
           </p>
         </form>
       )}

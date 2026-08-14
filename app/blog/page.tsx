@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import BlogIndex from "@/components/blog/BlogIndex";
+import { parseBlogPage } from "@/lib/blog/http";
 import { getPublishedBlogPosts } from "@/lib/models/blog";
 import { getStoreConfig } from "@/lib/store-config";
 
@@ -13,7 +14,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const store = getStoreConfig();
   const rawPage = (await searchParams).page;
-  const page = rawPage && /^\d+$/.test(rawPage) ? Math.max(1, Number(rawPage)) : 1;
+  const page = parseBlogPage(rawPage);
   return {
     title: `${page > 1 ? `Blog — Page ${page}` : "Blog"} | ${store.identity.name}`,
     description: `News and guides from ${store.identity.name}.`,
@@ -27,7 +28,7 @@ export default async function BlogPage({
   searchParams: Promise<{ page?: string }>;
 }) {
   const rawPage = (await searchParams).page;
-  const page = rawPage && /^\d+$/.test(rawPage) ? Math.max(1, Math.min(417, Number(rawPage))) : 1;
+  const page = parseBlogPage(rawPage);
   const pageSize = 24;
   const result = await getPublishedBlogPosts({ limit: pageSize + 1, offset: (page - 1) * pageSize });
   const posts = result.slice(0, pageSize);

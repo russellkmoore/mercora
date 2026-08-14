@@ -5,6 +5,10 @@ export function parsePositiveInt(value: string | null, fallback: number, maximum
   return Math.min(maximum, Math.max(1, Number(value)));
 }
 
+export function parseBlogPage(value: string | null | undefined): number {
+  return parsePositiveInt(value ?? null, 1, 417);
+}
+
 export function parseOffset(value: string | null): number {
   if (!value || !/^\d+$/.test(value)) return 0;
   return Math.min(10_000, Number(value));

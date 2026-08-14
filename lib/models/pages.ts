@@ -5,7 +5,7 @@
  * Integrates with the existing Cloudflare D1/Drizzle ORM architecture.
  */
 
-import { desc, eq, and, or, isNull, lte, count, like, inArray } from "drizzle-orm";
+import { desc, eq, and, or, isNull, lte, count, like, inArray, notInArray } from "drizzle-orm";
 import { getDbAsync } from "@/lib/db";
 import { getStoreConfig } from "@/lib/store-config";
 import { sanitizePageHtmlServer } from "@/lib/utils/sanitize-html-server";
@@ -37,6 +37,7 @@ export async function getPages(options: {
   offset?: number;
   searchTerm?: string;
   visibleAt?: number;
+  excludeReservedSlugs?: boolean;
 } = {}): Promise<PageSelect[]> {
   const db = await getDbAsync();
   
@@ -76,6 +77,10 @@ export async function getPages(options: {
       )
     );
   }
+
+  if (options.excludeReservedSlugs) {
+    conditions.push(notInArray(pages.slug, [...RESERVED_PAGE_SLUGS]));
+  }
   
   // Apply conditions
   if (conditions.length > 0) {
@@ -104,9 +109,10 @@ export async function getPublishedPages(options: { limit?: number; offset?: numb
     status: PAGE_STATUS.PUBLISHED,
     includeProtected: false,
     visibleAt: Math.floor(Date.now() / 1000),
+    excludeReservedSlugs: true,
     limit: options.limit,
     offset: options.offset,
-  })).filter((page) => !isReservedPageSlug(page.slug));
+  }));
 }
 
 /**
@@ -118,9 +124,10 @@ export async function getNavigationPages(options: { limit?: number; offset?: num
     includeNavOnly: true,
     includeProtected: false,
     visibleAt: Math.floor(Date.now() / 1000),
+    excludeReservedSlugs: true,
     limit: options.limit,
     offset: options.offset,
-  })).filter((page) => !isReservedPageSlug(page.slug));
+  }));
 }
 
 /**
@@ -150,6 +157,7 @@ export async function getPageBySlug(
   const conditions = [eq(pages.slug, slug)];
   if (!includeUnpublished) {
     conditions.push(eq(pages.status, PAGE_STATUS.PUBLISHED));
+    conditions.push(notInArray(pages.slug, [...RESERVED_PAGE_SLUGS]));
     conditions.push(or(
       isNull(pages.published_at),
       lte(pages.published_at, options.now ?? Math.floor(Date.now() / 1000)),
@@ -536,14 +544,16 @@ export async function searchPages(
     offset?: number;
   } = {}
 ): Promise<PageSelect[]> {
-  return getPages({
+  const results = await getPages({
     searchTerm,
     status: options.includeUnpublished ? undefined : PAGE_STATUS.PUBLISHED,
     includeProtected: options.includeUnpublished === true,
     visibleAt: options.includeUnpublished ? undefined : Math.floor(Date.now() / 1000),
+    excludeReservedSlugs: options.includeUnpublished !== true,
     limit: options.limit || 10,
     offset: options.offset,
   });
+  return results;
 }
 
 /**

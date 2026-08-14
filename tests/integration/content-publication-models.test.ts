@@ -17,7 +17,7 @@ import {
   getPublishedBlogPost,
   getPublishedBlogPosts,
 } from "@/lib/models/blog";
-import { getPageBySlug, getPublishedPages } from "@/lib/models/pages";
+import { getPageBySlug, getPublishedPages, searchPages } from "@/lib/models/pages";
 
 beforeEach(async () => {
   await applyTestMigrations();
@@ -48,6 +48,10 @@ describe("real D1 public content visibility", () => {
     await expect(getPageBySlug("draft-page", false, { now: 200 })).resolves.toBeNull();
     await expect(getPageBySlug("future-page", false, { now: 200 })).resolves.toBeNull();
     await expect(getPageBySlug("members-page", false, { now: 200 })).resolves.toBeNull();
+    await expect(getPageBySlug("blog", false, { now: 200 })).resolves.toBeNull();
+    await expect(searchPages("Body", { limit: 1 })).resolves.toEqual([
+      expect.objectContaining({ slug: "visible-page" }),
+    ]);
   });
 
   it("enforces Blog scheduling and strips private/editor fields from public detail", async () => {
