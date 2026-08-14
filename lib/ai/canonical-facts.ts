@@ -36,8 +36,11 @@ function nestedValue(value: unknown, ...path: readonly string[]): unknown {
 
 function boundedText(value: unknown, maxLength: number): string | undefined {
   if (typeof value !== "string" || value.length > maxLength) return undefined;
-  const trimmed = value.trim();
-  return trimmed || undefined;
+  const normalized = value
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return normalized || undefined;
 }
 
 function safeEmail(value: unknown): string | undefined {

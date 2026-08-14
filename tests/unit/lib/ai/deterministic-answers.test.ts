@@ -58,6 +58,7 @@ describe('classifyQuery', () => {
     'How much does return shipping cost?',
     'Do you ship internationally?',
     'Can I change my shipping address?',
+    'Where should I send a return?',
     'Do you use plastic-free shipping materials?',
     'Where are you today?',
     '',
