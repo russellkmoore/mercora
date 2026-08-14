@@ -465,7 +465,7 @@ export function buildD1ImportPlan(input: MaterializedD1Input, options: D1PlanOpt
         page.title !== version.title || page.content !== version.content ||
         page.excerpt !== version.excerpt || page.meta_title !== version.meta_title ||
         page.meta_description !== version.meta_description || page.meta_keywords !== version.meta_keywords ||
-        typeof page.template !== "string" || !page.template.trim() || page.template.length > 100 ||
+        page.template !== "default" ||
         page.custom_css !== null || page.custom_js !== null) {
       throw new TypeError("Initial page version must exactly match the supported page snapshot contract");
     }
