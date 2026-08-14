@@ -1,6 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { uploadToR2 } = vi.hoisted(() => ({ uploadToR2: vi.fn() }));
+const { bucket, getCloudflareContext, uploadToR2 } = vi.hoisted(() => ({
+  bucket: { put: vi.fn() },
+  getCloudflareContext: vi.fn(),
+  uploadToR2: vi.fn(),
+}));
+
+vi.mock('@opennextjs/cloudflare', () => ({ getCloudflareContext }));
 
 vi.mock('@/lib/auth/admin-middleware', () => ({
   checkAdminPermissions: vi.fn().mockResolvedValue({
@@ -60,10 +66,8 @@ function uploadRequest(options: {
 describe('admin image upload validation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv('MEDIA', 'configured-test-bucket');
+    getCloudflareContext.mockResolvedValue({ env: { MEDIA: bucket } });
   });
-
-  afterEach(() => vi.unstubAllEnvs());
 
   it('rejects unsafe filename segments before an R2 write', async () => {
     const response = await POST(uploadRequest({ filename: '../escape' }));
