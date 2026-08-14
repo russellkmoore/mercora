@@ -111,7 +111,7 @@ async function serveMedia(request: Request, context: RouteContext, head: boolean
 
     if (head) return new Response(null, { status: 200, headers });
     if (!("body" in object) || !object.body) return simpleResponse("Service unavailable", 503, head);
-    return new Response(object.body, { status: 200, headers });
+    return new Response(object.body as ReadableStream, { status: 200, headers });
   } catch {
     return simpleResponse("Service unavailable", 503, head);
   }
