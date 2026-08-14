@@ -58,6 +58,12 @@ export async function getSettings(category?: string): Promise<Record<string, any
  */
 export async function getRefundPolicy() {
   const refundSettings = await getSettings('refund');
+  const rawReturnWindowDays = refundSettings['refund.return_window_days'];
+  const returnWindowDays = typeof rawReturnWindowDays === 'number'
+    ? rawReturnWindowDays
+    : typeof rawReturnWindowDays === 'string' && rawReturnWindowDays.trim() !== ''
+      ? Number(rawReturnWindowDays)
+      : Number.NaN;
   
   return {
     refundShipping: refundSettings['refund.shipping_refunded_partial'] === true,
@@ -67,6 +73,12 @@ export async function getRefundPolicy() {
     applyRestockingFeeOnPartialReturn: refundSettings['refund.apply_restocking_fee_on_partial'] !== false,
     externalFullRestockEnabled:
       refundSettings['refund.external_full_restock_enabled'] === true,
+    // A customer-facing return window must come from a usable current setting.
+    // Keep malformed or missing values unavailable instead of inventing the
+    // seeded default after a failed or partial read.
+    returnWindowDays: Number.isSafeInteger(returnWindowDays) && returnWindowDays > 0
+      ? returnWindowDays
+      : null,
   };
 }
 
@@ -122,6 +134,7 @@ export interface RefundPolicy {
   minimumRefundAmount: number;
   applyRestockingFeeOnPartialReturn: boolean;
   externalFullRestockEnabled: boolean;
+  returnWindowDays: number | null;
 }
 
 export function normalizeRecommendationSettings(
