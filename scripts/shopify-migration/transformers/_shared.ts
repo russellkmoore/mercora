@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+
 import { CURRENCY_PRECISION } from "../../../lib/money/currencies.js";
 import { Money, type StoredMoney } from "../../../lib/money/money.js";
 import { sanitizeRichHtmlServer } from "../../../lib/utils/sanitize-html-core.js";
@@ -17,14 +19,51 @@ export function isReservedPageSlug(slug: string): boolean {
 
 export interface MediaRewrite {
   sourceUrl: string;
+  sourceHost: string;
   objectKey: string;
   publicPath: string;
-  contentType: "image/avif" | "image/gif" | "image/jpeg" | "image/png" | "image/webp";
+  contentType: "image/jpeg" | "image/png" | "image/webp";
   role: "product" | "category" | "page-inline" | "blog-cover" | "blog-inline";
   ownerId: string;
+  requiredBeforePersistence: true;
   altText?: string;
   width?: number;
   height?: number;
+}
+
+export type MediaHostAllowlist = ReadonlySet<string>;
+
+const MAX_MEDIA_HOSTS = 16;
+const MAX_INLINE_MEDIA = 100;
+export const MAX_SQL_TEXT_BYTES = 48 * 1024;
+const DNS_HOSTNAME = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u;
+
+/** Normalize a small exact-host allowlist. Empty explicitly disables media import. */
+export function mediaHostAllowlist(hosts: readonly string[]): MediaHostAllowlist {
+  if (!Array.isArray(hosts) || hosts.length > MAX_MEDIA_HOSTS) {
+    throw new TypeError(`allowedMediaHosts must contain at most ${MAX_MEDIA_HOSTS} exact hostnames`);
+  }
+  const normalized = new Set<string>();
+  for (const raw of hosts) {
+    const value = raw.trim();
+    if (!value || value.includes("://") || /[/\\@:#?%\[\]]/u.test(value)) {
+      throw new TypeError(`Invalid allowed media hostname: ${raw}`);
+    }
+    let hostname: string;
+    try {
+      hostname = new URL(`https://${value}`).hostname.toLowerCase();
+    } catch {
+      throw new TypeError(`Invalid allowed media hostname: ${raw}`);
+    }
+    if (
+      !DNS_HOSTNAME.test(hostname) || isIP(hostname) !== 0 || hostname === "localhost" ||
+      hostname.endsWith(".localhost")
+    ) {
+      throw new TypeError(`Invalid allowed media hostname: ${raw}`);
+    }
+    normalized.add(hostname);
+  }
+  return normalized;
 }
 
 export interface TransformFailure<T> {
@@ -102,11 +141,27 @@ export function clampInventory(value: unknown): number {
   return Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.trunc(value)));
 }
 
+export function boundedPositiveInteger(value: unknown, maximum = 100_000): number | undefined {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 && value <= maximum
+    ? value
+    : undefined;
+}
+
+/** Bytes consumed after Wrangler SQL literal escaping doubles apostrophes. */
+export function escapedSqlUtf8Bytes(value: string): number {
+  const apostrophes = value.match(/'/gu)?.length ?? 0;
+  return new TextEncoder().encode(value).byteLength + apostrophes;
+}
+
+export function fitsEscapedSqlText(value: string, maximum = MAX_SQL_TEXT_BYTES): boolean {
+  return escapedSqlUtf8Bytes(value) <= maximum;
+}
+
 function safeExtension(sourceUrl: string): string | null {
   try {
     const pathname = new URL(sourceUrl).pathname;
     const extension = pathname.match(/\.([a-zA-Z0-9]{2,5})$/)?.[1]?.toLowerCase();
-    return extension && ["avif", "gif", "jpeg", "jpg", "png", "webp"].includes(extension)
+    return extension && ["jpeg", "jpg", "png", "webp"].includes(extension)
       ? extension
       : null;
   } catch {
@@ -119,11 +174,21 @@ function imageContentType(extension: string): MediaRewrite["contentType"] {
   return `image/${extension}` as MediaRewrite["contentType"];
 }
 
-function safeSourceUrl(value: string): string | null {
+function safeSourceUrl(
+  value: string,
+  allowedHosts: MediaHostAllowlist,
+): { href: string; hostname: string } | null {
+  if (value.length > 2_048) return null;
+  const authority = /^https:\/\/([^/?#]+)/iu.exec(value)?.[1];
+  if (!authority || authority.includes(":") || authority.includes("@")) return null;
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:" || url.username || url.password) return null;
-    return url.href;
+    const hostname = url.hostname.toLowerCase();
+    if (
+      url.protocol !== "https:" || url.username || url.password || url.port || isIP(hostname) !== 0 ||
+      hostname === "localhost" || hostname.endsWith(".localhost") || !allowedHosts.has(hostname)
+    ) return null;
+    return { href: url.href, hostname };
   } catch {
     return null;
   }
@@ -131,14 +196,15 @@ function safeSourceUrl(value: string): string | null {
 
 export function mediaRewrite(
   source: string,
+  allowedHosts: MediaHostAllowlist,
   ownerId: string,
   role: MediaRewrite["role"],
   position: number,
   metadata: Pick<MediaRewrite, "altText" | "width" | "height"> = {},
 ): MediaRewrite | null {
-  const sourceUrl = safeSourceUrl(source);
+  const sourceUrl = safeSourceUrl(source, allowedHosts);
   if (!sourceUrl) return null;
-  const extension = safeExtension(sourceUrl);
+  const extension = safeExtension(sourceUrl.href);
   if (!extension) return null;
   const prefix = role === "product" ? "products"
     : role === "category" ? "categories"
@@ -149,12 +215,14 @@ export function mediaRewrite(
       : "";
   const objectKey = `${prefix}/${ownerId}${roleSegment}/${position}.${extension}`;
   return {
-    sourceUrl,
+    sourceUrl: sourceUrl.href,
+    sourceHost: sourceUrl.hostname,
     objectKey,
     publicPath: `/media/${objectKey}`,
     contentType: imageContentType(extension),
     role,
     ownerId,
+    requiredBeforePersistence: true,
     ...metadata,
   };
 }
@@ -162,18 +230,27 @@ export function mediaRewrite(
 /** Rewrite remote image sources to the future local object path before sanitizing. */
 export function rewriteAndSanitizeHtml(
   html: string,
+  allowedHosts: MediaHostAllowlist,
   ownerId: string,
   role: "page-inline" | "blog-inline",
 ): { html: string; media: MediaRewrite[] } {
   const media: MediaRewrite[] = [];
   let position = 0;
   const rewritten = html.replace(
-    /(<img\b[^>]*?\bsrc\s*=\s*)(["'])([^"']+)(\2)/giu,
-    (match, prefix: string, quote: string, source: string) => {
-      const plan = mediaRewrite(source, ownerId, role, ++position);
-      if (!plan) return match;
+    /<img\b[^>]*>/giu,
+    (tag) => {
+      const sourceAttributes = [...tag.matchAll(/\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/giu)];
+      if (sourceAttributes.length === 0) return tag;
+      if (sourceAttributes.length !== 1) return "";
+      const sourceAttribute = sourceAttributes[0];
+      const source = sourceAttribute[1] ?? sourceAttribute[2] ?? sourceAttribute[3] ?? "";
+      position += 1;
+      const plan = position <= MAX_INLINE_MEDIA
+        ? mediaRewrite(source, allowedHosts, ownerId, role, position)
+        : null;
+      if (!plan) return "";
       media.push(plan);
-      return `${prefix}${quote}${plan.publicPath}${quote}`;
+      return tag.replace(sourceAttribute[0], `src="${plan.publicPath}"`);
     },
   );
   return { html: sanitizeRichHtmlServer(rewritten), media };

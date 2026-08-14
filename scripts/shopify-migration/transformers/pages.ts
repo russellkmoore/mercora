@@ -3,7 +3,9 @@ import { deterministicProviderId, providerFingerprint } from "../lib/ids.js";
 import {
   SHOPIFY_PROVIDER,
   excerptFromHtml,
+  fitsEscapedSqlText,
   isReservedPageSlug,
+  mediaHostAllowlist,
   normalizeSlug,
   requiredMigrationTime,
   rewriteAndSanitizeHtml,
@@ -65,6 +67,7 @@ export interface PageTransformRecord {
 export interface PageTransformOptions {
   generatedAt: string;
   actorId: string;
+  allowedMediaHosts: readonly string[];
 }
 
 export function transformPages(
@@ -74,7 +77,8 @@ export function transformPages(
   const generatedAtIso = requiredMigrationTime(options.generatedAt);
   const generatedAt = unixTimestamp(generatedAtIso)!;
   const actorId = options.actorId.trim();
-  if (!actorId) throw new TypeError("actorId is required for page version attribution");
+  const allowedMediaHosts = mediaHostAllowlist(options.allowedMediaHosts);
+  if (!actorId || actorId.length > 255) throw new TypeError("actorId must be 1-255 characters for page version attribution");
   const records: PageTransformRecord[] = [];
   const idMap = new Map<string, string>();
   const skipped: Array<{ record: ShopifyPage; reason: string }> = [];
@@ -85,7 +89,10 @@ export function transformPages(
     const sourceId = String(source.id ?? "").trim();
     const title = source.title?.trim();
     const slug = normalizeSlug(source.handle ?? "");
-    if (!sourceId || !title || !slug) {
+    if (
+      !sourceId || sourceId.length > 256 || !title || title.length > 500 || !slug || slug.length > 160 ||
+      (source.body_html?.length ?? 0) > 100_000 || (source.template_suffix?.length ?? 0) > 100
+    ) {
       skipped.push({ record: source, reason: "Page requires an id, title, and valid handle" });
       continue;
     }
@@ -97,11 +104,19 @@ export function transformPages(
       skipped.push({ record: source, reason: `Duplicate page slug: ${slug}` });
       continue;
     }
-    slugs.add(slug);
-
     const pageReferenceId = deterministicProviderId(SHOPIFY_PROVIDER, "page", sourceId);
     const sourceFingerprint = providerFingerprint(SHOPIFY_PROVIDER, "page", sourceId);
-    const { html, media } = rewriteAndSanitizeHtml(source.body_html ?? "", pageReferenceId, "page-inline");
+    const { html, media } = rewriteAndSanitizeHtml(
+      source.body_html ?? "",
+      allowedMediaHosts,
+      pageReferenceId,
+      "page-inline",
+    );
+    if (!html.trim() || html.length > 100_000 || !fitsEscapedSqlText(html)) {
+      skipped.push({ record: source, reason: "Page content is empty or exceeds the SQL-safe text limit" });
+      continue;
+    }
+    slugs.add(slug);
     const publishedAt = unixTimestamp(source.published_at);
     if (source.published_at && publishedAt === null) {
       warnings.push(`Page ${sourceFingerprint} has an invalid publication time and was imported as draft`);
