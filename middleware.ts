@@ -62,17 +62,19 @@ import { getDbAsync } from "@/lib/db";
 import { redirectMap } from "@/lib/db/schema/redirect-map";
 import { eq } from "drizzle-orm";
 import { resolveLegacyRedirect } from "@/lib/redirects/resolver";
+import { isLegacyRedirectLookupPath } from "@/lib/redirects/policy";
 
 /**
  * Custom middleware that combines Clerk authentication with maintenance mode checking
  */
 export default clerkMiddleware(async (auth, req: NextRequest) => {
   const { pathname } = req.nextUrl;
+  const isLegacyRedirectPath = isLegacyRedirectLookupPath(pathname);
   
   // Skip maintenance check for static assets and Next.js internals
-  if (pathname.includes('/_next') || 
+  if (!isLegacyRedirectPath && (pathname.includes('/_next') || 
       pathname.includes('/favicon') || 
-      pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf)$/)) {
+      pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf)$/))) {
     return NextResponse.next();
   }
   
