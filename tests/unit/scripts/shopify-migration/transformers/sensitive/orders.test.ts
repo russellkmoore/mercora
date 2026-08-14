@@ -108,6 +108,18 @@ describe("historical Shopify order transform", () => {
     expect(JSON.stringify(record)).not.toContain("order-source-private");
   });
 
+  it("persists identical rows when only the operator run time changes", () => {
+    const input = order({ created_at: undefined, updated_at: undefined });
+    const options = { unresolvedCustomer: "reject" as const, ...mappings() };
+    const first = transformHistoricalOrders([input], { generatedAt, ...options });
+    const later = transformHistoricalOrders([input], {
+      generatedAt: "2027-08-14T12:00:00.000Z",
+      ...options,
+    });
+    expect(first).toEqual(later);
+    expect(first.records[0].order.created_at).toBe("1970-01-01T00:00:00.000Z");
+  });
+
   it("uses conservative payment and fulfillment mappings", () => {
     const result = transformHistoricalOrders([
       order({ id: "refunded", financial_status: "refunded", fulfillment_status: null }),

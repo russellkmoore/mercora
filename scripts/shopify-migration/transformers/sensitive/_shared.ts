@@ -4,6 +4,8 @@ import { SHOPIFY_PROVIDER } from "../_shared.js";
 export const MAX_SENSITIVE_RECORDS = 100_000;
 export const MAX_ADDRESSES = 25;
 export const MAX_ORDER_ITEMS = 500;
+/** Stable explicit fallback when a source record has no usable timestamp. */
+export const UNKNOWN_SOURCE_TIMESTAMP = "1970-01-01T00:00:00.000Z";
 
 export interface SensitiveTransformResult<TRecord> {
   records: TRecord[];

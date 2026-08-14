@@ -11,6 +11,7 @@ import {
 } from "../_shared.js";
 import {
   MAX_ORDER_ITEMS,
+  UNKNOWN_SOURCE_TIMESTAMP,
   assertBatchSize,
   boundedText,
   normalizedEmail,
@@ -155,7 +156,7 @@ export function transformHistoricalOrders(
   if (options.unresolvedCustomer !== "reject" && options.unresolvedCustomer !== "guest") {
     throw new TypeError("unresolvedCustomer must explicitly be reject or guest");
   }
-  const generatedAt = requiredMigrationTime(options.generatedAt);
+  requiredMigrationTime(options.generatedAt);
   const records: HistoricalOrderTransformRecord[] = [];
   const idMap = new Map<string, string>();
   const skipped: Array<{ sourceFingerprint: string | null; reason: string }> = [];
@@ -197,7 +198,7 @@ export function transformHistoricalOrders(
         warnings.push(`Order ${sourceFingerprint} has an incomplete billing address; address omitted`);
       }
       const email = normalizedEmail(order.email);
-      const createdAt = isoTimestamp(order.created_at, generatedAt);
+      const createdAt = isoTimestamp(order.created_at, UNKNOWN_SOURCE_TIMESTAMP);
       const updatedAt = isoTimestamp(order.updated_at, createdAt);
       const id = deterministicProviderId(SHOPIFY_PROVIDER, "order", providerId);
       const sourceFinancialStatus = boundedText(order.financial_status, 64)?.toLowerCase() ?? null;
@@ -229,7 +230,6 @@ export function transformHistoricalOrders(
               imported: true,
               historical: true,
               read_only: true,
-              generated_at: generatedAt,
               source_fingerprint: sourceFingerprint,
             },
             payment_provenance: {

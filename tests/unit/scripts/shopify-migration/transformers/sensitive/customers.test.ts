@@ -100,6 +100,17 @@ describe("sensitive customer transform", () => {
     });
   });
 
+  it("persists identical plans when only the operator run time changes", () => {
+    const first = transformCustomers([customer({ created_at: undefined, updated_at: undefined })], {
+      generatedAt,
+    });
+    const later = transformCustomers([customer({ created_at: undefined, updated_at: undefined })], {
+      generatedAt: "2027-08-14T12:00:00.000Z",
+    });
+    expect(first).toEqual(later);
+    expect(first.records[0].customerFields.created_at).toBe("1970-01-01T00:00:00.000Z");
+  });
+
   it("keeps unverified identity conservative and omits incomplete addresses", () => {
     const result = transformCustomers([customer({
       verified_email: false,

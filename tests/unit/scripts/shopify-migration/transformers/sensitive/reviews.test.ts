@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { JudgeMeFileRow, JudgeMeReview } from "@/scripts/shopify-migration/lib/types";
 import { providerFingerprint } from "@/scripts/shopify-migration/lib/ids";
 import {
+  type ImportedReviewAttribution,
   judgeMeReviewFingerprint,
   normalizeJudgeMeFileRow,
   normalizeJudgeMeFileRows,
@@ -10,7 +11,7 @@ import {
 
 const generatedAt = "2026-08-14T12:00:00.000Z";
 const productId = "product_target";
-const customerId = "customer_target";
+const customerId = "user_1234567890";
 
 function review(overrides: Partial<JudgeMeReview> = {}): JudgeMeReview {
   return {
@@ -27,7 +28,7 @@ function review(overrides: Partial<JudgeMeReview> = {}): JudgeMeReview {
   };
 }
 
-function mappings() {
+function mappings(inputs: readonly JudgeMeReview[] = [review()]) {
   return {
     productIds: new Map([
       [providerFingerprint("shopify", "product", "product-source-private"), productId],
@@ -36,6 +37,11 @@ function mappings() {
     customerIdsByEmailFingerprint: new Map([
       [providerFingerprint("shopify", "customer_email", "reviewer@example.invalid"), customerId],
     ]),
+    reviewAttributions: new Map<string, ImportedReviewAttribution>(inputs.map((input) => [judgeMeReviewFingerprint(input), {
+      productId,
+      orderId: "order_target",
+      customerId,
+    }])),
   };
 }
 
@@ -98,7 +104,7 @@ describe("Judge.me review transform", () => {
       id: expect.stringMatching(/^judge_me_review_/),
       product_id: productId,
       customer_id: customerId,
-      order_id: expect.stringMatching(/^judge_me_imported_order_/),
+      order_id: "order_target",
       order_item_id: null,
       status: "pending",
       is_verified: false,
@@ -114,9 +120,20 @@ describe("Judge.me review transform", () => {
     expect(JSON.stringify(transformed)).not.toContain("product-source-private");
   });
 
+  it("persists identical rows when only the operator run time changes", () => {
+    const input = review();
+    const options = mappings([input]);
+    const first = transformJudgeMeReviews([input], { generatedAt, ...options });
+    const later = transformJudgeMeReviews([input], {
+      generatedAt: "2027-08-14T12:00:00.000Z",
+      ...options,
+    });
+    expect(first).toEqual(later);
+  });
+
   it("fingerprints bounded long review content without persisting it in identity metadata", () => {
     const input = review({ body: "Synthetic sentence. ".repeat(300) });
-    const result = transformJudgeMeReviews([input], { generatedAt, ...mappings() });
+    const result = transformJudgeMeReviews([input], { generatedAt, ...mappings([input]) });
     expect(result.records).toHaveLength(1);
     expect(result.records[0].sourceFingerprint).toMatch(/^[a-f0-9]{64}$/);
     expect(result.records[0].review.metadata).not.toContain("Synthetic sentence");
@@ -125,9 +142,16 @@ describe("Judge.me review transform", () => {
   it("sets verified only from explicit matching order provenance", () => {
     const input = review({ status: "published" });
     const fingerprint = judgeMeReviewFingerprint(input);
+    const resolvedMappings = mappings([input]);
+    resolvedMappings.reviewAttributions.set(fingerprint, {
+      productId,
+      customerId,
+      orderId: "order_target",
+      orderItemId: "line_target",
+    });
     const result = transformJudgeMeReviews([input], {
       generatedAt,
-      ...mappings(),
+      ...resolvedMappings,
       verifiedPurchases: new Map([[fingerprint, {
         verified: true,
         productId,
@@ -153,7 +177,7 @@ describe("Judge.me review transform", () => {
     const fingerprint = judgeMeReviewFingerprint(input);
     const result = transformJudgeMeReviews([input], {
       generatedAt,
-      ...mappings(),
+      ...mappings([input]),
       verifiedPurchases: new Map([[fingerprint, {
         verified: true,
         productId: "different_product",
@@ -169,11 +193,12 @@ describe("Judge.me review transform", () => {
   });
 
   it("maps only explicit publication and suppression states", () => {
-    const result = transformJudgeMeReviews([
+    const inputs = [
       review({ review_date: "2025-01-01", status: "approved" }),
       review({ review_date: "2025-01-02", status: "spam" }),
       review({ review_date: "2025-01-03", status: "unknown" }),
-    ], { generatedAt, ...mappings() });
+    ];
+    const result = transformJudgeMeReviews(inputs, { generatedAt, ...mappings(inputs) });
     expect(result.records.map(({ review: value }) => [value.status, Boolean(value.published_at)])).toEqual([
       ["published", true],
       ["suppressed", false],
@@ -189,13 +214,19 @@ describe("Judge.me review transform", () => {
       providerFingerprint("shopify", "product_handle", "example-product"),
       "different_product",
     );
-    const invalid = transformJudgeMeReviews([
+    const invalidInputs = [
       review({ rating: 4.5 }),
       review({ review_date: "2025-01-02", body: "" }),
-    ], { generatedAt, ...mappings() });
+    ];
+    const invalid = transformJudgeMeReviews(invalidInputs, {
+      generatedAt,
+      ...mappings(invalidInputs),
+    });
     const ambiguousResult = transformJudgeMeReviews([ambiguous], {
       generatedAt,
       ...ambiguousMappings,
+      ...mappings([ambiguous]),
+      productIds: ambiguousMappings.productIds,
     });
     const duplicates = transformJudgeMeReviews([duplicate, duplicate], { generatedAt, ...mappings() });
 
@@ -209,5 +240,44 @@ describe("Judge.me review transform", () => {
     expect(duplicates.skipped[0].reason).toBe("Duplicate review source identity");
     expect([...invalid.skipped, ...ambiguousResult.skipped, ...duplicates.skipped]
       .every((entry) => !("record" in entry))).toBe(true);
+  });
+
+  it("refuses dangling synthetic order or customer identities", () => {
+    const input = review();
+    const missing = transformJudgeMeReviews([input], {
+      generatedAt,
+      ...mappings([input]),
+      reviewAttributions: new Map(),
+    });
+    const provisional = transformJudgeMeReviews([input], {
+      generatedAt,
+      ...mappings([input]),
+      reviewAttributions: new Map([[judgeMeReviewFingerprint(input), {
+        productId,
+        orderId: "judge_me_imported_order_deadbeef",
+        customerId,
+      }]]),
+    });
+    const provisionalCustomer = transformJudgeMeReviews([input], {
+      generatedAt,
+      ...mappings([input]),
+      reviewAttributions: new Map([[judgeMeReviewFingerprint(input), {
+        productId,
+        orderId: "order_target",
+        customerId: "judge_me_imported_customer_deadbeef",
+      }]]),
+    });
+
+    expect(missing.records).toEqual([]);
+    expect(provisional.records).toEqual([]);
+    expect(provisionalCustomer.records).toEqual([]);
+    expect(missing.skipped[0].reason).toContain("real matching order");
+    expect(JSON.stringify([
+      ...missing.records,
+      ...provisional.records,
+      ...provisionalCustomer.records,
+    ])).not.toMatch(
+      /judge_me_imported_(?:order|customer)/,
+    );
   });
 });
