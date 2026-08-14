@@ -84,8 +84,8 @@ const ALLOWED_ERROR_CLASSES = new Set([
 
 const ALLOWED_FIELD_ENUMS = {
   effect_type: new Set([
-    'confirmation_email', 'coupon', 'gift_card', 'inventory', 'subscription',
-    'paid_decrement', 'refund_restock',
+    'confirmation_email', 'coupon', 'gift_card', 'inventory', 'merchant_notification',
+    'subscription', 'paid_decrement', 'refund_restock',
   ]),
   operation: new Set([
     'audit_write', 'claim', 'complete', 'create', 'finalize', 'persist',

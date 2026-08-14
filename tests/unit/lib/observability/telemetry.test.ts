@@ -97,6 +97,8 @@ describe('privacy-safe telemetry envelope', () => {
       .toEqual({ path: '/api/orders/:id' });
     expect(sanitizeTelemetryFields({ path: '/api/orders/WEB-customer-secret' }))
       .toBeUndefined();
+    expect(sanitizeTelemetryFields({ effect_type: 'merchant_notification' }))
+      .toEqual({ effect_type: 'merchant_notification' });
   });
 
   it('samples expected failures but never samples critical failures', () => {

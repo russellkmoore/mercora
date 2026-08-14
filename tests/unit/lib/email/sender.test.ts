@@ -10,7 +10,7 @@ const message = {
 };
 
 beforeEach(() => {
-  delete process.env.EMAIL_PROVIDER;
+  Reflect.deleteProperty(process.env, "EMAIL_PROVIDER");
   delete process.env.RESEND_API_KEY;
 });
 

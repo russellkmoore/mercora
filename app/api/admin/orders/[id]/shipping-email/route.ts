@@ -8,6 +8,7 @@ import {
   initialShippingEmailKey,
   isConcurrentShippingEmailAttempt,
   sendShippingConfirmationEmail,
+  shippingEmailTelemetryProvider,
   shippingEmailFailureDetails,
   shippingEmailSuccessfulEventTypes,
   SHIPPING_EMAIL_TEMPLATE_VERSION,
@@ -266,8 +267,14 @@ export async function POST(
         }, { status: 202 });
       } else {
         recordTelemetry("email.delivery_failed", {
-          operation: "send", outcome: "failed", provider: "resend",
-          retryable: true, path: "/api/admin/orders/:id/shipping-email", trigger: "manual",
+          operation: "send",
+          outcome: result.needsReview ? "needs_review" : "failed",
+          ...(shippingEmailTelemetryProvider(result.provider)
+            ? { provider: shippingEmailTelemetryProvider(result.provider) }
+            : {}),
+          retryable: !result.needsReview,
+          path: "/api/admin/orders/:id/shipping-email",
+          trigger: "manual",
         });
       }
       const eventId = await recordOutcome(

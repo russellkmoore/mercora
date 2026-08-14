@@ -43,6 +43,11 @@ structured log remains available and the commerce operation continues.
 - never falls back across providers after delivery starts, avoiding duplicates
   when the selected provider returns an ambiguous failure.
 
+The Tail Worker keeps this small adapter inside its standalone package instead
+of importing the application sender. It mirrors the same provider selection,
+structured Cloudflare binding, and no-fallback rules without pulling Next.js or
+application D1 delivery-claim dependencies into the Tail Worker bundle.
+
 The Worker exposes no operator HTTP endpoint. Sender, single recipient, subject
 prefix, environment label, operator identity, success cooldown, and failure
 backoff are configuration. The generic committed values deliberately fail

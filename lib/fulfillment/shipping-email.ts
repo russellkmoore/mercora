@@ -1,4 +1,4 @@
-import { sendEmail } from "@/lib/email/sender";
+import { sendEmail, type EmailProvider } from "@/lib/email/sender";
 import { recordTelemetry } from "@/lib/observability/telemetry";
 import { getStoreConfig } from "@/lib/store-config";
 import { escapeHtmlText } from "@/lib/utils/maintenance-html";
@@ -47,6 +47,7 @@ export interface ShippingConfirmationData {
 
 export interface ShippingEmailResult {
   success: boolean;
+  provider?: EmailProvider;
   /** The provider is still resolving another request with the same stable key. */
   pending?: boolean;
   /** The provider may have accepted the message; an operator must reconcile before retrying. */
@@ -60,6 +61,12 @@ export interface InitialShippingEmailResult extends ShippingEmailResult {
   attempted: boolean;
   idempotent?: boolean;
   eventId?: string | null;
+}
+
+export function shippingEmailTelemetryProvider(
+  provider: EmailProvider | undefined,
+): "cloudflare_email" | "resend" | undefined {
+  return provider === "cloudflare" ? "cloudflare_email" : provider;
 }
 
 function singleLine(value: string): string {
@@ -214,6 +221,7 @@ export async function sendShippingConfirmationEmail(
     const result = await sendEmail(prepareShippingEmail(data), { idempotencyKey });
     return {
       success: result.success,
+      ...(result.provider ? { provider: result.provider } : {}),
       ...(result.pending ? { pending: true } : {}),
       ...(result.needsReview ? { needsReview: true } : {}),
       ...(result.id ? { providerId: result.id } : {}),
@@ -301,6 +309,9 @@ export async function sendInitialShippingEmail(
       recordTelemetry("email.delivery_failed", {
         operation: "send",
         outcome: result.needsReview ? "needs_review" : "failed",
+        ...(shippingEmailTelemetryProvider(result.provider)
+          ? { provider: shippingEmailTelemetryProvider(result.provider) }
+          : {}),
         retryable: !result.needsReview,
         trigger: "request",
       });

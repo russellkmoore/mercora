@@ -256,6 +256,7 @@ describe("shipping email idempotency and delivery", () => {
     mocks.send.mockResolvedValue({
       success: false,
       needsReview: true,
+      provider: "cloudflare",
       errorCode: "E_DELIVERY_INDETERMINATE",
       error: "Accepted-state unknown",
     });
@@ -271,6 +272,13 @@ describe("shipping email idempotency and delivery", () => {
       "shipping_email_failed",
       actor,
       expect.objectContaining({ needsReview: true }),
+    );
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      "email.delivery_failed",
+      {
+        operation: "send", outcome: "needs_review", provider: "cloudflare_email",
+        retryable: false, trigger: "request",
+      },
     );
   });
 
@@ -331,7 +339,7 @@ describe("shipping email idempotency and delivery", () => {
     expect(mocks.recordTelemetry).toHaveBeenCalledWith(
       "email.delivery_failed",
       {
-        operation: "send", outcome: "failed", provider: "resend",
+        operation: "send", outcome: "failed",
         retryable: true, trigger: "request",
       },
     );
