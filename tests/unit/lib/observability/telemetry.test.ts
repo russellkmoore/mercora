@@ -99,6 +99,27 @@ describe('privacy-safe telemetry envelope', () => {
       .toBeUndefined();
     expect(sanitizeTelemetryFields({ effect_type: 'merchant_notification' }))
       .toEqual({ effect_type: 'merchant_notification' });
+    expect(sanitizeTelemetryFields({ path: '/api/agent-chat?question=private' }))
+      .toEqual({ path: '/api/agent-chat' });
+  });
+
+  it('records AI guard outcomes without rejected response content', () => {
+    recordTelemetry(
+      'ai.response_guard_replaced',
+      {
+        operation: 'validate', outcome: 'rejected', provider: 'workers_ai',
+        trigger: 'request', path: '/api/agent-chat', count: 2,
+        answer: 'email secret@example.com at https://evil.example',
+      },
+      undefined,
+      { now, analytics: null },
+    );
+    const serialized = warnSpy.mock.calls.at(-1)?.[0] as string;
+    expect(JSON.parse(serialized)).toMatchObject({
+      event: 'ai.response_guard_replaced',
+      fields: { operation: 'validate', outcome: 'rejected', provider: 'workers_ai', trigger: 'request', path: '/api/agent-chat', count: 2 },
+    });
+    expect(serialized).not.toMatch(/secret@example|evil\.example|answer/);
   });
 
   it('samples expected failures but never samples critical failures', () => {

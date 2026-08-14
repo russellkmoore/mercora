@@ -25,12 +25,12 @@ export interface AIModelConfig {
 /**
  * Primary text generation model used for conversational AI, analytics, and content generation
  */
-export const TEXT_GENERATION_MODEL: AIModelConfig = {
+export const TEXT_GENERATION_MODEL = {
   model: "@cf/openai/gpt-oss-20b",
   temperature: 0.3,
   maxTokens: 512,
   description: "GPT-OSS-20B - OpenAI's powerful reasoning model for agentic tasks and versatile developer use cases"
-};
+} as const satisfies AIModelConfig;
 
 /**
  * Embedding model used for vectorized search and semantic similarity
@@ -95,59 +95,80 @@ export const AI_MODELS = {
 /**
  * Helper function to get AI model configuration by use case
  */
-export function getAIConfig(useCase: keyof typeof AI_MODELS): AIModelConfig {
+export function getAIConfig<K extends keyof typeof AI_MODELS>(
+  useCase: K,
+): (typeof AI_MODELS)[K] {
   return AI_MODELS[useCase];
+}
+
+export interface AITextMessage {
+  role: string;
+  content: string;
+  name?: string;
+  tool_call_id?: string;
+}
+
+export interface RunAIOptions {
+  messages?: readonly AITextMessage[];
+  text?: string;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+function nativeChatMessage(message: AITextMessage): ChatCompletionMessageParam {
+  const name = message.name?.trim();
+  switch (message.role) {
+    case "developer":
+      return { role: "developer", content: message.content, ...(name ? { name } : {}) };
+    case "system":
+      return { role: "system", content: message.content, ...(name ? { name } : {}) };
+    case "assistant":
+      return { role: "assistant", content: message.content, ...(name ? { name } : {}) };
+    case "tool": {
+      const toolCallId = message.tool_call_id?.trim();
+      if (!toolCallId) throw new TypeError("Tool messages require a tool_call_id");
+      return { role: "tool", content: message.content, tool_call_id: toolCallId };
+    }
+    case "function":
+      if (!name) throw new TypeError("Function messages require a name");
+      return { role: "function", content: message.content, name };
+    case "user":
+      return { role: "user", content: message.content, ...(name ? { name } : {}) };
+    default:
+      throw new TypeError(`Unsupported AI message role: ${message.role}`);
+  }
 }
 
 /**
  * Helper function to run AI with standardized configuration
  */
 export async function runAI(
-  ai: any,
+  ai: CloudflareEnv["AI"],
   useCase: keyof typeof AI_MODELS,
-  options: {
-    messages?: any[];
-    text?: string;
-    temperature?: number;
-    maxTokens?: number;
-  }
+  options: RunAIOptions,
 ) {
   const config = getAIConfig(useCase);
 
-  // Handle different model parameter formats
-  let params: any;
-
-  if (config.model.includes('@cf/openai/')) {
-    // OpenAI models (like GPT-OSS-20B) expect 'input' format
-    if (options.messages && options.messages.length > 0) {
-      // Convert messages to a single input string
-      const systemMessage = options.messages.find(m => m.role === 'system')?.content || '';
-      const userMessages = options.messages.filter(m => m.role !== 'system');
-      const lastUserMessage = userMessages[userMessages.length - 1]?.content || '';
-
-      params = {
-        instructions: systemMessage,
-        input: lastUserMessage,
-        max_tokens: options.maxTokens ?? config.maxTokens,
-        temperature: options.temperature ?? config.temperature,
-      };
-    } else {
-      params = {
-        input: options.text || '',
-        max_tokens: options.maxTokens ?? config.maxTokens,
-        temperature: options.temperature ?? config.temperature,
-      };
-    }
-  } else {
-    // Meta/Llama models expect 'messages' format
-    params = {
-      ...options,
-      max_tokens: options.maxTokens ?? config.maxTokens,
-      temperature: options.temperature ?? config.temperature,
-    };
+  if (isEmbeddingModel(config.model)) {
+    const text = options.text
+      ?? options.messages?.map((message) => message.content).join("\n")
+      ?? "";
+    return ai.run(EMBEDDING_MODEL.model, { text });
   }
 
-  return await ai.run(config.model, params);
+  const messages = options.messages?.length
+    ? options.messages.map(nativeChatMessage)
+    : [{ role: "user", content: options.text ?? "" } satisfies UserMessage];
+  const params: ChatCompletionsMessagesInput = {
+    messages,
+    max_tokens: options.maxTokens ?? config.maxTokens,
+    temperature: options.temperature ?? config.temperature,
+  };
+
+  if (config.model !== TEXT_GENERATION_MODEL.model) {
+    throw new TypeError(`Unsupported text-generation model configuration: ${config.model}`);
+  }
+  return ai.run(config.model, params);
 }
 
 /**
@@ -174,18 +195,102 @@ export function getCurrentEmbeddingModel(): typeof EMBEDDING_MODEL.model {
 /**
  * Extract text response from AI model output (handles different response formats)
  */
-export function extractAIResponse(response: any): string {
-  // Handle GPT-OSS-20B format
-  if (response.output && Array.isArray(response.output)) {
-    const messageOutput = response.output.find((item: any) => item.type === 'message');
-    if (messageOutput && messageOutput.content && Array.isArray(messageOutput.content)) {
-      const textContent = messageOutput.content.find((content: any) => content.type === 'output_text');
-      if (textContent && textContent.text) {
-        return textContent.text;
-      }
+const MAX_OUTPUT_ITEMS = 100;
+const MAX_CONTENT_ITEMS = 100;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isReadableStreamOutput(value: unknown): boolean {
+  return typeof ReadableStream !== "undefined" && value instanceof ReadableStream;
+}
+
+function contentText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (!Array.isArray(value) || value.length > MAX_CONTENT_ITEMS) return "";
+
+  const parts: string[] = [];
+  for (const part of value) {
+    if (!isRecord(part)) continue;
+    if ((part.type === "output_text" || part.type === "text") && typeof part.text === "string") {
+      parts.push(part.text);
     }
   }
+  return parts.join("");
+}
 
-  // Handle traditional formats (Llama, etc.)
-  return response.response || response.content || response.text || "";
+function chatCompletionText(value: unknown): string {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_OUTPUT_ITEMS) return "";
+  if (value.some((choice) => isRecord(choice) && (
+    (typeof choice.finish_reason === "string" && choice.finish_reason !== "stop")
+    || (isRecord(choice.message) && (
+      (Array.isArray(choice.message.tool_calls) && choice.message.tool_calls.length > 0)
+      || isRecord(choice.message.function_call)
+    ))
+  ))) return "";
+  for (const choice of value) {
+    if (!isRecord(choice) || !isRecord(choice.message)) continue;
+    const text = contentText(choice.message.content);
+    if (text) return text;
+  }
+  return "";
+}
+
+function responsesMessageText(value: unknown): string {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_OUTPUT_ITEMS) return "";
+  if (value.some((item) => isRecord(item) && (
+    item.type === "function_call"
+    || item.type === "custom_tool_call"
+    || item.type === "computer_call"
+  ))) return "";
+  const messages: string[] = [];
+  for (const item of value) {
+    if (!isRecord(item) || item.type !== "message") continue;
+    const text = contentText(item.content);
+    if (text) messages.push(text);
+  }
+  return messages.join("");
+}
+
+function hasTopLevelToolOutput(response: Record<string, unknown>): boolean {
+  return (
+    (Array.isArray(response.tool_calls) && response.tool_calls.length > 0)
+    || isRecord(response.function_call)
+    || (Array.isArray(response.output) && response.output.some((item) => isRecord(item) && (
+      item.type === "function_call"
+      || item.type === "custom_tool_call"
+      || item.type === "computer_call"
+    )))
+  );
+}
+
+export function extractAIResponse(response: unknown): string {
+  try {
+    if (isReadableStreamOutput(response) || !isRecord(response)) return "";
+
+    if (
+      (response.error !== undefined && response.error !== null)
+      || (Object.hasOwn(response, "status") && response.status !== "completed")
+      || hasTopLevelToolOutput(response)
+    ) {
+      return "";
+    }
+
+    if (typeof response.response === "string" && response.response) return response.response;
+
+    const completion = chatCompletionText(response.choices);
+    if (completion) return completion;
+
+    if (typeof response.output_text === "string" && response.output_text) return response.output_text;
+
+    const output = responsesMessageText(response.output);
+    if (output) return output;
+
+    if (typeof response.content === "string") return response.content;
+    if (typeof response.text === "string") return response.text;
+    return "";
+  } catch {
+    return "";
+  }
 }

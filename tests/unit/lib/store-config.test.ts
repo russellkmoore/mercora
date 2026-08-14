@@ -23,6 +23,22 @@ describe("resolveStoreConfig", () => {
     expect(resolveStoreConfig({ NEXT_PUBLIC_ROBOTS_INDEX: "true" }).deployment.indexable).toBe(true);
   });
 
+  it("canonicalizes configured locales and safely falls back", () => {
+    expect(resolveStoreConfig({ STORE_LOCALE: "de-de" }).commerce.locale).toBe("de-DE");
+    expect(resolveStoreConfig({ STORE_LOCALE: "not_a_locale" }).commerce.locale)
+      .toBe(storeDefaults.commerce.locale);
+    expect(resolveStoreConfig({ STORE_LOCALE: "x".repeat(101) }).commerce.locale)
+      .toBe(storeDefaults.commerce.locale);
+  });
+
+  it("accepts only currencies supported by Mercora Money precision", () => {
+    expect(resolveStoreConfig({ STORE_CURRENCY: "eur" }).commerce.currency).toBe("EUR");
+    expect(resolveStoreConfig({ STORE_CURRENCY: "JOD" }).commerce.currency)
+      .toBe(storeDefaults.commerce.currency);
+    expect(resolveStoreConfig({ STORE_CURRENCY: "not-a-currency" }).commerce.currency)
+      .toBe(storeDefaults.commerce.currency);
+  });
+
   it("derives sender identity from a renamed store", () => {
     const config = resolveStoreConfig({
       NEXT_PUBLIC_STORE_NAME: "Acme Store",
