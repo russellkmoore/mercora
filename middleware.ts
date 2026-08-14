@@ -58,6 +58,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSettings } from "@/lib/utils/settings";
 import { getStoreConfig } from "@/lib/store-config";
 import { escapeHtmlText, safeMaintenanceMessage } from "@/lib/utils/maintenance-html";
+import { getDbAsync } from "@/lib/db";
+import { redirectMap } from "@/lib/db/schema/redirect-map";
+import { eq } from "drizzle-orm";
+import { resolveLegacyRedirect } from "@/lib/redirects/resolver";
 
 /**
  * Custom middleware that combines Clerk authentication with maintenance mode checking
@@ -168,6 +172,20 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   } catch (error) {
     // If settings check fails, continue normally to avoid breaking the site
     console.error('Error checking maintenance mode:', error);
+  }
+
+  const redirect = await resolveLegacyRedirect(req.url, async (sourcePath) => {
+    const db = await getDbAsync();
+    const row = await db
+      .select({ targetPath: redirectMap.targetPath, statusCode: redirectMap.statusCode })
+      .from(redirectMap)
+      .where(eq(redirectMap.sourcePath, sourcePath))
+      .limit(1)
+      .get();
+    return row ?? null;
+  });
+  if (redirect) {
+    return NextResponse.redirect(redirect.url, redirect.statusCode);
   }
   
   // Continue with normal Clerk authentication
