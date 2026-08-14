@@ -1,12 +1,12 @@
 /**
  * === Agent Drawer Component ===
  *
- * A sliding chat interface that provides users with AI-powered assistance from Volt,
- * the outdoor gear expert. Features intelligent product recommendations, conversation
+ * A sliding chat interface that provides users with the configured AI assistant.
+ * Features intelligent product recommendations, conversation
  * history, and seamless user experience optimizations.
  *
  * === Key Features ===
- * - **AI Chat Interface**: Real-time conversations with Volt AI assistant
+ * - **AI Chat Interface**: Real-time conversations with the store assistant
  * - **Product Recommendations**: Displays AI-recommended products with full details
  * - **Auto-scroll**: Automatically scrolls to show latest messages
  * - **Auto-focus**: Returns focus to input after AI responses
@@ -48,6 +48,7 @@ import {
 import ProductCard from "./ProductCard";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Image from "next/image";
+import { useStoreConfig } from "@/lib/store";
 
 /**
  * Main AgentDrawer component providing AI chat interface
@@ -68,6 +69,8 @@ export default function AgentDrawer({
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { user } = useUser();
+  const store = useStoreConfig();
+  const assistantName = store.identity.assistantName;
   const userContext = useEnhancedUserContext();
   const {
     messages,
@@ -123,7 +126,7 @@ export default function AgentDrawer({
   }, [isOpen]);
 
   /**
-   * Handles form submission and API communication with Volt AI
+   * Handles form submission and API communication with the store assistant.
    * 
    * - Validates input
    * - Updates chat state
@@ -247,7 +250,7 @@ export default function AgentDrawer({
         <VisuallyHidden>
           <SheetTitle>AI Assistant Chat</SheetTitle>
           <SheetDescription>
-            Chat with Volt, your AI outdoor gear expert, to get product recommendations and adventure advice.
+            Chat with {assistantName}, the {store.identity.name} shopping assistant, for product help and recommendations.
           </SheetDescription>
         </VisuallyHidden>
 
@@ -272,7 +275,7 @@ export default function AgentDrawer({
         <div className="shrink-0">
           <h2 className="text-lg font-semibold mb-3 mt-2 flex items-center">
             <Search className="mr-2 h-5 w-5" />
-            Ask Volt
+            Ask {assistantName}
           </h2>
         </div>
 
@@ -286,21 +289,20 @@ export default function AgentDrawer({
               <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 space-y-3">
                 <div className="h-12 w-12 flex items-center justify-center">
                   <Image
-                    src="/volt.png"        // use PNG for crisp CF-resized avatars
-                    alt="Volt mascot"
+                    src={store.theme.logoPath}
+                    alt={`${assistantName} assistant`}
                     width={40}                    // a bit of padding inside the circle
                     height={40}
                     priority
                   />
                 </div>
                 <div className="space-y-2">
-                  <p className="font-semibold text-gray-700">Hi! I&rsquo;m Volt, your gear expert.</p>
+                  <p className="font-semibold text-gray-700">Hi! I&rsquo;m {assistantName}, your shopping assistant.</p>
                   <p className="text-xs leading-relaxed max-w-xs">
-                    Ask me about outdoor gear, product recommendations, or anything adventure-related.
-                    I&rsquo;m here to help you find the perfect equipment!
+                    Ask me about products, recommendations, orders, shipping, or store policies.
                   </p>
                   <p className="text-xs text-gray-600 italic">
-                    Try: &ldquo;what do I use to start a fire?&rdquo; or &ldquo;Tell me your secret s&rsquo;mores recipe&rdquo;
+                    Try: &ldquo;Which product would you recommend?&rdquo; or &ldquo;How can I track my order?&rdquo;
                   </p>
                 </div>
               </div>
@@ -318,15 +320,15 @@ export default function AgentDrawer({
                   <div key={i} className="flex items-start space-x-2">
                     <div className="h-6 w-6 flex items-center justify-center">
                       <Image
-                        src="/volt.png"
-                        alt="Volt mascot"
+                        src={store.theme.logoPath}
+                        alt={`${assistantName} assistant`}
                         width={20}
                         height={20}
                       />
                     </div>
                     <div className="bg-white text-gray-800 px-3 py-2 rounded-lg max-w-[75%] shadow-sm border">
                       <p>
-                        <strong>Volt:</strong> {msg.content}
+                        <strong>{assistantName}:</strong> {msg.content}
                       </p>
                     </div>
                   </div>
@@ -336,11 +338,11 @@ export default function AgentDrawer({
             {isLoading && (
               <div className="flex items-start space-x-2">
                 <div className="h-6 w-6 flex items-center justify-center bg-orange-500 rounded-full text-white text-xs font-bold">
-                  V
+                  {assistantName.slice(0, 1).toUpperCase()}
                 </div>
                 <div className="bg-white text-gray-800 px-3 py-2 rounded-lg shadow-sm border">
                   <p className="text-gray-500">
-                    <strong>Volt:</strong> Thinking...
+                    <strong>{assistantName}:</strong> Thinking...
                   </p>
                 </div>
               </div>
@@ -352,7 +354,7 @@ export default function AgentDrawer({
 
         {/* AI Disclaimer */}
         <div className="shrink-0 text-xs text-gray-500 text-center px-2 py-1">
-          AI-generated responses may contain inaccuracies. Verify gear recommendations before purchase.
+          AI-generated responses may contain inaccuracies. Verify recommendations before purchase.
         </div>
 
         {/* Input area - fixed */}
@@ -405,9 +407,9 @@ export default function AgentDrawer({
           ) : (
             <div className="text-center py-8 text-gray-400">
               <div className="space-y-2">
-                <div className="text-2xl">🎒</div>
+                <div className="text-2xl">🛍️</div>
                 <p className="font-medium text-gray-700">Product recommendations will appear here</p>
-                <p className="text-xs">Ask Volt about specific gear and I&rsquo;ll show you the best options!</p>
+                <p className="text-xs">Ask {assistantName} about what you need and I&rsquo;ll show you relevant options.</p>
               </div>
             </div>
           )}
