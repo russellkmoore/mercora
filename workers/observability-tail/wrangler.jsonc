@@ -1,0 +1,39 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "commerce-observability-tail",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.01 }
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "ALERT_COOLDOWN", "class_name": "AlertCooldown" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["AlertCooldown"] }
+  ],
+  "send_email": [
+    {
+      "name": "ALERT_EMAIL",
+      "destination_address": "configure@example.invalid",
+      "allowed_sender_addresses": ["configure@example.invalid"]
+    }
+  ],
+  "vars": {
+    // Cloudflare is recommended. Use "resend" with RESEND_API_KEY set as a
+    // Wrangler secret for compatibility. No cross-provider fallback occurs.
+    "EMAIL_PROVIDER": "cloudflare",
+    "ALERT_EMAIL_TO": "configure@example.invalid",
+    "ALERT_EMAIL_FROM": "configure@example.invalid",
+    "ALERT_SUBJECT_PREFIX": "configure-me",
+    "OPERATOR_IDENTITY": "configure-me",
+    "ENVIRONMENT": "configure-me",
+    "ALERT_COOLDOWN_SECONDS": "900",
+    "ALERT_FAILURE_BACKOFF_SECONDS": "30"
+  }
+}

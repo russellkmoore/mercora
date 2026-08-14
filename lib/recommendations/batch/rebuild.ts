@@ -1,4 +1,5 @@
 import { getCurrentEmbeddingModel } from "@/lib/ai/config";
+import { recordTelemetry } from "@/lib/observability/telemetry";
 
 const DEFAULT_NEIGHBORS = 10;
 const MAX_NEIGHBORS = 20;
@@ -105,10 +106,6 @@ export async function rebuildWithAdapter(
       productsProcessed += 1;
       rowsWritten += neighbors.length;
     } catch (error) {
-      console.error("Recommendations rebuild: product failed", {
-        productId: product.id,
-        error,
-      });
       errors.push({ productId: product.id, error: errorMessage(error) });
     }
   }
@@ -121,7 +118,10 @@ export async function rebuildWithAdapter(
     ));
   } catch (error) {
     // Reporting should not invalidate recommendation rows already rebuilt.
-    console.error("Recommendations rebuild: staleness check failed", error);
+    recordTelemetry("recommendation.rebuild_failed", {
+      operation: "rebuild", outcome: "partial_failure", provider: "d1",
+      retryable: true, trigger: "scheduled",
+    }, error);
   }
 
   return {

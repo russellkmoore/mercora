@@ -7,6 +7,7 @@ import { buildShipmentView } from "@/lib/fulfillment/shipment-view";
 import { parseShipmentInput } from "@/lib/fulfillment/transitions";
 import type { Actor } from "@/lib/fulfillment/types";
 import { toAdminOrder } from "@/lib/models/mach/order-serializer";
+import { recordTelemetry } from "@/lib/observability/telemetry";
 
 const MAX_JSON_BODY_BYTES = 4 * 1_024;
 
@@ -81,7 +82,10 @@ export async function POST(
         try {
           email = await sendInitialShippingEmail(id, actor);
         } catch (error) {
-          console.error("shipping_email_post_commit_threw", { orderId: id, error });
+          recordTelemetry("email.delivery_failed", {
+            operation: "send", outcome: "failed", retryable: true,
+            path: "/api/admin/orders/:id/ship", trigger: "request",
+          }, error);
           email = { attempted: false, success: false, error: "shipping_email_failed" };
         }
         return NextResponse.json(
@@ -133,7 +137,10 @@ export async function POST(
         );
     }
   } catch (error) {
-    console.error("POST /api/admin/orders/[id]/ship failed", error);
+    recordTelemetry("fulfillment.transition_failed", {
+      operation: "transition", outcome: "failed", provider: "d1",
+      retryable: true, path: "/api/admin/orders/:id/ship", trigger: "request",
+    }, error);
     return NextResponse.json(
       { code: "shipment_failed", error: "Failed to ship order" },
       { status: 500 },

@@ -2,6 +2,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 import type { Order, OrderItem } from '@/lib/types/order';
 import type { ProductInventory } from '@/lib/types';
 import { canFulfillInventory } from '@/lib/inventory/availability';
+import { recordTelemetry } from '@/lib/observability/telemetry';
 
 const ADJUSTMENT_LEASE_MS = 5 * 60 * 1000;
 const MAX_ADJUSTMENT_ERROR = 2_000;
@@ -408,7 +409,14 @@ export async function drainInventoryAdjustments(
       );
       if (status === 'succeeded') result.succeeded += 1;
       else if (status === 'skipped') result.skipped += 1;
-      else if (status === 'needs_review') result.needsReview += 1;
+      else if (status === 'needs_review') {
+        result.needsReview += 1;
+        recordTelemetry('inventory.adjustment_needs_review', {
+          operation: 'process', outcome: 'needs_review',
+          effect_type: adjustment.kind, attempt: adjustment.attempt_count,
+          retryable: false, trigger: options.orderId ? 'request' : 'recovery',
+        });
+      }
       else result.ownershipLost += 1;
     } catch (error) {
       await failInventoryAdjustment(
@@ -416,6 +424,17 @@ export async function drainInventoryAdjustments(
         adjustment,
         error,
         options.now?.() ?? new Date()
+      );
+      recordTelemetry(
+        adjustment.attempt_count >= 3
+          ? 'inventory.adjustment_repeated_failure'
+          : 'inventory.adjustment_first_attempt_failed',
+        {
+          operation: 'process', outcome: 'retry_scheduled',
+          effect_type: adjustment.kind, attempt: adjustment.attempt_count,
+          retryable: true, trigger: options.orderId ? 'request' : 'recovery',
+        },
+        error,
       );
       result.failed += 1;
     }

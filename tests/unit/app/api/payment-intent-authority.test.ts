@@ -3,24 +3,29 @@ import { NextRequest } from 'next/server';
 
 const mocks = vi.hoisted(() => ({
   insertValues: vi.fn(),
-  insertFails: false,
+  insertError: null as Error | null,
   createPaymentIntent: vi.fn(),
   cancelPaymentIntent: vi.fn(),
   priceCheckout: vi.fn(),
   assertCheckoutInventoryAvailable: vi.fn(),
+  recordTelemetry: vi.fn(),
+  auth: vi.fn(),
+  currentUser: vi.fn(),
+  getCustomer: vi.fn(),
+  createCustomer: vi.fn(),
 }));
 
 vi.mock('@clerk/nextjs/server', () => ({
-  auth: vi.fn(async () => ({ userId: null })),
-  currentUser: vi.fn(async () => null),
+  auth: mocks.auth,
+  currentUser: mocks.currentUser,
 }));
 vi.mock('@/lib/rate-limit', () => ({
   enforceRateLimit: vi.fn(async () => null),
   getClientIp: vi.fn(() => 'test'),
 }));
 vi.mock('@/lib/models/mach/customer', () => ({
-  getCustomer: vi.fn(),
-  createCustomer: vi.fn(),
+  getCustomer: mocks.getCustomer,
+  createCustomer: mocks.createCustomer,
 }));
 vi.mock('@/lib/services/checkout-pricing', () => ({
   priceCheckout: mocks.priceCheckout,
@@ -45,10 +50,13 @@ vi.mock('@/lib/db', () => ({
     insert: () => ({
       values: async (value: unknown) => {
         mocks.insertValues(value);
-        if (mocks.insertFails) throw new Error('D1 unavailable');
+        if (mocks.insertError) throw mocks.insertError;
       },
     }),
   })),
+}));
+vi.mock('@/lib/observability/telemetry', () => ({
+  recordTelemetry: mocks.recordTelemetry,
 }));
 
 import { POST } from '@/app/api/payment-intent/route';
@@ -103,7 +111,11 @@ function request() {
 }
 
 beforeEach(() => {
-  mocks.insertFails = false;
+  mocks.insertError = null;
+  mocks.auth.mockResolvedValue({ userId: null });
+  mocks.currentUser.mockResolvedValue(null);
+  mocks.getCustomer.mockResolvedValue(null);
+  mocks.createCustomer.mockResolvedValue(undefined);
   mocks.cancelPaymentIntent.mockResolvedValue(undefined);
   mocks.priceCheckout.mockResolvedValue(quote);
   mocks.assertCheckoutInventoryAvailable.mockResolvedValue(undefined);
@@ -156,11 +168,141 @@ describe('payment-intent durable authority boundary', () => {
   });
 
   it('withholds the client secret and cancels the PI if pending persistence fails', async () => {
-    mocks.insertFails = true;
+    const persistenceError = new Error('D1 unavailable');
+    mocks.insertError = persistenceError;
     const response = await POST(request());
     expect(response.status).toBe(503);
     expect(mocks.cancelPaymentIntent).toHaveBeenCalledWith('pi_authoritative');
     expect(await response.json()).not.toHaveProperty('clientSecret');
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      'payment.order_persist_failed',
+      {
+        operation: 'persist', outcome: 'failed', provider: 'd1', retryable: true,
+        path: '/api/payment-intent',
+      },
+      persistenceError,
+    );
+  });
+
+  it('reports provider creation failure without changing the retryable response', async () => {
+    const providerError = new Error('Stripe unavailable');
+    mocks.createPaymentIntent.mockRejectedValue(providerError);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ error: 'Payment provider is unavailable' });
+    expect(mocks.insertValues).not.toHaveBeenCalled();
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      'payment.intent_create_failed',
+      {
+        operation: 'create', outcome: 'failed', provider: 'stripe', retryable: true,
+        path: '/api/payment-intent',
+      },
+      providerError,
+    );
+  });
+
+  it('reports inventory infrastructure failure before creating a provider intent', async () => {
+    const inventoryError = new Error('D1 inventory unavailable');
+    mocks.assertCheckoutInventoryAvailable.mockRejectedValue(inventoryError);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ error: 'Inventory is temporarily unavailable' });
+    expect(mocks.createPaymentIntent).not.toHaveBeenCalled();
+    expect(mocks.insertValues).not.toHaveBeenCalled();
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      'payment.inventory_check_failed',
+      {
+        operation: 'validate', outcome: 'failed', provider: 'd1', retryable: true,
+        path: '/api/payment-intent',
+      },
+      inventoryError,
+    );
+  });
+
+  it('reports authenticated customer preparation failure before creating an intent', async () => {
+    const customerError = new Error('D1 customer unavailable');
+    mocks.auth.mockResolvedValue({ userId: 'user_123' });
+    mocks.getCustomer.mockRejectedValue(customerError);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ error: 'Could not prepare authenticated checkout' });
+    expect(mocks.createPaymentIntent).not.toHaveBeenCalled();
+    expect(mocks.insertValues).not.toHaveBeenCalled();
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      'payment.customer_prepare_failed',
+      {
+        operation: 'persist', outcome: 'failed', provider: 'd1', retryable: true,
+        path: '/api/payment-intent',
+      },
+      customerError,
+    );
+  });
+
+  it('rejects and cancels an invalid provider intent without persisting it', async () => {
+    mocks.createPaymentIntent.mockResolvedValue({
+      id: 'pi_invalid', client_secret: 'pi_invalid_secret', amount: 2_599, currency: 'usd',
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({ error: 'Payment provider returned an invalid intent' });
+    expect(mocks.cancelPaymentIntent).toHaveBeenCalledWith('pi_invalid');
+    expect(mocks.insertValues).not.toHaveBeenCalled();
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      'payment.intent_invalid',
+      {
+        operation: 'validate', outcome: 'invalid', provider: 'stripe',
+        http_status: 502, path: '/api/payment-intent',
+      },
+    );
+  });
+
+  it('reports cancellation failure for an invalid intent and preserves the 502 response', async () => {
+    const cancelError = new Error('Stripe cancellation unavailable');
+    mocks.createPaymentIntent.mockResolvedValue({
+      id: 'pi_invalid', client_secret: null, amount: 2_600, currency: 'usd',
+    });
+    mocks.cancelPaymentIntent.mockRejectedValue(cancelError);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({ error: 'Payment provider returned an invalid intent' });
+    expect(mocks.insertValues).not.toHaveBeenCalled();
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      'payment.intent_cancel_failed',
+      {
+        operation: 'process', outcome: 'failed', provider: 'stripe', retryable: true,
+        path: '/api/payment-intent',
+      },
+      cancelError,
+    );
+  });
+
+  it('reports cancellation failure after persistence fails and still withholds the secret', async () => {
+    const cancelError = new Error('Stripe cancellation unavailable');
+    mocks.insertError = new Error('D1 unavailable');
+    mocks.cancelPaymentIntent.mockRejectedValue(cancelError);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).not.toHaveProperty('clientSecret');
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      'payment.intent_cancel_failed',
+      {
+        operation: 'process', outcome: 'failed', provider: 'stripe', retryable: true,
+        path: '/api/payment-intent',
+      },
+      cancelError,
+    );
   });
 
   it('returns 409 before creating a PaymentIntent when aggregate stock is unavailable', async () => {

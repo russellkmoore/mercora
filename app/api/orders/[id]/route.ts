@@ -7,6 +7,7 @@ import type { Order } from "@/lib/types/order";
 import { authenticateRequest, PERMISSIONS } from '@/lib/auth/unified-auth';
 import { Money } from '@/lib/money';
 import { toAdminOrder, toCustomerOrder } from '@/lib/models/mach/order-serializer';
+import { recordTelemetry } from '@/lib/observability/telemetry';
 
 function parseJson<T>(value: unknown, fallback: T): T {
   if (value === null || value === undefined) return fallback;
@@ -68,7 +69,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       meta: { schema: "mach:order" },
     });
   } catch (error) {
-    console.error("Order GET error:", error);
+    recordTelemetry('order.query_failed', {
+      operation: 'process', outcome: 'failed', provider: 'd1', retryable: true,
+      path: '/api/orders/:id', trigger: 'request',
+    }, error);
     return NextResponse.json({ error: "Failed to retrieve order" }, { status: 500 });
   }
 }

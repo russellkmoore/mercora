@@ -1,4 +1,5 @@
-import { sendEmail } from "@/lib/email/sender";
+import { sendEmail, type EmailProvider } from "@/lib/email/sender";
+import { recordTelemetry } from "@/lib/observability/telemetry";
 import { getStoreConfig } from "@/lib/store-config";
 import { escapeHtmlText } from "@/lib/utils/maintenance-html";
 import { getOrderById } from "@/lib/models/mach/orders";
@@ -46,6 +47,7 @@ export interface ShippingConfirmationData {
 
 export interface ShippingEmailResult {
   success: boolean;
+  provider?: EmailProvider;
   /** The provider is still resolving another request with the same stable key. */
   pending?: boolean;
   /** The provider may have accepted the message; an operator must reconcile before retrying. */
@@ -59,6 +61,12 @@ export interface InitialShippingEmailResult extends ShippingEmailResult {
   attempted: boolean;
   idempotent?: boolean;
   eventId?: string | null;
+}
+
+export function shippingEmailTelemetryProvider(
+  provider: EmailProvider | undefined,
+): "cloudflare_email" | "resend" | undefined {
+  return provider === "cloudflare" ? "cloudflare_email" : provider;
 }
 
 function singleLine(value: string): string {
@@ -213,6 +221,7 @@ export async function sendShippingConfirmationEmail(
     const result = await sendEmail(prepareShippingEmail(data), { idempotencyKey });
     return {
       success: result.success,
+      ...(result.provider ? { provider: result.provider } : {}),
       ...(result.pending ? { pending: true } : {}),
       ...(result.needsReview ? { needsReview: true } : {}),
       ...(result.id ? { providerId: result.id } : {}),
@@ -297,6 +306,15 @@ export async function sendInitialShippingEmail(
       if (isConcurrentShippingEmailAttempt(result)) {
         return { attempted: true, ...result, pending: true, eventId: null };
       }
+      recordTelemetry("email.delivery_failed", {
+        operation: "send",
+        outcome: result.needsReview ? "needs_review" : "failed",
+        ...(shippingEmailTelemetryProvider(result.provider)
+          ? { provider: shippingEmailTelemetryProvider(result.provider) }
+          : {}),
+        retryable: !result.needsReview,
+        trigger: "request",
+      });
       const eventId = await recordEmailEvent(
         orderId,
         "shipping_email_failed",
@@ -313,11 +331,16 @@ export async function sendInitialShippingEmail(
         ...(result.providerId ? { providerId: result.providerId } : {}),
       });
     } catch (error) {
-      console.error("shipping_email_audit_write_failed");
+      recordTelemetry("email.audit_write_failed", {
+        operation: "audit_write", outcome: "failed", provider: "d1",
+        retryable: true, trigger: "request",
+      }, error);
     }
     return { attempted: true, ...result, eventId };
   } catch (error) {
-    console.error("shipping_email_initial_failed");
+    recordTelemetry("email.delivery_failed", {
+      operation: "send", outcome: "failed", retryable: true, trigger: "request",
+    }, error);
     return {
       attempted: false,
       success: false,

@@ -283,6 +283,10 @@ SET status = 'processing', attempt_count = 99, claim_token = 'owner-old',
     await env.DB.prepare(
       "DELETE FROM order_effects WHERE effect_type NOT IN ('coupon','inventory','confirmation_email')"
     ).run();
+    await env.DB.prepare(
+      "UPDATE order_effects SET attempt_count = 2 WHERE effect_type = 'confirmation_email'"
+    ).run();
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const reconcile = vi.fn(async () => undefined);
     const result = await drainOrderEffects({
       database: env.DB,
@@ -306,7 +310,7 @@ FROM order_effects ORDER BY effect_type
       last_error: string | null;
     }>();
     expect(rows.results).toEqual([
-      { effect_type: 'confirmation_email', status: 'failed', next_attempt_at: new Date(start.getTime() + 300_000).toISOString(), last_error: 'provider unavailable' },
+      { effect_type: 'confirmation_email', status: 'failed', next_attempt_at: new Date(start.getTime() + 20 * 60_000).toISOString(), last_error: 'provider unavailable' },
       { effect_type: 'coupon', status: 'succeeded', next_attempt_at: null, last_error: null },
       { effect_type: 'inventory', status: 'succeeded', next_attempt_at: null, last_error: null },
     ]);
@@ -318,6 +322,21 @@ SELECT status, result FROM inventory_adjustments WHERE order_id = ?
       outcome: 'needs_review',
       variantId: 'variant-1',
     });
+    const repeatedFailure = errorLog.mock.calls
+      .map(([entry]) => JSON.parse(String(entry)))
+      .find((entry) => entry.event === 'paid_effect.repeated_failure');
+    expect(repeatedFailure).toMatchObject({
+      marker: 'commerce.telemetry.v1',
+      severity: 'critical',
+      fields: {
+        operation: 'process', outcome: 'retry_scheduled',
+        effect_type: 'confirmation_email', attempt: 3,
+        retryable: true, trigger: 'recovery',
+      },
+      error_class: 'Error',
+    });
+    expect(JSON.stringify(repeatedFailure)).not.toContain('provider unavailable');
+    errorLog.mockRestore();
   });
 
   it('terminals an indeterminate email effect for manual review instead of retrying it', async () => {

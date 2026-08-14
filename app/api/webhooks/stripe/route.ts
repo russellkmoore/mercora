@@ -48,6 +48,7 @@ import {
   handleChargeRefunded,
   handleRefundLifecycle,
 } from '@/app/api/webhooks/stripe/handlers/refund-handlers';
+import { recordTelemetry } from '@/lib/observability/telemetry';
 
 function retryableResponse(message: string) {
   return NextResponse.json(
@@ -65,7 +66,10 @@ export async function POST(req: NextRequest) {
   const signature = req.headers.get('stripe-signature');
 
   if (!signature) {
-    console.error('Missing stripe-signature header');
+    recordTelemetry('webhook.signature_rejected', {
+      operation: 'validate', outcome: 'rejected', provider: 'stripe',
+      http_status: 400, path: '/api/webhooks/stripe', trigger: 'webhook',
+    });
     return NextResponse.json(
       { error: 'Missing stripe-signature header' },
       { status: 400 }
@@ -81,7 +85,10 @@ export async function POST(req: NextRequest) {
       signature
     );
   } catch (error) {
-    console.error('Webhook signature verification failed:', error);
+    recordTelemetry('webhook.signature_rejected', {
+      operation: 'validate', outcome: 'rejected', provider: 'stripe',
+      http_status: 400, path: '/api/webhooks/stripe', trigger: 'webhook',
+    }, error);
     return NextResponse.json(
       { error: 'Webhook signature verification failed' },
       { status: 400 }
@@ -95,7 +102,10 @@ export async function POST(req: NextRequest) {
       eventType: event.type,
     });
   } catch (error) {
-    console.error(`Could not claim Stripe webhook ${event.id}:`, error);
+    recordTelemetry('webhook.claim_failed', {
+      operation: 'claim', outcome: 'failed', provider: 'd1', retryable: true,
+      path: '/api/webhooks/stripe', trigger: 'webhook',
+    }, error);
     return NextResponse.json(
       { error: 'Webhook claim failed' },
       { status: 500 }
@@ -144,7 +154,6 @@ export async function POST(req: NextRequest) {
         break;
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
         outcome = 'ignored';
     }
 
@@ -154,13 +163,19 @@ export async function POST(req: NextRequest) {
       outcome,
     });
     if (!completed) {
-      console.error(`Lost ownership before completing Stripe webhook ${event.id}`);
+      recordTelemetry('webhook.ownership_lost', {
+        operation: 'complete', outcome: 'conflict', provider: 'd1', retryable: true,
+        path: '/api/webhooks/stripe', trigger: 'webhook',
+      });
       return retryableResponse('Webhook ownership expired before completion');
     }
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error('Error processing webhook:', error);
+    recordTelemetry('webhook.processing_failed', {
+      operation: 'process', outcome: 'failed', retryable: true,
+      path: '/api/webhooks/stripe', trigger: 'webhook',
+    }, error);
     try {
       const failed = await failWebhookEvent({
         eventId: event.id,
@@ -168,10 +183,16 @@ export async function POST(req: NextRequest) {
         error,
       });
       if (!failed) {
-        console.error(`Lost ownership before failing Stripe webhook ${event.id}`);
+        recordTelemetry('webhook.ownership_lost', {
+          operation: 'record_failure', outcome: 'conflict', provider: 'd1', retryable: true,
+          path: '/api/webhooks/stripe', trigger: 'webhook',
+        });
       }
     } catch (claimError) {
-      console.error(`Could not record failure for Stripe webhook ${event.id}:`, claimError);
+      recordTelemetry('webhook.failure_record_failed', {
+        operation: 'record_failure', outcome: 'failed', provider: 'd1', retryable: true,
+        path: '/api/webhooks/stripe', trigger: 'webhook',
+      }, claimError);
     }
     return NextResponse.json(
       { error: 'Webhook processing failed' },
@@ -187,12 +208,13 @@ export async function POST(req: NextRequest) {
 async function handlePaymentSucceeded(
   paymentIntent: Stripe.PaymentIntent
 ): Promise<WebhookEventOutcome> {
-  console.log('Payment succeeded:', paymentIntent.id);
-  
   const orderId = paymentIntent.metadata.orderId;
   
   if (!orderId) {
-    console.error('No orderId in payment intent metadata');
+    recordTelemetry('webhook.payment_verification_rejected', {
+      operation: 'validate', outcome: 'rejected', provider: 'stripe',
+      path: '/api/webhooks/stripe', trigger: 'webhook',
+    });
     return 'permanent_rejection';
   }
 
@@ -206,7 +228,10 @@ async function handlePaymentSucceeded(
     return 'handled';
   } catch (error) {
     if (error instanceof PaymentVerificationError) {
-      console.error(`Payment verification rejected for order ${orderId}:`, error.message);
+      recordTelemetry('webhook.payment_verification_rejected', {
+        operation: 'validate', outcome: 'rejected', provider: 'stripe',
+        path: '/api/webhooks/stripe', trigger: 'webhook',
+      }, error);
       return 'permanent_rejection';
     }
     // Transient D1/Stripe failures must reach POST's 500 response so Stripe
@@ -220,27 +245,23 @@ async function handlePaymentSucceeded(
  * Updates order status and handles payment failure scenarios
  */
 async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
-  console.log('Payment failed:', paymentIntent.id);
-  
   const orderId = paymentIntent.metadata.orderId;
   
-  if (!orderId) {
-    console.error('No orderId in payment intent metadata');
-    return;
-  }
+  if (!orderId) return;
 
   try {
     // Update order status to failed
     // TODO: Implement order status update
-    console.log(`Updating order ${orderId} to failed status`);
-    
     // You can add additional logic here:
     // - Send failure notification emails
     // - Restore inventory if needed
     // - Log payment failure reasons
     
   } catch (error) {
-    console.error('Error handling payment failure:', error);
+    recordTelemetry('webhook.processing_failed', {
+      operation: 'process', outcome: 'failed', provider: 'd1', retryable: true,
+      path: '/api/webhooks/stripe', trigger: 'webhook',
+    }, error);
   }
 }
 
@@ -249,26 +270,22 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
  * Processes successful checkout completion
  */
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-  console.log('Checkout session completed:', session.id);
-  
   const orderId = session.metadata?.orderId;
   
-  if (!orderId) {
-    console.error('No orderId in checkout session metadata');
-    return;
-  }
+  if (!orderId) return;
 
   try {
     // Handle checkout completion
-    console.log(`Processing completed checkout for order ${orderId}`);
-    
     // You can add additional logic here:
     // - Final order confirmation
     // - Customer onboarding
     // - Thank you emails
     
   } catch (error) {
-    console.error('Error handling checkout completion:', error);
+    recordTelemetry('webhook.processing_failed', {
+      operation: 'process', outcome: 'failed', provider: 'd1', retryable: true,
+      path: '/api/webhooks/stripe', trigger: 'webhook',
+    }, error);
   }
 }
 
@@ -277,18 +294,17 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
  * For subscription or recurring payment scenarios
  */
 async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
-  console.log('Invoice payment succeeded:', invoice.id);
-  
   try {
     // Handle subscription payment
-    console.log(`Processing invoice payment for customer ${invoice.customer}`);
-    
     // You can add additional logic here:
     // - Update subscription status
     // - Send invoice receipts
     // - Handle plan upgrades/downgrades
     
   } catch (error) {
-    console.error('Error handling invoice payment:', error);
+    recordTelemetry('webhook.processing_failed', {
+      operation: 'process', outcome: 'failed', provider: 'd1', retryable: true,
+      path: '/api/webhooks/stripe', trigger: 'webhook',
+    }, error);
   }
 }

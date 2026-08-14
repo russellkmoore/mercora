@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { runRecommendationCron } from "@/lib/recommendations/cron";
 import type { RecommendationRebuildSummary } from "@/lib/recommendations/batch/rebuild";
+
+const mocks = vi.hoisted(() => ({ recordTelemetry: vi.fn() }));
+
+vi.mock("@/lib/observability/telemetry", () => ({
+  recordTelemetry: mocks.recordTelemetry,
+}));
+
+import { runRecommendationCron } from "@/lib/recommendations/cron";
 
 const env = {} as CloudflareEnv;
 const summary: RecommendationRebuildSummary = {
@@ -20,14 +27,21 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("runRecommendationCron", () => {
   it("rethrows rebuild failures so the scheduled execution fails", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const rebuildError = new Error("offline");
     await expect(
-      runRecommendationCron(env, vi.fn().mockRejectedValue(new Error("offline"))),
+      runRecommendationCron(env, vi.fn().mockRejectedValue(rebuildError)),
     ).rejects.toThrow("offline");
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      "recommendation.rebuild_failed",
+      expect.objectContaining({
+        operation: "rebuild", outcome: "failed", retryable: true, trigger: "scheduled",
+        duration_ms: expect.any(Number),
+      }),
+      rebuildError,
+    );
   });
 
   it("treats partial product failures as a failed scheduled execution", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => undefined);
     await expect(
       runRecommendationCron(
         env,
@@ -37,20 +51,29 @@ describe("runRecommendationCron", () => {
         }),
       ),
     ).rejects.toThrow("1 product");
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      "recommendation.rebuild_failed",
+      expect.objectContaining({
+        operation: "rebuild", outcome: "failed", retryable: true, trigger: "scheduled",
+      }),
+      expect.objectContaining({ message: expect.stringContaining("1 product") }),
+    );
   });
 
   it("emits structured warnings for empty and stale rebuilds", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     await runRecommendationCron(
       env,
       vi.fn().mockResolvedValue({ ...summary, rowsWritten: 0, staleRowCount: 2 }),
     );
-    expect(JSON.parse(String(warn.mock.calls[0][0]))).toMatchObject({
-      event: "recommendations.rebuild",
-      outcome: "no_rows_written",
-      staleRowCount: 2,
-    });
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      "recommendation.no_rows_written",
+      expect.objectContaining({
+        operation: "rebuild",
+        count: 2,
+        trigger: "scheduled",
+      }),
+    );
   });
 
   it("logs a structured success summary", async () => {
