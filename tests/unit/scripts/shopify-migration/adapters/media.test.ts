@@ -18,6 +18,7 @@ import {
   MEDIA_IMPORTER_VERSION,
   type ExpectedMediaObject,
   type MediaObjectStore,
+  resolveR2S3Timeouts,
   type S3CommandSender,
   type StoredMediaObject,
 } from "@/scripts/shopify-migration/adapters/media/r2";
@@ -591,5 +592,40 @@ describe("R2 adapters and command construction", () => {
       "store-media", plan().objectKey, JPEG, { ...expectedMedia(), overwrite: false },
     );
     expect((send.mock.calls[0][0] as PutObjectCommand).input.IfNoneMatch).toBe("*");
+  });
+
+  it("bounds S3 operations with an abort signal and redacts provider errors", async () => {
+    const providerSecret = "secret-access-key-and-customer-object-name";
+    const signals: AbortSignal[] = [];
+    const send = vi.fn((_command: HeadObjectCommand | PutObjectCommand, options?: { abortSignal?: AbortSignal }) =>
+      new Promise<never>((_resolve, reject) => {
+        const signal = options?.abortSignal;
+        expect(signal).toBeDefined();
+        signals.push(signal!);
+        signal!.addEventListener("abort", () => reject(new Error(providerSecret)), { once: true });
+      }));
+    const adapter = new R2S3MediaStore("store-media", { send } as S3CommandSender, { operationTimeoutMs: 5 });
+
+    await expect(adapter.inspect("store-media", plan().objectKey)).rejects.toThrow("R2 object inspection failed");
+    await expect(adapter.put("store-media", plan().objectKey, JPEG, {
+      ...expectedMedia(), overwrite: false,
+    })).rejects.toThrow("R2 object write failed");
+    expect(signals).toHaveLength(2);
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
+    for (const operation of [
+      adapter.inspect("wrong-bucket", providerSecret),
+      adapter.put("wrong-bucket", providerSecret, JPEG, { ...expectedMedia(), overwrite: false }),
+    ]) await expect(operation).rejects.not.toThrow(providerSecret);
+  });
+
+  it("uses finite bounded operation, connection, request, and socket timeouts", () => {
+    expect(resolveR2S3Timeouts()).toEqual({
+      operationTimeoutMs: 60_000,
+      connectionTimeoutMs: 10_000,
+      requestTimeoutMs: 30_000,
+      socketTimeoutMs: 30_000,
+    });
+    expect(() => resolveR2S3Timeouts({ requestTimeoutMs: 0 })).toThrow(/requestTimeoutMs/);
+    expect(() => resolveR2S3Timeouts({ socketTimeoutMs: 120_001 })).toThrow(/socketTimeoutMs/);
   });
 });

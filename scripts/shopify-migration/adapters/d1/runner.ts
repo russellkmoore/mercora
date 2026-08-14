@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative } from "node:path";
 
 import type { ExecutionPlan } from "../../lib/config.js";
 import type { AppliedMediaImportResult } from "../media/index.js";
@@ -56,15 +56,26 @@ export interface PrivateSqlFiles {
   cleanup(directory: string): Promise<void>;
 }
 
+export interface ProjectFileStat {
+  kind: "file" | "directory";
+  size: number;
+  mode: number;
+}
+
+export interface D1ProjectFiles {
+  realpath(path: string): Promise<string>;
+  readFile(path: string): Promise<Buffer>;
+  stat(path: string): Promise<ProjectFileStat>;
+}
+
 export type D1MediaEvidence = AppliedMediaImportResult;
 
 export interface RunD1ImportOptions {
   input: MaterializedD1Input;
   execution: ExecutionPlan;
-  wranglerConfigText: string;
-  wranglerConfigPath: string;
-  /** Explicit project-local binary; the runner never invokes npx or downloads tools. */
-  wranglerExecutablePath: string;
+  /** Absolute, canonical project root containing wrangler.jsonc and local dependencies. */
+  projectRoot: string;
+  projectFiles?: D1ProjectFiles;
   wranglerEnvironment?: string;
   expectedDatabaseName?: string;
   mediaEvidence?: readonly D1MediaEvidence[];
@@ -123,16 +134,155 @@ const EXPECTED_INDEXES = [
   "idx_customers_type", "idx_orders_customer_id", "product_reviews_product_idx", "redirect_map_source_path_idx",
 ] as const;
 
+interface ColumnContract {
+  table: string;
+  name: string;
+  type: "TEXT" | "INTEGER";
+  notNull: 0 | 1;
+  defaultValue: string | null;
+  primaryKey: 0 | 1;
+}
+
+const TARGET_COLUMN_CONTRACTS: ColumnContract[] = [];
+function targetColumns(
+  table: string,
+  names: readonly string[],
+  type: ColumnContract["type"],
+  notNull: ColumnContract["notNull"] = 0,
+  defaultValue: string | null = null,
+  primaryKey: ColumnContract["primaryKey"] = 0,
+): void {
+  names.forEach((name) => TARGET_COLUMN_CONTRACTS.push({ table, name, type, notNull, defaultValue, primaryKey }));
+}
+
+targetColumns("categories", ["id"], "TEXT", 0, null, 1);
+targetColumns("categories", ["name"], "TEXT", 1);
+targetColumns("categories", ["position"], "INTEGER");
+targetColumns("categories", ["product_count"], "INTEGER", 0, "0");
+targetColumns("categories", ["status"], "TEXT", 0, "'active'");
+targetColumns("categories", ["description", "slug", "parent_id", "path", "external_references", "created_at", "updated_at", "children", "attributes", "tags", "primary_image", "media", "seo", "extensions"], "TEXT");
+
+targetColumns("products", ["id"], "TEXT", 0, null, 1);
+targetColumns("products", ["name"], "TEXT", 1);
+targetColumns("products", ["status"], "TEXT", 0, "'active'");
+targetColumns("products", ["fulfillment_type"], "TEXT", 0, "'physical'");
+targetColumns("products", ["type", "external_references", "created_at", "updated_at", "description", "slug", "brand", "categories", "tags", "options", "default_variant_id", "tax_category", "primary_image", "media", "seo", "rating", "related_products", "extensions"], "TEXT");
+
+targetColumns("product_variants", ["id"], "TEXT", 0, null, 1);
+targetColumns("product_variants", ["product_id", "sku", "option_values", "price"], "TEXT", 1);
+targetColumns("product_variants", ["status"], "TEXT", 0, "'active'");
+targetColumns("product_variants", ["position"], "INTEGER");
+targetColumns("product_variants", ["shipping_required"], "INTEGER", 0, "1");
+targetColumns("product_variants", ["compare_at_price", "cost", "weight", "dimensions", "barcode", "inventory", "tax_category", "media", "attributes", "created_at", "updated_at"], "TEXT");
+
+targetColumns("inventory", ["id"], "TEXT", 0, null, 1);
+targetColumns("inventory", ["sku_id", "location_id", "quantities"], "TEXT", 1);
+targetColumns("inventory", ["status"], "TEXT", 0, "'active'");
+targetColumns("inventory", ["backorderable", "safety_stock", "version"], "INTEGER", 0, "0");
+targetColumns("inventory", ["stock_status", "external_references", "created_at", "updated_at", "policy_id", "backorder_eta", "extensions"], "TEXT");
+
+targetColumns("pages", ["id"], "INTEGER", 0, null, 1);
+targetColumns("pages", ["title", "slug", "content"], "TEXT", 1);
+targetColumns("pages", ["status"], "TEXT", 1, "'draft'");
+targetColumns("pages", ["template"], "TEXT", 0, "'default'");
+targetColumns("pages", ["published_at", "parent_id"], "INTEGER");
+targetColumns("pages", ["sort_order", "show_in_nav", "is_protected"], "INTEGER", 0, "0");
+targetColumns("pages", ["created_at", "updated_at"], "INTEGER", 1, "unixepoch()");
+targetColumns("pages", ["version"], "INTEGER", 1, "1");
+targetColumns("pages", ["excerpt", "meta_title", "meta_description", "meta_keywords", "created_by", "updated_by", "nav_title", "custom_css", "custom_js", "required_roles"], "TEXT");
+
+targetColumns("page_versions", ["id"], "INTEGER", 0, null, 1);
+targetColumns("page_versions", ["page_id", "version"], "INTEGER", 1);
+targetColumns("page_versions", ["title", "content", "created_by"], "TEXT", 1);
+targetColumns("page_versions", ["created_at"], "INTEGER", 1, "unixepoch()");
+targetColumns("page_versions", ["excerpt", "meta_title", "meta_description", "meta_keywords", "change_summary"], "TEXT");
+
+targetColumns("blog_categories", ["id"], "INTEGER", 0, null, 1);
+targetColumns("blog_categories", ["name", "slug"], "TEXT", 1);
+targetColumns("blog_categories", ["description"], "TEXT");
+targetColumns("blog_categories", ["created_at", "updated_at"], "INTEGER", 1, "unixepoch()");
+
+targetColumns("blog_posts", ["id"], "INTEGER", 0, null, 1);
+targetColumns("blog_posts", ["title", "slug", "author"], "TEXT", 1);
+targetColumns("blog_posts", ["tags"], "TEXT", 1, "'[]'");
+targetColumns("blog_posts", ["status"], "TEXT", 1, "'draft'");
+targetColumns("blog_posts", ["html"], "TEXT", 1, "''");
+targetColumns("blog_posts", ["reading_time"], "INTEGER", 1, "1");
+targetColumns("blog_posts", ["category_id", "published_at"], "INTEGER");
+targetColumns("blog_posts", ["created_at", "updated_at"], "INTEGER", 1, "unixepoch()");
+targetColumns("blog_posts", ["excerpt", "cover_image_url", "cover_image_alt", "editor_json", "meta_title", "meta_description", "created_by", "updated_by"], "TEXT");
+
+targetColumns("customers", ["id"], "TEXT", 0, null, 1);
+targetColumns("customers", ["type"], "TEXT", 1);
+targetColumns("customers", ["status"], "TEXT", 0, "'active'");
+targetColumns("customers", ["external_references", "created_at", "updated_at", "person", "company", "contacts", "addresses", "communication_preferences", "segments", "tags", "loyalty", "authentication", "extensions"], "TEXT");
+
+targetColumns("orders", ["id"], "TEXT", 0, null, 1);
+targetColumns("orders", ["total_amount", "currency_code", "items"], "TEXT", 1);
+targetColumns("orders", ["status", "payment_status"], "TEXT", 0, "'pending'");
+targetColumns("orders", ["created_at", "updated_at"], "TEXT", 0, "CURRENT_TIMESTAMP");
+targetColumns("orders", ["customer_id", "shipping_address", "billing_address", "shipping_method", "payment_method", "notes", "shipped_at", "delivered_at", "tracking_number", "external_references", "extensions", "shipping_carrier"], "TEXT");
+
+targetColumns("product_reviews", ["id"], "TEXT", 0, null, 1);
+targetColumns("product_reviews", ["product_id", "order_id", "customer_id"], "TEXT", 1);
+targetColumns("product_reviews", ["rating"], "INTEGER", 1);
+targetColumns("product_reviews", ["status"], "TEXT", 1, "'pending'");
+targetColumns("product_reviews", ["is_verified"], "INTEGER", 0, "1");
+targetColumns("product_reviews", ["submitted_at", "created_at", "updated_at"], "TEXT", 0, "CURRENT_TIMESTAMP");
+targetColumns("product_reviews", ["order_item_id", "title", "body", "automated_moderation", "moderation_notes", "admin_response", "response_author_id", "responded_at", "published_at", "metadata"], "TEXT");
+
+targetColumns("redirect_map", ["id"], "INTEGER", 0, null, 1);
+targetColumns("redirect_map", ["source_path", "target_path"], "TEXT", 1);
+targetColumns("redirect_map", ["status_code"], "INTEGER", 1, "301");
+targetColumns("redirect_map", ["entity_type"], "TEXT");
+targetColumns("redirect_map", ["created_at"], "INTEGER", 1, "unixepoch()");
+
+export const D1_TARGET_COLUMN_COUNT = TARGET_COLUMN_CONTRACTS.length;
+
 function quotedList(values: readonly string[]): string {
   return values.map((value) => `'${value}'`).join(", ");
 }
 
+function quotedValue(value: string | null): string {
+  return value === null ? "NULL" : `'${value.replaceAll("'", "''")}'`;
+}
+
+function columnContractValues(): string {
+  return TARGET_COLUMN_CONTRACTS.map((contract) =>
+    `(${quotedValue(contract.table)}, ${quotedValue(contract.name)}, ${quotedValue(contract.type)}, ` +
+    `${contract.notNull}, ${quotedValue(contract.defaultValue)}, ${contract.primaryKey})`).join(",\n    ");
+}
+
 export const D1_PREFLIGHT_SQL = `
+WITH
+  expected_tables(name) AS (VALUES ${EXPECTED_TABLES.map((table) => `(${quotedValue(table)})`).join(", ")}),
+  expected_columns(table_name, column_name, column_type, is_not_null, default_value, is_primary_key) AS (
+    VALUES ${columnContractValues()}
+  )
 SELECT
   (SELECT COUNT(*) FROM d1_migrations) AS migration_count,
   (SELECT COUNT(*) FROM d1_migrations WHERE name IN (${quotedList(EXPECTED_MIGRATIONS)})) AS expected_migration_count,
   (SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN (${quotedList(EXPECTED_TABLES)})) AS table_count,
   (SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN (${quotedList(EXPECTED_INDEXES)})) AS index_count,
+  (SELECT COUNT(*) FROM expected_columns) AS target_column_count,
+  (
+    SELECT COUNT(*) FROM expected_columns AS expected
+    JOIN pragma_table_info(expected.table_name) AS actual
+      ON actual.name = expected.column_name
+      AND upper(actual.type) = expected.column_type
+      AND actual."notnull" = expected.is_not_null
+      AND actual.dflt_value IS expected.default_value
+      AND actual.pk = expected.is_primary_key
+  ) AS compatible_target_column_count,
+  (
+    SELECT COUNT(*) FROM expected_tables AS target
+    JOIN pragma_table_info(target.name) AS actual
+    LEFT JOIN expected_columns AS expected
+      ON expected.table_name = target.name AND expected.column_name = actual.name
+    WHERE expected.column_name IS NULL AND actual.pk = 0
+      AND actual."notnull" = 1
+      AND (actual.dflt_value IS NULL OR upper(trim(actual.dflt_value)) = 'NULL')
+  ) AS incompatible_additive_column_count,
   (
     (SELECT COUNT(*) FROM pragma_table_info('categories') WHERE name = 'id' AND pk = 1) +
     (SELECT COUNT(*) FROM pragma_table_info('products') WHERE name = 'id' AND pk = 1) +
@@ -182,6 +332,9 @@ const PREFLIGHT_EXPECTED: Readonly<Record<string, number>> = {
   expected_migration_count: EXPECTED_MIGRATIONS.length,
   table_count: EXPECTED_TABLES.length,
   index_count: EXPECTED_INDEXES.length,
+  target_column_count: D1_TARGET_COLUMN_COUNT,
+  compatible_target_column_count: D1_TARGET_COLUMN_COUNT,
+  incompatible_additive_column_count: 0,
   primary_key_count: EXPECTED_TABLES.length,
   unique_constraint_count: 5,
   foreign_key_count: 6,
@@ -306,6 +459,143 @@ export function createPrivateSqlFiles(): PrivateSqlFiles {
   };
 }
 
+export function createD1ProjectFiles(): D1ProjectFiles {
+  return {
+    realpath,
+    readFile,
+    async stat(path) {
+      const value = await stat(path);
+      return {
+        kind: value.isFile() ? "file" : value.isDirectory() ? "directory" : (() => {
+          throw new Error("D1 project path has an unsupported file type");
+        })(),
+        size: value.size,
+        mode: value.mode,
+      };
+    },
+  };
+}
+
+interface D1ProjectSnapshot {
+  root: string;
+  configPath: string;
+  configBytes: Buffer;
+  configText: string;
+  executablePath: string;
+  executableBytes: Buffer;
+  packageJsonPath: string;
+  packageJsonBytes: Buffer;
+}
+
+const MAX_PACKAGE_JSON_BYTES = 256 * 1024;
+const MAX_WRANGLER_ENTRY_BYTES = 8 * 1024 * 1024;
+
+function exactChild(root: string, path: string): boolean {
+  const child = relative(root, path);
+  return child !== "" && child !== ".." && !child.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) &&
+    !isAbsolute(child);
+}
+
+async function boundedProjectFile(
+  files: D1ProjectFiles,
+  path: string,
+  maximum: number,
+  executable = false,
+): Promise<Buffer> {
+  const metadata = await files.stat(path);
+  if (metadata.kind !== "file" || metadata.size < 1 || metadata.size > maximum ||
+      (executable && process.platform !== "win32" && (metadata.mode & 0o111) === 0)) {
+    throw new Error("D1 project file does not satisfy the local execution contract");
+  }
+  const bytes = await files.readFile(path);
+  if (bytes.byteLength !== metadata.size || bytes.byteLength > maximum) {
+    throw new Error("D1 project file changed while it was being read");
+  }
+  return Buffer.from(bytes);
+}
+
+function wranglerBin(value: unknown): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Local Wrangler package metadata is invalid");
+  }
+  const packageJson = value as Record<string, unknown>;
+  if (packageJson.name !== "wrangler" || typeof packageJson.version !== "string" || !/^\d+\.\d+\.\d+/.test(packageJson.version)) {
+    throw new Error("Local Wrangler package metadata is invalid");
+  }
+  const candidate = typeof packageJson.bin === "string"
+    ? packageJson.bin
+    : packageJson.bin && typeof packageJson.bin === "object" && !Array.isArray(packageJson.bin)
+      ? (packageJson.bin as Record<string, unknown>).wrangler
+      : undefined;
+  if (typeof candidate !== "string" || !candidate || candidate.length > 512 || isAbsolute(candidate) ||
+      candidate.split(/[\\/]/).includes("..") || /[\0\r\n]/.test(candidate)) {
+    throw new Error("Local Wrangler package bin metadata is invalid");
+  }
+  return candidate;
+}
+
+async function loadD1ProjectSnapshot(root: string, files: D1ProjectFiles): Promise<D1ProjectSnapshot> {
+  if (!isAbsolute(root) || root.length > 4_096 || /[\0\r\n]/.test(root)) {
+    throw new Error("D1 project root is invalid");
+  }
+  const canonicalRoot = await files.realpath(root);
+  const rootMetadata = await files.stat(canonicalRoot);
+  if (canonicalRoot !== root || rootMetadata.kind !== "directory") {
+    throw new Error("D1 project root must be an explicit canonical directory");
+  }
+
+  const configPath = join(canonicalRoot, "wrangler.jsonc");
+  const packageRoot = join(canonicalRoot, "node_modules", "wrangler");
+  const packageJsonPath = join(packageRoot, "package.json");
+  const executableShim = join(canonicalRoot, "node_modules", ".bin", process.platform === "win32" ? "wrangler.cmd" : "wrangler");
+  const [canonicalConfig, canonicalPackageRoot, canonicalPackageJson] = await Promise.all([
+    files.realpath(configPath),
+    files.realpath(packageRoot),
+    files.realpath(packageJsonPath),
+  ]);
+  if (canonicalConfig !== configPath || canonicalPackageRoot !== packageRoot || canonicalPackageJson !== packageJsonPath ||
+      !exactChild(canonicalRoot, canonicalPackageRoot)) {
+    throw new Error("Wrangler config and package must be local to the canonical project root");
+  }
+  const [configBytes, packageJsonBytes] = await Promise.all([
+    boundedProjectFile(files, configPath, 1024 * 1024),
+    boundedProjectFile(files, packageJsonPath, MAX_PACKAGE_JSON_BYTES),
+  ]);
+  let packageJson: unknown;
+  try { packageJson = JSON.parse(packageJsonBytes.toString("utf8")); } catch {
+    throw new Error("Local Wrangler package metadata is invalid");
+  }
+  const expectedExecutable = join(packageRoot, wranglerBin(packageJson));
+  const [canonicalShim, canonicalExecutable] = await Promise.all([
+    files.realpath(executableShim),
+    files.realpath(expectedExecutable),
+  ]);
+  if (canonicalShim !== canonicalExecutable || canonicalExecutable !== expectedExecutable ||
+      !exactChild(packageRoot, canonicalExecutable)) {
+    throw new Error("Local Wrangler executable is not owned by the local package");
+  }
+  const executableBytes = await boundedProjectFile(files, canonicalExecutable, MAX_WRANGLER_ENTRY_BYTES, true);
+  return {
+    root: canonicalRoot,
+    configPath,
+    configBytes,
+    configText: configBytes.toString("utf8"),
+    executablePath: canonicalExecutable,
+    executableBytes,
+    packageJsonPath,
+    packageJsonBytes,
+  };
+}
+
+async function verifyD1ProjectSnapshot(snapshot: D1ProjectSnapshot, files: D1ProjectFiles): Promise<void> {
+  const current = await loadD1ProjectSnapshot(snapshot.root, files);
+  if (current.configPath !== snapshot.configPath || current.executablePath !== snapshot.executablePath ||
+      current.packageJsonPath !== snapshot.packageJsonPath || !current.configBytes.equals(snapshot.configBytes) ||
+      !current.packageJsonBytes.equals(snapshot.packageJsonBytes) || !current.executableBytes.equals(snapshot.executableBytes)) {
+    throw new Error("D1 project configuration or local Wrangler changed before execution");
+  }
+}
+
 function dependencies(plan: D1ImportPlan): Array<{ dependency: D1Dependency; count: number }> {
   return D1_DEPENDENCIES.map((dependency) => ({ dependency, count: plan.counts[dependency] }));
 }
@@ -401,8 +691,10 @@ async function checkedRun(
   executable: string,
   args: readonly string[],
   stage: "preflight" | "chunk" | "validation",
+  verifyProject: () => Promise<void>,
 ): Promise<CommandResult> {
   try {
+    await verifyProject();
     const result = await commandRunner.run(executable, args);
     if (result.exitCode !== 0) throw new Error("nonzero");
     return result;
@@ -414,19 +706,10 @@ async function checkedRun(
 export async function runD1Import(options: RunD1ImportOptions): Promise<D1DryRunResult | D1ApplyResult> {
   const plan = buildD1ImportPlan(options.input, { ...options.planOptions, overwrite: options.execution.overwrite });
   assertExecutionGates(options.execution, plan.containsSensitiveRows);
-  if (!options.wranglerConfigPath || options.wranglerConfigPath.startsWith("-") ||
-      options.wranglerConfigPath.length > 4_096 || /[\0\r\n]/.test(options.wranglerConfigPath)) {
-    throw new Error("Wrangler config path is invalid");
-  }
-  const executableName = basename(options.wranglerExecutablePath ?? "");
-  const expectedExecutableDirectory = join(dirname(resolve(options.wranglerConfigPath)), "node_modules", ".bin");
-  if (!isAbsolute(options.wranglerExecutablePath ?? "") ||
-      (executableName !== "wrangler" && executableName !== "wrangler.cmd") ||
-      dirname(options.wranglerExecutablePath) !== expectedExecutableDirectory ||
-      options.wranglerExecutablePath.length > 4_096 || /[\0\r\n]/.test(options.wranglerExecutablePath)) {
-    throw new Error("Local Wrangler executable path is invalid");
-  }
-  const wranglerConfig = parseWranglerJsonc(options.wranglerConfigText);
+  const projectFiles = options.projectFiles ?? createD1ProjectFiles();
+  const project = await loadD1ProjectSnapshot(options.projectRoot, projectFiles);
+  const verifyProject = () => verifyD1ProjectSnapshot(project, projectFiles);
+  const wranglerConfig = parseWranglerJsonc(project.configText);
   const target = resolveDatabaseTarget(wranglerConfig, {
     target: options.execution.target,
     ...(options.wranglerEnvironment ? { environment: options.wranglerEnvironment } : {}),
@@ -446,37 +729,39 @@ export async function runD1Import(options: RunD1ImportOptions): Promise<D1DryRun
   }
 
   assertMediaEvidence(plan.requiredMediaPaths, options.mediaEvidence ?? []);
-  const commandBase = baseArgs(target.databaseName, target.target, options.wranglerConfigPath, target.environment);
+  const commandBase = baseArgs(target.databaseName, target.target, project.configPath, target.environment);
 
   const preflight = await checkedRun(
     options.commandRunner,
-    options.wranglerExecutablePath,
+    project.executablePath,
     [...commandBase, "--command", D1_PREFLIGHT_SQL],
     "preflight",
+    verifyProject,
   );
   try { assertPreflight(preflight.stdout); } catch { throw new Error("D1 preflight failed"); }
 
-  const files = options.privateFiles ?? createPrivateSqlFiles();
+  const privateFiles = options.privateFiles ?? createPrivateSqlFiles();
   let directory: string | undefined;
   let failure: Error | undefined;
   try {
-    directory = await files.createDirectory();
+    directory = await privateFiles.createDirectory();
     for (let index = 0; index < plan.chunks.length; index += 1) {
-      const path = await files.write(directory, `${String(index + 1).padStart(4, "0")}-chunk.sql`, plan.chunks[index]);
-      await checkedRun(options.commandRunner, options.wranglerExecutablePath, [...commandBase, "--file", path], "chunk");
+      const path = await privateFiles.write(directory, `${String(index + 1).padStart(4, "0")}-chunk.sql`, plan.chunks[index]);
+      await checkedRun(options.commandRunner, project.executablePath, [...commandBase, "--file", path], "chunk", verifyProject);
     }
     for (let index = 0; index < plan.validation.length; index += 1) {
       const unit = plan.validation[index];
-      const path = await files.write(
+      const path = await privateFiles.write(
         directory,
         `${String(index + 1).padStart(4, "0")}-validation.sql`,
         `${unit.sql}\n`,
       );
       const result = await checkedRun(
         options.commandRunner,
-        options.wranglerExecutablePath,
+        project.executablePath,
         [...commandBase, "--file", path],
         "validation",
+        verifyProject,
       );
       try { assertValidation(result.stdout); } catch { throw new Error("D1 validation failed"); }
     }
@@ -486,7 +771,7 @@ export async function runD1Import(options: RunD1ImportOptions): Promise<D1DryRun
       : new Error("D1 import failed");
   } finally {
     if (directory) {
-      try { await files.cleanup(directory); } catch {
+      try { await privateFiles.cleanup(directory); } catch {
         failure ??= new Error("D1 private SQL cleanup failed");
       }
     }

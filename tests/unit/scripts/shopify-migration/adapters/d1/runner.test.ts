@@ -5,10 +5,12 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  D1_TARGET_COLUMN_COUNT,
   createPrivateSqlFiles,
   createNodeCommandRunner,
   runD1Import,
   type CommandRunner,
+  type D1ProjectFiles,
   type PrivateSqlFiles,
   type SpawnCommand,
 } from "@/scripts/shopify-migration/adapters/d1/runner";
@@ -19,6 +21,9 @@ const preflight = `${JSON.stringify([{ success: true, results: [{
   expected_migration_count: 20,
   table_count: 12,
   index_count: 12,
+  target_column_count: D1_TARGET_COLUMN_COUNT,
+  compatible_target_column_count: D1_TARGET_COLUMN_COUNT,
+  incompatible_additive_column_count: 0,
   primary_key_count: 12,
   unique_constraint_count: 5,
   foreign_key_count: 6,
@@ -30,6 +35,49 @@ const wrangler = JSON.stringify({
   d1_databases: [{ binding: "DB", database_name: "local-db", database_id: "prod-id", preview_database_id: "preview-id" }],
 });
 const wranglerExecutablePath = join(process.cwd(), "node_modules", ".bin", "wrangler");
+const projectRoot = "/repo";
+const projectConfigPath = `${projectRoot}/wrangler.jsonc`;
+const projectPackageRoot = `${projectRoot}/node_modules/wrangler`;
+const projectPackageJsonPath = `${projectPackageRoot}/package.json`;
+const projectExecutablePath = `${projectPackageRoot}/bin/wrangler.js`;
+const projectShimPath = `${projectRoot}/node_modules/.bin/wrangler`;
+const packageJson = Buffer.from(JSON.stringify({
+  name: "wrangler",
+  version: "4.120.0",
+  bin: { wrangler: "bin/wrangler.js" },
+}));
+const executable = Buffer.from("#!/usr/bin/env node\n");
+
+function memoryProjectFiles(configReads: readonly string[] = [wrangler]): D1ProjectFiles {
+  let configIndex = 0;
+  return {
+    realpath: vi.fn(async (path: string) => path === projectShimPath ? projectExecutablePath : path),
+    readFile: vi.fn(async (path: string) => {
+      if (path === projectConfigPath) {
+        const value = configReads[Math.min(configIndex, configReads.length - 1)];
+        configIndex += 1;
+        return Buffer.from(value);
+      }
+      if (path === projectPackageJsonPath) return Buffer.from(packageJson);
+      if (path === projectExecutablePath) return Buffer.from(executable);
+      throw new Error("unexpected project read");
+    }),
+    stat: vi.fn(async (path: string) => {
+      if (path === projectRoot || path === projectPackageRoot) return { kind: "directory" as const, size: 0, mode: 0o755 };
+      if (path === projectConfigPath) {
+        const current = configReads[Math.min(configIndex, configReads.length - 1)];
+        return { kind: "file" as const, size: Buffer.byteLength(current), mode: 0o644 };
+      }
+      if (path === projectPackageJsonPath) return { kind: "file" as const, size: packageJson.byteLength, mode: 0o644 };
+      if (path === projectExecutablePath) return { kind: "file" as const, size: executable.byteLength, mode: 0o755 };
+      throw new Error("unexpected project stat");
+    }),
+  };
+}
+
+function project(configReads?: readonly string[]) {
+  return { projectRoot, projectFiles: memoryProjectFiles(configReads) };
+}
 
 function execution(overrides: Partial<ExecutionPlan> = {}): ExecutionPlan {
   return {
@@ -70,12 +118,19 @@ function memoryFiles() {
 }
 
 describe("D1 runner", () => {
+  it("binds a dry run to the real project's config and package-local Wrangler", async () => {
+    const commandRunner: CommandRunner = { run: vi.fn() };
+    await expect(runD1Import({
+      input: {}, execution: execution(), projectRoot: process.cwd(), commandRunner,
+    })).resolves.toMatchObject({ dryRun: true, totalRows: 0 });
+    expect(commandRunner.run).not.toHaveBeenCalled();
+  });
+
   it("returns a PII-free dry-run plan without subprocesses or temporary writes", async () => {
     const commandRunner: CommandRunner = { run: vi.fn() };
     const { files } = memoryFiles();
     const result = await runD1Import({
-      input: input(), execution: execution(), wranglerConfigText: wrangler,
-      wranglerConfigPath: "wrangler.jsonc", wranglerExecutablePath, commandRunner, privateFiles: files,
+      input: input(), execution: execution(), ...project(), commandRunner, privateFiles: files,
     });
     expect(result.dryRun).toBe(true);
     expect(commandRunner.run).not.toHaveBeenCalled();
@@ -95,17 +150,15 @@ describe("D1 runner", () => {
     const result = await runD1Import({
       input: input(),
       execution: execution({ dryRun: false, apply: true, target: "preview", confirmedPreview: true }),
-      wranglerConfigText: wrangler,
-      wranglerConfigPath: "wrangler.jsonc",
-      wranglerExecutablePath,
+      ...project(),
       commandRunner,
       privateFiles: files,
     });
     expect(result.dryRun).toBe(false);
     expect(events).toEqual(["preflight", "temp", "chunk", "validation"]);
     const calls = (commandRunner.run as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string[]]>;
-    expect(calls[0][0]).toBe(wranglerExecutablePath);
-    expect(calls[0][1]).toEqual(expect.arrayContaining(["d1", "execute", "local-db", "--remote", "--preview", "--config", "wrangler.jsonc", "--json", "--command"]));
+    expect(calls[0][0]).toBe(projectExecutablePath);
+    expect(calls[0][1]).toEqual(expect.arrayContaining(["d1", "execute", "local-db", "--remote", "--preview", "--config", projectConfigPath, "--json", "--command"]));
     expect(calls.flatMap((call) => call[1])).not.toContain("wrangler");
     expect(calls.flatMap((call) => call[1])).not.toContain("--yes");
     expect(files.cleanup).toHaveBeenCalledOnce();
@@ -120,8 +173,7 @@ describe("D1 runner", () => {
       const commandRunner: CommandRunner = { run: vi.fn(async () => ({ exitCode: 0, stdout, stderr: "private row" })) };
       const { files } = memoryFiles();
       await expect(runD1Import({
-        input: input(), execution: execution({ dryRun: false, apply: true }), wranglerConfigText: wrangler,
-        wranglerConfigPath: "wrangler.jsonc", wranglerExecutablePath, commandRunner, privateFiles: files,
+        input: input(), execution: execution({ dryRun: false, apply: true }), ...project(), commandRunner, privateFiles: files,
       })).rejects.toThrow(/^D1 preflight failed$/);
       expect(files.createDirectory).not.toHaveBeenCalled();
     }
@@ -136,8 +188,7 @@ describe("D1 runner", () => {
     })) };
     const { files } = memoryFiles();
     await expect(runD1Import({
-      input: input(), execution: execution({ dryRun: false, apply: true }), wranglerConfigText: wrangler,
-      wranglerConfigPath: "wrangler.jsonc", wranglerExecutablePath, commandRunner, privateFiles: files,
+      input: input(), execution: execution({ dryRun: false, apply: true }), ...project(), commandRunner, privateFiles: files,
     })).resolves.toMatchObject({ dryRun: false });
   });
 
@@ -145,12 +196,41 @@ describe("D1 runner", () => {
     const commandRunner: CommandRunner = { run: vi.fn() };
     await expect(runD1Import({
       input: input(), execution: execution({ dryRun: false, apply: true, overwrite: true }),
-      wranglerConfigText: wrangler, wranglerConfigPath: "wrangler.jsonc", wranglerExecutablePath, commandRunner,
+      ...project(), commandRunner,
     })).rejects.toThrow(/Overwrite apply/);
     await expect(runD1Import({
       input: { customers: [{ id: "user_12345678", type: "person" }] },
-      execution: execution(), wranglerConfigText: wrangler, wranglerConfigPath: "wrangler.jsonc", wranglerExecutablePath, commandRunner,
+      execution: execution(), ...project(), commandRunner,
     })).rejects.toThrow(/Sensitive rows/);
+  });
+
+  it("rejects a divergent initial page version before project reads or command execution", async () => {
+    const commandRunner: CommandRunner = { run: vi.fn() };
+    const projectFiles = memoryProjectFiles();
+    await expect(runD1Import({
+      input: { pages: [{
+        sourceFingerprint: "page-fingerprint",
+        page: {
+          title: "Page", slug: "page", content: "<p>Page</p>", excerpt: null,
+          meta_title: "Page", meta_description: null, meta_keywords: null,
+          template: "default", parent_id: null, created_by: "actor", updated_by: "actor",
+          version: 1, custom_css: null, custom_js: null,
+        },
+        initialVersion: {
+          pageReference: { provider: "shopify", sourceFingerprint: "page-fingerprint", slug: "page" },
+          record: {
+            title: "Page", content: "<p>Different</p>", excerpt: null,
+            meta_title: "Page", meta_description: null, meta_keywords: null,
+            version: 1, created_by: "actor",
+          },
+        },
+        conflict: { strategy: "insert-only", key: "slug", onConflict: "skip" },
+        media: [],
+      }] as never },
+      execution: execution(), projectRoot, projectFiles, commandRunner,
+    })).rejects.toThrow(/page snapshot contract/);
+    expect(commandRunner.run).not.toHaveBeenCalled();
+    expect(projectFiles.readFile).not.toHaveBeenCalled();
   });
 
   it("rejects planned/plain-exists media and accepts only complete cryptographic evidence", async () => {
@@ -161,8 +241,7 @@ describe("D1 runner", () => {
       stderr: "",
     })) };
     const common = {
-      input: input(path), execution: execution({ dryRun: false, apply: true }), wranglerConfigText: wrangler,
-      wranglerConfigPath: "wrangler.jsonc", wranglerExecutablePath, commandRunner,
+      input: input(path), execution: execution({ dryRun: false, apply: true }), ...project(), commandRunner,
     };
     await expect(runD1Import({ ...common, mediaEvidence: [{ objectKey: "categories/owner/1.jpg", publicPath: path, status: "planned" } as never] }))
       .rejects.toThrow(/cryptographically verified/);
@@ -196,9 +275,7 @@ describe("D1 runner", () => {
         { category: { id: "three", name: "Three" } },
       ] as never },
       execution: execution({ dryRun: false, apply: true }),
-      wranglerConfigText: wrangler,
-      wranglerConfigPath: "wrangler.jsonc",
-      wranglerExecutablePath,
+      ...project(),
       commandRunner,
       privateFiles: files,
       planOptions: { maxChunkStatements: 3, maxChunkBytes: 1024 },
@@ -216,18 +293,59 @@ describe("D1 runner", () => {
     await expect(stat(directory)).rejects.toThrow();
   });
 
-  it("fails closed instead of invoking npx or an arbitrary executable", async () => {
+  it("fails closed for a non-canonical or unrelated project root", async () => {
     const commandRunner: CommandRunner = { run: vi.fn() };
     await expect(runD1Import({
-      input: input(), execution: execution(), wranglerConfigText: wrangler,
-      wranglerConfigPath: "wrangler.jsonc", wranglerExecutablePath: "npx", commandRunner,
-    })).rejects.toThrow(/Local Wrangler executable path/);
+      input: input(), execution: execution(), projectRoot: "relative", projectFiles: memoryProjectFiles(), commandRunner,
+    })).rejects.toThrow(/project root/);
+    expect(commandRunner.run).not.toHaveBeenCalled();
+  });
+
+  it("rejects same-name config bytes with a different database ID before spawn", async () => {
+    const changed = JSON.stringify({
+      d1_databases: [{
+        binding: "DB",
+        database_name: "local-db",
+        database_id: "different-prod-id",
+        preview_database_id: "different-preview-id",
+      }],
+    });
+    const commandRunner: CommandRunner = { run: vi.fn() };
+    const { files } = memoryFiles();
     await expect(runD1Import({
-      input: input(), execution: execution(), wranglerConfigText: wrangler,
-      wranglerConfigPath: "wrangler.jsonc",
-      wranglerExecutablePath: "/tmp/unrelated/node_modules/.bin/wrangler",
-      commandRunner,
-    })).rejects.toThrow(/Local Wrangler executable path/);
+      input: input(), execution: execution({ dryRun: false, apply: true }),
+      ...project([wrangler, changed]), commandRunner, privateFiles: files,
+    })).rejects.toThrow(/^D1 preflight failed$/);
+    expect(commandRunner.run).not.toHaveBeenCalled();
+    expect(files.createDirectory).not.toHaveBeenCalled();
+  });
+
+  it("rechecks config bytes before a write and cleans up when they change after preflight", async () => {
+    const changed = JSON.stringify({
+      d1_databases: [{
+        binding: "DB", database_name: "local-db",
+        database_id: "later-prod-id", preview_database_id: "later-preview-id",
+      }],
+    });
+    const commandRunner: CommandRunner = { run: vi.fn(async () => ({ exitCode: 0, stdout: preflight, stderr: "" })) };
+    const { files } = memoryFiles();
+    await expect(runD1Import({
+      input: input(), execution: execution({ dryRun: false, apply: true }),
+      ...project([wrangler, wrangler, changed]), commandRunner, privateFiles: files,
+    })).rejects.toThrow(/^D1 chunk failed$/);
+    expect(commandRunner.run).toHaveBeenCalledOnce();
+    expect(files.createDirectory).toHaveBeenCalledOnce();
+    expect(files.cleanup).toHaveBeenCalledOnce();
+  });
+
+  it("rejects a Wrangler shim resolving into unrelated tmp node_modules", async () => {
+    const projectFiles = memoryProjectFiles();
+    projectFiles.realpath = vi.fn(async (path: string) =>
+      path === projectShimPath ? "/tmp/unrelated/node_modules/wrangler/bin/wrangler.js" : path);
+    const commandRunner: CommandRunner = { run: vi.fn() };
+    await expect(runD1Import({
+      input: input(), execution: execution(), projectRoot, projectFiles, commandRunner,
+    })).rejects.toThrow(/not owned by the local package/);
     expect(commandRunner.run).not.toHaveBeenCalled();
   });
 
@@ -336,8 +454,7 @@ describe("D1 runner", () => {
     }) };
     const { files } = memoryFiles();
     await expect(runD1Import({
-      input: input(), execution: execution({ dryRun: false, apply: true }), wranglerConfigText: wrangler,
-      wranglerConfigPath: "wrangler.jsonc", wranglerExecutablePath, commandRunner, privateFiles: files,
+      input: input(), execution: execution({ dryRun: false, apply: true }), ...project(), commandRunner, privateFiles: files,
     })).rejects.toThrow(/^D1 chunk failed$/);
     expect(calls).toBe(2);
     expect(files.cleanup).toHaveBeenCalledOnce();

@@ -5,6 +5,7 @@ import {
   type HeadObjectCommandOutput,
   type PutObjectCommandOutput,
 } from "@aws-sdk/client-s3";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
 import type { WranglerTarget } from "../../lib/wrangler-target.js";
 import type { MediaContentType } from "./security.js";
 
@@ -205,8 +206,41 @@ export class R2BindingMediaStore implements MediaObjectStore {
 }
 
 export interface S3CommandSender {
-  send(command: HeadObjectCommand): Promise<HeadObjectCommandOutput>;
-  send(command: PutObjectCommand): Promise<PutObjectCommandOutput>;
+  send(command: HeadObjectCommand, options?: { abortSignal?: AbortSignal }): Promise<HeadObjectCommandOutput>;
+  send(command: PutObjectCommand, options?: { abortSignal?: AbortSignal }): Promise<PutObjectCommandOutput>;
+}
+
+const MAX_R2_TIMEOUT_MS = 120_000;
+
+function boundedR2Timeout(value: number | undefined, fallback: number, name: string): number {
+  const resolved = value ?? fallback;
+  if (!Number.isSafeInteger(resolved) || resolved < 1 || resolved > MAX_R2_TIMEOUT_MS) {
+    throw new TypeError(`${name} must be an integer between 1 and ${MAX_R2_TIMEOUT_MS} milliseconds`);
+  }
+  return resolved;
+}
+
+export interface R2S3Timeouts {
+  operationTimeoutMs?: number;
+  connectionTimeoutMs?: number;
+  requestTimeoutMs?: number;
+  socketTimeoutMs?: number;
+}
+
+export interface ResolvedR2S3Timeouts {
+  operationTimeoutMs: number;
+  connectionTimeoutMs: number;
+  requestTimeoutMs: number;
+  socketTimeoutMs: number;
+}
+
+export function resolveR2S3Timeouts(options: R2S3Timeouts = {}): ResolvedR2S3Timeouts {
+  return {
+    operationTimeoutMs: boundedR2Timeout(options.operationTimeoutMs, 60_000, "operationTimeoutMs"),
+    connectionTimeoutMs: boundedR2Timeout(options.connectionTimeoutMs, 10_000, "connectionTimeoutMs"),
+    requestTimeoutMs: boundedR2Timeout(options.requestTimeoutMs, 30_000, "requestTimeoutMs"),
+    socketTimeoutMs: boundedR2Timeout(options.socketTimeoutMs, 30_000, "socketTimeoutMs"),
+  };
 }
 
 function errorStatus(error: unknown): number | undefined {
@@ -228,12 +262,35 @@ function isConditionalWriteConflict(error: unknown): boolean {
 
 /** Node operator adapter for R2's S3-compatible API. The bucket must come from canonical Wrangler resolution. */
 export class R2S3MediaStore implements MediaObjectStore {
-  constructor(private readonly bucketName: string, private readonly client: S3CommandSender) {
+  private readonly operationTimeoutMs: number;
+
+  constructor(
+    private readonly bucketName: string,
+    private readonly client: S3CommandSender,
+    timeouts: Pick<R2S3Timeouts, "operationTimeoutMs"> = {},
+  ) {
     safeObjectPath(bucketName, "pages/validation/1.jpg");
+    this.operationTimeoutMs = resolveR2S3Timeouts(timeouts).operationTimeoutMs;
   }
 
   private assertBucket(bucketName: string): void {
     if (bucketName !== this.bucketName) throw new Error("Resolved MEDIA bucket does not match the S3 R2 adapter");
+  }
+
+  private sendWithTimeout(command: HeadObjectCommand): Promise<HeadObjectCommandOutput>;
+  private sendWithTimeout(command: PutObjectCommand): Promise<PutObjectCommandOutput>;
+  private async sendWithTimeout(
+    command: HeadObjectCommand | PutObjectCommand,
+  ): Promise<HeadObjectCommandOutput | PutObjectCommandOutput> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.operationTimeoutMs);
+    try {
+      return command instanceof HeadObjectCommand
+        ? await this.client.send(command, { abortSignal: controller.signal })
+        : await this.client.send(command, { abortSignal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async inspect(bucketName: string, objectKey: string): Promise<StoredMediaObject | null> {
@@ -241,7 +298,7 @@ export class R2S3MediaStore implements MediaObjectStore {
     safeObjectPath(bucketName, objectKey);
     let response: HeadObjectCommandOutput;
     try {
-      response = await this.client.send(new HeadObjectCommand({
+      response = await this.sendWithTimeout(new HeadObjectCommand({
         Bucket: bucketName,
         Key: objectKey,
         ChecksumMode: "ENABLED",
@@ -273,7 +330,7 @@ export class R2S3MediaStore implements MediaObjectStore {
     this.assertBucket(bucketName);
     safeObjectPath(bucketName, objectKey);
     try {
-      await this.client.send(new PutObjectCommand({
+      await this.sendWithTimeout(new PutObjectCommand({
         Bucket: bucketName,
         Key: objectKey,
         Body: new Uint8Array(bytes),
@@ -297,6 +354,7 @@ export interface R2S3Credentials {
   accountId: string;
   accessKeyId: string;
   secretAccessKey: string;
+  timeouts?: R2S3Timeouts;
 }
 
 /** Builds the official S3 client without placing credentials in argv, object metadata, or errors. */
@@ -308,10 +366,17 @@ export function createR2S3MediaStore(options: R2S3Credentials): R2S3MediaStore {
   if (!options.secretAccessKey || options.secretAccessKey.length > 2_048 || /[\0\r\n]/u.test(options.secretAccessKey)) {
     throw new Error("R2 secret access key is invalid");
   }
+  const timeouts = resolveR2S3Timeouts(options.timeouts);
   const client = new S3Client({
     region: "auto",
     endpoint: `https://${options.accountId.toLowerCase()}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId: options.accessKeyId, secretAccessKey: options.secretAccessKey },
+    requestHandler: new NodeHttpHandler({
+      connectionTimeout: timeouts.connectionTimeoutMs,
+      requestTimeout: timeouts.requestTimeoutMs,
+      socketTimeout: timeouts.socketTimeoutMs,
+      throwOnRequestTimeout: true,
+    }),
   });
-  return new R2S3MediaStore(options.bucketName, client);
+  return new R2S3MediaStore(options.bucketName, client, timeouts);
 }
