@@ -127,6 +127,7 @@ export async function importMediaPlans(
 export { downloadVerifiedMedia, validateMediaPlan, verifyImageSignature } from "./security.js";
 export {
   createR2S3MediaStore,
+  resolveR2S3Timeouts,
   R2BindingMediaStore,
   R2S3MediaStore,
   wranglerR2GetArguments,
@@ -136,5 +137,7 @@ export type {
   ExpectedMediaObject,
   MediaObjectStore,
   R2S3Credentials,
+  R2S3Timeouts,
+  ResolvedR2S3Timeouts,
   StoredMediaObject,
 } from "./r2.js";
