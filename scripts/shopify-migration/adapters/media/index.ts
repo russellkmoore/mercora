@@ -124,7 +124,7 @@ export async function importMediaPlans(
   return results;
 }
 
-export { downloadVerifiedMedia, validateMediaPlan } from "./security.js";
+export { downloadVerifiedMedia, validateMediaPlan, verifyImageSignature } from "./security.js";
 export {
   createR2S3MediaStore,
   R2BindingMediaStore,
