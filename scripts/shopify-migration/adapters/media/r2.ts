@@ -8,7 +8,8 @@ import {
 import type { WranglerTarget } from "../../lib/wrangler-target.js";
 import type { MediaContentType } from "./security.js";
 
-export const IMMUTABLE_MEDIA_CACHE_CONTROL = "public, max-age=31536000, immutable";
+/** Position-derived media keys are overwriteable only with confirmation, so clients must revalidate them. */
+export const REVALIDATING_MEDIA_CACHE_CONTROL = "public, max-age=0, must-revalidate";
 export const MEDIA_IMPORTER_VERSION = "mercora-shopify-migration-v1";
 
 const METADATA_IMPORTER = "mercora-importer";
@@ -153,7 +154,7 @@ export function wranglerR2PutArguments(options: {
   return [
     "r2", "object", "put", safeObjectPath(options.bucketName, options.objectKey), "--pipe",
     "--content-type", options.contentType,
-    "--cache-control", IMMUTABLE_MEDIA_CACHE_CONTROL,
+    "--cache-control", REVALIDATING_MEDIA_CACHE_CONTROL,
     ...modeArguments(options.target), "--config", configArgument(options.configPath),
     ...environmentArguments(options.environment),
   ];

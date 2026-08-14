@@ -13,7 +13,7 @@ import {
   wranglerR2PutArguments,
 } from "@/scripts/shopify-migration/adapters/media";
 import {
-  IMMUTABLE_MEDIA_CACHE_CONTROL,
+  REVALIDATING_MEDIA_CACHE_CONTROL,
   MEDIA_IMPORTER_VERSION,
   type ExpectedMediaObject,
   type MediaObjectStore,
@@ -73,7 +73,7 @@ function store(overrides: Partial<MediaObjectStore> = {}): MediaObjectStore {
 function expectedMedia(source = plan(), bytes = JPEG): ExpectedMediaObject {
   return {
     contentType: source.contentType,
-    cacheControl: IMMUTABLE_MEDIA_CACHE_CONTROL,
+    cacheControl: REVALIDATING_MEDIA_CACHE_CONTROL,
     byteLength: bytes.byteLength,
     sha256: createHash("sha256").update(bytes).digest("hex"),
     sha256Base64: createHash("sha256").update(bytes).digest("base64"),
@@ -461,7 +461,7 @@ describe("R2 adapters and command construction", () => {
       Key: plan().objectKey,
       ContentLength: JPEG.byteLength,
       ContentType: "image/jpeg",
-      CacheControl: IMMUTABLE_MEDIA_CACHE_CONTROL,
+      CacheControl: REVALIDATING_MEDIA_CACHE_CONTROL,
       ChecksumSHA256: expectedMedia().sha256Base64,
       IfNoneMatch: "*",
       Metadata: expect.objectContaining({
