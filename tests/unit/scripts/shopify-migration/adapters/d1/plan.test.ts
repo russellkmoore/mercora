@@ -161,6 +161,10 @@ describe("D1 import plan", () => {
     const unsupportedStyling = page();
     (unsupportedStyling.page as { custom_css: string | null }).custom_css = "body{}";
     expect(() => buildD1ImportPlan({ pages: [unsupportedStyling] })).toThrow(/page snapshot contract/);
+
+    const unsupportedTemplate = page();
+    (unsupportedTemplate.page as { template: string }).template = "alternate";
+    expect(() => buildD1ImportPlan({ pages: [unsupportedTemplate] })).toThrow(/page snapshot contract/);
   });
 
   it("rejects unresolved or duplicated semantic references before execution", () => {
