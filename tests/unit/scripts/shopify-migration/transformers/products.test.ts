@@ -157,11 +157,36 @@ describe("catalog transforms", () => {
       name: JSON.stringify({ en: "Summer & More" }),
       slug: "summer-more",
       status: "inactive",
-      updated_at: generatedAt,
+      updated_at: "1970-01-01T00:00:00.000Z",
     });
     expect(result.records[0].category.description).not.toContain("<script>");
     expect(result.records[0].media[0]).toMatchObject({ contentType: "image/webp" });
     expect([...result.idMap.keys()][0]).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("keeps catalog rows identical across run clocks when source timestamps are unavailable", () => {
+    const source = product("19.99", "clock-stable");
+    source.created_at = "invalid";
+    source.updated_at = undefined;
+    source.variants[0].created_at = undefined;
+    source.variants[0].updated_at = "invalid";
+    const base = {
+      currency: "USD",
+      inventoryLocationId: "warehouse-main",
+      fulfillmentType: "physical" as const,
+      allowedMediaHosts: ["cdn.example.test"],
+    };
+    const first = transformProducts([source], { ...base, generatedAt: "2026-01-01T00:00:00Z" });
+    const second = transformProducts([source], { ...base, generatedAt: "2027-01-01T00:00:00Z" });
+    expect(first.records).toEqual(second.records);
+    expect(first.records[0].product.created_at).toBe("1970-01-01T00:00:00.000Z");
+    expect(first.records[0].variants[0].updated_at).toBe("1970-01-01T00:00:00.000Z");
+
+    const collection = { id: 99, title: "Stable", handle: "stable", updated_at: "invalid" };
+    const firstCategories = transformCollections([collection], { generatedAt: "2026-01-01T00:00:00Z", allowedMediaHosts: [] });
+    const secondCategories = transformCollections([collection], { generatedAt: "2027-01-01T00:00:00Z", allowedMediaHosts: [] });
+    expect(firstCategories.records).toEqual(secondCategories.records);
+    expect(firstCategories.records[0].category.created_at).toBe("1970-01-01T00:00:00.000Z");
   });
 
   it("does not plan product or category media outside the explicit allowlist", () => {

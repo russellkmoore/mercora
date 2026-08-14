@@ -7,6 +7,7 @@ import type {
 import { deterministicProviderId, providerFingerprint } from "../lib/ids.js";
 import {
   SHOPIFY_PROVIDER,
+  UNKNOWN_SOURCE_TIMESTAMP,
   boundedPositiveInteger,
   clampInventory,
   escapedSqlUtf8Bytes,
@@ -205,7 +206,7 @@ export function transformProducts(
   options: ProductTransformOptions,
 ): PureTransformResult<ShopifyProduct, ProductTransformRecord> {
   const currency = requireSupportedCurrency(options.currency);
-  const generatedAt = requiredMigrationTime(options.generatedAt);
+  requiredMigrationTime(options.generatedAt);
   const allowedMediaHosts = mediaHostAllowlist(options.allowedMediaHosts);
   const locationId = options.inventoryLocationId.trim();
   if (!locationId || locationId.length > 200) throw new TypeError("inventoryLocationId must be 1-200 characters");
@@ -330,8 +331,8 @@ export function transformProducts(
         const value = variant[`option${optionIndex + 1}` as "option1" | "option2" | "option3"]?.trim();
         return value ? [{ option_id: option.id, value }] : [];
       });
-      const createdAt = isoTimestamp(variant.created_at, isoTimestamp(source.created_at, generatedAt));
-      const updatedAt = isoTimestamp(variant.updated_at, isoTimestamp(source.updated_at, generatedAt));
+      const createdAt = isoTimestamp(variant.created_at, isoTimestamp(source.created_at, UNKNOWN_SOURCE_TIMESTAMP));
+      const updatedAt = isoTimestamp(variant.updated_at, isoTimestamp(source.updated_at, UNKNOWN_SOURCE_TIMESTAMP));
       variants.push({
         id: variantId,
         product_id: productId,
@@ -443,8 +444,8 @@ export function transformProducts(
         related_products: null,
         external_references: JSON.stringify({ shopify_fingerprint: sourceFingerprint }),
         extensions: JSON.stringify({ shopify: { product_type: source.product_type ?? null } }),
-        created_at: isoTimestamp(source.created_at, generatedAt),
-        updated_at: isoTimestamp(source.updated_at, generatedAt),
+        created_at: isoTimestamp(source.created_at, UNKNOWN_SOURCE_TIMESTAMP),
+        updated_at: isoTimestamp(source.updated_at, UNKNOWN_SOURCE_TIMESTAMP),
       },
     });
     idMap.set(sourceFingerprint, productId);

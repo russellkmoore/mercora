@@ -65,6 +65,15 @@ describe("page transform", () => {
     expect(result.warnings[0]).toContain("imported as draft");
   });
 
+  it("keeps persisted rows identical across run clocks when source timestamps are unavailable", () => {
+    const source = { id: 11, title: "Stable", handle: "stable", body_html: "<p>Stable</p>" };
+    const first = transformPages([source], { ...options, generatedAt: "2026-01-01T00:00:00Z" });
+    const second = transformPages([source], { ...options, generatedAt: "2027-01-01T00:00:00Z" });
+    expect(first.records).toEqual(second.records);
+    expect(first.records[0].page).toMatchObject({ created_at: 0, updated_at: 0 });
+    expect(first.records[0].initialVersion.record.created_at).toBe(0);
+  });
+
   it("rewrites only exact allowlisted media hosts and strips every unsafe inline source", () => {
     const result = transformPages([{
       id: 20,
