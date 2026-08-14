@@ -151,6 +151,7 @@ function machMedia(
   image: ShopifyProductImage,
   allowedMediaHosts: ReturnType<typeof mediaHostAllowlist>,
   sourceId: string,
+  imageSourceId: string,
   ownerId: string,
   position: number,
 ): { embedded: Record<string, unknown>; plan: MediaRewrite } | null {
@@ -163,14 +164,14 @@ function machMedia(
   return {
     plan,
     embedded: {
-      id: deterministicProviderId(SHOPIFY_PROVIDER, "media", `${sourceId}:${String(image.id ?? position)}`),
+      id: deterministicProviderId(SHOPIFY_PROVIDER, "media", `${sourceId}:${imageSourceId}`),
       type: "image",
       status: "active",
       external_references: {
         shopify_fingerprint: providerFingerprint(
           SHOPIFY_PROVIDER,
           "media",
-          `${sourceId}:${String(image.id ?? position)}`,
+          `${sourceId}:${imageSourceId}`,
         ),
       },
       file: {
@@ -184,12 +185,55 @@ function machMedia(
   };
 }
 
+function nestedIdentity(explicitId: unknown, fallback: string): string | null {
+  if (explicitId !== undefined && explicitId !== null) {
+    const value = String(explicitId).trim();
+    return value && value.length <= 256 ? value : null;
+  }
+  const value = fallback.trim();
+  return value ? `natural:${value}` : null;
+}
+
+function optionIdentity(option: NonNullable<ShopifyProduct["options"]>[number]): string | null {
+  return nestedIdentity(option.id, option.name.trim().toLocaleLowerCase("en-US"));
+}
+
+function imageIdentity(image: ShopifyProductImage): string | null {
+  return nestedIdentity(image.id, image.src.trim());
+}
+
+function variantNaturalKey(variant: ShopifyProductVariant): string {
+  return variant.sku?.trim() || [variant.option1, variant.option2, variant.option3]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .map((value) => value.trim())
+    .join("|") || variant.barcode?.trim() ||
+    (boundedPositiveInteger(variant.position, MAX_PRODUCT_VARIANTS) ? `position:${variant.position}` : "");
+}
+
+function variantIdentity(variant: ShopifyProductVariant): string | null {
+  return nestedIdentity(variant.id, variantNaturalKey(variant));
+}
+
+function hasAmbiguousNestedIdentities<T>(records: readonly T[], identity: (record: T) => string | null): boolean {
+  const seen = new Set<string>();
+  for (const record of records) {
+    const value = identity(record);
+    if (!value || seen.has(value)) return true;
+    seen.add(value);
+  }
+  return false;
+}
+
 export function collectionMembershipByProduct(
   collects: readonly ShopifyCollect[],
   categoryIdBySourceFingerprint: ReadonlyMap<string, string>,
 ): Map<string, string[]> {
   const result = new Map<string, string[]>();
   const canonical = canonicalProviderRecords(collects, "collect", (collect) => collect.id);
+  if (
+    canonical.duplicateFingerprints.size > 0 ||
+    canonical.records.some((collect) => !String(collect.id ?? "").trim())
+  ) throw new TypeError("Collect input contains ambiguous duplicate or missing source identities");
   for (const collect of canonical.records) {
     const categoryId = categoryIdBySourceFingerprint.get(
       providerFingerprint(SHOPIFY_PROVIDER, "category", collect.collection_id),
@@ -248,6 +292,14 @@ export function transformProducts(
       skipped.push({ record: source, reason: "Product requires an id, title, and valid handle" });
       continue;
     }
+    if (
+      hasAmbiguousNestedIdentities(source.options ?? [], optionIdentity) ||
+      hasAmbiguousNestedIdentities(source.images, imageIdentity) ||
+      hasAmbiguousNestedIdentities(source.variants, variantIdentity)
+    ) {
+      skipped.push({ record: source, reason: "Product contains ambiguous duplicate or missing nested source identities" });
+      continue;
+    }
     const sourceFingerprint = providerFingerprint(SHOPIFY_PROVIDER, "product", sourceId);
     if (canonical.duplicateFingerprints.has(sourceFingerprint)) {
       skipped.push({ record: source, reason: "Duplicate product source identity" });
@@ -257,9 +309,9 @@ export function transformProducts(
     const status = productStatus(source);
     const sourceOptions = [...(source.options ?? [])].sort((left, right) =>
       (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER) ||
-      String(left.id ?? left.name).localeCompare(String(right.id ?? right.name)));
+      optionIdentity(left)!.localeCompare(optionIdentity(right)!));
     const optionDefinitions = sourceOptions.slice(0, 3).map((option, position) => ({
-      id: deterministicProviderId(SHOPIFY_PROVIDER, "option", `${sourceId}:${String(option.id ?? position + 1)}`),
+      id: deterministicProviderId(SHOPIFY_PROVIDER, "option", `${sourceId}:${optionIdentity(option)!}`),
       name: option.name.trim(),
       values: uniqueStrings(option.values ?? []),
       position: boundedPositiveInteger(option.position, 3) ?? position + 1,
@@ -267,9 +319,9 @@ export function transformProducts(
 
     const sourceImages = [...(source.images ?? [])].sort((left, right) =>
       (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER) ||
-      String(left.id ?? left.src).localeCompare(String(right.id ?? right.src)));
+      imageIdentity(left)!.localeCompare(imageIdentity(right)!));
     const imageResults = sourceImages.flatMap((image, index) => {
-      const result = machMedia(image, allowedMediaHosts, sourceId, productId, index + 1);
+      const result = machMedia(image, allowedMediaHosts, sourceId, imageIdentity(image)!, productId, index + 1);
       if (!result) {
         warnings.push(
           `Product ${sourceFingerprint} image ${index + 1} omitted: invalid or unsupported image URL`,
@@ -286,7 +338,7 @@ export function transformProducts(
     const candidateSkus = new Set<string>();
     const sourceVariants = [...source.variants].sort((left, right) =>
       (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER) ||
-      String(left.id ?? left.sku ?? left.barcode ?? "").localeCompare(String(right.id ?? right.sku ?? right.barcode ?? "")));
+      variantIdentity(left)!.localeCompare(variantIdentity(right)!));
     for (let index = 0; index < sourceVariants.length; index += 1) {
       const variant = sourceVariants[index];
       const sku = variant.sku?.trim() || `${slug}-${index + 1}`;
@@ -307,10 +359,10 @@ export function transformProducts(
         warnings.push(`Product ${sourceFingerprint} variant ${preliminaryFingerprint} omitted: fields exceed limits`);
         continue;
       }
-      const naturalKey = variant.sku?.trim() || [variant.option1, variant.option2, variant.option3]
-        .filter((value): value is string => Boolean(value?.trim()))
-        .join("|") || variant.barcode?.trim() || `position:${index + 1}`;
-      const variantSourceId = String(variant.id ?? `${sourceId}:${naturalKey}`);
+      const sourceVariantIdentity = variantIdentity(variant)!;
+      const variantSourceId = variant.id === undefined || variant.id === null
+        ? `${sourceId}:${sourceVariantIdentity}`
+        : sourceVariantIdentity;
       const variantFingerprint = providerFingerprint(SHOPIFY_PROVIDER, "variant", variantSourceId);
       const normalizedSku = sku.toLocaleLowerCase("en-US");
       if (candidateSkus.has(normalizedSku)) {

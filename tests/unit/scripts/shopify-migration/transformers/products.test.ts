@@ -330,4 +330,82 @@ describe("catalog transforms", () => {
       reversedCategoryConflicts.skipped.map(({ record }) => record.id),
     );
   });
+
+  it("rejects ambiguous collect and nested provider identities independent of input order", () => {
+    const categories = transformCollections([
+      { id: 50, title: "First", handle: "first" },
+      { id: 51, title: "Second", handle: "second" },
+    ], { generatedAt, allowedMediaHosts: [] });
+    const duplicateCollects = [
+      { id: 60, collection_id: 50, product_id: 10 },
+      { id: 60, collection_id: 51, product_id: 11 },
+    ];
+    expect(() => collectionMembershipByProduct(duplicateCollects, categories.idMap)).toThrow(/ambiguous duplicate/);
+    expect(() => collectionMembershipByProduct([...duplicateCollects].reverse(), categories.idMap)).toThrow(/ambiguous duplicate/);
+
+    const nestedConflicts: ShopifyProduct[] = [];
+    const optionConflict = product("1.00", "option-conflict");
+    optionConflict.options = [
+      { id: 21, name: "Size", values: ["Small"] },
+      { id: 21, name: "Colour", values: ["Red"] },
+    ];
+    nestedConflicts.push(optionConflict);
+    const imageConflict = product("1.00", "image-conflict");
+    imageConflict.id = 11;
+    imageConflict.images.push({ id: 31, src: "https://cdn.shopify.com/other.jpg" });
+    nestedConflicts.push(imageConflict);
+    const variantConflict = product("1.00", "variant-conflict");
+    variantConflict.id = 12;
+    variantConflict.variants.push({ ...variantConflict.variants[0], sku: "OTHER-SKU" });
+    nestedConflicts.push(variantConflict);
+
+    const transform = (input: ShopifyProduct[]) => transformProducts(input, {
+      currency: "USD",
+      generatedAt,
+      inventoryLocationId: "warehouse-main",
+      fulfillmentType: "physical",
+      allowedMediaHosts: ["cdn.shopify.com"],
+    });
+    const first = transform(nestedConflicts);
+    const second = transform([...nestedConflicts].reverse());
+    expect(first.records).toEqual([]);
+    expect(first.skipped.map(({ record, reason }) => [record.id, reason])).toEqual(
+      second.skipped.map(({ record, reason }) => [record.id, reason]),
+    );
+    expect(first.skipped).toHaveLength(3);
+    expect(first.skipped.every(({ reason }) => reason.includes("nested source identities"))).toBe(true);
+  });
+
+  it("keeps missing nested provider identities deterministic across permutations", () => {
+    const source = product("1.00", "natural-identities");
+    source.options = [
+      { name: "Colour", position: 2, values: ["Red"] },
+      { name: "Size", position: 1, values: ["Small"] },
+    ];
+    source.images = [
+      { src: "https://cdn.shopify.com/back.jpg", position: 2 },
+      { src: "https://cdn.shopify.com/front.jpg", position: 1 },
+    ];
+    source.variants = [
+      { sku: "NATURAL-B", price: "2.00", position: 2, option1: "Small", option2: "Red" },
+      { sku: "NATURAL-A", price: "1.00", position: 1, option1: "Small", option2: "Red" },
+    ];
+    const options = {
+      currency: "USD",
+      generatedAt,
+      inventoryLocationId: "warehouse-main",
+      fulfillmentType: "physical" as const,
+      allowedMediaHosts: ["cdn.shopify.com"],
+    };
+    const first = transformProducts([source], options);
+    const second = transformProducts([{
+      ...source,
+      options: [...source.options].reverse(),
+      images: [...source.images].reverse(),
+      variants: [...source.variants].reverse(),
+    }], options);
+    expect(first.records).toEqual(second.records);
+    expect(first.skipped).toEqual(second.skipped);
+    expect(first.warnings).toEqual(second.warnings);
+  });
 });
