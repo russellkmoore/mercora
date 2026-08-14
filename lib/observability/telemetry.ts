@@ -9,6 +9,7 @@ export const TELEMETRY_PATHS: ReadonlySet<string> = new Set([
   '/api/admin/orders/:id/ship',
   '/api/admin/orders/:id/shipping-email',
   '/api/admin/orders/:id/tracking',
+  '/api/agent-chat',
   '/api/orders',
   '/api/orders/:id',
   '/api/orders/refund',
@@ -17,6 +18,8 @@ export const TELEMETRY_PATHS: ReadonlySet<string> = new Set([
 ]);
 
 export const TELEMETRY_EVENTS = {
+  'ai.response_guard_failed': { severity: 'error', sampleRate: 1 },
+  'ai.response_guard_replaced': { severity: 'warning', sampleRate: 1 },
   'payment.pricing_rejected': { severity: 'warning', sampleRate: 0.05 },
   'payment.inventory_unavailable': { severity: 'warning', sampleRate: 0.1 },
   'payment.inventory_check_failed': { severity: 'critical', sampleRate: 1 },

@@ -35,6 +35,21 @@ describe("runAI", () => {
       temperature: 0.1,
     });
   });
+
+  it("preserves supported native roles and rejects ambiguous tool history", async () => {
+    const run = vi.fn().mockResolvedValue({ response: "done" });
+    const ai = { run } as unknown as CloudflareEnv["AI"];
+
+    await runAI(ai, "CHAT", {
+      messages: [{ role: "developer", content: "Verified facts" }],
+    });
+    expect(run.mock.calls[0]?.[1]).toMatchObject({
+      messages: [{ role: "developer", content: "Verified facts" }],
+    });
+    await expect(runAI(ai, "CHAT", {
+      messages: [{ role: "tool", content: "Unbound tool output" }],
+    })).rejects.toThrow(/tool_call_id/);
+  });
 });
 
 describe("extractAIResponse", () => {
@@ -59,6 +74,11 @@ describe("extractAIResponse", () => {
     { output: [{ type: "function_call", arguments: "{}" }] },
     { choices: [{ message: { content: null, tool_calls: [{ id: "call-1" }] } }] },
     { tool_calls: [{ name: "lookup" }] },
+    { response: "", choices: [] },
+    { status: "incomplete", response: "unsafe partial" },
+    { error: { message: "failed" }, response: "unsafe partial" },
+    { choices: [{ finish_reason: "tool_calls", message: { content: "mixed", tool_calls: [{ id: "call-1" }] } }] },
+    { output: [{ type: "message", content: [{ type: "output_text", text: "mixed" }] }, { type: "function_call", arguments: "{}" }] },
   ])("returns an empty string for malformed or tool-only output", (value) => {
     expect(extractAIResponse(value)).toBe("");
   });

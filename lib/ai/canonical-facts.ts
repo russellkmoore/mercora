@@ -42,7 +42,21 @@ function boundedText(value: unknown, maxLength: number): string | undefined {
 
 function safeEmail(value: unknown): string | undefined {
   const candidate = boundedText(value, MAX_EMAIL_LENGTH)?.toLowerCase();
-  return candidate && EMAIL_PATTERN.test(candidate) ? candidate : undefined;
+  if (!candidate || !EMAIL_PATTERN.test(candidate)) return undefined;
+  const [local, domain] = candidate.split("@");
+  if (
+    !local
+    || !domain
+    || local.startsWith(".")
+    || local.endsWith(".")
+    || local.includes("..")
+    || domain.includes("..")
+    || domain.split(".").some((label) => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label))
+    || candidate === storeDefaults.contact.supportEmail.toLowerCase()
+  ) {
+    return undefined;
+  }
+  return candidate;
 }
 
 function safeLocale(value: unknown): string {
@@ -57,9 +71,14 @@ function safeLocale(value: unknown): string {
 
 function safeCurrency(value: unknown): string {
   const candidate = boundedText(value, 3)?.toUpperCase();
-  return candidate && /^[A-Z]{3}$/.test(candidate)
-    ? candidate
-    : storeDefaults.commerce.currency;
+  if (!candidate || !/^[A-Z]{3}$/.test(candidate)) return storeDefaults.commerce.currency;
+  try {
+    return Intl.supportedValuesOf("currency").includes(candidate)
+      ? candidate
+      : storeDefaults.commerce.currency;
+  } catch {
+    return storeDefaults.commerce.currency;
+  }
 }
 
 function httpsUrl(value: unknown, base?: string): URL | undefined {
@@ -117,7 +136,6 @@ export function canonicalFactsFromConfig(config: StoreConfig): CanonicalFacts {
   for (const [value, base] of [
     [siteUrl, undefined],
     [nestedValue(rawConfig, "urls", "imageCdn"), undefined],
-    [nestedValue(rawConfig, "urls", "clerkHost"), undefined],
     [nestedValue(rawConfig, "urls", "privacy"), siteUrl],
     [nestedValue(rawConfig, "urls", "terms"), siteUrl],
     [configuredReturns, siteUrl],

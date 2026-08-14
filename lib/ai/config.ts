@@ -25,12 +25,12 @@ export interface AIModelConfig {
 /**
  * Primary text generation model used for conversational AI, analytics, and content generation
  */
-export const TEXT_GENERATION_MODEL: AIModelConfig = {
+export const TEXT_GENERATION_MODEL = {
   model: "@cf/openai/gpt-oss-20b",
   temperature: 0.3,
   maxTokens: 512,
   description: "GPT-OSS-20B - OpenAI's powerful reasoning model for agentic tasks and versatile developer use cases"
-};
+} as const satisfies AIModelConfig;
 
 /**
  * Embedding model used for vectorized search and semantic similarity
@@ -95,7 +95,9 @@ export const AI_MODELS = {
 /**
  * Helper function to get AI model configuration by use case
  */
-export function getAIConfig(useCase: keyof typeof AI_MODELS): AIModelConfig {
+export function getAIConfig<K extends keyof typeof AI_MODELS>(
+  useCase: K,
+): (typeof AI_MODELS)[K] {
   return AI_MODELS[useCase];
 }
 
@@ -113,22 +115,28 @@ export interface RunAIOptions {
   maxTokens?: number;
 }
 
-function nativeChatMessage(message: AITextMessage, index: number): ChatCompletionMessageParam {
+function nativeChatMessage(message: AITextMessage): ChatCompletionMessageParam {
   const name = message.name?.trim();
-  if (message.role === "system") {
-    return { role: "system", content: message.content, ...(name ? { name } : {}) };
+  switch (message.role) {
+    case "developer":
+      return { role: "developer", content: message.content, ...(name ? { name } : {}) };
+    case "system":
+      return { role: "system", content: message.content, ...(name ? { name } : {}) };
+    case "assistant":
+      return { role: "assistant", content: message.content, ...(name ? { name } : {}) };
+    case "tool": {
+      const toolCallId = message.tool_call_id?.trim();
+      if (!toolCallId) throw new TypeError("Tool messages require a tool_call_id");
+      return { role: "tool", content: message.content, tool_call_id: toolCallId };
+    }
+    case "function":
+      if (!name) throw new TypeError("Function messages require a name");
+      return { role: "function", content: message.content, name };
+    case "user":
+      return { role: "user", content: message.content, ...(name ? { name } : {}) };
+    default:
+      throw new TypeError(`Unsupported AI message role: ${message.role}`);
   }
-  if (message.role === "assistant") {
-    return { role: "assistant", content: message.content, ...(name ? { name } : {}) };
-  }
-  if (message.role === "tool") {
-    return {
-      role: "tool",
-      content: message.content,
-      tool_call_id: message.tool_call_id?.trim() || `history-tool-${index}`,
-    };
-  }
-  return { role: "user", content: message.content, ...(name ? { name } : {}) };
 }
 
 /**
@@ -157,7 +165,7 @@ export async function runAI(
     temperature: options.temperature ?? config.temperature,
   };
 
-  return ai.run("@cf/openai/gpt-oss-20b", params);
+  return ai.run(TEXT_GENERATION_MODEL.model, params);
 }
 
 /**
@@ -211,6 +219,13 @@ function contentText(value: unknown): string {
 
 function chatCompletionText(value: unknown): string {
   if (!Array.isArray(value) || value.length === 0 || value.length > MAX_OUTPUT_ITEMS) return "";
+  if (value.some((choice) => isRecord(choice) && (
+    choice.finish_reason === "tool_calls"
+    || (isRecord(choice.message) && (
+      (Array.isArray(choice.message.tool_calls) && choice.message.tool_calls.length > 0)
+      || isRecord(choice.message.function_call)
+    ))
+  ))) return "";
   for (const choice of value) {
     if (!isRecord(choice) || !isRecord(choice.message)) continue;
     const text = contentText(choice.message.content);
@@ -221,6 +236,11 @@ function chatCompletionText(value: unknown): string {
 
 function responsesMessageText(value: unknown): string {
   if (!Array.isArray(value) || value.length === 0 || value.length > MAX_OUTPUT_ITEMS) return "";
+  if (value.some((item) => isRecord(item) && (
+    item.type === "function_call"
+    || item.type === "custom_tool_call"
+    || item.type === "computer_call"
+  ))) return "";
   const messages: string[] = [];
   for (const item of value) {
     if (!isRecord(item) || item.type !== "message") continue;
@@ -234,12 +254,16 @@ export function extractAIResponse(response: unknown): string {
   try {
     if (isReadableStreamOutput(response) || !isRecord(response)) return "";
 
-    if (typeof response.response === "string") return response.response;
+    if (response.error !== undefined || response.status === "failed" || response.status === "incomplete") {
+      return "";
+    }
+
+    if (typeof response.response === "string" && response.response) return response.response;
 
     const completion = chatCompletionText(response.choices);
     if (completion) return completion;
 
-    if (typeof response.output_text === "string") return response.output_text;
+    if (typeof response.output_text === "string" && response.output_text) return response.output_text;
 
     const output = responsesMessageText(response.output);
     if (output) return output;
