@@ -11,6 +11,8 @@ import { subscriptionLifecycleEmailKey } from '@/lib/subscriptions/lifecycle-ema
 const mocks = vi.hoisted(() => ({
   reconciliationEnabled: true,
   fulfillSubscriptionInvoice: vi.fn(),
+  recordSubscriptionInvoiceFailure: vi.fn(),
+  recordSubscriptionInvoiceRecovery: vi.fn(),
   recordTelemetry: vi.fn(),
 }));
 
@@ -21,6 +23,8 @@ vi.mock('@/lib/store-config', () => ({
 }));
 vi.mock('@/lib/subscriptions/invoice-service', () => ({
   fulfillSubscriptionInvoice: mocks.fulfillSubscriptionInvoice,
+  recordSubscriptionInvoiceFailure: mocks.recordSubscriptionInvoiceFailure,
+  recordSubscriptionInvoiceRecovery: mocks.recordSubscriptionInvoiceRecovery,
 }));
 vi.mock('@/lib/observability/telemetry', () => ({
   recordTelemetry: mocks.recordTelemetry,
@@ -156,8 +160,17 @@ function runtime(options: {
       id: 'plan-ordering', productId: 'product-ordering', variantId: 'variant-ordering',
       price: Money.fromMinor(2_500, 'USD'), stripePriceId: 'price_ordering',
       cadence: { unit: 'month' as const, count: 1 },
+      shippingRequired: true,
     },
     quantity: 1,
+    shippingAddress: {
+      recipient: 'Ordering Customer',
+      line1: '1 Main Street',
+      city: 'Denver',
+      region: 'CO',
+      postal_code: '80202',
+      country: 'US',
+    },
     consent: {
       termsVersion: '2026-08', acceptedAt: '2026-08-01T00:00:00.000Z', source: 'checkout' as const,
     },
@@ -224,6 +237,11 @@ beforeEach(() => {
       total_amount: Money.fromMinor(2_500).toJSON(), currency_code: 'USD', items: [],
     },
   });
+  mocks.recordSubscriptionInvoiceFailure.mockResolvedValue({
+    outcome: 'applied',
+    notify: true,
+  });
+  mocks.recordSubscriptionInvoiceRecovery.mockResolvedValue({ recovered: false });
 });
 
 describe('subscription Stripe webhook classification', () => {
@@ -264,13 +282,19 @@ describe('subscription Stripe webhook classification', () => {
     expect(first.lifecycleEmailSender).not.toHaveBeenCalled();
 
     const recovered = runtime({ priorFailure: true });
+    mocks.recordSubscriptionInvoiceRecovery.mockResolvedValueOnce({
+      recovered: true,
+      outcome: 'applied',
+    });
     await handleSubscriptionStripeEvent(event('invoice.payment_succeeded', 'evt_recovered'), recovered);
-    expect(recovered.repository.recordSubscriptionEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ eventType: 'payment_recovered', outcome: 'applied' }),
-    );
+    expect(mocks.recordSubscriptionInvoiceRecovery).toHaveBeenCalledWith(expect.objectContaining({
+      subscriptionId: 'subscription-ordering',
+      stripeInvoiceId: 'in_ordering',
+      providerEvent: { id: 'evt_recovered', createdAt: 1_786_147_205 },
+    }));
     expect(recovered.lifecycleEmailSender).toHaveBeenCalledWith(expect.objectContaining({
       subscriptionId: 'subscription-ordering',
-      providerEventId: 'evt_recovered',
+      deliveryScope: 'in_ordering',
       kind: 'payment_recovered',
     }));
 
@@ -282,11 +306,13 @@ describe('subscription Stripe webhook classification', () => {
       },
     });
     const duplicate = runtime({ priorFailure: true });
+    mocks.recordSubscriptionInvoiceRecovery.mockResolvedValueOnce({
+      recovered: true,
+      outcome: 'duplicate',
+    });
     await handleSubscriptionStripeEvent(event('invoice.paid', 'evt_duplicate'), duplicate);
-    expect(duplicate.repository.recordSubscriptionEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ eventType: 'payment_recovered', outcome: 'duplicate' }),
-    );
     expect(duplicate.lifecycleEmailSender).toHaveBeenCalledWith(expect.objectContaining({
+      deliveryScope: 'in_ordering',
       kind: 'payment_recovered',
     }));
   });
@@ -350,10 +376,12 @@ describe('subscription Stripe webhook classification', () => {
       expect(dependencies.lifecycleEmailSender).not.toHaveBeenCalled();
 
       await expect(handleSubscriptionStripeEvent(owned, dependencies)).resolves.toBe('handled');
-      expect(dependencies.repository.recordSubscriptionEvent).toHaveBeenCalledTimes(1);
       if (type === 'invoice.paid') {
+        expect(dependencies.repository.recordSubscriptionEvent).toHaveBeenCalledTimes(1);
         expect(mocks.fulfillSubscriptionInvoice).toHaveBeenCalledTimes(1);
       } else {
+        expect(dependencies.repository.recordSubscriptionEvent).not.toHaveBeenCalled();
+        expect(mocks.recordSubscriptionInvoiceFailure).toHaveBeenCalledTimes(1);
         expect(mocks.fulfillSubscriptionInvoice).not.toHaveBeenCalled();
       }
       mocks.fulfillSubscriptionInvoice.mockClear();
@@ -453,38 +481,68 @@ describe('subscription Stripe webhook classification', () => {
       event('invoice.payment_failed', 'evt_failed'),
       failure,
     )).resolves.toBe('handled');
-    expect(failure.repository.recordSubscriptionEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ eventType: 'payment_failed', outcome: 'applied' }),
-    );
+    expect(mocks.recordSubscriptionInvoiceFailure).toHaveBeenCalledWith(expect.objectContaining({
+      subscriptionId: 'subscription-ordering',
+      stripeInvoiceId: 'in_ordering',
+      providerEvent: { id: 'evt_failed', createdAt: 1_786_147_205 },
+    }));
     expect(failure.lifecycleEmailSender).toHaveBeenCalledWith(expect.objectContaining({
-      providerEventId: 'evt_failed',
+      deliveryScope: 'evt_failed',
       kind: 'payment_failed',
     }));
 
     const lateFailure = runtime({ paidOrder: true });
+    mocks.recordSubscriptionInvoiceFailure.mockResolvedValueOnce({
+      outcome: 'ignored_stale',
+      notify: false,
+    });
     await handleSubscriptionStripeEvent(
       event('invoice.payment_attempt_required', 'evt_late_failure'),
       lateFailure,
-    );
-    expect(lateFailure.repository.recordSubscriptionEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ eventType: 'payment_failed', outcome: 'ignored_stale' }),
     );
     expect(lateFailure.lifecycleEmailSender).not.toHaveBeenCalled();
   });
 
   it('retries the same payment-failure notification after its audit row already exists', async () => {
     const duplicate = runtime({ auditInserted: false });
+    mocks.recordSubscriptionInvoiceFailure.mockResolvedValueOnce({
+      outcome: 'duplicate',
+      notify: true,
+    });
     await expect(handleSubscriptionStripeEvent(
       event('invoice.payment_failed', 'evt_failed_email_retry'),
       duplicate,
     )).resolves.toBe('handled');
-    expect(duplicate.repository.recordSubscriptionEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ eventType: 'payment_failed', outcome: 'applied' }),
-    );
     expect(duplicate.lifecycleEmailSender).toHaveBeenCalledWith(expect.objectContaining({
-      providerEventId: 'evt_failed_email_retry',
+      deliveryScope: 'evt_failed_email_retry',
       kind: 'payment_failed',
     }));
+  });
+
+  it('uses one invoice business delivery key across recovery alias event IDs', async () => {
+    mocks.recordSubscriptionInvoiceRecovery
+      .mockResolvedValueOnce({ recovered: true, outcome: 'applied' })
+      .mockResolvedValueOnce({ recovered: true, outcome: 'duplicate' });
+    const paid = runtime();
+    const succeeded = runtime();
+
+    await handleSubscriptionStripeEvent(event('invoice.paid', 'evt_paid_alias'), paid);
+    await handleSubscriptionStripeEvent(
+      event('invoice.payment_succeeded', 'evt_succeeded_alias'),
+      succeeded,
+    );
+
+    const scopes = [paid, succeeded].map((dependencies) => (
+      dependencies.lifecycleEmailSender.mock.calls[0]?.[0].deliveryScope
+    ));
+    expect(scopes).toEqual(['in_ordering', 'in_ordering']);
+    await expect(Promise.all(scopes.map((scope) => subscriptionLifecycleEmailKey(
+      scope!,
+      'payment_recovered',
+    )))).resolves.toEqual([
+      await subscriptionLifecycleEmailKey('in_ordering', 'payment_recovered'),
+      await subscriptionLifecycleEmailKey('in_ordering', 'payment_recovered'),
+    ]);
   });
 
   it('permanently rejects a malformed signed lifecycle object and audits failure when bound', async () => {
@@ -521,7 +579,7 @@ describe('subscription Stripe webhook classification', () => {
       )).resolves.toBe('handled');
       expect(dependencies.lifecycleEmailSender).toHaveBeenCalledWith(expect.objectContaining({
         subscriptionId: 'subscription-ordering',
-        providerEventId: `evt_${kind}`,
+        deliveryScope: `evt_${kind}`,
         kind,
       }));
     }
@@ -572,7 +630,7 @@ describe('subscription Stripe webhook classification', () => {
         expect.objectContaining({ details: { notification_kind: kind } }),
       );
       expect(dependencies.lifecycleEmailSender).toHaveBeenCalledWith(expect.objectContaining({
-        providerEventId: `evt_updated_${kind}`,
+        deliveryScope: `evt_updated_${kind}`,
         kind,
       }));
     }
@@ -589,7 +647,7 @@ describe('subscription Stripe webhook classification', () => {
       .mockRejectedValueOnce(new Error('audit temporarily unavailable'));
     const keys: string[] = [];
     dependencies.lifecycleEmailSender.mockImplementation(async (input) => {
-      keys.push(await subscriptionLifecycleEmailKey(input.providerEventId, input.kind));
+      keys.push(await subscriptionLifecycleEmailKey(input.deliveryScope, input.kind));
       return { status: 'sent' };
     });
 

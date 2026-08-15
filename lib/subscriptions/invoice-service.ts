@@ -82,6 +82,20 @@ export interface FulfillSubscriptionInvoiceResult {
   created: boolean;
 }
 
+export interface SubscriptionInvoiceEventCursor {
+  id: string;
+  createdAt: number;
+}
+
+export interface SubscriptionInvoiceFailureDecision {
+  outcome: 'applied' | 'duplicate' | 'ignored_stale';
+  notify: boolean;
+}
+
+export type SubscriptionInvoiceRecoveryDecision =
+  | { recovered: false }
+  | { recovered: true; outcome: 'applied' | 'duplicate' };
+
 function assertProviderId(value: string, prefix: string, label: string): void {
   if (typeof value !== 'string' || !value.startsWith(prefix) ||
       value.length <= prefix.length || value.length > 255 || value.trim() !== value) {
@@ -264,6 +278,8 @@ function createPendingOrder(
         ...(invoice.periodEnd !== undefined ? { end: invoice.periodEnd } : {}),
       },
       verified_paid_at: invoice.verifiedPaidAt,
+      checkout_subtotal: lineTotal.toJSON(),
+      checkout_catalog_subtotal: lineTotal.toJSON(),
     },
     created_at: now.toISOString(),
     updated_at: now.toISOString(),
@@ -569,4 +585,171 @@ export async function fulfillSubscriptionInvoice(
   if (!paid) throw new Error('Subscription invoice order commit could not be observed');
   assertExistingBinding(paid, context, invoice, pendingOrder);
   return { order: hydrateExisting(paid), created: true };
+}
+
+function assertSubscriptionInvoiceEventInput(args: {
+  subscriptionId: string;
+  providerEvent: SubscriptionInvoiceEventCursor;
+  stripeInvoiceId: string;
+}): void {
+  if (!/^[^\s]{1,128}$/.test(args.subscriptionId)
+    || !/^[^\s]{1,255}$/.test(args.providerEvent.id)
+    || !Number.isSafeInteger(args.providerEvent.createdAt)
+    || args.providerEvent.createdAt < 0) {
+    throw new TypeError('Subscription invoice event identity is invalid');
+  }
+  assertProviderId(args.stripeInvoiceId, 'in_', 'Stripe invoice id');
+}
+
+async function subscriptionInvoiceAuditId(
+  identity: string,
+  eventType: 'payment_failed' | 'payment_recovered',
+): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(`${identity}\u0000${eventType}`),
+  );
+  return `se_${Array.from(
+    new Uint8Array(digest),
+    (byte) => byte.toString(16).padStart(2, '0'),
+  ).join('')}`;
+}
+
+interface StoredInvoiceEventDecision {
+  subscription_id: string;
+  provider_event_id: string;
+  provider_event_created_at: number;
+  event_type: string;
+  outcome: string;
+  stripe_invoice_id: string | null;
+  paid: number;
+}
+
+async function findStoredInvoiceEventDecision(
+  database: D1Database,
+  auditId: string,
+  stripeInvoiceId: string,
+): Promise<StoredInvoiceEventDecision | null> {
+  return database.prepare(`SELECT se.subscription_id, se.provider_event_id,
+    se.provider_event_created_at, se.event_type, se.outcome,
+    json_extract(se.details, '$.stripe_invoice_id') AS stripe_invoice_id,
+    EXISTS (
+      SELECT 1 FROM subscription_invoice_orders sio
+      WHERE sio.stripe_invoice_id = ? AND sio.subscription_id = se.subscription_id
+    ) AS paid
+    FROM subscription_events se WHERE se.id = ? LIMIT 1`)
+    .bind(stripeInvoiceId, auditId).first<StoredInvoiceEventDecision>();
+}
+
+/**
+ * Atomically orders a signed payment failure against the paid invoice map.
+ * The INSERT statement's SQLite snapshot decides applied versus stale while
+ * holding write serialization; duplicate retries notify only while unpaid.
+ */
+export async function recordSubscriptionInvoiceFailure(args: {
+  database: D1Database;
+  subscriptionId: string;
+  providerEvent: SubscriptionInvoiceEventCursor;
+  stripeInvoiceId: string;
+}): Promise<SubscriptionInvoiceFailureDecision> {
+  assertSubscriptionInvoiceEventInput(args);
+  const auditId = await subscriptionInvoiceAuditId(args.providerEvent.id, 'payment_failed');
+  const details = JSON.stringify({ stripe_invoice_id: args.stripeInvoiceId });
+  const inserted = await args.database.prepare(`INSERT OR IGNORE INTO subscription_events
+    (id, subscription_id, provider_event_id, provider_event_created_at,
+     event_type, outcome, details)
+    SELECT ?, ?, ?, ?, 'payment_failed',
+      CASE WHEN EXISTS (
+        SELECT 1 FROM subscription_invoice_orders
+        WHERE stripe_invoice_id = ? AND subscription_id = ?
+      ) THEN 'ignored_stale' ELSE 'applied' END,
+      ?
+    RETURNING outcome`)
+    .bind(
+      auditId,
+      args.subscriptionId,
+      args.providerEvent.id,
+      args.providerEvent.createdAt,
+      args.stripeInvoiceId,
+      args.subscriptionId,
+      details,
+    ).first<{ outcome: 'applied' | 'ignored_stale' }>();
+  if (inserted) {
+    return { outcome: inserted.outcome, notify: inserted.outcome === 'applied' };
+  }
+  const stored = await findStoredInvoiceEventDecision(
+    args.database,
+    auditId,
+    args.stripeInvoiceId,
+  );
+  if (!stored
+    || stored.subscription_id !== args.subscriptionId
+    || stored.provider_event_id !== args.providerEvent.id
+    || stored.provider_event_created_at !== args.providerEvent.createdAt
+    || stored.event_type !== 'payment_failed'
+    || stored.stripe_invoice_id !== args.stripeInvoiceId
+    || !['applied', 'ignored_stale'].includes(stored.outcome)) {
+    throw new Error('Existing subscription payment failure audit conflicts with signed facts');
+  }
+  const notify = stored.outcome === 'applied' && stored.paid !== 1;
+  return {
+    outcome: stored.outcome === 'ignored_stale' ? 'ignored_stale' : 'duplicate',
+    notify,
+  };
+}
+
+/**
+ * Records at most one recovery per invoice business identity across provider
+ * alias event IDs. Absence of either paid map or applied failure is not a
+ * recovery and leaves ordinary renewal classification to the caller.
+ */
+export async function recordSubscriptionInvoiceRecovery(args: {
+  database: D1Database;
+  subscriptionId: string;
+  providerEvent: SubscriptionInvoiceEventCursor;
+  stripeInvoiceId: string;
+}): Promise<SubscriptionInvoiceRecoveryDecision> {
+  assertSubscriptionInvoiceEventInput(args);
+  const auditId = await subscriptionInvoiceAuditId(args.stripeInvoiceId, 'payment_recovered');
+  const details = JSON.stringify({ stripe_invoice_id: args.stripeInvoiceId });
+  const inserted = await args.database.prepare(`INSERT OR IGNORE INTO subscription_events
+    (id, subscription_id, provider_event_id, provider_event_created_at,
+     event_type, outcome, details)
+    SELECT ?, ?, ?, ?, 'payment_recovered', 'applied', ?
+    WHERE EXISTS (
+      SELECT 1 FROM subscription_invoice_orders
+      WHERE stripe_invoice_id = ? AND subscription_id = ?
+    ) AND EXISTS (
+      SELECT 1 FROM subscription_events
+      WHERE subscription_id = ? AND event_type = 'payment_failed'
+        AND outcome = 'applied'
+        AND json_valid(COALESCE(details, '{}')) = 1
+        AND json_extract(details, '$.stripe_invoice_id') = ?
+    )
+    RETURNING outcome`)
+    .bind(
+      auditId,
+      args.subscriptionId,
+      args.providerEvent.id,
+      args.providerEvent.createdAt,
+      details,
+      args.stripeInvoiceId,
+      args.subscriptionId,
+      args.subscriptionId,
+      args.stripeInvoiceId,
+    ).first<{ outcome: 'applied' }>();
+  if (inserted) return { recovered: true, outcome: 'applied' };
+  const stored = await findStoredInvoiceEventDecision(
+    args.database,
+    auditId,
+    args.stripeInvoiceId,
+  );
+  if (!stored) return { recovered: false };
+  if (stored.subscription_id !== args.subscriptionId
+    || stored.event_type !== 'payment_recovered'
+    || stored.outcome !== 'applied'
+    || stored.stripe_invoice_id !== args.stripeInvoiceId) {
+    throw new Error('Existing subscription payment recovery audit conflicts with invoice facts');
+  }
+  return { recovered: true, outcome: 'duplicate' };
 }
