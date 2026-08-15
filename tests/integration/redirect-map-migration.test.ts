@@ -4,8 +4,12 @@ import { applyD1Migrations } from "cloudflare:test";
 
 describe("redirect map migration ordering", () => {
   it("preserves a populated 0019 baseline byte-for-byte before adding empty state", async () => {
-    const throughContentPublishing = env.TEST_MIGRATIONS.slice(0, -1);
-    const redirectMigration = env.TEST_MIGRATIONS.slice(-1);
+    const redirectIndex = env.TEST_MIGRATIONS.findIndex(
+      ({ name }) => name === "0020_add_redirect_map.sql",
+    );
+    expect(redirectIndex).toBeGreaterThan(0);
+    const throughContentPublishing = env.TEST_MIGRATIONS.slice(0, redirectIndex);
+    const redirectMigration = env.TEST_MIGRATIONS.slice(redirectIndex, redirectIndex + 1);
     expect(redirectMigration.map(({ name }) => name)).toEqual(["0020_add_redirect_map.sql"]);
 
     await applyD1Migrations(env.DB, throughContentPublishing);

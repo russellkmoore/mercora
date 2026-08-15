@@ -68,12 +68,14 @@ export type StoreConfig = {
   commerce: {
     locale: string;
     currency: string;
+    subscriptionTermsVersion?: string;
     freeShippingThresholdCents?: number;
     carriers: readonly StoreCarrierDefinition[];
     features: {
       recommendations: boolean;
       giftCards: boolean;
-      subscriptions: boolean;
+      subscriptionAcquisition: boolean;
+      subscriptionReconciliation: boolean;
     };
   };
   deployment: {
@@ -149,7 +151,12 @@ export const storeDefaults: StoreConfig = {
       },
       { code: "other", label: "Other", legacyAliases: [] },
     ],
-    features: { recommendations: true, giftCards: false, subscriptions: false },
+    features: {
+      recommendations: true,
+      giftCards: false,
+      subscriptionAcquisition: false,
+      subscriptionReconciliation: false,
+    },
   },
   deployment: {
     // A host must opt in explicitly. Preview deployments must never be indexed
@@ -162,6 +169,11 @@ export const storeDefaults: StoreConfig = {
 function text(env: Environment, key: string, fallback: string) {
   const value = env[key]?.trim();
   return value ? value : fallback;
+}
+
+function optionalVersion(env: Environment, key: string): string | undefined {
+  const value = env[key]?.trim();
+  return value && /^[A-Za-z0-9._:-]{1,100}$/.test(value) ? value : undefined;
 }
 
 function bool(env: Environment, key: string, fallback: boolean) {
@@ -417,8 +429,27 @@ export function resolveStoreConfig(env: Environment = {}): StoreConfig {
       ...storeDefaults.commerce,
       locale: locale(env),
       currency: currency(env),
+      subscriptionTermsVersion: optionalVersion(env, "STORE_SUBSCRIPTION_TERMS_VERSION"),
       freeShippingThresholdCents: parseOptionalCents(env["STORE_FREE_SHIPPING_THRESHOLD_CENTS"]),
       carriers: parseCarrierDefinitions(env["STORE_CARRIERS_JSON"]),
+      features: {
+        recommendations: bool(
+          env,
+          "STORE_FEATURE_RECOMMENDATIONS",
+          storeDefaults.commerce.features.recommendations,
+        ),
+        giftCards: storeDefaults.commerce.features.giftCards,
+        subscriptionAcquisition: bool(
+          env,
+          "STORE_FEATURE_SUBSCRIPTION_ACQUISITION",
+          storeDefaults.commerce.features.subscriptionAcquisition,
+        ),
+        subscriptionReconciliation: bool(
+          env,
+          "STORE_FEATURE_SUBSCRIPTION_RECONCILIATION",
+          storeDefaults.commerce.features.subscriptionReconciliation,
+        ),
+      },
     },
     deployment: {
       indexable: bool(env, "NEXT_PUBLIC_ROBOTS_INDEX", storeDefaults.deployment.indexable),

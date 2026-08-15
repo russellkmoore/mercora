@@ -47,6 +47,7 @@ import ProductDisplay from "./ProductDisplay";
 import { toPublicProduct } from "@/lib/models/mach/product-serializer";
 import { getRecommendationsForProduct } from "@/lib/recommendations";
 import { buildServerUserContext } from "@/lib/recommendations/user-context.server";
+import { getStoreConfig } from "@/lib/store-config";
 
 export const revalidate = 0;
 
@@ -61,6 +62,8 @@ export default async function ProductPage({ params }: any) {
   const storedProduct = await getProductBySlug(params.slug);
   if (!storedProduct || storedProduct.status !== "active") return notFound();
   const product = toPublicProduct(storedProduct);
+  const store = getStoreConfig();
+  const commerce = store.commerce;
   const userContextPromise = buildServerUserContext(userId);
 
   const [reviews, reviewEligibility, recommendations] = await Promise.all([
@@ -88,6 +91,13 @@ export default async function ProductPage({ params }: any) {
           recommendations={recommendations}
           reviews={reviews}
           reviewEligibility={reviewEligibility}
+          subscription={{
+            enabled: commerce.features.subscriptionAcquisition
+              && commerce.features.subscriptionReconciliation
+              && commerce.subscriptionTermsVersion !== undefined,
+            termsVersion: commerce.subscriptionTermsVersion,
+            termsUrl: store.urls.terms,
+          }}
         />
       </div>
     </div>

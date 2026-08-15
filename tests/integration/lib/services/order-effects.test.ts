@@ -11,6 +11,7 @@ import {
 import type { Order } from '@/lib/types/order';
 import { Money } from '@/lib/money';
 import { applyTestMigrations } from '../../helpers/d1';
+import { SUBSCRIPTION_ACQUISITION_EXTENSION } from '@/lib/commerce/capabilities';
 
 const start = new Date('2026-08-05T18:00:00.000Z');
 
@@ -40,6 +41,7 @@ function order(paymentStatus: Order['payment_status'] = 'pending'): Order {
       checkout_tax: Money.fromMinor(200).toJSON(),
       checkout_tender: Money.zero('USD').toJSON(),
       checkout_tender_state: { reservation: 'tender-1' },
+      [SUBSCRIPTION_ACQUISITION_EXTENSION]: 'acq_effect_test',
     },
   };
 }
@@ -142,6 +144,27 @@ END
       now: start,
       claimToken: 'owner-paid',
     })).resolves.toMatchObject({ claim_token: 'owner-paid', attempt_count: 1 });
+  });
+
+  it('stages subscription work only for a protected marker and permits renewal suppression', async () => {
+    const unmarked = order();
+    delete unmarked.extensions![SUBSCRIPTION_ACQUISITION_EXTENSION];
+    await insertOrder(unmarked);
+    await stagePaidOrderEffects(unmarked, { database: env.DB, now: start });
+    await expect(env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM order_effects WHERE effect_type = 'subscription'"
+    ).first<{ count: number }>()).resolves.toEqual({ count: 0 });
+
+    await env.DB.exec('DELETE FROM order_effects');
+    const renewal = order();
+    await stagePaidOrderEffects(renewal, {
+      database: env.DB,
+      now: start,
+      includeSubscription: false,
+    });
+    await expect(env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM order_effects WHERE effect_type = 'subscription'"
+    ).first<{ count: number }>()).resolves.toEqual({ count: 0 });
   });
 
   it('serializes concurrent claims and rejects a stale owner after lease takeover', async () => {
@@ -249,7 +272,7 @@ SET status = 'processing', attempt_count = 99, claim_token = 'owner-old',
           verifyReservedTender: vi.fn(),
           applyTender,
         },
-        subscriptions: { validateCheckout: vi.fn(), orderPaid },
+        subscriptions: { orderPaid },
       },
       sendConfirmation,
       sendMerchantNotification,

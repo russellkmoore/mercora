@@ -3,7 +3,7 @@
  * Drizzle ORM schema for MACH compliant Product and ProductVariant entities
  */
 
-import { sqliteTable, text, integer, real, blob } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, blob, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import type { 
   Money,
   Media,
@@ -66,7 +66,10 @@ export const product_variants = sqliteTable('product_variants', {
   attributes: text('attributes', { mode: 'json' }).$type<Record<string, any>>(),
   created_at: text('created_at'),
   updated_at: text('updated_at')
-});
+}, (table) => ({
+  productIdIdUnique: uniqueIndex('product_variants_product_id_id_unique')
+    .on(table.product_id, table.id),
+}));
 
 /**
  * Schema validation and transformation utilities
