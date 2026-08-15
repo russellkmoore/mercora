@@ -157,6 +157,62 @@ describe('customer subscription dashboard transport', () => {
     })))).rejects.toThrow('too large');
   });
 
+  it('cancels an actually oversized streamed response before reading its remaining bytes', async () => {
+    const cancel = vi.fn();
+    let pulls = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1;
+        controller.enqueue(new Uint8Array(40 * 1024).fill(0x20));
+      },
+      cancel,
+    });
+    const fetcher = vi.fn<SubscriptionFetch>(async () => new Response(body, {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+
+    await expect(fetchCustomerSubscriptions(fetcher)).rejects.toThrow('too large');
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(pulls).toBeLessThanOrEqual(3);
+  });
+
+  it('rejects invalid streamed UTF-8 with the bounded public response error', async () => {
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([0x7b, 0x22, 0xc3, 0x28]));
+      },
+      cancel,
+    });
+    const fetcher = vi.fn<SubscriptionFetch>(async () => new Response(body, {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+
+    await expect(fetchCustomerSubscriptions(fetcher))
+      .rejects.toThrow('Subscription service returned an invalid response');
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it.each(['abc', '-1'])('rejects malformed Content-Length %s before reading the body', async (length) => {
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"subscriptions":[]}'));
+      },
+      cancel,
+    });
+    const fetcher = vi.fn<SubscriptionFetch>(async () => new Response(body, {
+      status: 200,
+      headers: { 'content-length': length },
+    }));
+
+    await expect(fetchCustomerSubscriptions(fetcher))
+      .rejects.toThrow('Subscription service returned an invalid response');
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
   it.each([
     [{ type: 'pause' } as CustomerSubscriptionAction, '/pause', {}],
     [{ type: 'resume' } as CustomerSubscriptionAction, '/resume', {}],
