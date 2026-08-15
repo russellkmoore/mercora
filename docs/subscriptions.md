@@ -63,5 +63,16 @@ order. The capability contract distinguishes an ordinary order (not
 applicable) from an order carrying a protected subscription acquisition marker.
 While disabled, ordinary orders converge successfully, but a genuine marker
 must fail and remain retryable rather than silently succeeding through a no-op.
-The route/effect wave must conditionally stage from the protected marker before
-subscriptions can be enabled.
+Verified subscription invoices do not use that recursive effect: their atomic
+order writer deliberately stages inventory and customer/merchant email effects,
+but excludes the subscription effect. Lifecycle and invoice reconciliation are
+driven only by signed Stripe webhook events.
+
+## Runtime flags and rollback
+
+Set `STORE_FEATURE_SUBSCRIPTION_RECONCILIATION=true` before accepting the first
+subscription. New acquisition additionally requires
+`STORE_FEATURE_SUBSCRIPTION_ACQUISITION=true` and a bounded
+`STORE_SUBSCRIPTION_TERMS_VERSION` matching the published recurring terms. To
+stop new sales, disable acquisition first and leave reconciliation enabled for
+existing subscriptions, invoices, customer actions, and renewal orders.
