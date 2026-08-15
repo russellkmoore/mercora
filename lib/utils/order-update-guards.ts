@@ -1,3 +1,5 @@
+import { SUBSCRIPTION_ACQUISITION_EXTENSION } from '@/lib/commerce/capabilities';
+
 /** Fields accepted by the generic order update endpoint. */
 export const ORDER_METADATA_FIELDS = [
   'notes',
@@ -41,6 +43,7 @@ export const SERVER_OWNED_ORDER_EXTENSION_KEYS = [
   'discount_codes',
   'coupon_reconciliation_codes',
   'finalized_at',
+  SUBSCRIPTION_ACQUISITION_EXTENSION,
 ] as const;
 
 const REJECTED_ORDER_FIELDS = new Set([
