@@ -261,7 +261,7 @@ describe('verified paid-order finalization', () => {
     const orderPaid = vi.fn(async () => undefined);
     const capabilities = {
       giftCards: { resolveTender: vi.fn(), verifyReservedTender, applyTender },
-      subscriptions: { validateCheckout: vi.fn(), orderPaid },
+      subscriptions: { orderPaid },
     };
 
     const first = await finalizeOrderPayment({
@@ -294,7 +294,7 @@ describe('verified paid-order finalization', () => {
         verifyReservedTender: vi.fn(async () => undefined),
         applyTender: vi.fn(async () => { throw new Error('tender store unavailable'); }),
       },
-      subscriptions: { validateCheckout: vi.fn(), orderPaid: vi.fn() },
+      subscriptions: { orderPaid: vi.fn() },
     };
 
     mocks.drainOrderEffects.mockResolvedValue({ claimed: 5, succeeded: 4, failed: 1 });
@@ -316,7 +316,6 @@ describe('verified paid-order finalization', () => {
         applyTender: vi.fn(async () => undefined),
       },
       subscriptions: {
-        validateCheckout: vi.fn(),
         orderPaid: vi.fn(async () => { throw new Error('subscription store unavailable'); }),
       },
     };
@@ -352,7 +351,7 @@ describe('verified paid-order finalization', () => {
         verifyReservedTender: vi.fn(async () => { throw new Error('reservation expired'); }),
         applyTender: vi.fn(),
       },
-      subscriptions: { validateCheckout: vi.fn(), orderPaid: vi.fn() },
+      subscriptions: { orderPaid: vi.fn() },
     };
     await expect(finalizeOrderPayment({
       orderId: mocks.record.id,

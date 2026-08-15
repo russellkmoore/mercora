@@ -36,6 +36,11 @@ subscriptions. Enabling acquisition without installed reconciliation is a
 configuration error. Deploy the additive schema first, install reconciliation,
 then enable the acquisition flag.
 
+Core one-time checkout never interprets catalog products as subscription
+acquisition. Products that also have subscription plans remain available for a
+one-time purchase while acquisition is off. Only the dedicated subscription
+route consults the acquisition flag and selected recurring plan.
+
 ## Search indexing and images
 
 Robots defaults to `noindex`. Production must opt in with
