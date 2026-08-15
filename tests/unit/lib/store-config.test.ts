@@ -58,6 +58,16 @@ describe("resolveStoreConfig", () => {
     });
   });
 
+  it("accepts only a bounded operator-owned subscription terms version", () => {
+    expect(resolveStoreConfig({}).commerce.subscriptionTermsVersion).toBeUndefined();
+    expect(resolveStoreConfig({ STORE_SUBSCRIPTION_TERMS_VERSION: "2026-08:v1" })
+      .commerce.subscriptionTermsVersion).toBe("2026-08:v1");
+    expect(resolveStoreConfig({ STORE_SUBSCRIPTION_TERMS_VERSION: "terms version" })
+      .commerce.subscriptionTermsVersion).toBeUndefined();
+    expect(resolveStoreConfig({ STORE_SUBSCRIPTION_TERMS_VERSION: "x".repeat(101) })
+      .commerce.subscriptionTermsVersion).toBeUndefined();
+  });
+
   it("derives sender identity from a renamed store", () => {
     const config = resolveStoreConfig({
       NEXT_PUBLIC_STORE_NAME: "Acme Store",

@@ -68,6 +68,7 @@ export type StoreConfig = {
   commerce: {
     locale: string;
     currency: string;
+    subscriptionTermsVersion?: string;
     freeShippingThresholdCents?: number;
     carriers: readonly StoreCarrierDefinition[];
     features: {
@@ -168,6 +169,11 @@ export const storeDefaults: StoreConfig = {
 function text(env: Environment, key: string, fallback: string) {
   const value = env[key]?.trim();
   return value ? value : fallback;
+}
+
+function optionalVersion(env: Environment, key: string): string | undefined {
+  const value = env[key]?.trim();
+  return value && /^[A-Za-z0-9._:-]{1,100}$/.test(value) ? value : undefined;
 }
 
 function bool(env: Environment, key: string, fallback: boolean) {
@@ -423,6 +429,7 @@ export function resolveStoreConfig(env: Environment = {}): StoreConfig {
       ...storeDefaults.commerce,
       locale: locale(env),
       currency: currency(env),
+      subscriptionTermsVersion: optionalVersion(env, "STORE_SUBSCRIPTION_TERMS_VERSION"),
       freeShippingThresholdCents: parseOptionalCents(env["STORE_FREE_SHIPPING_THRESHOLD_CENTS"]),
       carriers: parseCarrierDefinitions(env["STORE_CARRIERS_JSON"]),
       features: {
