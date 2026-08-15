@@ -19,7 +19,6 @@ export interface GiftCardCheckoutCapability {
 }
 
 export interface SubscriptionCheckoutCapability {
-  validateCheckout(args: { productIds: string[]; customerId?: string }): Promise<void>;
   /** Idempotently apply paid-order subscription effects, keyed by order id. */
   orderPaid(order: Order): Promise<void>;
 }
@@ -69,7 +68,6 @@ export const noOpCommerceCapabilities: CommerceCapabilities = {
     async applyTender() {},
   },
   subscriptions: {
-    async validateCheckout() {},
     async orderPaid(order) {
       if (subscriptionAcquisitionIdFromOrder(order)) {
         throw new Error("Subscription capability is disabled for an applicable paid order");
@@ -116,10 +114,6 @@ export function resolveCommerceCapabilities(
   const gatedSubscriptions: SubscriptionCheckoutCapability = subscriptions === noOpCommerceCapabilities.subscriptions
     ? subscriptions
     : {
-        async validateCheckout(args) {
-          if (!flags.subscriptionAcquisition) return;
-          await subscriptions.validateCheckout(args);
-        },
         async orderPaid(order) {
           // Core currently stages this optional effect unconditionally. Ordinary
           // orders must not wake the subscription database/provider boundary.

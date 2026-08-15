@@ -529,11 +529,6 @@ export async function priceCheckout(
     };
   });
 
-  await capabilities.subscriptions.validateCheckout({
-    productIds: orderItems.map((item) => item.product_id),
-    customerId: input.customerId,
-  });
-
   const [shippingSettings, storeSettings] = await Promise.all([
     deps.getSettings('shipping'),
     deps.getSettings('store'),
