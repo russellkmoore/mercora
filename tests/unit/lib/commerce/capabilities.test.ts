@@ -61,7 +61,6 @@ describe("commerce capability resolution", () => {
 
   it("keeps reconciliation installed when new acquisition is disabled", async () => {
     const subscriptionCapability = {
-      validateCheckout: vi.fn(async () => undefined),
       orderPaid: vi.fn(async () => undefined),
     };
     const giftCards = vi.fn();
@@ -77,8 +76,6 @@ describe("commerce capability resolution", () => {
 
     expect(subscriptions).toHaveBeenCalledOnce();
     expect(giftCards).not.toHaveBeenCalled();
-    await resolved.subscriptions.validateCheckout({ productIds: ["prod_one"] });
-    expect(subscriptionCapability.validateCheckout).not.toHaveBeenCalled();
     await resolved.subscriptions.orderPaid(paidOrder());
     expect(subscriptionCapability.orderPaid).not.toHaveBeenCalled();
     const invoiceOrder = paidOrder({
@@ -94,7 +91,7 @@ describe("commerce capability resolution", () => {
       subscriptionAcquisition: true,
       subscriptionReconciliation: false,
     }, {
-      subscriptions: () => ({ validateCheckout: vi.fn(), orderPaid: vi.fn() }),
+      subscriptions: () => ({ orderPaid: vi.fn() }),
     })).toThrow("requires lifecycle and invoice reconciliation");
   });
 });

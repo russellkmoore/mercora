@@ -5,6 +5,10 @@ additive and may be deployed while old code is still running. Roll back the
 application by disabling acquisition; never down-migrate subscription or
 invoice-order state. After the first subscription exists, reconciliation must
 remain enabled even while acquisition and its UI are disabled.
+Core one-time checkout does not call the subscription capability. A product may
+therefore remain purchasable once even when it also has subscription plans and
+new subscription acquisition is disabled. Only the dedicated, guarded
+subscription acquisition route may interpret a plan selection as recurring.
 
 ## Acquisition and initial order
 
@@ -12,9 +16,12 @@ Subscription acquisition is not an ordinary paid-order effect. The customer
 first completes a server-owned Stripe SetupIntent. Mercora verifies that the
 SetupIntent belongs to the authenticated customer, then reserves a bounded
 `subscription_acquisitions` row before asking Stripe to create a subscription.
-The row id is also the Stripe idempotency key. It stores only plan, customer,
-quantity, address, consent, state, and bounded provider identities—never a
-payment-method id, client secret, or credential.
+The row id is also the Stripe idempotency key. It stores only the immutable
+plan billing snapshot, customer, quantity, address, consent, state, and bounded
+provider identities—never a payment-method id, client secret, or credential.
+The repository may create that snapshot only from a currently active plan.
+Later plan deactivation prevents new acquisitions but does not invalidate a
+reserved retry or signed lifecycle webhook for an existing acquisition.
 
 Each acquisition represents exactly one plan/variant binding. A UI that offers
 more than one subscription line must create one independent acquisition per
@@ -25,7 +32,11 @@ The synchronous Stripe create response records only `provider_created` and the
 subscription id; it must never synthesize a webhook event cursor. The signed
 `customer.subscription.created` event atomically creates the lifecycle row and
 opening audit event, and completes the acquisition linked from trusted provider
-metadata. No Mercora order exists yet. The first
+metadata. Completion compares the provider customer, plan/price identity,
+currency and amount, cadence, and quantity against the full canonical reserved
+acquisition. A repeated SetupIntent converges only when plan, customer,
+quantity, normalized address, and consent all still match. No Mercora order
+exists yet. The first
 verified paid invoice creates the first order; subsequent paid invoices create
 renewal orders. `subscription_invoice_orders.stripe_invoice_id` guarantees one
 order per invoice. No fulfillment effect may be staged until invoice payment is
@@ -42,7 +53,8 @@ and never advance or block the lifecycle cursor.
 Stripe pause collection is stored separately from subscription status because
 pausing invoice collection does not change the provider lifecycle status.
 Scheduled cancellation (`cancel_at`) and end-of-period cancellation are also
-separate persisted facts.
+separate persisted facts. `ended_at` records the actual end of service and is
+not inferred from the cancellation request time.
 
 ## Paid-order effect applicability
 
