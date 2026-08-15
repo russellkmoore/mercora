@@ -45,12 +45,22 @@ async function seedSubscription() {
             'price_monthly', 'month', 1, 1)
   `).run();
   await env.DB.prepare(`
+    INSERT OR IGNORE INTO subscription_acquisitions
+      (id, setup_intent_id, plan_id, customer_id, stripe_customer_id,
+       quantity, shipping_address, consent_record, status, stripe_subscription_id)
+    VALUES ('acq-one', 'seti_one', 'plan-monthly', 'user_existing', 'cus_one',
+            1, ?, ?, 'completed', 'sub_one')
+  `).bind(
+    JSON.stringify({ line1: "1 Example Way", city: "Example", country: "US" }),
+    JSON.stringify({ termsVersion: "2026-08", acceptedAt: "2026-08-01T00:00:00.000Z" }),
+  ).run();
+  await env.DB.prepare(`
     INSERT OR IGNORE INTO customer_subscriptions
-      (id, plan_id, customer_id, source_order_id,
+      (id, plan_id, customer_id, acquisition_id,
        stripe_subscription_id, stripe_customer_id,
        status, shipping_address, consent_record,
        latest_lifecycle_event_created_at, latest_lifecycle_event_id)
-    VALUES ('subscription-one', 'plan-monthly', 'user_existing', 'order-existing', 'sub_one',
+    VALUES ('subscription-one', 'plan-monthly', 'user_existing', 'acq-one', 'sub_one',
             'cus_one', 'active', ?, ?, 100, 'evt_open')
   `).bind(
     JSON.stringify({ line1: "1 Example Way", city: "Example", country: "US" }),
@@ -68,13 +78,14 @@ describe("subscription foundation on real D1", () => {
     const counts = await env.DB.prepare(`
       SELECT
         (SELECT count(*) FROM subscription_plans) AS plans,
+        (SELECT count(*) FROM subscription_acquisitions) AS acquisitions,
         (SELECT count(*) FROM customer_subscriptions) AS subscriptions,
         (SELECT count(*) FROM subscription_events) AS events,
         (SELECT count(*) FROM subscription_invoice_orders) AS invoice_orders
     `).first<Record<string, number>>();
 
     expect(product?.id).toBe("prod-existing");
-    expect(counts).toEqual({ plans: 0, subscriptions: 0, events: 0, invoice_orders: 0 });
+    expect(counts).toEqual({ plans: 0, acquisitions: 0, subscriptions: 0, events: 0, invoice_orders: 0 });
   });
 
   it("rejects plans whose variant belongs to another product", async () => {
@@ -118,18 +129,32 @@ describe("subscription foundation on real D1", () => {
     `).run()).rejects.toThrow();
   });
 
-  it("allows only one acquired subscription for a paid source order", async () => {
+  it("converges acquisition retries on one verified SetupIntent", async () => {
     await applyFoundationOnPopulatedBaseline();
     await seedSubscription();
-
     await expect(env.DB.prepare(`
-      INSERT INTO customer_subscriptions
-        (id, plan_id, customer_id, source_order_id,
-         stripe_subscription_id, stripe_customer_id, status, consent_record,
-         latest_lifecycle_event_created_at, latest_lifecycle_event_id)
-      VALUES ('subscription-retry', 'plan-monthly', 'user_existing', 'order-existing',
-              'sub_retry', 'cus_one', 'active', '{}', 101, 'evt_retry')
+      INSERT INTO subscription_acquisitions
+        (id, setup_intent_id, plan_id, customer_id, stripe_customer_id,
+         quantity, consent_record)
+      VALUES ('acq-retry', 'seti_one', 'plan-monthly', 'user_existing',
+              'cus_one', 1, '{}')
     `).run()).rejects.toThrow();
+  });
+
+  it("stores pause collection independently of lifecycle status", async () => {
+    await applyFoundationOnPopulatedBaseline();
+    await seedSubscription();
+    await env.DB.prepare(`
+      UPDATE customer_subscriptions
+      SET pause_collection = ?
+      WHERE id = 'subscription-one'
+    `).bind(JSON.stringify({ behavior: "void" })).run();
+    const row = await env.DB.prepare(`
+      SELECT status, pause_collection FROM customer_subscriptions
+      WHERE id = 'subscription-one'
+    `).first<{ status: string; pause_collection: string }>();
+
+    expect(row).toEqual({ status: "active", pause_collection: '{"behavior":"void"}' });
   });
 
   it("rejects active zero-priced plans but permits inactive staging", async () => {
