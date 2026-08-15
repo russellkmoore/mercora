@@ -5,10 +5,20 @@ import type {
   SubscriptionLifecycleSnapshot,
   SubscriptionPlanBinding,
   ProviderAcquisitionRequest,
+  ProviderSubscriptionBinding,
+  VerifiedSubscriptionInvoice,
 } from "./domain";
 
 /** Narrow persistence contract; implementations must make each method atomic. */
 export interface SubscriptionRepository {
+  findProviderCustomer(customerId: string): Promise<{
+    customerId: string;
+    stripeCustomerId: string;
+  } | undefined>;
+  bindProviderCustomer(args: {
+    customerId: string;
+    stripeCustomerId: string;
+  }): Promise<"created" | "identical" | "conflict">;
   findActivePlan(args: {
     productId: string;
     variantId: string;
@@ -18,21 +28,21 @@ export interface SubscriptionRepository {
     cadenceCount: number;
   }): Promise<SubscriptionPlanBinding | undefined>;
   findAcquisitionBySetupIntent(setupIntentId: string): Promise<{
-    id: string;
+    acquisition: SubscriptionAcquisition;
     status: "pending" | "provider_created" | "completed" | "failed";
     stripeSubscriptionId?: string;
   } | undefined>;
   reserveAcquisition(acquisition: SubscriptionAcquisition): Promise<{
-    id: string;
+    acquisition: SubscriptionAcquisition;
     created: boolean;
   }>;
   recordProviderCreated(args: {
-    acquisitionId: string;
-    stripeSubscriptionId: string;
+    acquisition: SubscriptionAcquisition;
+    provider: ProviderSubscriptionBinding;
   }): Promise<"updated" | "already_recorded" | "conflict">;
   completeAcquisitionFromLifecycleWebhook(args: {
-    acquisitionId: string;
-    stripeSubscriptionId: string;
+    acquisition: SubscriptionAcquisition;
+    provider: ProviderSubscriptionBinding;
     lifecycle: SubscriptionLifecycleSnapshot;
     lifecycleEvent: LifecycleEventCursor;
   }): Promise<{ id: string; created: boolean }>;
@@ -43,20 +53,15 @@ export interface SubscriptionRepository {
     snapshot: SubscriptionLifecycleSnapshot;
   }): Promise<"applied" | "already_applied" | "conflict">;
   recordVerifiedInvoiceOrder(args: {
-    stripeInvoiceId: string;
     subscriptionId: string;
     order: Order;
-    verifiedPaidAt: number;
+    invoice: VerifiedSubscriptionInvoice;
   }): Promise<{ orderId: string; created: boolean }>;
 }
 
 /** Stripe operations stay behind this injected port and are never imported by core checkout. */
 export interface SubscriptionProvider {
-  createSubscription(args: ProviderAcquisitionRequest): Promise<{
-    stripeSubscriptionId: string;
-  }>;
-  retrieveLifecycle(stripeSubscriptionId: string): Promise<{
-    snapshot: SubscriptionLifecycleSnapshot;
-    event: LifecycleEventCursor;
-  }>;
+  createSubscription(args: ProviderAcquisitionRequest): Promise<ProviderSubscriptionBinding>;
+  /** Authoritative refresh returns state only; the signed event remains the cursor authority. */
+  retrieveLifecycle(stripeSubscriptionId: string): Promise<SubscriptionLifecycleSnapshot>;
 }
