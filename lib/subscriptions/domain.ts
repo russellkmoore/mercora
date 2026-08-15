@@ -28,6 +28,7 @@ export interface SubscriptionPlanBinding {
   price: Money;
   stripePriceId: string;
   cadence: SubscriptionCadence;
+  shippingRequired: boolean;
   active: boolean;
 }
 
@@ -93,6 +94,8 @@ export interface ProviderSubscriptionBinding {
   stripePriceId: string;
   price: Money;
   cadence: SubscriptionCadence;
+  /** Versioned Stripe metadata; absent only for legacy provider bindings. */
+  shippingRequired?: boolean;
   quantity: number;
 }
 
@@ -145,6 +148,9 @@ export function assertSubscriptionPlanBinding(plan: SubscriptionPlanBinding): vo
   if (typeof plan.active !== "boolean") {
     throw new TypeError("subscription plan active must be boolean");
   }
+  if (typeof plan.shippingRequired !== "boolean") {
+    throw new TypeError("subscription plan shippingRequired must be boolean");
+  }
   if (!(plan.price instanceof Money) || plan.price.isNegative()) {
     throw new TypeError("subscription price must be nonnegative Money");
   }
@@ -188,6 +194,7 @@ export function planBindingsEqual(
     && left.stripePriceId === right.stripePriceId
     && left.cadence.unit === right.cadence.unit
     && left.cadence.count === right.cadence.count
+    && left.shippingRequired === right.shippingRequired
     && left.active === right.active;
 }
 
@@ -264,6 +271,9 @@ export function assertSubscriptionAcquisition(input: SubscriptionAcquisition): v
       country: input.shippingAddress.country.toUpperCase(),
     });
   }
+  if (input.plan.shippingRequired !== (input.shippingAddress !== undefined)) {
+    throw new TypeError("subscription shipping address must match its immutable shipping mode");
+  }
   assertSubscriptionConsent(input.consent);
 }
 
@@ -302,6 +312,7 @@ export function canonicalSubscriptionAcquisition(input: SubscriptionAcquisition)
       price: input.plan.price.toJSON(),
       stripePriceId: input.plan.stripePriceId,
       cadence: input.plan.cadence,
+      shippingRequired: input.plan.shippingRequired,
     },
     quantity: input.quantity,
     shippingAddress: normalizedSubscriptionAddress(input.shippingAddress),
@@ -334,6 +345,9 @@ export function assertProviderSubscriptionMatchesAcquisition(
   if (!Number.isSafeInteger(provider.quantity) || provider.quantity < 1 || provider.quantity > 1000) {
     throw new TypeError("provider subscription quantity must be between 1 and 1000");
   }
+  if (provider.shippingRequired !== undefined && typeof provider.shippingRequired !== "boolean") {
+    throw new TypeError("provider subscription shippingRequired must be boolean when present");
+  }
   if (!Number.isSafeInteger(provider.cadence.count) || provider.cadence.count < 1 || provider.cadence.count > 365) {
     throw new TypeError("provider subscription cadence count must be between 1 and 365");
   }
@@ -348,6 +362,8 @@ export function assertProviderSubscriptionMatchesAcquisition(
     && provider.price.equals(acquisition.plan.price)
     && provider.cadence.unit === acquisition.plan.cadence.unit
     && provider.cadence.count === acquisition.plan.cadence.count
+    && (provider.shippingRequired === undefined
+      || provider.shippingRequired === acquisition.plan.shippingRequired)
     && provider.quantity === acquisition.quantity;
   if (!exact) throw new Error("Provider subscription does not match the reserved acquisition");
 }

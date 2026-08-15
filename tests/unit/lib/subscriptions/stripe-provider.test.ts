@@ -76,6 +76,8 @@ function subscription(overrides: Partial<Stripe.Subscription> = {}): Stripe.Subs
     metadata: {
       mercora_acquisition_id: "acq_one",
       mercora_plan_id: "plan_one",
+      mercora_binding_version: "2",
+      mercora_shipping_required: "true",
     },
     pause_collection: null,
     status: "active",
@@ -216,9 +218,11 @@ function acquisition() {
       price: Money.fromMinor(2500, "USD"),
       stripePriceId: "price_monthly",
       cadence: { unit: "month" as const, count: 1 },
+      shippingRequired: true,
       active: true,
     }),
     quantity: 2,
+    shippingAddress: { line1: "1 Main", city: "Denver", country: "US" },
     consent: {
       termsVersion: "2026-08",
       acceptedAt: "2026-08-14T00:00:00.000Z",
@@ -290,6 +294,8 @@ describe("Stripe subscription adapter", () => {
       metadata: expect.objectContaining({
         mercora_acquisition_id: "acq_one",
         mercora_plan_id: "plan_one",
+        mercora_binding_version: "2",
+        mercora_shipping_required: "true",
       }),
     }), { idempotencyKey: "acq_one" });
   });

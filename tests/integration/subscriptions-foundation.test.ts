@@ -54,10 +54,10 @@ async function seedSubscription() {
       (id, setup_intent_id, plan_id, product_id, variant_id, currency_code,
        unit_amount_minor, stripe_price_id, cadence_unit, cadence_count,
        customer_id, stripe_customer_id,
-       quantity, shipping_address, consent_record, status, stripe_subscription_id)
+       quantity, shipping_required, shipping_address, consent_record, status, stripe_subscription_id)
     VALUES ('acq-one', 'seti_one', 'plan-monthly', 'prod-existing', 'var-existing',
             'USD', 2250, 'price_monthly', 'month', 1, 'user_existing', 'cus_one',
-            1, ?, ?, 'completed', 'sub_one')
+            1, 1, ?, ?, 'completed', 'sub_one')
   `).bind(
     JSON.stringify({ line1: "1 Example Way", city: "Example", country: "US" }),
     JSON.stringify({ termsVersion: "2026-08", acceptedAt: "2026-08-01T00:00:00.000Z" }),
@@ -66,10 +66,10 @@ async function seedSubscription() {
     INSERT OR IGNORE INTO customer_subscriptions
       (id, plan_id, customer_id, acquisition_id,
        stripe_subscription_id, stripe_customer_id,
-       status, shipping_address, consent_record,
+       shipping_required, status, shipping_address, consent_record,
        latest_lifecycle_event_created_at, latest_lifecycle_event_id)
     VALUES ('subscription-one', 'plan-monthly', 'user_existing', 'acq-one', 'sub_one',
-            'cus_one', 'active', ?, ?, 100, 'evt_open')
+            'cus_one', 1, 'active', ?, ?, 100, 'evt_open')
   `).bind(
     JSON.stringify({ line1: "1 Example Way", city: "Example", country: "US" }),
     JSON.stringify({ termsVersion: "2026-08", acceptedAt: "2026-08-01T00:00:00.000Z" }),
@@ -163,10 +163,10 @@ describe("subscription foundation on real D1", () => {
         (id, setup_intent_id, plan_id, product_id, variant_id, currency_code,
          unit_amount_minor, stripe_price_id, cadence_unit, cadence_count,
          customer_id, stripe_customer_id,
-         quantity, consent_record)
+         quantity, shipping_required, consent_record)
       VALUES ('acq-retry', 'seti_one', 'plan-monthly', 'prod-existing',
               'var-existing', 'USD', 2250, 'price_monthly', 'month', 1, 'user_existing',
-              'cus_one', 1, '{}')
+              'cus_one', 0, 1, '{}')
     `).run()).rejects.toThrow();
   });
 
@@ -188,11 +188,11 @@ describe("subscription foundation on real D1", () => {
       INSERT INTO subscription_acquisitions
         (id, setup_intent_id, plan_id, product_id, variant_id, currency_code,
          unit_amount_minor, stripe_price_id, cadence_unit, cadence_count,
-         customer_id, stripe_customer_id, quantity, consent_record, status,
+         customer_id, stripe_customer_id, quantity, shipping_required, consent_record, status,
          stripe_subscription_id)
       VALUES ('acq-deactivated', 'seti_deactivated', 'plan-monthly', 'prod-existing',
               'var-existing', 'USD', 2250, 'price_monthly', 'month', 1,
-              'user_existing', 'cus_one', 1, '{}', 'provider_created',
+              'user_existing', 'cus_one', 1, 0, '{}', 'provider_created',
               'sub_deactivated')
     `).run();
     await env.DB.prepare(`
@@ -201,7 +201,7 @@ describe("subscription foundation on real D1", () => {
 
     const reserved = await env.DB.prepare(`
       SELECT plan_id, currency_code, unit_amount_minor, stripe_price_id,
-             cadence_unit, cadence_count
+             cadence_unit, cadence_count, shipping_required
       FROM subscription_acquisitions WHERE id = 'acq-deactivated'
     `).first<Record<string, string | number>>();
     expect(reserved).toEqual({
@@ -211,14 +211,15 @@ describe("subscription foundation on real D1", () => {
       stripe_price_id: "price_monthly",
       cadence_unit: "month",
       cadence_count: 1,
+      shipping_required: 0,
     });
     await expect(env.DB.prepare(`
       INSERT INTO customer_subscriptions
         (id, plan_id, customer_id, acquisition_id, stripe_subscription_id,
-         stripe_customer_id, status, consent_record,
+         stripe_customer_id, shipping_required, status, consent_record,
          latest_lifecycle_event_created_at, latest_lifecycle_event_id)
       VALUES ('subscription-deactivated', 'plan-monthly', 'user_existing',
-              'acq-deactivated', 'sub_deactivated', 'cus_one', 'active', '{}',
+              'acq-deactivated', 'sub_deactivated', 'cus_one', 0, 'active', '{}',
               300, 'evt_deactivated')
     `).run()).resolves.toBeDefined();
   });
@@ -238,19 +239,19 @@ describe("subscription foundation on real D1", () => {
         (id, setup_intent_id, plan_id, product_id, variant_id, currency_code,
          unit_amount_minor, stripe_price_id, cadence_unit, cadence_count,
          customer_id, stripe_customer_id,
-         quantity, consent_record, status, stripe_subscription_id)
+         quantity, shipping_required, consent_record, status, stripe_subscription_id)
       VALUES ('acq-binding', 'seti_binding', 'plan-monthly', 'prod-existing',
               'var-existing', 'USD', 2250, 'price_monthly', 'month', 1, 'user_existing',
-              'cus_one', 1, '{}', 'provider_created', 'sub_binding')
+              'cus_one', 1, 0, '{}', 'provider_created', 'sub_binding')
     `).run();
 
     await expect(env.DB.prepare(`
       INSERT INTO customer_subscriptions
         (id, plan_id, customer_id, acquisition_id, stripe_subscription_id,
-         stripe_customer_id, status, consent_record,
+         stripe_customer_id, shipping_required, status, consent_record,
          latest_lifecycle_event_created_at, latest_lifecycle_event_id)
       VALUES ('subscription-bad-binding', 'plan-quarterly', 'user_existing',
-              'acq-binding', 'sub_binding', 'cus_one', 'active', '{}', 200,
+              'acq-binding', 'sub_binding', 'cus_one', 0, 'active', '{}', 200,
               'evt_binding')
     `).run()).rejects.toThrow();
   });
@@ -288,10 +289,10 @@ describe("subscription foundation on real D1", () => {
         (id, setup_intent_id, plan_id, product_id, variant_id, currency_code,
          unit_amount_minor, stripe_price_id, cadence_unit, cadence_count,
          customer_id, stripe_customer_id,
-         quantity, consent_record)
+         quantity, shipping_required, consent_record)
       VALUES ('acq-bad-pair', 'seti_bad_pair', 'plan-pair-check', 'prod-existing',
               'var-existing', 'USD', 2500, 'price_pair_check', 'month', 3,
-              'user_existing', 'cus_two', 1, '{}')
+              'user_existing', 'cus_two', 1, 0, '{}')
     `).run()).rejects.toThrow();
   });
 

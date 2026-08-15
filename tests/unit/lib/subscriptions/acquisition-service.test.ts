@@ -34,6 +34,7 @@ function storedAcquisition(): { acquisition: SubscriptionAcquisition; status: "p
         price: plan.price,
         stripePriceId: plan.stripePriceId,
         cadence: plan.cadence,
+        shippingRequired: true,
       },
       quantity: 1,
       shippingAddress: { line1: "1 Main", city: "Denver", country: "US" },
@@ -138,9 +139,27 @@ describe("subscription acquisition service", () => {
     });
     await service.begin(beginInput);
     expect(repository.findPlanById).not.toHaveBeenCalled();
+    expect(repository.reserveAcquisition).toHaveBeenCalledWith(expect.objectContaining({
+      plan: expect.objectContaining({ shippingRequired: true }),
+    }));
     expect(provider.retrieveProviderCustomer).toHaveBeenCalledWith({
       customerId: "user_one", stripeCustomerId: "cus_one",
     });
+  });
+
+  it("keeps digital acquisitions addressless and snapshots their shipping mode", async () => {
+    const { service, repository, provider } = mocks();
+    repository.findPlanById.mockResolvedValue({ ...plan, shippingRequired: false });
+    await service.begin({ ...beginInput, shippingAddress: undefined });
+    expect(repository.reserveAcquisition).toHaveBeenCalledWith(expect.objectContaining({
+      plan: expect.objectContaining({ shippingRequired: false }),
+      shippingAddress: undefined,
+    }));
+
+    const next = mocks();
+    next.repository.findPlanById.mockResolvedValue({ ...plan, shippingRequired: false });
+    await expect(next.service.begin(beginInput)).rejects.toThrow("must not include");
+    expect(next.provider.createProviderCustomer).not.toHaveBeenCalled();
   });
 
   it("rejects a terminally failed begin retry before provider access or D1 mutation", async () => {

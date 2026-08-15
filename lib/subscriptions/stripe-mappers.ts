@@ -250,8 +250,19 @@ export function mapProviderSubscriptionBinding(
 
   const acquisitionId = subscription.metadata?.mercora_acquisition_id;
   const planId = subscription.metadata?.mercora_plan_id;
+  const bindingVersion = subscription.metadata?.mercora_binding_version;
+  const shippingRequiredValue = subscription.metadata?.mercora_shipping_required;
   assertBoundedString(acquisitionId, "subscription acquisition metadata", { maxLength: 128 });
   assertBoundedString(planId, "subscription plan metadata", { maxLength: 128 });
+  let shippingRequired: boolean | undefined;
+  if (bindingVersion === undefined && shippingRequiredValue === undefined) {
+    shippingRequired = undefined;
+  } else if (bindingVersion === "2"
+    && (shippingRequiredValue === "true" || shippingRequiredValue === "false")) {
+    shippingRequired = shippingRequiredValue === "true";
+  } else {
+    fail("subscription shipping metadata is invalid");
+  }
   const mappedPrice = mapSubscriptionPrice(item);
   if (normalizeStripeCurrency(subscription.currency) !== mappedPrice.price.currency) {
     fail("subscription and price currencies disagree");
@@ -265,6 +276,7 @@ export function mapProviderSubscriptionBinding(
     stripePriceId: mappedPrice.stripePriceId,
     price: mappedPrice.price,
     cadence: mappedPrice.cadence,
+    ...(shippingRequired === undefined ? {} : { shippingRequired }),
     quantity: item.quantity,
   };
 }

@@ -26,6 +26,7 @@ const acquisition: SubscriptionAcquisition = {
     price: Money.fromMinor(2_500, 'USD'),
     stripePriceId: 'price_lifecycle',
     cadence: { unit: 'month', count: 1 },
+    shippingRequired: true,
   },
   quantity: 2,
   shippingAddress: { line1: '1 Main St', city: 'Denver', country: 'US' },
@@ -44,6 +45,7 @@ const binding: ProviderSubscriptionBinding = {
   stripePriceId: acquisition.plan.stripePriceId,
   price: acquisition.plan.price,
   cadence: acquisition.plan.cadence,
+  shippingRequired: true,
   quantity: acquisition.quantity,
 };
 
@@ -177,6 +179,7 @@ describe('subscription lifecycle reconciliation', () => {
     for (const changed of [
       { ...binding, price: Money.fromMinor(2_501, 'USD') },
       { ...binding, quantity: 3 },
+      { ...binding, shippingRequired: false },
     ]) {
       const dependencies = runtime({
         current: stored(),

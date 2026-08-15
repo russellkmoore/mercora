@@ -23,6 +23,7 @@ function plan(overrides: Partial<SubscriptionPlanBinding> = {}): SubscriptionPla
     price: Money.fromMinor(2500, "USD"),
     stripePriceId: "price_monthly",
     cadence: { unit: "month", count: 1 },
+    shippingRequired: true,
     active: true,
     ...overrides,
   };
@@ -51,6 +52,7 @@ describe("subscription domain", () => {
     expect(planBindingsEqual(plan(), plan({ variantId: "var_two" }))).toBe(false);
     expect(planBindingsEqual(plan(), plan({ price: Money.fromMinor(2500, "EUR") }))).toBe(false);
     expect(planBindingsEqual(plan(), plan({ cadence: { unit: "month", count: 2 } }))).toBe(false);
+    expect(planBindingsEqual(plan(), plan({ shippingRequired: false }))).toBe(false);
   });
 
   it("permits a zero-price plan only while it is inactive", () => {
@@ -132,6 +134,11 @@ describe("subscription domain", () => {
     ]) {
       expect(subscriptionAcquisitionsEqual(reserved, changed)).toBe(false);
     }
+    expect(subscriptionAcquisitionsEqual(reserved, {
+      ...reserved,
+      plan: { ...reserved.plan, shippingRequired: false },
+      shippingAddress: undefined,
+    })).toBe(false);
     expect(canonicalSubscriptionAcquisition(reserved)).not.toHaveProperty("paymentMethodId");
   });
 
@@ -145,9 +152,14 @@ describe("subscription domain", () => {
       stripePriceId: reserved.plan.stripePriceId,
       price: Money.fromMinor(2500, "USD"),
       cadence: { ...reserved.plan.cadence },
+      shippingRequired: true,
       quantity: reserved.quantity,
     };
     expect(() => assertProviderSubscriptionMatchesAcquisition(reserved, provider)).not.toThrow();
+    expect(() => assertProviderSubscriptionMatchesAcquisition(
+      reserved,
+      { ...provider, shippingRequired: undefined },
+    )).not.toThrow();
 
     const mismatches = [
       { ...provider, acquisitionId: "acq_other" },
@@ -158,6 +170,7 @@ describe("subscription domain", () => {
       { ...provider, price: Money.fromMinor(2500, "EUR") },
       { ...provider, cadence: { unit: "week" as const, count: 1 } },
       { ...provider, cadence: { unit: "month" as const, count: 2 } },
+      { ...provider, shippingRequired: false },
       { ...provider, quantity: 1 },
     ];
     for (const mismatch of mismatches) {

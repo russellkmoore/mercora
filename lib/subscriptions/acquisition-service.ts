@@ -221,6 +221,9 @@ function sameRequestedFacts(
   input: Omit<BeginSubscriptionAcquisitionInput, "customerEmail" | "customerName" | "idempotencyKey">,
   stripeCustomerId: string,
 ): boolean {
+  if (stored.acquisition.plan.shippingRequired !== (input.shippingAddress !== undefined)) {
+    return false;
+  }
   return subscriptionAcquisitionsEqual(stored.acquisition, {
     ...stored.acquisition,
     customerId: input.customerId,
@@ -297,13 +300,15 @@ export function createSubscriptionAcquisitionService(args: {
         throw new SubscriptionAcquisitionConflictError();
       }
       const plan = existing
-        ? { ...existing.acquisition.plan, active: false, shippingRequired: false }
+        ? { ...existing.acquisition.plan, active: false }
         : await repository.findPlanById(input.planId, currency);
       if (!plan || plan.id !== input.planId || plan.price.currency !== currency) {
         throw new SubscriptionNotFoundError("Subscription plan is unavailable");
       }
-      if (!existing && plan.shippingRequired && input.shippingAddress === undefined) {
-        throw new TypeError("A shipping address is required for this subscription plan");
+      if (!existing && plan.shippingRequired !== (input.shippingAddress !== undefined)) {
+        throw new TypeError(plan.shippingRequired
+          ? "A shipping address is required for this subscription plan"
+          : "A digital subscription plan must not include a shipping address");
       }
       const stripeCustomerId = await establishProviderCustomer({ repository, provider, input });
       const setupIdempotencyKey = await stableId("subscription-setup", acquisitionId);

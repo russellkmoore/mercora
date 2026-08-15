@@ -102,6 +102,7 @@ CREATE TABLE subscription_acquisitions (
     AND stripe_customer_id GLOB 'cus_*'
   ),
   quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity BETWEEN 1 AND 1000),
+  shipping_required INTEGER NOT NULL CHECK (shipping_required IN (0, 1)),
   shipping_address TEXT CHECK (
     shipping_address IS NULL OR (
       length(shipping_address) <= 32768
@@ -125,6 +126,10 @@ CREATE TABLE subscription_acquisitions (
   ),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  CHECK (
+    (shipping_required = 1 AND shipping_address IS NOT NULL)
+    OR (shipping_required = 0 AND shipping_address IS NULL)
+  ),
   FOREIGN KEY (
     plan_id, product_id, variant_id, currency_code, unit_amount_minor,
     stripe_price_id, cadence_unit, cadence_count
@@ -143,7 +148,8 @@ CREATE INDEX subscription_acquisitions_plan_idx
   ON subscription_acquisitions(plan_id);
 CREATE UNIQUE INDEX subscription_acquisitions_lifecycle_binding_unique
   ON subscription_acquisitions(
-    id, plan_id, customer_id, stripe_customer_id, stripe_subscription_id
+    id, plan_id, customer_id, stripe_customer_id, stripe_subscription_id,
+    shipping_required
   );
 
 CREATE TABLE customer_subscriptions (
@@ -160,6 +166,7 @@ CREATE TABLE customer_subscriptions (
     AND stripe_customer_id GLOB 'cus_*'
   ),
   quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity BETWEEN 1 AND 1000),
+  shipping_required INTEGER NOT NULL CHECK (shipping_required IN (0, 1)),
   status TEXT NOT NULL CHECK (status IN (
     'incomplete', 'incomplete_expired', 'trialing', 'active', 'past_due',
     'paused', 'canceled', 'unpaid'
@@ -201,10 +208,16 @@ CREATE TABLE customer_subscriptions (
   version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  CHECK (
+    (shipping_required = 1 AND shipping_address IS NOT NULL)
+    OR (shipping_required = 0 AND shipping_address IS NULL)
+  ),
   FOREIGN KEY (
-    acquisition_id, plan_id, customer_id, stripe_customer_id, stripe_subscription_id
+    acquisition_id, plan_id, customer_id, stripe_customer_id, stripe_subscription_id,
+    shipping_required
   ) REFERENCES subscription_acquisitions(
-    id, plan_id, customer_id, stripe_customer_id, stripe_subscription_id
+    id, plan_id, customer_id, stripe_customer_id, stripe_subscription_id,
+    shipping_required
   ) ON DELETE RESTRICT,
   FOREIGN KEY (customer_id, stripe_customer_id)
     REFERENCES subscription_provider_customers(customer_id, stripe_customer_id)

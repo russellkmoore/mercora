@@ -32,6 +32,10 @@ describe("subscription foundation migration", () => {
 
   it("records consent, address snapshots, monotonic provider state, and invoice identity", () => {
     expect(sql).toContain("shipping_address TEXT CHECK");
+    expect(sql.match(/shipping_required INTEGER NOT NULL CHECK/g)).toHaveLength(2);
+    expect(sql).toContain("shipping_required = 1 AND shipping_address IS NOT NULL");
+    expect(sql).toContain("shipping_required = 0 AND shipping_address IS NULL");
+    expect(sql).toContain("stripe_subscription_id,\n    shipping_required");
     expect(sql).toContain("consent_record TEXT NOT NULL CHECK");
     expect(sql).toContain("setup_intent_id TEXT NOT NULL UNIQUE CHECK");
     expect(sql).toContain("subscription_plans_binding_unique");
