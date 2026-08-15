@@ -24,8 +24,9 @@ const provider: SubscriptionInvoiceProvider = {
 async function seedSubscription(options: { shippingRequired?: boolean; withAddress?: boolean } = {}) {
   const shippingRequired = options.shippingRequired !== false;
   const withAddress = options.withAddress !== false;
-  await env.DB.prepare(`INSERT INTO customers (id, type, status)
-    VALUES ('customer-renewal', 'person', 'active')`).run();
+  await env.DB.prepare(`INSERT INTO customers (id, type, status, person)
+    VALUES ('customer-renewal', 'person', 'active', ?)`)
+    .bind(JSON.stringify({ email: 'renewal@example.test', full_name: 'Renewal Customer' })).run();
   await env.DB.prepare(`INSERT INTO products
     (id, name, status, fulfillment_type, created_at, updated_at)
     VALUES ('product-renewal', 'Renewal Tea', 'active', ?, ?, ?)`)
@@ -192,6 +193,11 @@ describe('subscription invoice orders in real D1', () => {
       stripeSubscriptionId: 'sub_renewal',
     });
     expect(result.order.shipping_address).toBeUndefined();
+    expect(result.order.extensions).toMatchObject({
+      email: 'renewal@example.test',
+      customer_name: 'Renewal Customer',
+      subscription_shipping_required: false,
+    });
     expect(result.order.items).toEqual([
       expect.objectContaining({
         product_id: 'product-renewal',
@@ -200,6 +206,19 @@ describe('subscription invoice orders in real D1', () => {
         quantity: 2,
       }),
     ]);
+  });
+
+  it('fails before order persistence when the durable customer email is unavailable', async () => {
+    await seedSubscription({ shippingRequired: false, withAddress: false });
+    await env.DB.prepare("UPDATE customers SET person = '{}' WHERE id = 'customer-renewal'").run();
+    await expect(fulfillSubscriptionInvoice({
+      database: env.DB,
+      provider,
+      stripeInvoiceId: invoice.stripeInvoiceId,
+      stripeSubscriptionId: 'sub_renewal',
+    })).rejects.toThrow('delivery email');
+    await expect(env.DB.prepare('SELECT count(*) AS count FROM orders WHERE id = ?')
+      .bind(`SUB-${invoice.stripeInvoiceId}`).first()).resolves.toEqual({ count: 0 });
   });
 
   it('rejects a deterministic order-id collision instead of accepting malformed winner data', async () => {

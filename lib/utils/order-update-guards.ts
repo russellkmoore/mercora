@@ -44,6 +44,8 @@ export const SERVER_OWNED_ORDER_EXTENSION_KEYS = [
   'coupon_reconciliation_codes',
   'finalized_at',
   SUBSCRIPTION_ACQUISITION_EXTENSION,
+  'subscription_shipping_required',
+  'customer_name',
 ] as const;
 
 const REJECTED_ORDER_FIELDS = new Set([
