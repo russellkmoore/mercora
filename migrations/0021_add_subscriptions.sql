@@ -37,8 +37,8 @@ CREATE TABLE subscription_plans (
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   FOREIGN KEY (product_id, variant_id)
     REFERENCES product_variants(product_id, id) ON DELETE RESTRICT,
-  -- Free definitions may be staged while inactive, but acquisition through the
-  -- paid-order effect contract requires a positive recurring amount.
+  -- Free definitions may be staged while inactive, but subscription
+  -- acquisition requires a positive recurring amount.
   CHECK (is_active = 0 OR unit_amount_minor > 0)
 );
 
@@ -47,6 +47,27 @@ CREATE INDEX subscription_plans_product_variant_idx
 CREATE UNIQUE INDEX subscription_plans_active_cadence_unique
   ON subscription_plans(product_id, variant_id, currency_code, cadence_unit, cadence_count)
   WHERE is_active = 1;
+CREATE UNIQUE INDEX subscription_plans_binding_unique
+  ON subscription_plans(
+    id, product_id, variant_id, currency_code, unit_amount_minor,
+    stripe_price_id, cadence_unit, cadence_count
+  );
+
+-- Durable local identity mapping for Stripe Customers. SetupIntent acquisition
+-- resolves this row directly; it must never depend on eventually-consistent
+-- provider-side customer search.
+CREATE TABLE subscription_provider_customers (
+  customer_id TEXT PRIMARY KEY REFERENCES customers(id) ON DELETE RESTRICT,
+  stripe_customer_id TEXT NOT NULL UNIQUE CHECK (
+    length(stripe_customer_id) BETWEEN 5 AND 255
+    AND stripe_customer_id GLOB 'cus_*'
+  ),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE UNIQUE INDEX subscription_provider_customers_pair_unique
+  ON subscription_provider_customers(customer_id, stripe_customer_id);
 
 -- A verified SetupIntent is the durable acquisition key. This row exists before
 -- provider subscription creation, so route retries converge on one provider
@@ -60,8 +81,22 @@ CREATE TABLE subscription_acquisitions (
     length(setup_intent_id) BETWEEN 6 AND 255
     AND setup_intent_id GLOB 'seti_*'
   ),
-  plan_id TEXT NOT NULL REFERENCES subscription_plans(id) ON DELETE RESTRICT,
-  customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
+  plan_id TEXT NOT NULL,
+  product_id TEXT NOT NULL CHECK (length(product_id) BETWEEN 1 AND 128),
+  variant_id TEXT NOT NULL CHECK (length(variant_id) BETWEEN 1 AND 128),
+  currency_code TEXT NOT NULL CHECK (
+    length(currency_code) = 3
+    AND currency_code = upper(currency_code)
+    AND currency_code NOT GLOB '*[^A-Z]*'
+  ),
+  unit_amount_minor INTEGER NOT NULL CHECK (unit_amount_minor > 0),
+  stripe_price_id TEXT NOT NULL CHECK (
+    length(stripe_price_id) BETWEEN 7 AND 255
+    AND stripe_price_id GLOB 'price_*'
+  ),
+  cadence_unit TEXT NOT NULL CHECK (cadence_unit IN ('day', 'week', 'month', 'year')),
+  cadence_count INTEGER NOT NULL CHECK (cadence_count BETWEEN 1 AND 365),
+  customer_id TEXT NOT NULL,
   stripe_customer_id TEXT NOT NULL CHECK (
     length(stripe_customer_id) BETWEEN 5 AND 255
     AND stripe_customer_id GLOB 'cus_*'
@@ -89,20 +124,33 @@ CREATE TABLE subscription_acquisitions (
     )
   ),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  FOREIGN KEY (
+    plan_id, product_id, variant_id, currency_code, unit_amount_minor,
+    stripe_price_id, cadence_unit, cadence_count
+  ) REFERENCES subscription_plans(
+    id, product_id, variant_id, currency_code, unit_amount_minor,
+    stripe_price_id, cadence_unit, cadence_count
+  ) ON DELETE RESTRICT,
+  FOREIGN KEY (customer_id, stripe_customer_id)
+    REFERENCES subscription_provider_customers(customer_id, stripe_customer_id)
+    ON DELETE RESTRICT
 );
 
 CREATE INDEX subscription_acquisitions_customer_status_idx
   ON subscription_acquisitions(customer_id, status);
 CREATE INDEX subscription_acquisitions_plan_idx
   ON subscription_acquisitions(plan_id);
+CREATE UNIQUE INDEX subscription_acquisitions_lifecycle_binding_unique
+  ON subscription_acquisitions(
+    id, plan_id, customer_id, stripe_customer_id, stripe_subscription_id
+  );
 
 CREATE TABLE customer_subscriptions (
   id TEXT PRIMARY KEY CHECK (length(id) BETWEEN 1 AND 128),
   plan_id TEXT NOT NULL REFERENCES subscription_plans(id) ON DELETE RESTRICT,
-  customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
-  acquisition_id TEXT NOT NULL UNIQUE
-    REFERENCES subscription_acquisitions(id) ON DELETE RESTRICT,
+  customer_id TEXT NOT NULL,
+  acquisition_id TEXT NOT NULL UNIQUE,
   stripe_subscription_id TEXT NOT NULL UNIQUE CHECK (
     length(stripe_subscription_id) BETWEEN 5 AND 255
     AND stripe_subscription_id GLOB 'sub_*'
@@ -145,13 +193,22 @@ CREATE TABLE customer_subscriptions (
   cancel_at_period_end INTEGER NOT NULL DEFAULT 0 CHECK (cancel_at_period_end IN (0, 1)),
   cancel_at INTEGER CHECK (cancel_at IS NULL OR cancel_at >= 0),
   canceled_at INTEGER CHECK (canceled_at IS NULL OR canceled_at >= 0),
+  ended_at INTEGER CHECK (ended_at IS NULL OR ended_at >= 0),
   -- This cursor orders customer.subscription lifecycle snapshots only. Invoice
   -- events have independent claims and must never advance or block this state.
   latest_lifecycle_event_created_at INTEGER NOT NULL CHECK (latest_lifecycle_event_created_at >= 0),
   latest_lifecycle_event_id TEXT NOT NULL CHECK (length(latest_lifecycle_event_id) BETWEEN 1 AND 255),
   version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  FOREIGN KEY (
+    acquisition_id, plan_id, customer_id, stripe_customer_id, stripe_subscription_id
+  ) REFERENCES subscription_acquisitions(
+    id, plan_id, customer_id, stripe_customer_id, stripe_subscription_id
+  ) ON DELETE RESTRICT,
+  FOREIGN KEY (customer_id, stripe_customer_id)
+    REFERENCES subscription_provider_customers(customer_id, stripe_customer_id)
+    ON DELETE RESTRICT
 );
 
 CREATE INDEX customer_subscriptions_customer_status_idx
