@@ -407,6 +407,21 @@ export function parseStripeSetupRedirect(currentUrl: string, expectedOrigin: str
   return { kind: "success", setupIntentId: values.setup_intent[0], cleanUrl };
 }
 
+/**
+ * Remove Stripe return parameters from the visible URL immediately after parsing.
+ * The returned value never contains the client secret and is independent of any
+ * product or acquisition feature state.
+ */
+export function scrubStripeSetupRedirect(
+  currentUrl: string,
+  expectedOrigin: string,
+  replaceUrl: (cleanUrl: string) => void,
+): StripeSetupRedirect {
+  const redirect = parseStripeSetupRedirect(currentUrl, expectedOrigin);
+  if (redirect.kind !== "none" && redirect.cleanUrl) replaceUrl(redirect.cleanUrl);
+  return redirect;
+}
+
 export async function completeStripeSetupRedirect(args: {
   fetcher: FetchLike;
   redirect: StripeSetupRedirect;
