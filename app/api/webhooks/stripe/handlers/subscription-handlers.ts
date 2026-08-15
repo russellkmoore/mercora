@@ -190,6 +190,10 @@ async function handlePaidInvoice(
   assertSignedInvoiceId(invoice.id);
   const stripeSubscriptionId = signedInvoiceSubscriptionId(invoice);
   if (!stripeSubscriptionId) return 'ignored';
+  const acquisition = await runtime.repository.findAcquisitionByStripeSubscription(
+    stripeSubscriptionId,
+  );
+  if (!acquisition) return 'ignored';
   const result = await fulfillSubscriptionInvoice({
     database: runtime.database,
     provider: runtime.invoiceProvider,
@@ -213,11 +217,11 @@ LIMIT 1
   await recordInvoiceEvent(runtime.repository, {
     subscriptionId: stored.id,
     event,
-    eventType: result.created && previousFailure ? 'payment_recovered' : 'renewed',
+    eventType: previousFailure ? 'payment_recovered' : 'renewed',
     outcome: result.created ? 'applied' : 'duplicate',
     stripeInvoiceId: invoice.id,
   });
-  return result.order.payment_status === 'paid' ? 'handled' : 'permanent_rejection';
+  return 'handled';
 }
 
 async function handleFailedInvoice(
@@ -228,6 +232,10 @@ async function handleFailedInvoice(
   assertSignedInvoiceId(invoice.id);
   const stripeSubscriptionId = signedInvoiceSubscriptionId(invoice);
   if (!stripeSubscriptionId) return 'ignored';
+  const acquisition = await runtime.repository.findAcquisitionByStripeSubscription(
+    stripeSubscriptionId,
+  );
+  if (!acquisition) return 'ignored';
   const stored = await runtime.repository.findSubscriptionByStripeSubscription(
     stripeSubscriptionId,
   );

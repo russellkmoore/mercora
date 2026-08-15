@@ -193,6 +193,21 @@ describe('subscription lifecycle reconciliation', () => {
     }
   });
 
+  it('permanently rejects malformed authoritative provider lifecycle state', async () => {
+    const dependencies = runtime({
+      current: stored(),
+      refreshedSnapshot: { ...snapshot, quantity: 0 },
+    });
+    await expect(reconcileSubscriptionLifecycle({
+      ...dependencies,
+      event: { id: 'evt_equal', createdAt: 100 },
+      stripeSubscriptionId: binding.stripeSubscriptionId,
+      signedBinding: binding,
+      signedSnapshot: snapshot,
+    })).rejects.toBeInstanceOf(SubscriptionWebhookPermanentError);
+    expect(dependencies.repository.compareAndApplyLifecycle).not.toHaveBeenCalled();
+  });
+
   it('retries invoice-before-acquisition races and bounds lifecycle CAS conflicts', async () => {
     const missing = runtime();
     vi.mocked(missing.repository.findAcquisitionByStripeSubscription).mockResolvedValue(undefined);
