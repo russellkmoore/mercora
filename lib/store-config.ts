@@ -73,7 +73,8 @@ export type StoreConfig = {
     carriers: readonly StoreCarrierDefinition[];
     features: {
       recommendations: boolean;
-      giftCards: boolean;
+      giftCardAcquisition: boolean;
+      giftCardReconciliation: boolean;
       subscriptionAcquisition: boolean;
       subscriptionReconciliation: boolean;
     };
@@ -153,7 +154,8 @@ export const storeDefaults: StoreConfig = {
     ],
     features: {
       recommendations: true,
-      giftCards: false,
+      giftCardAcquisition: false,
+      giftCardReconciliation: false,
       subscriptionAcquisition: false,
       subscriptionReconciliation: false,
     },
@@ -438,7 +440,16 @@ export function resolveStoreConfig(env: Environment = {}): StoreConfig {
           "STORE_FEATURE_RECOMMENDATIONS",
           storeDefaults.commerce.features.recommendations,
         ),
-        giftCards: storeDefaults.commerce.features.giftCards,
+        giftCardAcquisition: bool(
+          env,
+          "STORE_FEATURE_GIFT_CARD_ACQUISITION",
+          storeDefaults.commerce.features.giftCardAcquisition,
+        ),
+        giftCardReconciliation: bool(
+          env,
+          "STORE_FEATURE_GIFT_CARD_RECONCILIATION",
+          storeDefaults.commerce.features.giftCardReconciliation,
+        ),
         subscriptionAcquisition: bool(
           env,
           "STORE_FEATURE_SUBSCRIPTION_ACQUISITION",
