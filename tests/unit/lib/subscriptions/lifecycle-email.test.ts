@@ -65,7 +65,7 @@ describe('subscription lifecycle email', () => {
       await expect(sendSubscriptionLifecycleEmail({
         database: database(customerRow),
         subscriptionId: 'subscription_local',
-        providerEventId: `evt_${kind}`,
+        deliveryScope: `evt_${kind}`,
         kind,
       }, sender)).resolves.toEqual({ status: 'sent', providerId: 'message_1' });
     }
@@ -115,7 +115,7 @@ describe('subscription lifecycle email', () => {
       await expect(sendSubscriptionLifecycleEmail({
         database: database(row),
         subscriptionId: 'subscription_local',
-        providerEventId: 'evt_missing',
+        deliveryScope: 'evt_missing',
         kind: 'created',
       }, sender)).resolves.toEqual({ status: 'skipped' });
     }
@@ -124,7 +124,7 @@ describe('subscription lifecycle email', () => {
 
   it('retries definite failures but terminates ambiguous needs-review outcomes without leaking payloads', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const definite = vi.fn(async () => ({
+    const definite = vi.fn<SubscriptionLifecycleEmailSender>(async () => ({
       success: false,
       error: 'private recipient Current.Customer@Example.com provider detail',
       errorCode: 'E_PROVIDER_PRIVATE',
@@ -132,7 +132,7 @@ describe('subscription lifecycle email', () => {
     const input = {
       database: database(customerRow),
       subscriptionId: 'subscription_local',
-      providerEventId: 'evt_delivery',
+      deliveryScope: 'evt_delivery',
       kind: 'payment_failed' as const,
     };
 
@@ -148,6 +148,17 @@ describe('subscription lifecycle email', () => {
     );
     expect((thrown as Error).message).not.toContain('Current.Customer');
     expect(consoleError).not.toHaveBeenCalled();
+
+    const recovered = vi.fn<SubscriptionLifecycleEmailSender>(async () => ({
+      success: true,
+      id: 'message_retry',
+      provider: 'cloudflare' as const,
+    }));
+    await expect(sendSubscriptionLifecycleEmail(input, recovered))
+      .resolves.toEqual({ status: 'sent', providerId: 'message_retry' });
+    expect(definite.mock.calls[0]?.[1].idempotencyKey).toBe(
+      recovered.mock.calls[0]?.[1].idempotencyKey,
+    );
 
     const ambiguous = vi.fn(async () => ({
       success: false,

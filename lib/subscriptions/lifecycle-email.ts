@@ -26,7 +26,8 @@ export interface SubscriptionLifecycleNotificationRepository {
 export interface SubscriptionLifecycleEmailInput {
   database: D1Database;
   subscriptionId: string;
-  providerEventId: string;
+  /** Event identity for lifecycle/failure; invoice identity for recovery aliases. */
+  deliveryScope: string;
   kind: SubscriptionLifecycleNotificationKind;
 }
 
@@ -248,12 +249,12 @@ function prepareEmail(
 }
 
 export async function subscriptionLifecycleEmailKey(
-  providerEventId: string,
+  deliveryScope: string,
   kind: SubscriptionLifecycleNotificationKind,
 ): Promise<string> {
   const digest = await crypto.subtle.digest(
     'SHA-256',
-    new TextEncoder().encode(`${providerEventId}\u0000${kind}`),
+    new TextEncoder().encode(`${deliveryScope}\u0000${kind}`),
   );
   const hex = Array.from(
     new Uint8Array(digest),
@@ -276,7 +277,7 @@ export async function sendSubscriptionLifecycleEmail(
   const identity = row ? customerIdentity(row) : undefined;
   if (!row || !identity) return { status: 'skipped' };
   const result = await sender(prepareEmail(identity, row, input.kind), {
-    idempotencyKey: await subscriptionLifecycleEmailKey(input.providerEventId, input.kind),
+    idempotencyKey: await subscriptionLifecycleEmailKey(input.deliveryScope, input.kind),
     database: input.database,
   });
   if (result.success) {

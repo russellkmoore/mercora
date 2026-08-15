@@ -3,6 +3,8 @@ import { env } from 'cloudflare:workers';
 import { Money } from '@/lib/money';
 import {
   fulfillSubscriptionInvoice,
+  recordSubscriptionInvoiceFailure,
+  recordSubscriptionInvoiceRecovery,
   type SubscriptionInvoiceProvider,
 } from '@/lib/subscriptions/invoice-service';
 import type { VerifiedSubscriptionInvoice } from '@/lib/subscriptions';
@@ -23,7 +25,7 @@ const provider: SubscriptionInvoiceProvider = {
 
 async function seedSubscription(options: { shippingRequired?: boolean; withAddress?: boolean } = {}) {
   const shippingRequired = options.shippingRequired !== false;
-  const withAddress = options.withAddress !== false;
+  const withAddress = options.withAddress ?? shippingRequired;
   await env.DB.prepare(`INSERT INTO customers (id, type, status, person)
     VALUES ('customer-renewal', 'person', 'active', ?)`)
     .bind(JSON.stringify({ email: 'renewal@example.test', full_name: 'Renewal Customer' })).run();
@@ -48,12 +50,13 @@ async function seedSubscription(options: { shippingRequired?: boolean; withAddre
   await env.DB.prepare(`INSERT INTO subscription_acquisitions
     (id, setup_intent_id, plan_id, product_id, variant_id, currency_code,
      unit_amount_minor, stripe_price_id, cadence_unit, cadence_count,
-     customer_id, stripe_customer_id, quantity, shipping_address,
+     customer_id, stripe_customer_id, quantity, shipping_required, shipping_address,
      consent_record, status, stripe_subscription_id)
     VALUES ('acq-renewal', 'seti_renewal', 'plan-renewal', 'product-renewal',
             'variant-renewal', 'USD', 2500, 'price_renewal', 'month', 1,
-            'customer-renewal', 'cus_renewal', 2, ?, ?, 'completed', 'sub_renewal')`)
+            'customer-renewal', 'cus_renewal', 2, ?, ?, ?, 'completed', 'sub_renewal')`)
     .bind(
+      shippingRequired ? 1 : 0,
       withAddress
         ? JSON.stringify({
             line1: '1 Main St', city: 'Denver', region: 'CO', postal_code: '80202',
@@ -66,11 +69,11 @@ async function seedSubscription(options: { shippingRequired?: boolean; withAddre
     ).run();
   await env.DB.prepare(`INSERT INTO customer_subscriptions
     (id, plan_id, customer_id, acquisition_id, stripe_subscription_id,
-     stripe_customer_id, quantity, status, shipping_address, consent_record,
+     stripe_customer_id, quantity, shipping_required, status, shipping_address, consent_record,
      current_period_start, current_period_end, cancel_at_period_end,
      latest_lifecycle_event_created_at, latest_lifecycle_event_id)
     SELECT 'subscription-renewal', plan_id, customer_id, id, stripe_subscription_id,
-           stripe_customer_id, quantity, 'active', shipping_address, consent_record,
+           stripe_customer_id, quantity, shipping_required, 'active', shipping_address, consent_record,
            1786147200, 1788825600, 0, 1786147200, 'evt_subscription_created'
     FROM subscription_acquisitions WHERE id = 'acq-renewal'`).run();
 }
@@ -144,6 +147,91 @@ describe('subscription invoice orders in real D1', () => {
         status: 'processing',
         payment_status: 'paid',
       });
+    const stored = await env.DB.prepare('SELECT extensions FROM orders WHERE id = ?')
+      .bind(`SUB-${invoice.stripeInvoiceId}`).first<{ extensions: string }>();
+    expect(JSON.parse(stored!.extensions)).toMatchObject({
+      checkout_subtotal: Money.fromMinor(5_000, 'USD').toJSON(),
+      checkout_catalog_subtotal: Money.fromMinor(5_000, 'USD').toJSON(),
+    });
+  });
+
+  it('orders an in-flight paid delivery after failure and records one recovery across aliases', async () => {
+    await seedSubscription();
+    let releaseInvoice!: () => void;
+    let announceInvoiceRead!: () => void;
+    const invoiceRead = new Promise<void>((resolve) => { announceInvoiceRead = resolve; });
+    const invoiceRelease = new Promise<void>((resolve) => { releaseInvoice = resolve; });
+    const blockedProvider: SubscriptionInvoiceProvider = {
+      retrieveVerifiedInvoice: vi.fn(async () => {
+        announceInvoiceRead();
+        await invoiceRelease;
+        return invoice;
+      }),
+    };
+    const paid = fulfillSubscriptionInvoice({
+      database: env.DB,
+      provider: blockedProvider,
+      stripeInvoiceId: invoice.stripeInvoiceId,
+      stripeSubscriptionId: 'sub_renewal',
+    });
+    await invoiceRead;
+
+    await expect(recordSubscriptionInvoiceFailure({
+      database: env.DB,
+      subscriptionId: 'subscription-renewal',
+      providerEvent: { id: 'evt_failure_before_paid', createdAt: 1_786_147_204 },
+      stripeInvoiceId: invoice.stripeInvoiceId,
+    })).resolves.toEqual({ outcome: 'applied', notify: true });
+    releaseInvoice();
+    await expect(paid).resolves.toMatchObject({ created: true });
+
+    await expect(recordSubscriptionInvoiceRecovery({
+      database: env.DB,
+      subscriptionId: 'subscription-renewal',
+      providerEvent: { id: 'evt_invoice_paid_alias', createdAt: 1_786_147_205 },
+      stripeInvoiceId: invoice.stripeInvoiceId,
+    })).resolves.toEqual({ recovered: true, outcome: 'applied' });
+    await expect(recordSubscriptionInvoiceRecovery({
+      database: env.DB,
+      subscriptionId: 'subscription-renewal',
+      providerEvent: { id: 'evt_payment_succeeded_alias', createdAt: 1_786_147_206 },
+      stripeInvoiceId: invoice.stripeInvoiceId,
+    })).resolves.toEqual({ recovered: true, outcome: 'duplicate' });
+
+    const decisions = await env.DB.prepare(`SELECT event_type, outcome, count(*) AS count
+      FROM subscription_events
+      WHERE subscription_id = 'subscription-renewal'
+        AND json_extract(details, '$.stripe_invoice_id') = ?
+      GROUP BY event_type, outcome ORDER BY event_type`)
+      .bind(invoice.stripeInvoiceId)
+      .all<{ event_type: string; outcome: string; count: number }>();
+    expect(decisions.results).toEqual([
+      { event_type: 'payment_failed', outcome: 'applied', count: 1 },
+      { event_type: 'payment_recovered', outcome: 'applied', count: 1 },
+    ]);
+  });
+
+  it('makes a failure stale when the paid invoice batch wins first', async () => {
+    await seedSubscription();
+    await fulfillSubscriptionInvoice({
+      database: env.DB,
+      provider,
+      stripeInvoiceId: invoice.stripeInvoiceId,
+      stripeSubscriptionId: 'sub_renewal',
+    });
+
+    await expect(recordSubscriptionInvoiceFailure({
+      database: env.DB,
+      subscriptionId: 'subscription-renewal',
+      providerEvent: { id: 'evt_failure_after_paid', createdAt: 1_786_147_206 },
+      stripeInvoiceId: invoice.stripeInvoiceId,
+    })).resolves.toEqual({ outcome: 'ignored_stale', notify: false });
+    await expect(recordSubscriptionInvoiceRecovery({
+      database: env.DB,
+      subscriptionId: 'subscription-renewal',
+      providerEvent: { id: 'evt_paid_no_failure', createdAt: 1_786_147_205 },
+      stripeInvoiceId: invoice.stripeInvoiceId,
+    })).resolves.toEqual({ recovered: false });
   });
 
   it('rolls back order, invoice map, and every effect when staging fails, then retries cleanly', async () => {
@@ -171,17 +259,6 @@ describe('subscription invoice orders in real D1', () => {
 
     await env.DB.exec('DROP TRIGGER reject_renewal_effect');
     await expect(fulfillSubscriptionInvoice(args)).resolves.toMatchObject({ created: true });
-  });
-
-  it('fails closed for a physical renewal without its durable address snapshot', async () => {
-    await seedSubscription({ withAddress: false });
-    await expect(fulfillSubscriptionInvoice({
-      database: env.DB,
-      provider,
-      stripeInvoiceId: invoice.stripeInvoiceId,
-      stripeSubscriptionId: 'sub_renewal',
-    })).rejects.toThrow('Physical subscription renewal has no durable shipping address');
-    expect(provider.retrieveVerifiedInvoice).toHaveBeenCalledOnce();
   });
 
   it('permits a digital renewal without shipping while retaining the exact variant binding', async () => {

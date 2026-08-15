@@ -16,6 +16,8 @@ import {
 } from '@/lib/subscriptions/lifecycle-service';
 import {
   fulfillSubscriptionInvoice,
+  recordSubscriptionInvoiceFailure,
+  recordSubscriptionInvoiceRecovery,
   type SubscriptionInvoiceProvider,
 } from '@/lib/subscriptions/invoice-service';
 import type { WebhookEventOutcome } from '@/lib/webhooks/processed-events';
@@ -269,7 +271,7 @@ async function handleLifecycle(
       if (notificationKind) {
         await sendLifecycleNotification(runtime, {
           subscriptionId: result.subscriptionId,
-          providerEventId: event.id,
+          deliveryScope: event.id,
           kind: notificationKind,
         });
       }
@@ -324,28 +326,25 @@ async function handlePaidInvoice(
     stripeSubscriptionId,
   );
   if (!stored) throw new Error('Paid invoice order lost its subscription binding');
-  const previousFailure = await runtime.database.prepare(`
-SELECT 1 AS present
-FROM subscription_events
-WHERE subscription_id = ?
-  AND event_type = 'payment_failed'
-  AND outcome = 'applied'
-  AND json_valid(COALESCE(details, '{}')) = 1
-  AND json_extract(details, '$.stripe_invoice_id') = ?
-LIMIT 1
-`).bind(stored.id, invoice.id).first<{ present: number }>();
-  const outcome = await recordInvoiceEvent(runtime.repository, {
+  const recovery = await recordSubscriptionInvoiceRecovery({
+    database: runtime.database,
     subscriptionId: stored.id,
-    event,
-    eventType: previousFailure ? 'payment_recovered' : 'renewed',
-    outcome: result.created ? 'applied' : 'duplicate',
+    providerEvent: { id: event.id, createdAt: event.created },
     stripeInvoiceId: invoice.id,
   });
-  if (previousFailure && (outcome === 'applied' || outcome === 'duplicate')) {
+  if (recovery.recovered) {
     await sendLifecycleNotification(runtime, {
       subscriptionId: stored.id,
-      providerEventId: event.id,
+      deliveryScope: invoice.id,
       kind: 'payment_recovered',
+    });
+  } else {
+    await recordInvoiceEvent(runtime.repository, {
+      subscriptionId: stored.id,
+      event,
+      eventType: 'renewed',
+      outcome: result.created ? 'applied' : 'duplicate',
+      stripeInvoiceId: invoice.id,
     });
   }
   return 'handled';
@@ -374,25 +373,16 @@ async function handleFailedInvoice(
   if (!stored) {
     throw new Error('Failed invoice arrived before its subscription binding');
   }
-  const paid = await runtime.database.prepare(`
-SELECT 1 AS present
-FROM subscription_invoice_orders
-WHERE stripe_invoice_id = ? AND subscription_id = ?
-LIMIT 1
-`).bind(invoice.id, stored.id).first<{ present: number }>();
-  const requestedOutcome = paid ? 'ignored_stale' : 'applied';
-  const outcome = await recordInvoiceEvent(runtime.repository, {
+  const decision = await recordSubscriptionInvoiceFailure({
+    database: runtime.database,
     subscriptionId: stored.id,
-    event,
-    eventType: 'payment_failed',
-    outcome: requestedOutcome,
+    providerEvent: { id: event.id, createdAt: event.created },
     stripeInvoiceId: invoice.id,
   });
-  if (requestedOutcome !== 'ignored_stale'
-    && (outcome === 'applied' || outcome === 'duplicate')) {
+  if (decision.notify) {
     await sendLifecycleNotification(runtime, {
       subscriptionId: stored.id,
-      providerEventId: event.id,
+      deliveryScope: event.id,
       kind: 'payment_failed',
     });
   }
