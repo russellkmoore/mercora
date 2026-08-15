@@ -14,7 +14,10 @@ vi.mock('@/lib/utils/email', () => ({
 }));
 vi.mock('@/lib/store-config', () => ({ getStoreConfig: mocks.getStoreConfig }));
 
-import { sendMerchantOrderNotification } from '@/lib/services/order-confirmation';
+import {
+  sendMerchantOrderNotification,
+  sendOrderConfirmation,
+} from '@/lib/services/order-confirmation';
 
 function emailLessOrder(): Order {
   return {
@@ -75,6 +78,34 @@ describe('merchant order effect payload', () => {
     await expect(sendMerchantOrderNotification(order, 'merchant/MCP-EMAILLESS-1/v1'))
       .resolves.toMatchObject({ success: false, errorCode: 'E_MERCHANT_PAYLOAD' });
     expect(mocks.sendMerchant).not.toHaveBeenCalled();
+  });
+
+  it('delivers addressless digital renewal payloads to customer and merchant', async () => {
+    mocks.sendConfirmation.mockResolvedValue({ success: true, id: 'customer-digital' });
+    const order = emailLessOrder();
+    order.shipping_address = undefined;
+    order.extensions = {
+      email: 'digital@example.test',
+      customer_name: 'Digital Customer',
+      subscription_shipping_required: false,
+    };
+
+    await expect(sendOrderConfirmation(order, 'confirmation/digital/v1'))
+      .resolves.toMatchObject({ success: true, id: 'customer-digital' });
+    await expect(sendMerchantOrderNotification(order, 'merchant/digital/v1'))
+      .resolves.toMatchObject({ success: true, id: 'merchant-1' });
+    expect(mocks.sendConfirmation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customerEmail: 'digital@example.test',
+        customerName: 'Digital Customer',
+      }),
+      { idempotencyKey: 'confirmation/digital/v1' },
+    );
+    expect(mocks.sendConfirmation.mock.calls.at(-1)?.[0]).not.toHaveProperty('shippingAddress');
+    expect(mocks.sendMerchant).toHaveBeenCalledWith(expect.any(Object), {
+      idempotencyKey: 'merchant/digital/v1',
+    });
+    expect(mocks.sendMerchant.mock.calls.at(-1)?.[0]).not.toHaveProperty('shippingAddress');
   });
 
   it('reports a skip only when the merchant recipient is absent', async () => {

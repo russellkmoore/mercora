@@ -27,6 +27,9 @@ interface InvoiceSubscriptionContextRow {
   cadence_count: number;
   quantity: number;
   shipping_address: string | null;
+  customer_person: string | null;
+  customer_company: string | null;
+  customer_contacts: string | null;
   product_name: string;
   sku: string;
   shipping_required: number | null;
@@ -133,6 +136,9 @@ SELECT cs.id AS subscription_id,
        a.cadence_count,
        cs.quantity,
        cs.shipping_address,
+       c.person AS customer_person,
+       c.company AS customer_company,
+       c.contacts AS customer_contacts,
        p.name AS product_name,
        v.sku,
        v.shipping_required
@@ -143,6 +149,7 @@ JOIN subscription_acquisitions a
  AND a.customer_id = cs.customer_id
  AND a.stripe_customer_id = cs.stripe_customer_id
  AND a.stripe_subscription_id = cs.stripe_subscription_id
+JOIN customers c ON c.id = cs.customer_id
 JOIN products p ON p.id = a.product_id
 JOIN product_variants v ON v.id = a.variant_id AND v.product_id = a.product_id
 WHERE cs.stripe_subscription_id = ?
@@ -160,6 +167,38 @@ LIMIT 2
 
 function deterministicOrderId(stripeInvoiceId: string): string {
   return `SUB-${stripeInvoiceId}`;
+}
+
+function boundedText(value: unknown, maxLength: number): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim();
+  return normalized && normalized.length <= maxLength ? normalized : undefined;
+}
+
+function customerIdentity(context: InvoiceSubscriptionContextRow): {
+  email: string;
+  name?: string;
+} {
+  const person = parseJson<Record<string, unknown>>(context.customer_person, 'Customer person');
+  const company = parseJson<Record<string, unknown>>(context.customer_company, 'Customer company');
+  const contacts = parseJson<Array<Record<string, unknown>>>(
+    context.customer_contacts,
+    'Customer contacts',
+  );
+  const primary = Array.isArray(contacts)
+    ? contacts.find((entry) => entry?.is_primary === true) ?? contacts[0]
+    : undefined;
+  const email = boundedText(person?.email, 320) ?? boundedText(primary?.email, 320);
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error('Subscription customer has no verified delivery email');
+  }
+  const personParts = [boundedText(person?.first_name, 100), boundedText(person?.last_name, 100)]
+    .filter((part): part is string => Boolean(part)).join(' ');
+  const name = boundedText(person?.full_name, 200)
+    ?? (personParts || undefined)
+    ?? boundedText(company?.display_name, 200)
+    ?? boundedText(company?.name, 200);
+  return { email: email.toLowerCase(), ...(name ? { name } : {}) };
 }
 
 function createPendingOrder(
@@ -180,6 +219,7 @@ function createPendingOrder(
     throw new Error('Physical subscription renewal has no durable shipping address');
   }
   if (shippingAddress) assertShippingAddress(shippingAddress);
+  const identity = customerIdentity(context);
   const orderId = deterministicOrderId(invoice.stripeInvoiceId);
   const item: OrderItem = {
     id: `${orderId}:line:1`,
@@ -209,7 +249,10 @@ function createPendingOrder(
         : {}),
     },
     extensions: {
+      email: identity.email,
+      ...(identity.name ? { customer_name: identity.name } : {}),
       [SUBSCRIPTION_ACQUISITION_EXTENSION]: context.acquisition_id,
+      subscription_shipping_required: context.shipping_required !== 0,
       subscription_id: context.subscription_id,
       subscription_plan_id: context.plan_id,
       subscription_cadence: {
