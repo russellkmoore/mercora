@@ -219,13 +219,19 @@ export default function SubscriptionPlanManager() {
       if (controller.signal.aborted) return;
       setLoading(true);
       setError("");
+      setPlans([]);
+      setTotal(0);
       listAdminSubscriptionPlans(fetch, { filter, limit: PAGE_SIZE, offset, signal: controller.signal })
         .then((result) => {
           setPlans(result.plans);
           setTotal(result.total);
         })
         .catch((cause) => {
-          if (!controller.signal.aborted) setError(safeMessage(cause));
+          if (!controller.signal.aborted) {
+            setPlans([]);
+            setTotal(0);
+            setError(safeMessage(cause));
+          }
         })
         .finally(() => {
           if (!controller.signal.aborted) setLoading(false);
@@ -249,6 +255,9 @@ export default function SubscriptionPlanManager() {
           <select
             value={filter}
             onChange={(event) => {
+              setPlans([]);
+              setTotal(0);
+              setLoading(true);
               setFilter(event.target.value as AdminPlanStatusFilter);
               setOffset(0);
             }}
@@ -286,7 +295,7 @@ export default function SubscriptionPlanManager() {
         </div>
       ) : null}
 
-      {plans.length > 0 ? (
+      {!loading && !error && plans.length > 0 ? (
         <div className="overflow-x-auto rounded-lg border border-neutral-700">
           <table className="min-w-full divide-y divide-neutral-700 text-left text-sm">
             <thead className="bg-neutral-900 text-gray-300">
@@ -322,7 +331,7 @@ export default function SubscriptionPlanManager() {
                     <div className="flex justify-end gap-2">
                       <button
                         type="button"
-                        disabled={loadingDetail || !!actionId}
+                        disabled={loading || loadingDetail || !!actionId}
                         onClick={async () => {
                           setLoadingDetail(true);
                           setError("");
@@ -343,7 +352,7 @@ export default function SubscriptionPlanManager() {
                       {plan.active ? (
                         <button
                           type="button"
-                          disabled={!!actionId}
+                          disabled={loading || loadingDetail || !!actionId}
                           onClick={async () => {
                             if (!window.confirm("Deactivate this plan? Existing subscriptions remain, but customers cannot start new ones.")) return;
                             setActionId(plan.id);
@@ -377,7 +386,12 @@ export default function SubscriptionPlanManager() {
           <button
             type="button"
             disabled={offset === 0 || loading}
-            onClick={() => setOffset((value) => Math.max(0, value - PAGE_SIZE))}
+            onClick={() => {
+              setPlans([]);
+              setTotal(0);
+              setLoading(true);
+              setOffset((value) => Math.max(0, value - PAGE_SIZE));
+            }}
             className="rounded border border-neutral-600 px-3 py-1.5 disabled:opacity-40"
           >
             Previous
@@ -385,7 +399,12 @@ export default function SubscriptionPlanManager() {
           <button
             type="button"
             disabled={offset + PAGE_SIZE >= total || loading}
-            onClick={() => setOffset((value) => value + PAGE_SIZE)}
+            onClick={() => {
+              setPlans([]);
+              setTotal(0);
+              setLoading(true);
+              setOffset((value) => value + PAGE_SIZE);
+            }}
             className="rounded border border-neutral-600 px-3 py-1.5 disabled:opacity-40"
           >
             Next

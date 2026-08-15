@@ -10,7 +10,9 @@ describe("product subscription acquisition integration", () => {
     expect(source).toContain("useCartStore.getState().addItem");
     expect(source).toContain(">\n                Add to Cart\n");
     expect(source).toContain("variantId={selectedVariant.id}");
-    expect(source).toContain("available && selectedVariant?.id && subscription?.enabled");
+    expect(source).toContain("selectedVariant?.id && subscription?.enabled");
+    expect(source).toContain("available={available}");
+    expect(source).not.toContain("available && selectedVariant?.id && subscription?.enabled");
   });
 
   it("uses Clerk and Stripe Elements without persisting or logging provider secrets", () => {
@@ -22,6 +24,11 @@ describe("product subscription acquisition integration", () => {
     expect(source).toContain("<SignInButton mode=\"modal\">");
     expect(source).toContain("<StripeProvider clientSecret={setup.clientSecret}>");
     expect(source).toContain("<PaymentElement");
+    expect(source).toContain("setup.ownerId === currentOwner");
+    expect(source).toContain("window.history.replaceState");
+    expect(source).toContain("setWorking(false)");
+    expect(source).toContain("Retry finalization");
+    expect(source).toContain("setRedirectRetry((value) => value + 1)");
     expect(source).not.toMatch(/localStorage|sessionStorage|console\.(?:log|error)/);
   });
 });

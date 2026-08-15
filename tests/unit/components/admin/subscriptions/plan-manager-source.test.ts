@@ -22,4 +22,11 @@ describe("admin subscription plan management UI", () => {
     expect(layout).toContain("case 'subscription-plans':");
     expect(layout).toContain("Subscription Plan Management");
   });
+
+  it("hides stale rows and disables their actions while a new page or filter loads", () => {
+    const source = read("components/admin/subscriptions/SubscriptionPlanManager.tsx");
+    expect(source).toContain("setPlans([])");
+    expect(source).toContain("!loading && !error && plans.length > 0");
+    expect(source).toContain("disabled={loading || loadingDetail || !!actionId}");
+  });
 });
