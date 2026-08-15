@@ -64,12 +64,18 @@ type FulfillmentOrderData = Omit<OrderData, 'customerEmail'>;
 async function buildFulfillmentOrderData(order: Order): Promise<FulfillmentOrderData | null> {
   const address = order.shipping_address;
   const extensions = order.extensions ?? {};
-  if (!address || !order.id || order.items.length === 0) return null;
+  const addresslessDigitalOrder = extensions.subscription_shipping_required === false;
+  if ((!address && !addresslessDigitalOrder) || !order.id || order.items.length === 0) return null;
   const images = await resolveOrderLineImages(order.items.map((item) => item.product_id));
+  const persistedName = typeof extensions.customer_name === 'string'
+    && extensions.customer_name.trim().length > 0
+    && extensions.customer_name.length <= 200
+    ? extensions.customer_name.trim()
+    : undefined;
 
   return {
     orderNumber: order.id,
-    customerName: address.recipient || address.company || 'Customer',
+    customerName: address?.recipient || address?.company || persistedName || 'Customer',
     items: order.items.map((item) => ({
       productId: item.product_id,
       name: item.product_name,
@@ -89,13 +95,15 @@ async function buildFulfillmentOrderData(order: Order): Promise<FulfillmentOrder
     discount: Money.fromStored(extensions.checkout_discount ?? 0, order.currency_code).toJSON(),
     tender: Money.fromStored(extensions.checkout_tender ?? 0, order.currency_code).toJSON(),
     total: Money.fromStored(order.total_amount, order.currency_code).toJSON(),
-    shippingAddress: {
-      street: [localizedText(address.line1), localizedText(address.line2)].filter(Boolean).join(', '),
-      city: localizedText(address.city),
-      state: address.region || '',
-      zipCode: address.postal_code || '',
-      country: address.country,
-    },
+    ...(address ? {
+      shippingAddress: {
+        street: [localizedText(address.line1), localizedText(address.line2)].filter(Boolean).join(', '),
+        city: localizedText(address.city),
+        state: address.region || '',
+        zipCode: address.postal_code || '',
+        country: address.country,
+      },
+    } : {}),
   };
 }
 
@@ -146,7 +154,7 @@ export async function sendMerchantOrderNotification(
     ? sendNewOrderMerchantNotification(data, { idempotencyKey })
     : {
         success: false,
-        error: 'Merchant notification requires an order id, shipping address, and line items',
+        error: 'Merchant notification requires a valid order id and line items',
         errorCode: 'E_MERCHANT_PAYLOAD',
       };
 }
