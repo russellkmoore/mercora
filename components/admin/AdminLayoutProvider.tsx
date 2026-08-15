@@ -84,6 +84,9 @@ function generateBreadcrumbs(pathname: string): BreadcrumbItem[] {
       case 'products':
         label = 'Products';
         break;
+      case 'subscription-plans':
+        label = 'Subscription Plans';
+        break;
       case 'categories':
         label = 'Categories';
         break;
@@ -130,6 +133,8 @@ function generatePageTitle(pathname: string): string {
   switch (lastSegment) {
     case 'products':
       return 'Product Management';
+    case 'subscription-plans':
+      return 'Subscription Plan Management';
     case 'categories':
       return 'Category Management';
     case 'promotions':
