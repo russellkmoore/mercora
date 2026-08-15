@@ -31,6 +31,9 @@ export interface SubscriptionPlanBinding {
   active: boolean;
 }
 
+/** Immutable plan facts copied into an acquisition while the live plan is active. */
+export type ReservedSubscriptionPlanBinding = Omit<SubscriptionPlanBinding, "active">;
+
 export interface SubscriptionConsent {
   termsVersion: string;
   acceptedAt: string;
@@ -60,6 +63,8 @@ export interface SubscriptionLifecycleSnapshot {
   cancelAtPeriodEnd: boolean;
   cancelAt?: number;
   canceledAt?: number;
+  /** Actual end of service; distinct from when cancellation was requested. */
+  endedAt?: number;
 }
 
 export interface SubscriptionAcquisition {
@@ -69,7 +74,7 @@ export interface SubscriptionAcquisition {
   setupIntentId: string;
   customerId: string;
   stripeCustomerId: string;
-  plan: SubscriptionPlanBinding;
+  plan: ReservedSubscriptionPlanBinding;
   quantity: number;
   shippingAddress?: Address;
   consent: SubscriptionConsent;
@@ -78,6 +83,27 @@ export interface SubscriptionAcquisition {
 export type ProviderAcquisitionRequest = SubscriptionAcquisition & {
   idempotencyKey: string;
 };
+
+/** Exact signed/provider subscription fields compared to the reserved acquisition. */
+export interface ProviderSubscriptionBinding {
+  acquisitionId: string;
+  planId: string;
+  stripeSubscriptionId: string;
+  stripeCustomerId: string;
+  stripePriceId: string;
+  price: Money;
+  cadence: SubscriptionCadence;
+  quantity: number;
+}
+
+export interface VerifiedSubscriptionInvoice {
+  stripeInvoiceId: string;
+  stripePaymentIntentId?: string;
+  paidAmount: Money;
+  periodStart?: number;
+  periodEnd?: number;
+  verifiedPaidAt: number;
+}
 
 function assertBoundedId(value: string, label: string, maxLength = 255): void {
   if (typeof value !== "string" || value.length < 1 || value.length > maxLength || value.trim() !== value) {
@@ -98,6 +124,12 @@ function assertEpochSeconds(value: number | undefined, label: string): void {
   }
 }
 
+function assertRequiredEpochSeconds(value: unknown, label: string): asserts value is number {
+  if (!Number.isSafeInteger(value) || (value as number) < 0) {
+    throw new TypeError(`${label} must be nonnegative integer epoch seconds`);
+  }
+}
+
 function assertIsoTimestamp(value: string, label: string): void {
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed) || new Date(parsed).toISOString() !== value) {
@@ -110,6 +142,9 @@ export function assertSubscriptionPlanBinding(plan: SubscriptionPlanBinding): vo
   assertBoundedId(plan.productId, "product id", 128);
   assertBoundedId(plan.variantId, "variant id", 128);
   assertProviderId(plan.stripePriceId, "price_", "Stripe price id");
+  if (typeof plan.active !== "boolean") {
+    throw new TypeError("subscription plan active must be boolean");
+  }
   if (!(plan.price instanceof Money) || plan.price.isNegative()) {
     throw new TypeError("subscription price must be nonnegative Money");
   }
@@ -122,6 +157,22 @@ export function assertSubscriptionPlanBinding(plan: SubscriptionPlanBinding): vo
   if (!Number.isSafeInteger(plan.cadence.count) || plan.cadence.count < 1 || plan.cadence.count > 365) {
     throw new TypeError("subscription cadence count must be between 1 and 365");
   }
+}
+
+export function assertReservedSubscriptionPlanBinding(
+  plan: ReservedSubscriptionPlanBinding,
+): void {
+  assertSubscriptionPlanBinding({ ...plan, active: true });
+}
+
+/** Snapshot a currently active plan before reserving a durable acquisition. */
+export function toReservedSubscriptionPlanBinding(
+  plan: SubscriptionPlanBinding,
+): ReservedSubscriptionPlanBinding {
+  assertSubscriptionPlanBinding(plan);
+  if (!plan.active) throw new TypeError("subscription acquisition requires an active plan");
+  const { active: _active, ...reserved } = plan;
+  return reserved;
 }
 
 export function planBindingsEqual(
@@ -168,11 +219,20 @@ export function assertLifecycleSnapshot(snapshot: SubscriptionLifecycleSnapshot)
   if (!Number.isSafeInteger(snapshot.quantity) || snapshot.quantity < 1 || snapshot.quantity > 1000) {
     throw new TypeError("subscription quantity must be between 1 and 1000");
   }
+  if (typeof snapshot.cancelAtPeriodEnd !== "boolean") {
+    throw new TypeError("subscription cancelAtPeriodEnd must be boolean");
+  }
   assertEpochSeconds(snapshot.currentPeriodStart, "current period start");
   assertEpochSeconds(snapshot.currentPeriodEnd, "current period end");
   assertEpochSeconds(snapshot.cancelAt, "scheduled cancellation");
   assertEpochSeconds(snapshot.canceledAt, "cancellation time");
+  assertEpochSeconds(snapshot.endedAt, "service end time");
   if (snapshot.pauseCollection) {
+    const unexpectedKeys = Object.keys(snapshot.pauseCollection)
+      .filter((key) => key !== "behavior" && key !== "resumesAt");
+    if (unexpectedKeys.length > 0) {
+      throw new TypeError("subscription pause collection contains unexpected fields");
+    }
     if (!["keep_as_draft", "mark_uncollectible", "void"].includes(
       snapshot.pauseCollection.behavior,
     )) {
@@ -194,13 +254,124 @@ export function assertSubscriptionAcquisition(input: SubscriptionAcquisition): v
   assertProviderId(input.setupIntentId, "seti_", "SetupIntent id");
   assertBoundedId(input.customerId, "customer id", 128);
   assertProviderId(input.stripeCustomerId, "cus_", "Stripe customer id");
-  assertSubscriptionPlanBinding(input.plan);
-  if (!input.plan.active) throw new TypeError("subscription acquisition requires an active plan");
+  assertReservedSubscriptionPlanBinding(input.plan);
   if (!Number.isSafeInteger(input.quantity) || input.quantity < 1 || input.quantity > 1000) {
     throw new TypeError("subscription quantity must be between 1 and 1000");
   }
-  if (input.shippingAddress) assertShippingAddress(input.shippingAddress);
+  if (input.shippingAddress) {
+    assertShippingAddress({
+      ...input.shippingAddress,
+      country: input.shippingAddress.country.toUpperCase(),
+    });
+  }
   assertSubscriptionConsent(input.consent);
+}
+
+function canonicalize(value: unknown): unknown {
+  if (value === undefined) return undefined;
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean" || value === null) return value;
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, entry]) => entry !== undefined)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entry]) => [key, canonicalize(entry)]),
+    );
+  }
+  throw new TypeError("subscription snapshot contains an unsupported value");
+}
+
+export function normalizedSubscriptionAddress(address: Address | undefined): unknown {
+  if (!address) return undefined;
+  assertShippingAddress({ ...address, country: address.country.toUpperCase() });
+  return canonicalize({ ...address, country: address.country.toUpperCase() });
+}
+
+export function canonicalSubscriptionAcquisition(input: SubscriptionAcquisition): unknown {
+  assertSubscriptionAcquisition(input);
+  return canonicalize({
+    setupIntentId: input.setupIntentId,
+    customerId: input.customerId,
+    stripeCustomerId: input.stripeCustomerId,
+    plan: {
+      id: input.plan.id,
+      productId: input.plan.productId,
+      variantId: input.plan.variantId,
+      price: input.plan.price.toJSON(),
+      stripePriceId: input.plan.stripePriceId,
+      cadence: input.plan.cadence,
+    },
+    quantity: input.quantity,
+    shippingAddress: normalizedSubscriptionAddress(input.shippingAddress),
+    consent: input.consent,
+  });
+}
+
+/** Same-SetupIntent retries may converge only when every reserved fact matches. */
+export function subscriptionAcquisitionsEqual(
+  left: SubscriptionAcquisition,
+  right: SubscriptionAcquisition,
+): boolean {
+  return JSON.stringify(canonicalSubscriptionAcquisition(left))
+    === JSON.stringify(canonicalSubscriptionAcquisition(right));
+}
+
+export function assertProviderSubscriptionMatchesAcquisition(
+  acquisition: SubscriptionAcquisition,
+  provider: ProviderSubscriptionBinding,
+): void {
+  assertSubscriptionAcquisition(acquisition);
+  assertBoundedId(provider.acquisitionId, "provider acquisition id", 128);
+  assertBoundedId(provider.planId, "provider plan id", 128);
+  assertProviderId(provider.stripeSubscriptionId, "sub_", "Stripe subscription id");
+  assertProviderId(provider.stripeCustomerId, "cus_", "Stripe customer id");
+  assertProviderId(provider.stripePriceId, "price_", "Stripe price id");
+  if (!(provider.price instanceof Money) || provider.price.isNegative()) {
+    throw new TypeError("provider subscription price must be nonnegative Money");
+  }
+  if (!Number.isSafeInteger(provider.quantity) || provider.quantity < 1 || provider.quantity > 1000) {
+    throw new TypeError("provider subscription quantity must be between 1 and 1000");
+  }
+  if (!Number.isSafeInteger(provider.cadence.count) || provider.cadence.count < 1 || provider.cadence.count > 365) {
+    throw new TypeError("provider subscription cadence count must be between 1 and 365");
+  }
+  if (!["day", "week", "month", "year"].includes(provider.cadence.unit)) {
+    throw new TypeError("provider subscription cadence unit is invalid");
+  }
+
+  const exact = provider.acquisitionId === acquisition.id
+    && provider.planId === acquisition.plan.id
+    && provider.stripeCustomerId === acquisition.stripeCustomerId
+    && provider.stripePriceId === acquisition.plan.stripePriceId
+    && provider.price.equals(acquisition.plan.price)
+    && provider.cadence.unit === acquisition.plan.cadence.unit
+    && provider.cadence.count === acquisition.plan.cadence.count
+    && provider.quantity === acquisition.quantity;
+  if (!exact) throw new Error("Provider subscription does not match the reserved acquisition");
+}
+
+export function assertVerifiedSubscriptionInvoice(
+  invoice: VerifiedSubscriptionInvoice,
+): void {
+  assertProviderId(invoice.stripeInvoiceId, "in_", "Stripe invoice id");
+  if (invoice.stripePaymentIntentId !== undefined) {
+    assertProviderId(invoice.stripePaymentIntentId, "pi_", "Stripe PaymentIntent id");
+  }
+  if (!(invoice.paidAmount instanceof Money) || invoice.paidAmount.isNegative()) {
+    throw new TypeError("verified subscription invoice amount must be nonnegative Money");
+  }
+  assertEpochSeconds(invoice.periodStart, "invoice period start");
+  assertEpochSeconds(invoice.periodEnd, "invoice period end");
+  assertRequiredEpochSeconds(invoice.verifiedPaidAt, "invoice verified-paid time");
+  if (
+    invoice.periodStart !== undefined
+    && invoice.periodEnd !== undefined
+    && invoice.periodEnd < invoice.periodStart
+  ) {
+    throw new TypeError("verified subscription invoice period end precedes its start");
+  }
 }
 
 /** Provider idempotency must always be derived from the durable acquisition row. */
@@ -223,8 +394,8 @@ export function decideLifecycleEvent(
 ): LifecycleEventDecision {
   assertBoundedId(current.id, "current lifecycle event id");
   assertBoundedId(incoming.id, "incoming lifecycle event id");
-  assertEpochSeconds(current.createdAt, "current lifecycle event timestamp");
-  assertEpochSeconds(incoming.createdAt, "incoming lifecycle event timestamp");
+  assertRequiredEpochSeconds(current.createdAt, "current lifecycle event timestamp");
+  assertRequiredEpochSeconds(incoming.createdAt, "incoming lifecycle event timestamp");
 
   if (incoming.createdAt < current.createdAt) return "ignored_stale";
   if (incoming.createdAt > current.createdAt) return "apply";
