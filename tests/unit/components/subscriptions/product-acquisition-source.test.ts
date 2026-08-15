@@ -29,6 +29,13 @@ describe("product subscription acquisition integration", () => {
     expect(source).toContain("setWorking(false)");
     expect(source).toContain("Retry finalization");
     expect(source).toContain("setRedirectRetry((value) => value + 1)");
+    expect(source).toContain("setConfirmedSetup({ ownerId: setup.ownerId, setupIntentId })");
+    expect(source).toContain("finalizeSubscriptionSetup(fetch, confirmedSetup.setupIntentId");
+    expect(source).toContain("setConfirmedSetup(null)");
+    expect(source).toContain("currentOwner !== null && confirmedSetup?.ownerId !== currentOwner");
+    expect(source).toContain("if (!controller.signal.aborted && props.currentOwner() === props.ownerId)");
+    expect(source).toContain("if (!available && !setup) return null;");
+    expect(source).not.toContain("confirmSetupAndFinalize({");
     expect(source).not.toMatch(/localStorage|sessionStorage|console\.(?:log|error)/);
   });
 });
