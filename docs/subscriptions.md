@@ -1,9 +1,10 @@
 # Subscriptions
 
-Subscriptions are optional and disabled by default. Migration `0021` is
+New subscription acquisition is optional and disabled by default. Migration `0021` is
 additive and may be deployed while old code is still running. Roll back the
-application by disabling the capability; never down-migrate subscription or
-invoice-order state.
+application by disabling acquisition; never down-migrate subscription or
+invoice-order state. After the first subscription exists, reconciliation must
+remain enabled even while acquisition and its UI are disabled.
 
 ## Acquisition and initial order
 
