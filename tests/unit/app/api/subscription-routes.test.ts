@@ -231,6 +231,21 @@ describe("subscription customer routes", () => {
     expect(mocks.finalize).toHaveBeenCalledWith("user_one", "seti_one");
   });
 
+  it("finalizes an in-flight acquisition after new subscription sales are disabled", async () => {
+    mocks.getStoreConfig.mockReturnValue({
+      commerce: {
+        currency: "USD",
+        subscriptionTermsVersion: undefined,
+        features: { subscriptionAcquisition: false, subscriptionReconciliation: true },
+      },
+    });
+
+    const response = await finalize(request("/api/subscriptions", { setupIntentId: "seti_one" }));
+
+    expect(response.status).toBe(202);
+    expect(mocks.finalize).toHaveBeenCalledWith("user_one", "seti_one");
+  });
+
   it("bounds empty action bodies and validates the local subscription id", async () => {
     const invalidId = await pause(request("/api/subscriptions/not-a-sub/pause", {}), {
       params: Promise.resolve({ id: "not-a-sub" }),
