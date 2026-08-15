@@ -26,10 +26,10 @@ vi.mock('@/lib/webhooks/processed-events', () => ({
 
 import { POST } from '@/app/api/webhooks/stripe/route';
 
-function request(body: string, signature?: string) {
+function request(body: BodyInit, signature?: string, headers?: Record<string, string>) {
   return new NextRequest('https://example.test/api/webhooks/stripe', {
     method: 'POST',
-    headers: signature ? { 'stripe-signature': signature } : undefined,
+    headers: { ...(signature ? { 'stripe-signature': signature } : {}), ...headers },
     body,
   });
 }
@@ -59,7 +59,10 @@ describe('Stripe webhook signature verification', () => {
     const response = await POST(request(rawBody, 't=1,v1=signed'));
 
     expect(response.status).toBe(200);
-    expect(mocks.constructWebhookEvent).toHaveBeenCalledWith(rawBody, 't=1,v1=signed');
+    const [verifiedBody, verifiedSignature] = mocks.constructWebhookEvent.mock.calls[0];
+    expect(verifiedBody).toBeInstanceOf(Uint8Array);
+    expect(new TextDecoder().decode(verifiedBody)).toBe(rawBody);
+    expect(verifiedSignature).toBe('t=1,v1=signed');
     expect(mocks.claimWebhookEvent).toHaveBeenCalledWith({
       eventId: 'evt_valid',
       eventType: 'unhandled.test',
@@ -71,6 +74,16 @@ describe('Stripe webhook signature verification', () => {
     });
   });
 
+  it('does not decode or normalize raw bytes before signature verification', async () => {
+    const rawBody = Uint8Array.from([0x7b, 0x22, 0x78, 0x22, 0x3a, 0xff, 0x7d]);
+
+    const response = await POST(request(rawBody, 't=1,v1=signed'));
+
+    expect(response.status).toBe(200);
+    expect(Array.from(mocks.constructWebhookEvent.mock.calls[0][0] as Uint8Array))
+      .toEqual(Array.from(rawBody));
+  });
+
   it('rejects verification failures without dispatching', async () => {
     mocks.constructWebhookEvent.mockRejectedValue(new Error('bad signature'));
 
@@ -78,6 +91,55 @@ describe('Stripe webhook signature verification', () => {
 
     expect(response.status).toBe(400);
     expect(mocks.finalizeOrderPayment).not.toHaveBeenCalled();
+    expect(mocks.claimWebhookEvent).not.toHaveBeenCalled();
+  });
+
+  it('rejects a missing signature before touching a large request stream', async () => {
+    const pulled = vi.fn();
+    const canceled = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled();
+        controller.enqueue(new Uint8Array(1_048_577));
+      },
+      cancel: canceled,
+    });
+
+    const response = await POST(request(body));
+
+    expect(response.status).toBe(400);
+    expect(pulled).not.toHaveBeenCalled();
+    expect(canceled).toHaveBeenCalledOnce();
+    expect(mocks.constructWebhookEvent).not.toHaveBeenCalled();
+  });
+
+  it('rejects declared oversized bodies before verification', async () => {
+    const response = await POST(request('{}', 't=1,v1=signed', {
+      'content-length': '1048577',
+    }));
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toEqual({ error: 'Webhook payload was rejected' });
+    expect(mocks.constructWebhookEvent).not.toHaveBeenCalled();
+    expect(mocks.claimWebhookEvent).not.toHaveBeenCalled();
+  });
+
+  it('rejects actual chunked oversized bodies and cancels the stream', async () => {
+    const canceled = vi.fn();
+    let chunk = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        chunk += 1;
+        if (chunk <= 2) controller.enqueue(new Uint8Array(600_000));
+      },
+      cancel: canceled,
+    });
+
+    const response = await POST(request(body, 't=1,v1=signed'));
+
+    expect(response.status).toBe(413);
+    expect(canceled).toHaveBeenCalledOnce();
+    expect(mocks.constructWebhookEvent).not.toHaveBeenCalled();
     expect(mocks.claimWebhookEvent).not.toHaveBeenCalled();
   });
 });
