@@ -8,6 +8,7 @@ import {
   D1_TARGET_COLUMN_COUNT,
   createPrivateSqlFiles,
   createNodeCommandRunner,
+  preflightD1Target,
   runD1Import,
   type CommandRunner,
   type D1ProjectFiles,
@@ -118,6 +119,74 @@ function memoryFiles() {
 }
 
 describe("D1 runner", () => {
+  it("exports a read-only canonical preflight receipt without creating SQL files", async () => {
+    const commandRunner: CommandRunner = {
+      run: vi.fn(async () => ({ exitCode: 0, stdout: preflight, stderr: "" })),
+    };
+    const receipt = await preflightD1Target({
+      execution: execution({ dryRun: false, apply: true }),
+      ...project(),
+      commandRunner,
+    });
+    expect(receipt).toMatchObject({
+      version: 1,
+      target: "local",
+      databaseName: "local-db",
+      databaseId: null,
+      environment: null,
+    });
+    expect(receipt.projectDigest).toMatch(/^[a-f0-9]{64}$/u);
+    expect(commandRunner.run).toHaveBeenCalledOnce();
+    const args = (commandRunner.run as ReturnType<typeof vi.fn>).mock.calls[0][1] as string[];
+    expect(args).toContain("--command");
+    expect(args).not.toContain("--file");
+  });
+
+  it("fails read-only preflight for a missing migration without exposing command output", async () => {
+    const stale = preflight.replace('"migration_count":20', '"migration_count":19');
+    const commandRunner: CommandRunner = {
+      run: vi.fn(async () => ({ exitCode: 0, stdout: stale, stderr: "private database output" })),
+    };
+    await expect(preflightD1Target({
+      execution: execution({ dryRun: false, apply: true }),
+      ...project(),
+      commandRunner,
+    })).rejects.toThrow(/^D1 preflight failed$/);
+  });
+
+  it("rejects the wrong canonical database target before spawning a command", async () => {
+    const commandRunner: CommandRunner = { run: vi.fn() };
+    await expect(preflightD1Target({
+      execution: execution({ dryRun: false, apply: true }),
+      ...project(),
+      expectedDatabaseName: "another-database",
+      commandRunner,
+    })).rejects.toThrow("does not match expected");
+    expect(commandRunner.run).not.toHaveBeenCalled();
+  });
+
+  it("rejects a stale preflight receipt before media checks, subprocesses, or SQL files", async () => {
+    const commandRunner: CommandRunner = { run: vi.fn() };
+    const { files } = memoryFiles();
+    await expect(runD1Import({
+      input: input(),
+      execution: execution({ dryRun: false, apply: true }),
+      ...project(),
+      commandRunner,
+      privateFiles: files,
+      preflightReceipt: {
+        version: 1,
+        target: "local",
+        databaseName: "local-db",
+        databaseId: null,
+        environment: null,
+        projectDigest: "f".repeat(64),
+      },
+    })).rejects.toThrow("receipt does not match");
+    expect(commandRunner.run).not.toHaveBeenCalled();
+    expect(files.createDirectory).not.toHaveBeenCalled();
+  });
+
   it("binds a dry run to the real project's config and package-local Wrangler", async () => {
     const commandRunner: CommandRunner = { run: vi.fn() };
     await expect(runD1Import({

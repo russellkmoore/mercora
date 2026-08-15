@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative } from "node:path";
@@ -80,8 +81,29 @@ export interface RunD1ImportOptions {
   expectedDatabaseName?: string;
   mediaEvidence?: readonly D1MediaEvidence[];
   commandRunner: CommandRunner;
+  /** Receipt from the read-only preflight that ran before non-D1 external writes. */
+  preflightReceipt?: D1PreflightReceipt;
   privateFiles?: PrivateSqlFiles;
   planOptions?: Omit<D1PlanOptions, "overwrite">;
+}
+
+export interface PreflightD1Options {
+  execution: ExecutionPlan;
+  /** Absolute, canonical project root containing wrangler.jsonc and local dependencies. */
+  projectRoot: string;
+  projectFiles?: D1ProjectFiles;
+  wranglerEnvironment?: string;
+  expectedDatabaseName?: string;
+  commandRunner: CommandRunner;
+}
+
+export interface D1PreflightReceipt {
+  version: 1;
+  target: WranglerTarget;
+  databaseName: string;
+  databaseId: string | null;
+  environment: string | null;
+  projectDigest: string;
 }
 
 export interface D1DryRunResult {
@@ -487,6 +509,18 @@ interface D1ProjectSnapshot {
   packageJsonBytes: Buffer;
 }
 
+function projectDigest(snapshot: D1ProjectSnapshot): string {
+  const hash = createHash("sha256");
+  for (const value of [
+    snapshot.root,
+    snapshot.configPath,
+    snapshot.executablePath,
+    snapshot.packageJsonPath,
+  ]) hash.update(value, "utf8").update("\0", "utf8");
+  hash.update(snapshot.configBytes).update(snapshot.packageJsonBytes).update(snapshot.executableBytes);
+  return hash.digest("hex");
+}
+
 const MAX_PACKAGE_JSON_BYTES = 256 * 1024;
 const MAX_WRANGLER_ENTRY_BYTES = 8 * 1024 * 1024;
 
@@ -703,6 +737,64 @@ async function checkedRun(
   }
 }
 
+function receiptFor(
+  project: D1ProjectSnapshot,
+  target: ReturnType<typeof resolveDatabaseTarget>,
+): D1PreflightReceipt {
+  return {
+    version: 1,
+    target: target.target,
+    databaseName: target.databaseName,
+    databaseId: target.databaseId ?? null,
+    environment: target.environment ?? null,
+    projectDigest: projectDigest(project),
+  };
+}
+
+function assertPreflightReceipt(
+  receipt: D1PreflightReceipt,
+  project: D1ProjectSnapshot,
+  target: ReturnType<typeof resolveDatabaseTarget>,
+): void {
+  const expected = receiptFor(project, target);
+  if (
+    receipt.version !== expected.version || receipt.target !== expected.target ||
+    receipt.databaseName !== expected.databaseName || receipt.databaseId !== expected.databaseId ||
+    receipt.environment !== expected.environment || receipt.projectDigest !== expected.projectDigest
+  ) {
+    throw new Error("D1 preflight receipt does not match the current canonical target");
+  }
+}
+
+/**
+ * Execute the canonical target/schema/ledger query without creating SQL files
+ * or running any mutating statement. Call this before R2 or Clerk apply phases.
+ */
+export async function preflightD1Target(options: PreflightD1Options): Promise<D1PreflightReceipt> {
+  assertExecutionGates(options.execution, false);
+  if (options.execution.dryRun || !options.execution.apply) {
+    throw new Error("D1 target preflight is reserved for confirmed apply runs");
+  }
+  const projectFiles = options.projectFiles ?? createD1ProjectFiles();
+  const project = await loadD1ProjectSnapshot(options.projectRoot, projectFiles);
+  const verifyProject = () => verifyD1ProjectSnapshot(project, projectFiles);
+  const target = resolveDatabaseTarget(parseWranglerJsonc(project.configText), {
+    target: options.execution.target,
+    ...(options.wranglerEnvironment ? { environment: options.wranglerEnvironment } : {}),
+    ...(options.expectedDatabaseName ? { expectedName: options.expectedDatabaseName } : {}),
+  });
+  const result = await checkedRun(
+    options.commandRunner,
+    project.executablePath,
+    [...baseArgs(target.databaseName, target.target, project.configPath, target.environment), "--command", D1_PREFLIGHT_SQL],
+    "preflight",
+    verifyProject,
+  );
+  try { assertPreflight(result.stdout); } catch { throw new Error("D1 preflight failed"); }
+  await verifyProject();
+  return receiptFor(project, target);
+}
+
 export async function runD1Import(options: RunD1ImportOptions): Promise<D1DryRunResult | D1ApplyResult> {
   const plan = buildD1ImportPlan(options.input, { ...options.planOptions, overwrite: options.execution.overwrite });
   assertExecutionGates(options.execution, plan.containsSensitiveRows);
@@ -727,6 +819,8 @@ export async function runD1Import(options: RunD1ImportOptions): Promise<D1DryRun
       requiredMediaCount: plan.requiredMediaPaths.length,
     };
   }
+
+  if (options.preflightReceipt) assertPreflightReceipt(options.preflightReceipt, project, target);
 
   assertMediaEvidence(plan.requiredMediaPaths, options.mediaEvidence ?? []);
   const commandBase = baseArgs(target.databaseName, target.target, project.configPath, target.environment);
