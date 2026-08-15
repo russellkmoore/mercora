@@ -1,7 +1,10 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { SubscriptionContent } from '@/components/account/SubscriptionManager';
+import {
+  SubscriptionContent,
+  subscriptionCollectionAction,
+} from '@/components/account/SubscriptionManager';
 import {
   fetchCustomerSubscriptions,
   submitCustomerSubscriptionAction,
@@ -88,6 +91,39 @@ describe('customer subscription dashboard states', () => {
     expect(canceled).toContain('Ended');
     expect(canceled).not.toContain('Pause collection');
     expect(canceled).not.toContain('Cancel immediately');
+  });
+
+  it('keeps lifecycle pause distinct from collection pause in notices and controls', () => {
+    const lifecyclePaused = { ...subscription, status: 'paused' as const };
+    const paused = content({ subscriptions: [lifecyclePaused] });
+    expect(paused).toContain('Subscription lifecycle status is paused');
+    expect(paused).toContain('Collection controls are unavailable');
+    expect(paused).not.toContain('Collection is paused');
+    expect(paused).not.toContain('Resume collection');
+    expect(paused).not.toContain('Pause collection');
+    expect(paused).toContain('Cancel at period end');
+    expect(paused).toContain('Cancel immediately');
+
+    const lifecyclePausedAndCanceling = content({
+      subscriptions: [{ ...lifecyclePaused, cancelAtPeriodEnd: true }],
+    });
+    expect(lifecyclePausedAndCanceling).toContain('Subscription lifecycle status is paused');
+    expect(lifecyclePausedAndCanceling).toContain('Cancellation is scheduled');
+  });
+
+  it('derives collection action eligibility only from durable pauseCollection state', () => {
+    expect(subscriptionCollectionAction(subscription)).toEqual({ type: 'pause' });
+    expect(subscriptionCollectionAction({ ...subscription, status: 'paused' })).toBeUndefined();
+    expect(subscriptionCollectionAction({
+      ...subscription,
+      status: 'active',
+      pauseCollection: { behavior: 'void' },
+    })).toEqual({ type: 'resume' });
+    expect(subscriptionCollectionAction({
+      ...subscription,
+      status: 'paused',
+      pauseCollection: { behavior: 'void' },
+    })).toEqual({ type: 'resume' });
   });
 });
 

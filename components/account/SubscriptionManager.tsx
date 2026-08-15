@@ -28,24 +28,35 @@ function lifecycleNotice(subscription: CustomerSubscriptionSummary): string | un
   if (subscription.endedAt !== undefined) {
     return `Ended ${formatSubscriptionDate(subscription.endedAt) ?? 'on the recorded end date'}.`;
   }
+  const notices: string[] = [];
   if (subscription.cancelAtPeriodEnd) {
-    return `Cancellation is scheduled${subscription.currentPeriodEnd
+    notices.push(`Cancellation is scheduled${subscription.currentPeriodEnd
       ? ` for ${formatSubscriptionDate(subscription.currentPeriodEnd)}`
-      : ' for the end of the current period'}.`;
+      : ' for the end of the current period'}.`);
+  } else if (subscription.cancelAt !== undefined) {
+    notices.push(`Cancellation is scheduled for ${formatSubscriptionDate(subscription.cancelAt)}.`);
   }
-  if (subscription.cancelAt !== undefined) {
-    return `Cancellation is scheduled for ${formatSubscriptionDate(subscription.cancelAt)}.`;
+  if (subscription.pauseCollection) {
+    const resumes = formatSubscriptionDate(subscription.pauseCollection.resumesAt);
+    notices.push(resumes ? `Collection is paused until ${resumes}.` : 'Collection is paused.');
+  } else if (subscription.status === 'paused') {
+    notices.push('Subscription lifecycle status is paused. Collection controls are unavailable while this status remains.');
   }
-  if (subscription.pauseCollection || subscription.status === 'paused') {
-    const resumes = formatSubscriptionDate(subscription.pauseCollection?.resumesAt);
-    return resumes ? `Collection is paused until ${resumes}.` : 'Collection is paused.';
-  }
-  return undefined;
+  return notices.length > 0 ? notices.join(' ') : undefined;
 }
 
 function canManage(subscription: CustomerSubscriptionSummary): boolean {
   return !['pending', 'provider_created', 'incomplete_expired', 'canceled'].includes(subscription.status)
     && subscription.endedAt === undefined;
+}
+
+export function subscriptionCollectionAction(
+  subscription: CustomerSubscriptionSummary,
+): Extract<CustomerSubscriptionAction, { type: 'pause' | 'resume' }> | undefined {
+  if (!canManage(subscription)) return undefined;
+  if (subscription.pauseCollection) return { type: 'resume' };
+  if (subscription.status === 'paused') return undefined;
+  return { type: 'pause' };
 }
 
 export function SubscriptionContent({
@@ -68,8 +79,8 @@ export function SubscriptionContent({
 
   return <div className="space-y-5">
     {subscriptions.map((subscription) => {
-      const paused = subscription.status === 'paused' || subscription.pauseCollection !== undefined;
       const manageable = canManage(subscription);
+      const collectionAction = subscriptionCollectionAction(subscription);
       const notice = lifecycleNotice(subscription);
       const isBusy = busyId === subscription.id;
       return <article key={subscription.id} aria-labelledby={`${subscription.id}-heading`} className="rounded-lg border border-neutral-700 bg-neutral-900 p-5 shadow-sm">
@@ -85,9 +96,8 @@ export function SubscriptionContent({
         </dl>
         {notice && <p className="mt-5 rounded-md border border-amber-900/70 bg-amber-950/30 px-3 py-2 text-sm text-amber-100">{notice}</p>}
         {manageable && <div className="mt-5 flex flex-wrap gap-3 border-t border-neutral-800 pt-4">
-          {paused
-            ? <button type="button" disabled={busyId !== null} onClick={() => onAction(subscription, { type: 'resume' })} className="rounded-md border border-neutral-600 px-3 py-2 text-sm text-gray-100 hover:border-orange-500 disabled:cursor-not-allowed disabled:opacity-50">{isBusy ? 'Requesting…' : 'Resume collection'}</button>
-            : <button type="button" disabled={busyId !== null} onClick={() => onAction(subscription, { type: 'pause' })} className="rounded-md border border-neutral-600 px-3 py-2 text-sm text-gray-100 hover:border-orange-500 disabled:cursor-not-allowed disabled:opacity-50">{isBusy ? 'Requesting…' : 'Pause collection'}</button>}
+          {collectionAction?.type === 'resume' && <button type="button" disabled={busyId !== null} onClick={() => onAction(subscription, collectionAction)} className="rounded-md border border-neutral-600 px-3 py-2 text-sm text-gray-100 hover:border-orange-500 disabled:cursor-not-allowed disabled:opacity-50">{isBusy ? 'Requesting…' : 'Resume collection'}</button>}
+          {collectionAction?.type === 'pause' && <button type="button" disabled={busyId !== null} onClick={() => onAction(subscription, collectionAction)} className="rounded-md border border-neutral-600 px-3 py-2 text-sm text-gray-100 hover:border-orange-500 disabled:cursor-not-allowed disabled:opacity-50">{isBusy ? 'Requesting…' : 'Pause collection'}</button>}
           {!subscription.cancelAtPeriodEnd && <button type="button" disabled={busyId !== null} onClick={() => onAction(subscription, { type: 'cancel', mode: 'period_end' })} className="rounded-md border border-neutral-600 px-3 py-2 text-sm text-gray-100 hover:border-orange-500 disabled:cursor-not-allowed disabled:opacity-50">Cancel at period end</button>}
           <button type="button" disabled={busyId !== null} onClick={() => onAction(subscription, { type: 'cancel', mode: 'immediate' })} className="rounded-md border border-red-900 px-3 py-2 text-sm text-red-300 hover:border-red-600 disabled:cursor-not-allowed disabled:opacity-50">Cancel immediately</button>
         </div>}
