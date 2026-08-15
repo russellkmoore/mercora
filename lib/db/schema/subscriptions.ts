@@ -51,6 +51,11 @@ export interface SubscriptionConsentRecord {
   source: "checkout" | "admin" | "migration";
 }
 
+export interface SubscriptionPauseCollection {
+  behavior: "keep_as_draft" | "mark_uncollectible" | "void";
+  resumesAt?: number;
+}
+
 const isoNow = sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`;
 
 export const subscriptionPlans = sqliteTable("subscription_plans", {
@@ -76,6 +81,16 @@ export const subscriptionPlans = sqliteTable("subscription_plans", {
   uniqueIndex("subscription_plans_active_cadence_unique")
     .on(table.productId, table.variantId, table.currencyCode, table.cadenceUnit, table.cadenceCount)
     .where(sql`${table.isActive} = 1`),
+  uniqueIndex("subscription_plans_binding_unique").on(
+    table.id,
+    table.productId,
+    table.variantId,
+    table.currencyCode,
+    table.unitAmountMinor,
+    table.stripePriceId,
+    table.cadenceUnit,
+    table.cadenceCount,
+  ),
   check("subscription_plans_currency_check", sql`
     length(${table.currencyCode}) = 3
     AND ${table.currencyCode} = upper(${table.currencyCode})
@@ -99,11 +114,32 @@ export const subscriptionPlans = sqliteTable("subscription_plans", {
   check("subscription_plans_cadence_count_check", sql`${table.cadenceCount} BETWEEN 1 AND 365`),
 ]);
 
+export const subscriptionProviderCustomers = sqliteTable("subscription_provider_customers", {
+  customerId: text("customer_id").primaryKey().references(() => customers.id, { onDelete: "restrict" }),
+  stripeCustomerId: text("stripe_customer_id").notNull().unique(),
+  createdAt: text("created_at").notNull().default(isoNow),
+  updatedAt: text("updated_at").notNull().default(isoNow),
+}, (table) => [
+  uniqueIndex("subscription_provider_customers_pair_unique")
+    .on(table.customerId, table.stripeCustomerId),
+  check("subscription_provider_customers_stripe_id_check", sql`
+    length(${table.stripeCustomerId}) BETWEEN 5 AND 255
+    AND ${table.stripeCustomerId} GLOB 'cus_*'
+  `),
+]);
+
 export const subscriptionAcquisitions = sqliteTable("subscription_acquisitions", {
   id: text("id").primaryKey(),
   setupIntentId: text("setup_intent_id").notNull().unique(),
-  planId: text("plan_id").notNull().references(() => subscriptionPlans.id, { onDelete: "restrict" }),
-  customerId: text("customer_id").notNull().references(() => customers.id, { onDelete: "restrict" }),
+  planId: text("plan_id").notNull(),
+  productId: text("product_id").notNull(),
+  variantId: text("variant_id").notNull(),
+  currencyCode: text("currency_code").notNull(),
+  unitAmountMinor: integer("unit_amount_minor").notNull(),
+  stripePriceId: text("stripe_price_id").notNull(),
+  cadenceUnit: text("cadence_unit", { enum: ["day", "week", "month", "year"] }).notNull(),
+  cadenceCount: integer("cadence_count").notNull(),
+  customerId: text("customer_id").notNull(),
   stripeCustomerId: text("stripe_customer_id").notNull(),
   quantity: integer("quantity").notNull().default(1),
   shippingAddress: text("shipping_address", { mode: "json" }).$type<Address>(),
@@ -115,12 +151,64 @@ export const subscriptionAcquisitions = sqliteTable("subscription_acquisitions",
   createdAt: text("created_at").notNull().default(isoNow),
   updatedAt: text("updated_at").notNull().default(isoNow),
 }, (table) => [
+  foreignKey({
+    columns: [
+      table.planId,
+      table.productId,
+      table.variantId,
+      table.currencyCode,
+      table.unitAmountMinor,
+      table.stripePriceId,
+      table.cadenceUnit,
+      table.cadenceCount,
+    ],
+    foreignColumns: [
+      subscriptionPlans.id,
+      subscriptionPlans.productId,
+      subscriptionPlans.variantId,
+      subscriptionPlans.currencyCode,
+      subscriptionPlans.unitAmountMinor,
+      subscriptionPlans.stripePriceId,
+      subscriptionPlans.cadenceUnit,
+      subscriptionPlans.cadenceCount,
+    ],
+  }).onDelete("restrict"),
+  foreignKey({
+    columns: [table.customerId, table.stripeCustomerId],
+    foreignColumns: [
+      subscriptionProviderCustomers.customerId,
+      subscriptionProviderCustomers.stripeCustomerId,
+    ],
+  }).onDelete("restrict"),
   index("subscription_acquisitions_customer_status_idx").on(table.customerId, table.status),
   index("subscription_acquisitions_plan_idx").on(table.planId),
+  uniqueIndex("subscription_acquisitions_lifecycle_binding_unique").on(
+    table.id,
+    table.planId,
+    table.customerId,
+    table.stripeCustomerId,
+    table.stripeSubscriptionId,
+  ),
   check("subscription_acquisitions_id_check", sql`length(${table.id}) BETWEEN 1 AND 128`),
   check("subscription_acquisitions_setup_intent_check", sql`
     length(${table.setupIntentId}) BETWEEN 6 AND 255
     AND ${table.setupIntentId} GLOB 'seti_*'
+  `),
+  check("subscription_acquisitions_product_check", sql`length(${table.productId}) BETWEEN 1 AND 128`),
+  check("subscription_acquisitions_variant_check", sql`length(${table.variantId}) BETWEEN 1 AND 128`),
+  check("subscription_acquisitions_currency_check", sql`
+    length(${table.currencyCode}) = 3
+    AND ${table.currencyCode} = upper(${table.currencyCode})
+    AND ${table.currencyCode} NOT GLOB '*[^A-Z]*'
+  `),
+  check("subscription_acquisitions_amount_check", sql`${table.unitAmountMinor} > 0`),
+  check("subscription_acquisitions_price_check", sql`
+    length(${table.stripePriceId}) BETWEEN 7 AND 255
+    AND ${table.stripePriceId} GLOB 'price_*'
+  `),
+  check("subscription_acquisitions_cadence_check", sql`
+    ${table.cadenceUnit} IN ('day', 'week', 'month', 'year')
+    AND ${table.cadenceCount} BETWEEN 1 AND 365
   `),
   check("subscription_acquisitions_customer_check", sql`
     length(${table.stripeCustomerId}) BETWEEN 5 AND 255
@@ -153,11 +241,8 @@ export const subscriptionAcquisitions = sqliteTable("subscription_acquisitions",
 export const customerSubscriptions = sqliteTable("customer_subscriptions", {
   id: text("id").primaryKey(),
   planId: text("plan_id").notNull().references(() => subscriptionPlans.id, { onDelete: "restrict" }),
-  customerId: text("customer_id").notNull().references(() => customers.id, { onDelete: "restrict" }),
-  acquisitionId: text("acquisition_id").notNull().unique().references(
-    () => subscriptionAcquisitions.id,
-    { onDelete: "restrict" },
-  ),
+  customerId: text("customer_id").notNull(),
+  acquisitionId: text("acquisition_id").notNull().unique(),
   stripeSubscriptionId: text("stripe_subscription_id").notNull().unique(),
   stripeCustomerId: text("stripe_customer_id").notNull(),
   quantity: integer("quantity").notNull().default(1),
@@ -177,16 +262,40 @@ export const customerSubscriptions = sqliteTable("customer_subscriptions", {
   consentRecord: text("consent_record", { mode: "json" }).$type<SubscriptionConsentRecord>().notNull(),
   currentPeriodStart: integer("current_period_start"),
   currentPeriodEnd: integer("current_period_end"),
-  pauseCollection: text("pause_collection", { mode: "json" }).$type<Record<string, unknown>>(),
+  pauseCollection: text("pause_collection", { mode: "json" }).$type<SubscriptionPauseCollection>(),
   cancelAtPeriodEnd: integer("cancel_at_period_end", { mode: "boolean" }).notNull().default(false),
   cancelAt: integer("cancel_at"),
   canceledAt: integer("canceled_at"),
+  endedAt: integer("ended_at"),
   latestLifecycleEventCreatedAt: integer("latest_lifecycle_event_created_at").notNull(),
   latestLifecycleEventId: text("latest_lifecycle_event_id").notNull(),
   version: integer("version").notNull().default(1),
   createdAt: text("created_at").notNull().default(isoNow),
   updatedAt: text("updated_at").notNull().default(isoNow),
 }, (table) => [
+  foreignKey({
+    columns: [
+      table.acquisitionId,
+      table.planId,
+      table.customerId,
+      table.stripeCustomerId,
+      table.stripeSubscriptionId,
+    ],
+    foreignColumns: [
+      subscriptionAcquisitions.id,
+      subscriptionAcquisitions.planId,
+      subscriptionAcquisitions.customerId,
+      subscriptionAcquisitions.stripeCustomerId,
+      subscriptionAcquisitions.stripeSubscriptionId,
+    ],
+  }).onDelete("restrict"),
+  foreignKey({
+    columns: [table.customerId, table.stripeCustomerId],
+    foreignColumns: [
+      subscriptionProviderCustomers.customerId,
+      subscriptionProviderCustomers.stripeCustomerId,
+    ],
+  }).onDelete("restrict"),
   index("customer_subscriptions_customer_status_idx").on(table.customerId, table.status),
   index("customer_subscriptions_plan_idx").on(table.planId),
   check("customer_subscriptions_quantity_check", sql`${table.quantity} BETWEEN 1 AND 1000`),
@@ -234,6 +343,7 @@ export const customerSubscriptions = sqliteTable("customer_subscriptions", {
   check("customer_subscriptions_cancel_period_check", sql`${table.cancelAtPeriodEnd} IN (0, 1)`),
   check("customer_subscriptions_cancel_at_check", sql`${table.cancelAt} IS NULL OR ${table.cancelAt} >= 0`),
   check("customer_subscriptions_canceled_at_check", sql`${table.canceledAt} IS NULL OR ${table.canceledAt} >= 0`),
+  check("customer_subscriptions_ended_at_check", sql`${table.endedAt} IS NULL OR ${table.endedAt} >= 0`),
   check("customer_subscriptions_event_created_check", sql`${table.latestLifecycleEventCreatedAt} >= 0`),
   check("customer_subscriptions_event_id_check", sql`
     length(${table.latestLifecycleEventId}) BETWEEN 1 AND 255
@@ -346,6 +456,8 @@ export const subscriptionInvoiceOrders = sqliteTable("subscription_invoice_order
 
 export type SubscriptionPlanRow = typeof subscriptionPlans.$inferSelect;
 export type SubscriptionPlanInsert = typeof subscriptionPlans.$inferInsert;
+export type SubscriptionProviderCustomerRow = typeof subscriptionProviderCustomers.$inferSelect;
+export type SubscriptionProviderCustomerInsert = typeof subscriptionProviderCustomers.$inferInsert;
 export type SubscriptionAcquisitionRow = typeof subscriptionAcquisitions.$inferSelect;
 export type SubscriptionAcquisitionInsert = typeof subscriptionAcquisitions.$inferInsert;
 export type CustomerSubscriptionRow = typeof customerSubscriptions.$inferSelect;
