@@ -15,6 +15,10 @@ import {
 } from "./domain";
 import type { SubscriptionRepository } from "./ports";
 import type { Address } from "@/lib/types";
+import type {
+  SubscriptionLifecycleNotificationKind,
+  SubscriptionLifecycleNotificationRepository,
+} from "./lifecycle-email";
 
 type AcquisitionStatus = "pending" | "provider_created" | "completed" | "failed";
 
@@ -235,7 +239,7 @@ export function createSubscriptionRepository(database: D1Database) {
     return row ? mapAcquisition(row) : undefined;
   };
 
-  const repository: SubscriptionRepository & {
+  const repository: SubscriptionRepository & SubscriptionLifecycleNotificationRepository & {
     findPlanById(
       planId: string,
       currency: string,
@@ -469,6 +473,20 @@ export function createSubscriptionRepository(database: D1Database) {
         WHERE customer_id = ? ORDER BY created_at DESC, id DESC LIMIT 100`)
         .bind(customerId).all<SubscriptionRow>();
       return result.results.map(mapSubscription);
+    },
+
+    async findSubscriptionEventNotificationKind(eventAuditId) {
+      const row = await database.prepare(`SELECT
+        json_extract(details, '$.notification_kind') AS notificationKind
+        FROM subscription_events
+        WHERE id = ? AND json_valid(COALESCE(details, '{}')) = 1 LIMIT 1`)
+        .bind(eventAuditId)
+        .first<{ notificationKind: string | null }>();
+      const allowed: SubscriptionLifecycleNotificationKind[] = [
+        'created', 'paused', 'resumed', 'cancel_scheduled', 'canceled',
+        'payment_failed', 'payment_recovered',
+      ];
+      return allowed.find((kind) => kind === row?.notificationKind);
     },
 
     async recordSubscriptionEvent(args) {
