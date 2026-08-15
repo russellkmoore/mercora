@@ -298,6 +298,97 @@ describe("subscription plan management on real D1", () => {
       .bind(PLAN.id).first<{ is_active: number }>()).resolves.toEqual({ is_active: 0 });
   });
 
+  it("keeps corrupt catalog display and money evidence admin-visible only for safe rollback", async () => {
+    const seeded = createSubscriptionPlanService(env.DB, { priceVerifier: ACCEPT_PRICE });
+    await seeded.create(PLAN);
+    await env.DB.prepare(`UPDATE product_variants
+      SET option_values = '{not-json', price = '{not-json'
+      WHERE id = ?`).bind(PLAN.variantId).run();
+    const service = createSubscriptionPlanService(env.DB, { priceVerifier: ACCEPT_PRICE });
+
+    const listed = await service.listAdmin({ active: true, limit: 20, offset: 0 });
+    expect(listed).toMatchObject({
+      total: 1,
+      plans: [{
+        id: PLAN.id,
+        product: { id: PLAN.productId, label: "Black Tea" },
+        variant: { id: PLAN.variantId, label: PLAN.variantId },
+        active: true,
+      }],
+    });
+    const detail = await service.getAdmin(PLAN.id);
+    expect(detail).toMatchObject({ id: PLAN.id, variant: { label: PLAN.variantId }, active: true });
+    await expect(service.listPublic({ limit: 20, offset: 0 }))
+      .rejects.toThrow("Stored catalog variant price is invalid");
+
+    await expect(service.update(PLAN.id, { active: false }, detail.updatedAt))
+      .resolves.toMatchObject({ id: PLAN.id, active: false });
+  });
+
+  it("keeps a stored plan visible to admins when its catalog join is missing", async () => {
+    const seeded = createSubscriptionPlanService(env.DB, { priceVerifier: ACCEPT_PRICE });
+    await seeded.create(PLAN);
+    const stored = await env.DB.prepare(`SELECT
+      id, product_id, variant_id, currency_code, unit_amount_minor,
+      stripe_price_id, cadence_unit, cadence_count, is_active, created_at, updated_at
+      FROM subscription_plans WHERE id = ?`).bind(PLAN.id).first<Record<string, unknown>>();
+    const missingCatalogRow = {
+      ...stored,
+      product_name: null,
+      product_status: null,
+      variant_sku: null,
+      variant_status: null,
+      option_values: null,
+      variant_price: null,
+      shipping_required: null,
+    };
+    let missingPageStatement: D1PreparedStatement | null = null;
+    const missingCatalog = new Proxy(env.DB, {
+      get(target, property) {
+        if (property === "prepare") {
+          return (query: string) => {
+            if (query.includes("LEFT JOIN products p")) {
+              const statement = {
+                bind() { return this; },
+                first: async () => missingCatalogRow,
+              } as unknown as D1PreparedStatement;
+              if (query.includes("ORDER BY sp.id")) missingPageStatement = statement;
+              return statement;
+            }
+            return target.prepare(query);
+          };
+        }
+        if (property === "batch") {
+          return async (statements: D1PreparedStatement[]) => {
+            if (missingPageStatement !== null && statements[0] === missingPageStatement) {
+              const [count] = await target.batch([statements[1]]);
+              return [{ success: true, results: [missingCatalogRow], meta: {} }, count] as D1Result[];
+            }
+            return target.batch(statements);
+          };
+        }
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) as D1Database;
+    const service = createSubscriptionPlanService(missingCatalog, { priceVerifier: ACCEPT_PRICE });
+
+    const listed = await service.listAdmin({ active: true, limit: 20, offset: 0 });
+    expect(listed).toMatchObject({
+      total: 1,
+      plans: [{
+        id: PLAN.id,
+        product: { id: PLAN.productId, label: PLAN.productId },
+        variant: { id: PLAN.variantId, label: PLAN.variantId },
+        shippingRequired: false,
+        active: true,
+      }],
+    });
+    const detail = await service.getAdmin(PLAN.id);
+    await expect(service.update(PLAN.id, { active: false }, detail.updatedAt))
+      .resolves.toMatchObject({ id: PLAN.id, active: false });
+  });
+
   it("does not apply the rollback bypass to a simultaneous binding change", async () => {
     const seeded = createSubscriptionPlanService(env.DB, { priceVerifier: ACCEPT_PRICE });
     const created = await seeded.create(PLAN);

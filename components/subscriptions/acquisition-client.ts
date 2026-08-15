@@ -357,13 +357,11 @@ export async function finalizeSubscriptionSetup(
   return subscription;
 }
 
-export async function confirmSetupAndFinalize(args: {
+export async function confirmSubscriptionSetup(args: {
   stripe: Pick<Stripe, "confirmSetup">;
   elements: StripeElements;
-  fetcher: FetchLike;
   returnUrl: string;
-  signal?: AbortSignal;
-}): Promise<{ setupIntent: SetupIntent; subscription: FinalizedSubscriptionSummary }> {
+}): Promise<SetupIntent> {
   const confirmed = await args.stripe.confirmSetup({
     elements: args.elements,
     confirmParams: { return_url: args.returnUrl },
@@ -372,19 +370,11 @@ export async function confirmSetupAndFinalize(args: {
   if (confirmed.error) {
     throw new Error(confirmed.error.message || "Payment method setup was not completed");
   }
-  if (!confirmed.setupIntent || confirmed.setupIntent.status !== "succeeded") {
+  if (!confirmed.setupIntent || confirmed.setupIntent.status !== "succeeded"
+    || !SETUP_INTENT_PATTERN.test(confirmed.setupIntent.id)) {
     throw new Error("Payment method setup requires additional action");
   }
-  if (args.signal?.aborted) throw new DOMException("Subscription setup was canceled", "AbortError");
-  const subscription = await finalizeSubscriptionSetup(
-    args.fetcher,
-    confirmed.setupIntent.id,
-    args.signal,
-  );
-  return {
-    setupIntent: confirmed.setupIntent,
-    subscription,
-  };
+  return confirmed.setupIntent;
 }
 
 export type StripeSetupRedirect =

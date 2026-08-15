@@ -8,10 +8,11 @@ import StripeProvider from "@/components/checkout/StripeProvider";
 import {
   attemptFactsKey,
   completeStripeSetupRedirect,
-  confirmSetupAndFinalize,
+  confirmSubscriptionSetup,
   createOwnerBoundSubscriptionSetupAttempt,
   fetchSavedAddressesForPlan,
   fetchSubscriptionPlans,
+  finalizeSubscriptionSetup,
   parseStripeSetupRedirect,
   recurringTotal,
   shippingAddressFromSaved,
@@ -47,7 +48,7 @@ function addressLabel(saved: SavedSubscriptionAddress): string {
 function SetupPaymentForm(props: {
   ownerId: string;
   currentOwner: () => string | null;
-  onComplete: () => void;
+  onConfirmed: (setupIntentId: string) => void;
   onError: (message: string) => void;
 }) {
   const stripe = useStripe();
@@ -69,14 +70,14 @@ function SetupPaymentForm(props: {
         setSubmitting(true);
         props.onError("");
         try {
-          await confirmSetupAndFinalize({
+          const setupIntent = await confirmSubscriptionSetup({
             stripe,
             elements,
-            fetcher: fetch,
             returnUrl: window.location.href,
-            signal: controller.signal,
           });
-          if (!controller.signal.aborted && props.currentOwner() === props.ownerId) props.onComplete();
+          if (!controller.signal.aborted && props.currentOwner() === props.ownerId) {
+            props.onConfirmed(setupIntent.id);
+          }
         } catch (error) {
           if (!controller.signal.aborted && props.currentOwner() === props.ownerId) {
             props.onError(error instanceof Error ? error.message : "Subscription setup failed");
@@ -128,6 +129,12 @@ export default function SubscriptionAcquisitionPanel({
   const [working, setWorking] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
   const [completedOwner, setCompletedOwner] = useState<string | null>(null);
+  const [confirmedSetup, setConfirmedSetup] = useState<{
+    ownerId: string;
+    setupIntentId: string;
+  } | null>(null);
+  const [finalizationWorking, setFinalizationWorking] = useState(false);
+  const [finalizationRetry, setFinalizationRetry] = useState(0);
   const [redirectWorkingOwner, setRedirectWorkingOwner] = useState<string | null>(null);
   const [redirectError, setRedirectError] = useState<{
     ownerId: string;
@@ -147,6 +154,11 @@ export default function SubscriptionAcquisitionPanel({
     setSetup(null);
     setCheckoutError("");
     setCompletedOwner(null);
+    if (currentOwner !== null && confirmedSetup?.ownerId !== currentOwner) {
+      setConfirmedSetup(null);
+      setFinalizationWorking(false);
+      setFinalizationRetry(0);
+    }
     setRedirectWorkingOwner(null);
     setRedirectError(null);
     setAccepted(false);
@@ -158,6 +170,32 @@ export default function SubscriptionAcquisitionPanel({
     beginControllerRef.current?.abort();
     attemptRef.current = null;
   }, [currentOwner]);
+
+  useEffect(() => {
+    if (!confirmedSetup || confirmedSetup.ownerId !== currentOwner) return;
+    const owner = confirmedSetup.ownerId;
+    const controller = new AbortController();
+    queueMicrotask(() => {
+      if (!controller.signal.aborted && ownerRef.current === owner) {
+        setCheckoutError("");
+        setFinalizationWorking(true);
+      }
+    });
+    finalizeSubscriptionSetup(fetch, confirmedSetup.setupIntentId, controller.signal)
+      .then(() => {
+        if (!controller.signal.aborted && ownerRef.current === owner) {
+          setConfirmedSetup(null);
+          setCompletedOwner(owner);
+        }
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted && ownerRef.current === owner) {
+          setCheckoutError(error instanceof Error ? error.message : "Subscription finalization failed");
+          setFinalizationWorking(false);
+        }
+      });
+    return () => controller.abort();
+  }, [confirmedSetup, currentOwner, finalizationRetry]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -319,7 +357,33 @@ export default function SubscriptionAcquisitionPanel({
       </section>
     );
   }
-  if (!available) return null;
+  if (confirmedSetup?.ownerId === currentOwner && currentOwner) {
+    if (finalizationWorking) {
+      return <p className="text-sm text-gray-400" role="status">Finalizing your subscription request…</p>;
+    }
+    return (
+      <section className="rounded-lg border border-red-800 bg-red-950/30 p-5" role="alert">
+        <h2 className="font-semibold text-red-200">Subscription finalization needs attention</h2>
+        <p className="mt-2 text-sm text-gray-300">
+          {checkoutError || "Subscription finalization is temporarily unavailable"}
+        </p>
+        <button
+          type="button"
+          className="mt-3 text-sm font-semibold text-orange-400 underline"
+          onClick={() => {
+            setCheckoutError("");
+            setFinalizationWorking(true);
+            setFinalizationRetry((value) => value + 1);
+          }}
+        >
+          Retry finalization
+        </button>
+      </section>
+    );
+  }
+  // Keep an already-started provider form mounted through inventory changes;
+  // explicit Back/auth changes still unmount it and abort owner-bound handling.
+  if (!available && !setup) return null;
   if (loadingPlans) return <p className="text-sm text-gray-400" role="status">Checking subscription options…</p>;
   if (planError) {
     return (
@@ -521,7 +585,12 @@ export default function SubscriptionAcquisitionPanel({
             <SetupPaymentForm
               ownerId={setup.ownerId}
               currentOwner={() => ownerRef.current}
-              onComplete={() => setCompletedOwner(setup.ownerId)}
+              onConfirmed={(setupIntentId) => {
+                setSetup(null);
+                setCheckoutError("");
+                setFinalizationWorking(true);
+                setConfirmedSetup({ ownerId: setup.ownerId, setupIntentId });
+              }}
               onError={setCheckoutError}
             />
           </StripeProvider>

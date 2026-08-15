@@ -223,6 +223,7 @@ export default function SubscriptionPlanManager() {
       setTotal(0);
       listAdminSubscriptionPlans(fetch, { filter, limit: PAGE_SIZE, offset, signal: controller.signal })
         .then((result) => {
+          if (controller.signal.aborted) return;
           setPlans(result.plans);
           setTotal(result.total);
         })
