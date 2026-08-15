@@ -326,6 +326,14 @@ export async function orchestrateMigration(options: OrchestrateMigrationOptions)
       unresolvedCustomer: options.domain.unresolvedCustomer,
     })
     : { records: [], idMap: new Map<string, string>(), skipped: [], warnings: [] };
+  const preflightReviews = options.config.execution.includeSensitive
+    ? transformJudgeMeReviews(normalizedReviews.records, {
+      generatedAt,
+      productIds,
+      reviewAttributions: options.domain.reviewAttributions,
+      ...(options.domain.verifiedPurchases ? { verifiedPurchases: options.domain.verifiedPurchases } : {}),
+    })
+    : { records: [], idMap: new Map<string, string>(), skipped: [], warnings: [] };
 
   const publicInput: MaterializedD1Input = {
     categories: categories.records,
@@ -338,9 +346,9 @@ export async function orchestrateMigration(options: OrchestrateMigrationOptions)
   };
   const preflightPlan = buildD1ImportPlan(publicInput, { overwrite: options.config.execution.overwrite });
 
-  const warningCount = categories.warnings.length + products.warnings.length + pages.warnings.length +
+  const baseWarningCount = categories.warnings.length + products.warnings.length + pages.warnings.length +
     blog.warnings.length + redirects.warnings.length + customerPlans.warnings.length +
-    normalizedReviews.warnings.length + preflightOrders.warnings.length;
+    normalizedReviews.warnings.length;
 
   if (options.config.execution.dryRun) {
     return {
@@ -356,13 +364,18 @@ export async function orchestrateMigration(options: OrchestrateMigrationOptions)
         blogs: summary(source.articles.length, blog.records.length, blog.skipped.length, 0),
         customers: summary(source.customers.length, customerPlans.records.length, customerPlans.skipped.length, 0),
         orders: summary(source.orders.length, preflightOrders.records.length, preflightOrders.skipped.length, 0),
-        reviews: summary(source.judgeMeRows.length, normalizedReviews.records.length, normalizedReviews.skipped.length, 0),
+        reviews: summary(
+          source.judgeMeRows.length,
+          preflightReviews.records.length,
+          normalizedReviews.skipped.length + preflightReviews.skipped.length,
+          0,
+        ),
         redirects: summary(source.redirects.length, redirects.records.length, redirects.skipped.length, 0),
       },
       media: { planned: plannedMedia(mediaPlans).length, persisted: 0 },
       clerk: { created: 0, existing: 0, reconciliation: 0 },
       d1: dryRunD1(preflightPlan),
-      warnings: warningCount,
+      warnings: baseWarningCount + preflightOrders.warnings.length + preflightReviews.warnings.length,
     };
   }
 
@@ -384,7 +397,7 @@ export async function orchestrateMigration(options: OrchestrateMigrationOptions)
 
   let clerk: ClerkProvisioningResult = { idMap: new Map(), created: 0, existing: 0, reconciliation: [] };
   let customers = preflightCustomers;
-  if (options.config.execution.includeSensitive) {
+  if (options.config.execution.includeSensitive && customerPlans.records.length > 0) {
     const clerkClient = await options.applyFactories.createClerkClient();
     clerk = await options.runners.provisionClerk(customerPlans.records, options.config.execution, clerkClient);
     customers = materializeCustomers(customerPlans.records, clerk.idMap);
@@ -450,6 +463,6 @@ export async function orchestrateMigration(options: OrchestrateMigrationOptions)
     media: { planned: mediaPlans.length, persisted: mediaEvidence.length },
     clerk: { created: clerk.created, existing: clerk.existing, reconciliation: clerk.reconciliation.length },
     d1,
-    warnings: warningCount + orders.warnings.length + reviews.warnings.length,
+    warnings: baseWarningCount + orders.warnings.length + reviews.warnings.length,
   };
 }
