@@ -11,6 +11,7 @@ const statements = sql.replace(/^\s*--.*$/gm, "");
 describe("subscription foundation migration", () => {
   it("is additive and reuses the core webhook claim ledger", () => {
     expect(sql).toContain("CREATE TABLE subscription_plans");
+    expect(sql).toContain("CREATE TABLE subscription_provider_customers");
     expect(sql).toContain("CREATE TABLE subscription_acquisitions");
     expect(sql).toContain("CREATE TABLE customer_subscriptions");
     expect(sql).toContain("CREATE TABLE subscription_events");
@@ -33,9 +34,12 @@ describe("subscription foundation migration", () => {
     expect(sql).toContain("shipping_address TEXT CHECK");
     expect(sql).toContain("consent_record TEXT NOT NULL CHECK");
     expect(sql).toContain("setup_intent_id TEXT NOT NULL UNIQUE CHECK");
+    expect(sql).toContain("subscription_plans_binding_unique");
+    expect(sql).toContain("unit_amount_minor INTEGER NOT NULL CHECK (unit_amount_minor > 0)");
     expect(sql).toContain("acquisition_id TEXT NOT NULL UNIQUE");
     expect(sql).toContain("pause_collection TEXT CHECK");
     expect(sql).toContain("cancel_at INTEGER CHECK");
+    expect(sql).toContain("ended_at INTEGER CHECK");
     expect(sql).toContain("latest_lifecycle_event_created_at INTEGER NOT NULL");
     expect(sql).toContain("latest_lifecycle_event_id TEXT NOT NULL");
     expect(sql).toContain("stripe_invoice_id TEXT PRIMARY KEY");
