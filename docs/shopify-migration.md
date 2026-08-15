@@ -2,11 +2,13 @@
 
 The operator-only Shopify migration toolkit imports catalog, content, media, customers, historical orders, and optionally Judge.me reviews into Mercora. It defaults to a local dry run. A dry run extracts and transforms data, resolves the named Wrangler targets, and builds the complete D1 plan without constructing R2, Clerk, or D1 write adapters.
 
-The toolkit is deliberately fail-fast between phases. An apply validates deterministic source transforms before it obtains write adapters, then executes in this order:
+The toolkit is deliberately fail-fast between phases. An apply validates and transforms the complete source before it obtains write adapters, then executes in this order:
 
-1. verify and persist Shopify media to the Wrangler `MEDIA` R2 bucket;
-2. resolve existing Clerk identities and, only when separately authorized, create source-verified customer identities;
-3. rebuild the identity-dependent order/review plan, run the D1 schema preflight, apply dependency-ordered chunks, and validate the result.
+1. run a read-only D1 canonical-target, schema, and migration-ledger preflight;
+2. when customers are present, read the Clerk instance and verify that the secret belongs to the confirmed instance and target environment;
+3. verify and persist Shopify media to the Wrangler `MEDIA` R2 bucket;
+4. resolve existing Clerk identities and, only when separately authorized, create source-verified customer identities;
+5. rebuild the identity-dependent order/review plan, revalidate D1 to prevent target/config drift, apply dependency-ordered chunks, and validate the result.
 
 It does not deploy Mercora, create Cloudflare resources, migrate schemas, obtain credentials, send email, or change Shopify/Judge.me.
 
@@ -14,10 +16,10 @@ It does not deploy Mercora, create Cloudflare resources, migrate schemas, obtain
 
 - Node 24 and the repository dependencies installed locally.
 - Mercora database migrations `0001` through `0020` already applied to the selected D1 database.
-- A reviewed `wrangler.jsonc` with exactly one canonical `DB` binding and one canonical `MEDIA` binding for the selected environment. Use `MIGRATION_DATABASE_NAME` or `--expected-database-name` to pin the expected D1 name.
+- A reviewed `wrangler.jsonc` with exactly one canonical `DB` binding and one canonical `MEDIA` binding for the selected environment. Remote targets must also declare the selected Cloudflare `account_id` and `vars.CLERK_INSTANCE_ID`. Use `MIGRATION_DATABASE_NAME` or `--expected-database-name` to pin the expected D1 name.
 - A stable inventory location ID, page/blog actor ID, fallback blog author, ISO-4217 currency, fulfillment type, and unresolved-customer policy chosen by the merchant.
-- An operator-created private input directory. Never place exports in the repository or a web-served directory.
-- For API extraction, an exact `https://{shop}.myshopify.com` origin, a pinned quarterly Admin API version, and a read-only Shopify access token scoped only to the resources being migrated.
+- Operator-created input and output directories that already exist, resolve canonically, are separate, and are outside the repository. Never place exports in a web-served directory.
+- For API extraction, an exact `https://{shop}.myshopify.com` origin, a pinned quarterly Admin API version, and a read-only Shopify access token scoped only to the resources being migrated. Historical orders require Shopify approval for `read_all_orders` in addition to `read_orders`; without it Shopify limits order access to the recent window.
 - For apply, Cloudflare R2 S3 credentials limited to the target bucket and the existing local Wrangler authentication/configuration needed by the D1 runner.
 
 Run Mercora's normal tests and deployment preflight before beginning. Confirm the selected Wrangler environment and binding names independently; the migration refuses ambiguous or mismatched targets, but an operator is still responsible for selecting the intended account.
@@ -43,7 +45,7 @@ private-shopify-export/
   verified-purchases.json    # optional, sensitive
 ```
 
-API mode reads collections, collects, products, pages, blogs/articles, redirects, and—when confirmed—customers and all order statuses. Judge.me remains a bounded local CSV input, so API mode also needs `MIGRATION_INPUT_ROOT` when `JUDGE_ME_FILE` is set.
+API mode reads collections, collects, products, pages, blogs/articles, redirects, and—when confirmed—customers and all order statuses. Article endpoints are read sequentially with per-blog and total bounds. For historical orders, obtain an independent exact source count, pass `--confirm-shopify-read-all-orders --expected-shopify-order-count=<count>`, and require the extracted count to match before transformation. Judge.me remains a bounded local CSV input, so API mode also needs `MIGRATION_INPUT_ROOT` when `JUDGE_ME_FILE` is set.
 
 Review attribution files are JSON arrays. Every item contains a `reviewFingerprint` plus the final Mercora `productId`, historical `orderId`, Clerk `customerId`, and optional `orderItemId`. Verified-purchase rows contain the same identifiers and `verified: true`. The toolkit rejects missing, duplicate, synthetic, or contradictory attribution rather than inventing purchase history.
 
@@ -63,6 +65,8 @@ MIGRATION_UNRESOLVED_CUSTOMER=reject
 MIGRATION_DATABASE_NAME=mercora-db
 ```
 
+Every configured input/output root must be an absolute canonical path to an existing directory outside the Mercora repository. The repository ignore rules are defense in depth for accidental artifacts; they do not make an in-repository export safe, and the CLI rejects such roots.
+
 Allowed fulfillment values are `physical`, `digital`, and `service`. The unresolved-customer policy must explicitly be `reject` or `guest`; `reject` is the safer default for historical orders.
 
 `MIGRATION_MEDIA_HOSTS` is an explicit allowlist, but it cannot broaden the toolkit's trust boundary. Media is accepted only from exact Shopify-owned asset hosts: `cdn.shopify.com`, or an exact `*.myshopify.com` host with a `/cdn/` path. Arbitrary custom CDNs are intentionally unsupported. Inline external images that fail this policy are removed from imported HTML.
@@ -76,7 +80,16 @@ SHOPIFY_ACCESS_TOKEN=private-read-token
 SHOPIFY_API_VERSION=2026-07
 ```
 
-Apply-only R2 credentials are read from `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY`. Clerk uses `CLERK_SECRET_KEY`. Secrets are never accepted as command-line flags, written to the manifest, or admitted into structured logs.
+For sensitive API extraction, also require Shopify's approved `read_all_orders` scope and provide both the explicit acknowledgement and independently established total:
+
+```text
+--include-sensitive --confirm-sensitive-data
+--confirm-shopify-read-all-orders --expected-shopify-order-count=1234
+```
+
+A mismatch aborts without logging order records. Record how the source total was obtained alongside the private migration evidence.
+
+Remote apply requires `MIGRATION_CLOUDFLARE_ACCOUNT_ID` to match the selected Wrangler `account_id`. When customers will be resolved, `MIGRATION_CLERK_INSTANCE_ID` must match the selected Wrangler `vars.CLERK_INSTANCE_ID`. Apply-only R2 credentials are read from `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY`; their account ID must independently match the confirmed target. Clerk uses `CLERK_SECRET_KEY`, which is bound before mutation by a bounded, abortable read of `/v1/instance`: preview requires a Clerk `development` instance and production requires `production`. Secrets are never accepted as command-line flags, written to the manifest, or admitted into structured logs.
 
 ## Dry run
 
@@ -126,11 +139,13 @@ npm run migrate:shopify -- --apply --target=preview --confirm-preview
 MERCORA_ALLOW_PRODUCTION_IMPORTS=1 npm run migrate:shopify -- --apply --target=production --confirm-production
 ```
 
+Local apply never constructs remote R2 or Clerk clients. It therefore accepts only plans with no media uploads and no customer identity work; use local dry run for the full dataset and a confirmed preview target for an end-to-end apply.
+
 Use `--env=<wrangler-environment>` when the reviewed bindings live in a named Wrangler environment. Production's environment variable is an additional circuit breaker, not a substitute for the target and confirmation flags.
 
 Existing merchant rows are compare-only by default. A semantic mismatch aborts instead of overwriting merchant changes. Overwrite mode requires both `--overwrite` and `--confirm-overwrite`; use it only after reviewing the exact conflict and taking a backup.
 
-For an apply report written as a private atomic `0600` file, set `MIGRATION_OUTPUT_ROOT` to a private existing directory. The resulting `manifest.json` contains aggregate counts only. Export files, attribution files, SQL chunks, logs, ID maps, and manifests are ignored by the repository's migration artifact rules, but operators must still verify they are not staged or uploaded.
+For an apply report written as a private atomic `0600` file, set `MIGRATION_OUTPUT_ROOT` to a private existing canonical directory outside the repository and separate from the input root. The resulting `manifest.json` contains aggregate counts only. Repository ignore rules provide defense in depth for accidental artifacts, but operators must still verify private files are not staged or uploaded.
 
 ## Deployment order
 
@@ -142,7 +157,7 @@ For an apply report written as a private atomic `0600` file, set `MIGRATION_OUTP
 6. Repeat the dry run immediately before production, then run the separately confirmed production apply.
 7. Retain the private source exports, reviewed report, backup, and reconciliation list according to the merchant's data-retention policy.
 
-R2 is applied before D1 so imported rows never intentionally reference media that has not been cryptographically verified as written or already identical. Clerk precedes customer/order D1 rows because Mercora customer primary keys must be final `user_*` IDs.
+The read-only D1 preflight happens before R2 or Clerk mutation, and D1 is revalidated immediately before its write phase. R2 is applied before D1 so imported rows never intentionally reference media that has not been cryptographically verified as written or already identical. Clerk identity work precedes customer/order D1 rows because Mercora customer primary keys must be final `user_*` IDs.
 
 ## Resuming and rerunning
 
