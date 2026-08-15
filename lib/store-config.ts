@@ -74,6 +74,7 @@ export type StoreConfig = {
       recommendations: boolean;
       giftCards: boolean;
       subscriptionAcquisition: boolean;
+      subscriptionReconciliation: boolean;
     };
   };
   deployment: {
@@ -149,7 +150,12 @@ export const storeDefaults: StoreConfig = {
       },
       { code: "other", label: "Other", legacyAliases: [] },
     ],
-    features: { recommendations: true, giftCards: false, subscriptionAcquisition: false },
+    features: {
+      recommendations: true,
+      giftCards: false,
+      subscriptionAcquisition: false,
+      subscriptionReconciliation: false,
+    },
   },
   deployment: {
     // A host must opt in explicitly. Preview deployments must never be indexed
@@ -430,6 +436,11 @@ export function resolveStoreConfig(env: Environment = {}): StoreConfig {
           env,
           "STORE_FEATURE_SUBSCRIPTION_ACQUISITION",
           storeDefaults.commerce.features.subscriptionAcquisition,
+        ),
+        subscriptionReconciliation: bool(
+          env,
+          "STORE_FEATURE_SUBSCRIPTION_RECONCILIATION",
+          storeDefaults.commerce.features.subscriptionReconciliation,
         ),
       },
     },
