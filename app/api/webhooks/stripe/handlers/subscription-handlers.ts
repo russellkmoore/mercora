@@ -10,6 +10,7 @@ import { createSubscriptionRepository } from '@/lib/subscriptions/repository';
 import {
   reconcileSubscriptionLifecycle,
   SubscriptionWebhookPermanentError,
+  SubscriptionWebhookRetryError,
   type SubscriptionLifecycleProvider,
   type SubscriptionLifecycleRepository,
 } from '@/lib/subscriptions/lifecycle-service';
@@ -20,6 +21,13 @@ import {
 import type { WebhookEventOutcome } from '@/lib/webhooks/processed-events';
 import { recordTelemetry } from '@/lib/observability/telemetry';
 import { getStoreConfig } from '@/lib/store-config';
+import {
+  sendSubscriptionLifecycleEmail,
+  type SubscriptionLifecycleEmailInput,
+  type SubscriptionLifecycleEmailResult,
+  type SubscriptionLifecycleNotificationKind,
+  type SubscriptionLifecycleNotificationRepository,
+} from '@/lib/subscriptions/lifecycle-email';
 
 const LIFECYCLE_EVENT_TYPES = new Set<Stripe.Event.Type>([
   'customer.subscription.created',
@@ -33,9 +41,14 @@ const LIFECYCLE_EVENT_TYPES = new Set<Stripe.Event.Type>([
 
 export interface SubscriptionWebhookRuntime {
   database: D1Database;
-  repository: SubscriptionLifecycleRepository;
+  repository: SubscriptionLifecycleRepository
+    & SubscriptionLifecycleNotificationRepository
+    & Pick<ReturnType<typeof createSubscriptionRepository>, 'findAcquisitionById'>;
   lifecycleProvider: SubscriptionLifecycleProvider;
   invoiceProvider: SubscriptionInvoiceProvider;
+  lifecycleEmailSender?: (
+    input: SubscriptionLifecycleEmailInput,
+  ) => Promise<SubscriptionLifecycleEmailResult>;
 }
 
 async function resolveRuntime(): Promise<SubscriptionWebhookRuntime> {
@@ -64,6 +77,42 @@ export function signedInvoiceSubscriptionId(invoice: Stripe.Invoice): string | u
   return subscriptionId;
 }
 
+/** Signed subscription-parent metadata distinguishes an owned persistence race. */
+function signedInvoiceAcquisitionId(invoice: Stripe.Invoice): string | undefined {
+  if (invoice.parent?.type !== 'subscription_details') return undefined;
+  const value = invoice.parent.subscription_details?.metadata?.mercora_acquisition_id;
+  return typeof value === 'string' && /^acq_[a-f0-9]{48}$/.test(value)
+    ? value
+    : undefined;
+}
+
+async function requireMappedInvoiceAcquisition(
+  invoice: Stripe.Invoice,
+  stripeSubscriptionId: string,
+  repository: SubscriptionWebhookRuntime['repository'],
+): Promise<NonNullable<Awaited<ReturnType<
+  SubscriptionLifecycleRepository['findAcquisitionByStripeSubscription']
+>>> | undefined> {
+  const acquisition = await repository.findAcquisitionByStripeSubscription(
+    stripeSubscriptionId,
+  );
+  if (acquisition) return acquisition;
+  const signedAcquisitionId = signedInvoiceAcquisitionId(invoice);
+  if (!signedAcquisitionId) return undefined;
+  const durable = await repository.findAcquisitionById(signedAcquisitionId);
+  if (!durable) return undefined;
+  if (durable.acquisition.id === signedAcquisitionId
+    && durable.status === 'pending'
+    && durable.stripeSubscriptionId === undefined) {
+    throw new SubscriptionWebhookRetryError(
+      'Subscription invoice arrived before provider acquisition persistence',
+    );
+  }
+  throw new SubscriptionWebhookPermanentError(
+    'Signed invoice acquisition conflicts with durable provider ownership',
+  );
+}
+
 function assertSignedInvoiceId(invoiceId: string): void {
   if (!/^in_[^\s]{1,252}$/.test(invoiceId)) {
     throw new SubscriptionWebhookPermanentError('Signed invoice identity is invalid');
@@ -87,9 +136,9 @@ async function recordInvoiceEvent(
     outcome: 'applied' | 'duplicate' | 'ignored_stale';
     stripeInvoiceId: string;
   },
-): Promise<void> {
+): Promise<'applied' | 'duplicate' | 'ignored_stale'> {
   const id = await eventAuditId(args.event.id, args.eventType);
-  await repository.recordSubscriptionEvent({
+  const inserted = await repository.recordSubscriptionEvent({
     id,
     subscriptionId: args.subscriptionId,
     providerEvent: { id: args.event.id, createdAt: args.event.created },
@@ -97,6 +146,7 @@ async function recordInvoiceEvent(
     outcome: args.outcome,
     details: { stripe_invoice_id: args.stripeInvoiceId },
   });
+  return inserted ? args.outcome : 'duplicate';
 }
 
 function lifecycleAuditType(eventType: Stripe.Event.Type) {
@@ -113,6 +163,49 @@ function lifecycleAuditOutcome(
   decision: 'apply' | 'duplicate' | 'ignored_stale' | 'refresh_required',
 ) {
   return decision === 'apply' ? 'applied' as const : decision;
+}
+
+function directLifecycleNotificationKind(
+  eventType: Stripe.Event.Type,
+): SubscriptionLifecycleNotificationKind | undefined {
+  switch (eventType) {
+    case 'customer.subscription.created': return 'created';
+    case 'customer.subscription.deleted': return 'canceled';
+    case 'customer.subscription.paused': return 'paused';
+    case 'customer.subscription.resumed': return 'resumed';
+    default: return undefined;
+  }
+}
+
+function signedUpdatedNotificationKind(
+  event: Stripe.Event,
+  signedSnapshot: ReturnType<typeof mapSubscriptionLifecycle>,
+): SubscriptionLifecycleNotificationKind | undefined {
+  if (event.type !== 'customer.subscription.updated') return undefined;
+  const previous = event.data.previous_attributes as
+    | Partial<Stripe.Subscription>
+    | undefined;
+  if (!previous) return undefined;
+  if (signedSnapshot.cancelAtPeriodEnd && previous.cancel_at_period_end === false) {
+    return 'cancel_scheduled';
+  }
+  if (Object.prototype.hasOwnProperty.call(previous, 'pause_collection')) {
+    if (signedSnapshot.pauseCollection && previous.pause_collection === null) {
+      return 'paused';
+    }
+    if (!signedSnapshot.pauseCollection && previous.pause_collection) {
+      return 'resumed';
+    }
+  }
+  return undefined;
+}
+
+async function sendLifecycleNotification(
+  runtime: SubscriptionWebhookRuntime,
+  args: Omit<SubscriptionLifecycleEmailInput, 'database'>,
+): Promise<void> {
+  const sender = runtime.lifecycleEmailSender ?? sendSubscriptionLifecycleEmail;
+  await sender({ database: runtime.database, ...args });
 }
 
 async function handleLifecycle(
@@ -152,13 +245,35 @@ async function handleLifecycle(
       signedBinding,
       signedSnapshot,
     });
+    const auditId = await eventAuditId(event.id, eventType);
+    const outcome = lifecycleAuditOutcome(result.decision);
+    const eligibleOutcome = outcome === 'applied' || outcome === 'duplicate';
+    const signedTransitionKind = eligibleOutcome
+      ? signedUpdatedNotificationKind(event, signedSnapshot)
+      : undefined;
     await runtime.repository.recordSubscriptionEvent({
-      id: await eventAuditId(event.id, eventType),
+      id: auditId,
       subscriptionId: result.subscriptionId,
       providerEvent: { id: event.id, createdAt: event.created },
       eventType,
-      outcome: lifecycleAuditOutcome(result.decision),
+      outcome,
+      ...(signedTransitionKind
+        ? { details: { notification_kind: signedTransitionKind } }
+        : {}),
     });
+    if (eligibleOutcome) {
+      const notificationKind = signedTransitionKind
+        ?? (outcome === 'duplicate' && event.type === 'customer.subscription.updated'
+          ? await runtime.repository.findSubscriptionEventNotificationKind(auditId)
+          : directLifecycleNotificationKind(event.type));
+      if (notificationKind) {
+        await sendLifecycleNotification(runtime, {
+          subscriptionId: result.subscriptionId,
+          providerEventId: event.id,
+          kind: notificationKind,
+        });
+      }
+    }
     return 'handled';
   } catch (error) {
     if (error instanceof SubscriptionWebhookPermanentError) {
@@ -190,8 +305,10 @@ async function handlePaidInvoice(
   assertSignedInvoiceId(invoice.id);
   const stripeSubscriptionId = signedInvoiceSubscriptionId(invoice);
   if (!stripeSubscriptionId) return 'ignored';
-  const acquisition = await runtime.repository.findAcquisitionByStripeSubscription(
+  const acquisition = await requireMappedInvoiceAcquisition(
+    invoice,
     stripeSubscriptionId,
+    runtime.repository,
   );
   if (!acquisition) return 'ignored';
   if (acquisition.status === 'failed') {
@@ -217,13 +334,20 @@ WHERE subscription_id = ?
   AND json_extract(details, '$.stripe_invoice_id') = ?
 LIMIT 1
 `).bind(stored.id, invoice.id).first<{ present: number }>();
-  await recordInvoiceEvent(runtime.repository, {
+  const outcome = await recordInvoiceEvent(runtime.repository, {
     subscriptionId: stored.id,
     event,
     eventType: previousFailure ? 'payment_recovered' : 'renewed',
     outcome: result.created ? 'applied' : 'duplicate',
     stripeInvoiceId: invoice.id,
   });
+  if (previousFailure && (outcome === 'applied' || outcome === 'duplicate')) {
+    await sendLifecycleNotification(runtime, {
+      subscriptionId: stored.id,
+      providerEventId: event.id,
+      kind: 'payment_recovered',
+    });
+  }
   return 'handled';
 }
 
@@ -235,8 +359,10 @@ async function handleFailedInvoice(
   assertSignedInvoiceId(invoice.id);
   const stripeSubscriptionId = signedInvoiceSubscriptionId(invoice);
   if (!stripeSubscriptionId) return 'ignored';
-  const acquisition = await runtime.repository.findAcquisitionByStripeSubscription(
+  const acquisition = await requireMappedInvoiceAcquisition(
+    invoice,
     stripeSubscriptionId,
+    runtime.repository,
   );
   if (!acquisition) return 'ignored';
   if (acquisition.status === 'failed') {
@@ -254,13 +380,22 @@ FROM subscription_invoice_orders
 WHERE stripe_invoice_id = ? AND subscription_id = ?
 LIMIT 1
 `).bind(invoice.id, stored.id).first<{ present: number }>();
-  await recordInvoiceEvent(runtime.repository, {
+  const requestedOutcome = paid ? 'ignored_stale' : 'applied';
+  const outcome = await recordInvoiceEvent(runtime.repository, {
     subscriptionId: stored.id,
     event,
     eventType: 'payment_failed',
-    outcome: paid ? 'ignored_stale' : 'applied',
+    outcome: requestedOutcome,
     stripeInvoiceId: invoice.id,
   });
+  if (requestedOutcome !== 'ignored_stale'
+    && (outcome === 'applied' || outcome === 'duplicate')) {
+    await sendLifecycleNotification(runtime, {
+      subscriptionId: stored.id,
+      providerEventId: event.id,
+      kind: 'payment_failed',
+    });
+  }
   return 'handled';
 }
 
