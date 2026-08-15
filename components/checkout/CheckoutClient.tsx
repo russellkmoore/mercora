@@ -40,6 +40,7 @@ import OrderConfirmationModal from './OrderConfirmationModal';
 import type { Address, ShippingOption } from '@/lib/types';
 import { Money } from '@/lib/money';
 import { clearPendingCheckout, savePendingCheckout } from '@/lib/checkout/order-payload';
+import { projectCartLineForCheckout } from '@/lib/gift-cards/line-identity';
 
 interface CheckoutClientProps {
   userId: string | null;
@@ -162,11 +163,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: items.map((item) => ({
-            productId: item.productId,
-            variantId: item.variantId,
-            quantity: item.quantity,
-          })),
+          items: items.map(projectCartLineForCheckout),
           shippingAddress,
           shippingMethodId: selectedShippingOption.id,
           discountCodes: appliedDiscounts.map((discount) => discount.code),
