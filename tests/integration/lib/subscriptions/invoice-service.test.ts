@@ -219,4 +219,23 @@ describe('subscription invoice orders in real D1', () => {
       WHERE stripe_invoice_id = ?`).bind(invoice.stripeInvoiceId).first())
       .resolves.toEqual({ count: 0 });
   });
+
+  it('accepts an immutable matching winner after later fulfillment and extension updates', async () => {
+    await seedSubscription();
+    const args = {
+      database: env.DB,
+      provider,
+      stripeInvoiceId: invoice.stripeInvoiceId,
+      stripeSubscriptionId: 'sub_renewal',
+    };
+    await expect(fulfillSubscriptionInvoice(args)).resolves.toMatchObject({ created: true });
+    await env.DB.prepare(`UPDATE orders
+      SET status = 'shipped', tracking_number = 'TRACK-1',
+          extensions = json_set(extensions, '$.refunds_version', 1)
+      WHERE id = ?`).bind(`SUB-${invoice.stripeInvoiceId}`).run();
+    await expect(fulfillSubscriptionInvoice(args)).resolves.toMatchObject({
+      created: false,
+      order: { status: 'shipped', payment_status: 'paid' },
+    });
+  });
 });
