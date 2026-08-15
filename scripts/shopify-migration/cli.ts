@@ -2,7 +2,13 @@ import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { provisionClerkCustomers, type ClerkMigrationClient } from "./adapters/clerk/index.js";
+import {
+  ClerkRetryableRequestError,
+  provisionClerkCustomers,
+  type ClerkMigrationClient,
+  type ClerkMigrationUser,
+  type ClerkRequestContext,
+} from "./adapters/clerk/index.js";
 import { createNodeCommandRunner, runD1Import } from "./adapters/d1/index.js";
 import { createR2S3MediaStore, importMediaPlans } from "./adapters/media/index.js";
 import { extractFileRecords } from "./extractors/file-based/index.js";
@@ -190,7 +196,7 @@ function emptySensitive(): Pick<MigrationSourceBundle, "customers" | "orders" | 
   return { customers: [], orders: [], judgeMeRows: [] };
 }
 
-function fileSource(config: MigrationConfig, parsed: ParsedMigrationCli): MigrationSource {
+export function createFileMigrationSource(config: MigrationConfig, parsed: ParsedMigrationCli): MigrationSource {
   const root = config.inputRoot!;
   return {
     async extract(includeSensitive) {
@@ -223,7 +229,7 @@ function fileSource(config: MigrationConfig, parsed: ParsedMigrationCli): Migrat
   };
 }
 
-function apiSource(config: MigrationConfig, parsed: ParsedMigrationCli): MigrationSource {
+export function createShopifyApiMigrationSource(config: MigrationConfig, parsed: ParsedMigrationCli): MigrationSource {
   const shopify = config.shopify!;
   return {
     async extract(includeSensitive) {
@@ -293,6 +299,155 @@ function canonicalProjectConfig(projectRoot: string): { projectRoot: string; tex
   return { projectRoot: canonicalRoot, text: readFileSync(configPath, "utf8") };
 }
 
+const CLERK_USERS_URL = "https://api.clerk.com/v1/users";
+const MAX_CLERK_RESPONSE_BYTES = 1024 * 1024;
+
+function retryAfterMilliseconds(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds * 1_000);
+  const date = Date.parse(value);
+  return Number.isFinite(date) ? Math.max(0, date - Date.now()) : undefined;
+}
+
+async function boundedClerkJson(response: Response): Promise<unknown> {
+  const declared = response.headers.get("content-length");
+  if (declared !== null && (!/^(?:0|[1-9][0-9]*)$/u.test(declared) || Number(declared) > MAX_CLERK_RESPONSE_BYTES)) {
+    void response.body?.cancel();
+    throw new Error("Clerk migration response exceeds its safety limit");
+  }
+  if (!response.body) throw new Error("Clerk migration response body is missing");
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    length += value.byteLength;
+    if (length > MAX_CLERK_RESPONSE_BYTES) {
+      await reader.cancel();
+      throw new Error("Clerk migration response exceeds its safety limit");
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  } catch {
+    throw new Error("Clerk migration response is invalid");
+  }
+}
+
+async function clerkRequest(
+  secretKey: string,
+  fetchImplementation: typeof fetch,
+  url: URL,
+  init: RequestInit & { signal: AbortSignal },
+): Promise<unknown> {
+  let response: Response;
+  try {
+    response = await fetchImplementation(url, {
+      ...init,
+      redirect: "error",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${secretKey}`,
+        ...(init.body ? { "Content-Type": "application/json" } : {}),
+      },
+    });
+  } catch (error) {
+    if (error && typeof error === "object") {
+      const shaped = error as { clerkError?: unknown; status?: unknown; retryAfter?: unknown };
+      const status = typeof shaped.status === "number" ? shaped.status : undefined;
+      if (
+        shaped.clerkError === true && status !== undefined && (status === 429 || status >= 500) &&
+        (shaped.retryAfter === undefined || (typeof shaped.retryAfter === "number" && Number.isFinite(shaped.retryAfter)))
+      ) {
+        const retryAfter = typeof shaped.retryAfter === "number" && shaped.retryAfter >= 0
+          ? Math.ceil(shaped.retryAfter * 1_000)
+          : undefined;
+        throw new ClerkRetryableRequestError(retryAfter);
+      }
+      if (shaped.clerkError === true && status !== undefined) {
+        throw new Error("Clerk migration request was rejected");
+      }
+    }
+    throw new ClerkRetryableRequestError();
+  }
+  if (response.status === 429 || response.status >= 500) {
+    void response.body?.cancel();
+    throw new ClerkRetryableRequestError(retryAfterMilliseconds(response.headers.get("retry-after")));
+  }
+  if (!response.ok) {
+    void response.body?.cancel();
+    throw new Error("Clerk migration request was rejected");
+  }
+  return await boundedClerkJson(response);
+}
+
+function clerkUser(value: unknown): ClerkMigrationUser {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Clerk migration user response is invalid");
+  }
+  const record = value as { id?: unknown; external_id?: unknown };
+  if (
+    typeof record.id !== "string" ||
+    (record.external_id !== null && record.external_id !== undefined && typeof record.external_id !== "string")
+  ) {
+    throw new Error("Clerk migration user response is invalid");
+  }
+  return { id: record.id, externalId: typeof record.external_id === "string" ? record.external_id : null };
+}
+
+/** Minimal abortable Clerk Backend API client for migration-only user calls. */
+export function createClerkRestMigrationClient(
+  secretKey: string,
+  fetchImplementation: typeof fetch = fetch,
+): ClerkMigrationClient {
+  if (!secretKey || secretKey.length > 2_048 || /[\0\r\n]/u.test(secretKey)) {
+    throw new Error("CLERK_SECRET_KEY is invalid");
+  }
+  const contextSignal = (context: ClerkRequestContext | undefined): AbortSignal => {
+    if (!context?.signal) throw new Error("Clerk migration requests require a bounded abort signal");
+    return context.signal;
+  };
+  return {
+    users: {
+      async getUserList(params, context) {
+        const url = new URL(CLERK_USERS_URL);
+        params.externalId?.forEach((value) => url.searchParams.append("external_id", value));
+        params.emailAddress?.forEach((value) => url.searchParams.append("email_address", value));
+        url.searchParams.set("limit", String(params.limit));
+        const value = await clerkRequest(secretKey, fetchImplementation, url, {
+          method: "GET",
+          signal: contextSignal(context),
+        });
+        if (!Array.isArray(value)) throw new Error("Clerk migration user list is invalid");
+        return { data: value.map(clerkUser) };
+      },
+      async createUser(params, context) {
+        const value = await clerkRequest(secretKey, fetchImplementation, new URL(CLERK_USERS_URL), {
+          method: "POST",
+          signal: contextSignal(context),
+          body: JSON.stringify({
+            email_address: [...params.emailAddress],
+            ...(params.firstName ? { first_name: params.firstName } : {}),
+            ...(params.lastName ? { last_name: params.lastName } : {}),
+            external_id: params.externalId,
+            skip_legal_checks: params.skipLegalChecks,
+          }),
+        });
+        return clerkUser(value);
+      },
+    },
+  };
+}
+
 function defaultFactories(env: Environment): MigrationApplyFactories {
   return {
     createMediaStore(bucketName) {
@@ -304,25 +459,7 @@ function defaultFactories(env: Environment): MigrationApplyFactories {
       });
     },
     async createClerkClient(): Promise<ClerkMigrationClient> {
-      required(env.CLERK_SECRET_KEY, "CLERK_SECRET_KEY");
-      const { clerkClient } = await import("@clerk/nextjs/server");
-      const client = await clerkClient();
-      return {
-        users: {
-          async getUserList(params) {
-            const response = await client.users.getUserList({
-              ...(params.externalId ? { externalId: [...params.externalId] } : {}),
-              ...(params.emailAddress ? { emailAddress: [...params.emailAddress] } : {}),
-              limit: params.limit,
-            });
-            return { data: response.data.map((user) => ({ id: user.id, externalId: user.externalId })) };
-          },
-          async createUser(params) {
-            const user = await client.users.createUser({ ...params, emailAddress: [...params.emailAddress] });
-            return { id: user.id, externalId: user.externalId };
-          },
-        },
-      };
+      return createClerkRestMigrationClient(required(env.CLERK_SECRET_KEY, "CLERK_SECRET_KEY"));
     },
     createCommandRunner: () => createNodeCommandRunner(),
   };
@@ -341,7 +478,9 @@ export async function runMigrationCli(dependencies: MigrationCliDependencies = {
     ? keyedRows(readJsonFile<VerifiedPurchaseRow>(inputRoot!, parsed.verifiedPurchasesFile), "Verified purchases")
     : undefined;
   const source = dependencies.createSource?.(parsed.config, parsed)
-    ?? (parsed.config.sourceMode === "file" ? fileSource(parsed.config, parsed) : apiSource(parsed.config, parsed));
+    ?? (parsed.config.sourceMode === "file"
+      ? createFileMigrationSource(parsed.config, parsed)
+      : createShopifyApiMigrationSource(parsed.config, parsed));
   const report = await orchestrateMigration({
     config: parsed.config,
     domain: {
