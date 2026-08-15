@@ -38,7 +38,7 @@ export interface CommerceCapabilityFactories {
 
 export class CommerceCapabilityConfigurationError extends Error {}
 
-/** Protected order metadata written only by the future subscription checkout. */
+/** Protected order metadata written only while reconciling a verified subscription invoice order. */
 export const SUBSCRIPTION_ACQUISITION_EXTENSION = "subscription_acquisition_id";
 
 export function subscriptionAcquisitionIdFromOrder(order: Order): string | undefined {
