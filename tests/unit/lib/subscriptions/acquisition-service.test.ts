@@ -304,4 +304,52 @@ describe("subscription acquisition service", () => {
     await service.act("user_one", "subscription_acq_one", { type: "pause" });
     expect(provider.pauseCollection).not.toHaveBeenCalled();
   });
+
+  it("projects validated pause state and lets an active paused subscription resume", async () => {
+    const { service, repository, provider } = mocks();
+    const paused = {
+      id: "subscription_acq_one", planId: "plan_one", customerId: "user_one",
+      acquisitionId: "acq_one", stripeSubscriptionId: "sub_one", stripeCustomerId: "cus_one",
+      quantity: 1, status: "active", consent: storedAcquisition().acquisition.consent,
+      pauseCollection: { behavior: "void", resumesAt: 1_800_000_000 }, cancelAtPeriodEnd: false,
+      latestLifecycleEvent: { id: "evt_one", createdAt: 1 }, version: 2,
+    } as const;
+    repository.listSubscriptionsForCustomer.mockResolvedValue([paused]);
+    repository.findSubscriptionForOwner.mockResolvedValue(paused);
+
+    const [summary] = await service.list("user_one");
+    expect(summary).toMatchObject({
+      id: "subscription_acq_one",
+      status: "active",
+      pauseCollection: { behavior: "void", resumesAt: 1_800_000_000 },
+    });
+    expect(summary).not.toHaveProperty("stripeSubscriptionId");
+    expect(summary).not.toHaveProperty("stripeCustomerId");
+
+    const result = await service.act("user_one", "subscription_acq_one", { type: "resume" });
+    expect(provider.resumeCollection).toHaveBeenCalledOnce();
+    expect(provider.resumeCollection).toHaveBeenCalledWith(expect.objectContaining({
+      stripeSubscriptionId: "sub_one",
+    }));
+    expect(result.subscription.pauseCollection).toEqual({
+      behavior: "void",
+      resumesAt: 1_800_000_000,
+    });
+  });
+
+  it.each([
+    { behavior: "void", resumesAt: -1 },
+    { behavior: "void", providerSubscriptionId: "sub_secret" },
+  ])("rejects malformed persisted pause state instead of projecting it: %j", async (pauseCollection) => {
+    const { service, repository } = mocks();
+    repository.listSubscriptionsForCustomer.mockResolvedValue([{
+      id: "subscription_acq_one", planId: "plan_one", customerId: "user_one",
+      acquisitionId: "acq_one", stripeSubscriptionId: "sub_one", stripeCustomerId: "cus_one",
+      quantity: 1, status: "active", consent: storedAcquisition().acquisition.consent,
+      pauseCollection, cancelAtPeriodEnd: false,
+      latestLifecycleEvent: { id: "evt_one", createdAt: 1 }, version: 2,
+    }]);
+
+    await expect(service.list("user_one")).rejects.toBeInstanceOf(TypeError);
+  });
 });
