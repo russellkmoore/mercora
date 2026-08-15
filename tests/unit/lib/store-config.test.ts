@@ -44,14 +44,17 @@ describe("resolveStoreConfig", () => {
       recommendations: true,
       giftCards: false,
       subscriptionAcquisition: false,
+      subscriptionReconciliation: false,
     });
     expect(resolveStoreConfig({
       STORE_FEATURE_RECOMMENDATIONS: "false",
       STORE_FEATURE_SUBSCRIPTION_ACQUISITION: "true",
+      STORE_FEATURE_SUBSCRIPTION_RECONCILIATION: "true",
     }).commerce.features).toEqual({
       recommendations: false,
       giftCards: false,
       subscriptionAcquisition: true,
+      subscriptionReconciliation: true,
     });
   });
 
