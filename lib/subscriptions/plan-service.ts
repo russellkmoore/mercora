@@ -90,7 +90,7 @@ export class SubscriptionPlanConflictError extends Error {
   }
 }
 
-interface PlanRow {
+interface StoredPlanRow {
   id: string;
   product_id: string;
   variant_id: string;
@@ -102,6 +102,9 @@ interface PlanRow {
   is_active: number;
   created_at: string;
   updated_at: string;
+}
+
+interface PlanRow extends StoredPlanRow {
   product_name: string;
   product_status: string | null;
   variant_sku: string;
@@ -136,6 +139,12 @@ const PLAN_SELECT = `SELECT
 FROM subscription_plans sp
 JOIN products p ON p.id = sp.product_id
 JOIN product_variants pv ON pv.id = sp.variant_id AND pv.product_id = sp.product_id`;
+
+const STORED_PLAN_SELECT = `SELECT
+  id, product_id, variant_id, currency_code, unit_amount_minor,
+  stripe_price_id, cadence_unit, cadence_count, is_active,
+  created_at, updated_at
+FROM subscription_plans`;
 
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const STRIPE_PRICE_PATTERN = /^price_[A-Za-z0-9]{1,249}$/;
@@ -317,6 +326,43 @@ function mapAdmin(row: PlanRow): AdminSubscriptionPlan {
   };
 }
 
+/**
+ * Catalog-independent response for the exact rollback operation. Stable binding
+ * ids are used as labels because missing or corrupt catalog display data must
+ * never prevent an active plan from being shut off.
+ */
+function mapDeactivatedAdmin(row: StoredPlanRow): AdminSubscriptionPlan {
+  const value: SubscriptionPlanWrite = {
+    id: row.id,
+    productId: row.product_id,
+    variantId: row.variant_id,
+    currency: row.currency_code,
+    unitAmountMinor: row.unit_amount_minor,
+    stripePriceId: row.stripe_price_id,
+    cadence: {
+      unit: row.cadence_unit as SubscriptionPlanCadenceUnit,
+      count: row.cadence_count,
+    },
+    active: false,
+  };
+  assertWrite(value);
+  assertVersion(row.created_at);
+  assertVersion(row.updated_at);
+  return {
+    id: value.id,
+    product: { id: value.productId, label: value.productId },
+    variant: { id: value.variantId, label: value.variantId },
+    price: Money.fromMinor(value.unitAmountMinor, value.currency).toMach(),
+    cadence: value.cadence,
+    shippingRequired: false,
+    unitAmountMinor: value.unitAmountMinor,
+    stripePriceId: value.stripePriceId,
+    active: false,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 function validatePagination(options: SubscriptionPlanListOptions): void {
   if (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > MAX_SUBSCRIPTION_PLAN_LIMIT ||
       !Number.isSafeInteger(options.offset) || options.offset < 0 || options.offset > MAX_SUBSCRIPTION_PLAN_OFFSET) {
@@ -349,6 +395,10 @@ function nextTimestamp(previous: string, now: Date): string {
   return new Date(Math.max(current, prior + 1)).toISOString();
 }
 
+function isExactDeactivation(patch: SubscriptionPlanPatch): patch is { active: false } {
+  return patch.active === false && Object.keys(patch).length === 1;
+}
+
 export function createSubscriptionPlanService(
   database: D1Database,
   options: { now?: () => Date; priceVerifier: SubscriptionPlanPriceVerifier },
@@ -367,6 +417,11 @@ export function createSubscriptionPlanService(
 
   async function findRow(id: string): Promise<PlanRow | null> {
     return await database.prepare(`${PLAN_SELECT} WHERE sp.id = ? LIMIT 1`).bind(id).first<PlanRow>();
+  }
+
+  async function findStoredRow(id: string): Promise<StoredPlanRow | null> {
+    return await database.prepare(`${STORED_PLAN_SELECT} WHERE id = ? LIMIT 1`)
+      .bind(id).first<StoredPlanRow>();
   }
 
   async function findCatalog(productId: string, variantId: string): Promise<CatalogRow | null> {
@@ -474,6 +529,28 @@ export function createSubscriptionPlanService(
       assertSubscriptionPlanId(id);
       assertPatch(patch);
       assertVersion(expectedUpdatedAt);
+      if (isExactDeactivation(patch)) {
+        const stored = await findStoredRow(id);
+        if (!stored) throw new SubscriptionPlanNotFoundError();
+        if (stored.updated_at !== expectedUpdatedAt) {
+          throw new SubscriptionPlanConflictError("Subscription plan version is stale");
+        }
+        const updatedAt = nextTimestamp(stored.updated_at, now());
+        const result = await database.prepare(`UPDATE subscription_plans
+          SET is_active = 0, updated_at = ?
+          WHERE id = ? AND product_id = ? AND variant_id = ? AND currency_code = ?
+            AND unit_amount_minor = ? AND stripe_price_id = ? AND cadence_unit = ?
+            AND cadence_count = ? AND is_active = ? AND created_at = ? AND updated_at = ?`)
+          .bind(
+            updatedAt, id, stored.product_id, stored.variant_id, stored.currency_code,
+            stored.unit_amount_minor, stored.stripe_price_id, stored.cadence_unit,
+            stored.cadence_count, stored.is_active, stored.created_at, stored.updated_at,
+          ).run();
+        if (result.meta.changes !== 1) {
+          throw new SubscriptionPlanConflictError("Subscription plan changed concurrently");
+        }
+        return mapDeactivatedAdmin({ ...stored, is_active: 0, updated_at: updatedAt });
+      }
       const row = await findRow(id);
       if (!row) throw new SubscriptionPlanNotFoundError();
       if (row.updated_at !== expectedUpdatedAt) throw new SubscriptionPlanConflictError("Subscription plan version is stale");
