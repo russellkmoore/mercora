@@ -1,6 +1,7 @@
 import type { Address } from "@/lib/types";
 import type { SubscriptionProvider } from "./ports";
 import {
+  assertLifecycleSnapshot,
   subscriptionAcquisitionsEqual,
   toProviderAcquisitionRequest,
   toReservedSubscriptionPlanBinding,
@@ -95,6 +96,7 @@ export interface SafeSubscriptionSummary {
   cancelAt?: number;
   canceledAt?: number;
   endedAt?: number;
+  pauseCollection?: NonNullable<SubscriptionLifecycleSnapshot["pauseCollection"]>;
 }
 
 export type SubscriptionAction =
@@ -181,6 +183,15 @@ function validateBeginInput(input: BeginSubscriptionAcquisitionInput): void {
 }
 
 function safeSummary(record: CustomerSubscriptionRecord): SafeSubscriptionSummary {
+  assertLifecycleSnapshot(record);
+  const pauseCollection = record.pauseCollection
+    ? {
+        behavior: record.pauseCollection.behavior,
+        ...(record.pauseCollection.resumesAt === undefined
+          ? {}
+          : { resumesAt: record.pauseCollection.resumesAt }),
+      }
+    : undefined;
   return {
     id: record.id,
     planId: record.planId,
@@ -192,6 +203,7 @@ function safeSummary(record: CustomerSubscriptionRecord): SafeSubscriptionSummar
     cancelAt: record.cancelAt,
     canceledAt: record.canceledAt,
     endedAt: record.endedAt,
+    ...(pauseCollection ? { pauseCollection } : {}),
   };
 }
 
