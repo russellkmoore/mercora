@@ -5,6 +5,7 @@ import {
   mergeOrderExternalReferences,
   validateOrderMetadataUpdate,
 } from '@/lib/utils/order-update-guards';
+import { SUBSCRIPTION_ACQUISITION_EXTENSION } from '@/lib/commerce/capabilities';
 
 describe('order update trust boundary', () => {
   it.each(['status', 'payment_status', 'customer_id', 'items', 'total_amount', 'tracking_number'])(
@@ -53,6 +54,28 @@ describe('order update trust boundary', () => {
     )).toEqual({
       ok: true,
       value: { payment_intent_id: 'pi_server', erp: 'E-1' },
+    });
+  });
+
+  it('cannot plant, replace, or remove the subscription acquisition marker', () => {
+    expect(SERVER_OWNED_ORDER_EXTENSION_KEYS).toContain(SUBSCRIPTION_ACQUISITION_EXTENSION);
+    expect(mergeOrderExtensions(
+      { [SUBSCRIPTION_ACQUISITION_EXTENSION]: 'acq_attacker' },
+      {},
+    )).toEqual({ ok: true, value: {} });
+    expect(mergeOrderExtensions(
+      { [SUBSCRIPTION_ACQUISITION_EXTENSION]: 'acq_attacker' },
+      { [SUBSCRIPTION_ACQUISITION_EXTENSION]: 'acq_server' },
+    )).toEqual({
+      ok: true,
+      value: { [SUBSCRIPTION_ACQUISITION_EXTENSION]: 'acq_server' },
+    });
+    expect(mergeOrderExtensions(
+      {},
+      { [SUBSCRIPTION_ACQUISITION_EXTENSION]: 'acq_server' },
+    )).toEqual({
+      ok: true,
+      value: { [SUBSCRIPTION_ACQUISITION_EXTENSION]: 'acq_server' },
     });
   });
 
