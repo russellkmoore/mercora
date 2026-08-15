@@ -87,6 +87,8 @@ function subscription(overrides: Partial<Stripe.Subscription> = {}): Stripe.Subs
     metadata: {
       mercora_acquisition_id: "acq_one",
       mercora_plan_id: "plan_one",
+      mercora_binding_version: "2",
+      mercora_shipping_required: "true",
     },
     pause_collection: null,
     status: "active",
@@ -238,6 +240,7 @@ describe("Stripe subscription mappers", () => {
       stripeCustomerId: "cus_one",
       stripePriceId: "price_monthly",
       cadence: { unit: "month", count: 1 },
+      shippingRequired: true,
       quantity: 2,
     });
     expect(provider.price.equals(Money.fromMinor(2500, "USD"))).toBe(true);
@@ -252,6 +255,28 @@ describe("Stripe subscription mappers", () => {
         url: "/items",
       },
     }))).toThrow("per-unit");
+  });
+
+  it("accepts absent legacy shipping metadata but strictly validates version two", () => {
+    const legacy = mapProviderSubscriptionBinding(subscription({
+      metadata: { mercora_acquisition_id: "acq_one", mercora_plan_id: "plan_one" },
+    }));
+    expect(legacy).not.toHaveProperty("shippingRequired");
+    expect(() => mapProviderSubscriptionBinding(subscription({
+      metadata: {
+        mercora_acquisition_id: "acq_one",
+        mercora_plan_id: "plan_one",
+        mercora_binding_version: "2",
+      },
+    }))).toThrow("shipping metadata");
+    expect(() => mapProviderSubscriptionBinding(subscription({
+      metadata: {
+        mercora_acquisition_id: "acq_one",
+        mercora_plan_id: "plan_one",
+        mercora_binding_version: "2",
+        mercora_shipping_required: "yes",
+      },
+    }))).toThrow("shipping metadata");
   });
 
   it("maps item periods and pause collection without rewriting lifecycle status", () => {
