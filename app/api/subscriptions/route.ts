@@ -70,8 +70,15 @@ export async function POST(request: NextRequest) {
   if (!setupIntentId) return NextResponse.json({ error: "Invalid subscription request" }, { status: 400 });
   try {
     const service = await getSubscriptionAcquisitionService();
-    const subscription = await service.finalize(userId, setupIntentId);
-    return NextResponse.json({ subscription }, { status: 202 });
+    const finalized = await service.finalize(userId, setupIntentId);
+    return NextResponse.json({
+      subscription: {
+        id: finalized.id,
+        planId: finalized.planId,
+        quantity: finalized.quantity,
+        status: finalized.status,
+      },
+    }, { status: 202 });
   } catch (error) {
     if (error instanceof SubscriptionNotFoundError) {
       // Owner mismatch deliberately shares the not-found response.
