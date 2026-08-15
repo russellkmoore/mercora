@@ -2,8 +2,6 @@ import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { clerkClient } from "@clerk/nextjs/server";
-
 import { provisionClerkCustomers, type ClerkMigrationClient } from "./adapters/clerk/index.js";
 import { createNodeCommandRunner, runD1Import } from "./adapters/d1/index.js";
 import { createR2S3MediaStore, importMediaPlans } from "./adapters/media/index.js";
@@ -307,6 +305,7 @@ function defaultFactories(env: Environment): MigrationApplyFactories {
     },
     async createClerkClient(): Promise<ClerkMigrationClient> {
       required(env.CLERK_SECRET_KEY, "CLERK_SECRET_KEY");
+      const { clerkClient } = await import("@clerk/nextjs/server");
       const client = await clerkClient();
       return {
         users: {
