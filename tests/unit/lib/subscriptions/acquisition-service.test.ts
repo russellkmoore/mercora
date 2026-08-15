@@ -7,6 +7,7 @@ import {
   type SubscriptionAcquisitionProvider,
 } from "@/lib/subscriptions/acquisition-service";
 import type { SubscriptionAcquisition } from "@/lib/subscriptions/domain";
+import { SubscriptionAcquisitionConflictError } from "@/lib/subscriptions/repository";
 
 const plan = {
   id: "plan_one",
@@ -142,6 +143,26 @@ describe("subscription acquisition service", () => {
     });
   });
 
+  it("rejects a terminally failed begin retry before provider access or D1 mutation", async () => {
+    const { service, repository, provider } = mocks();
+    repository.findAcquisitionById.mockResolvedValue({
+      ...storedAcquisition(),
+      status: "failed",
+      stripeSubscriptionId: "sub_failed",
+    });
+
+    await expect(service.begin(beginInput))
+      .rejects.toBeInstanceOf(SubscriptionAcquisitionConflictError);
+
+    expect(repository.findPlanById).not.toHaveBeenCalled();
+    expect(repository.findProviderCustomer).not.toHaveBeenCalled();
+    expect(repository.bindProviderCustomer).not.toHaveBeenCalled();
+    expect(repository.reserveAcquisition).not.toHaveBeenCalled();
+    expect(provider.createProviderCustomer).not.toHaveBeenCalled();
+    expect(provider.retrieveProviderCustomer).not.toHaveBeenCalled();
+    expect(provider.createSetupIntent).not.toHaveBeenCalled();
+  });
+
   it("rejects changed idempotent facts before mutating the SetupIntent", async () => {
     const { service, repository, provider } = mocks();
     repository.findAcquisitionById.mockResolvedValue(storedAcquisition());
@@ -182,6 +203,23 @@ describe("subscription acquisition service", () => {
     await expect(service.finalize("user_other", "seti_existing"))
       .rejects.toBeInstanceOf(SubscriptionNotFoundError);
     expect(provider.retrieveVerifiedSetupIntent).not.toHaveBeenCalled();
+  });
+
+  it("rejects a terminally failed finalization before provider access or D1 mutation", async () => {
+    const { service, repository, provider } = mocks();
+    repository.findAcquisitionBySetupIntent.mockResolvedValue({
+      ...storedAcquisition(),
+      status: "failed",
+      stripeSubscriptionId: "sub_failed",
+    });
+
+    await expect(service.finalize("user_one", "seti_existing"))
+      .rejects.toBeInstanceOf(SubscriptionNotFoundError);
+
+    expect(repository.findSubscriptionByStripeSubscription).not.toHaveBeenCalled();
+    expect(repository.recordProviderCreated).not.toHaveBeenCalled();
+    expect(provider.retrieveVerifiedSetupIntent).not.toHaveBeenCalled();
+    expect(provider.createSubscription).not.toHaveBeenCalled();
   });
 
   it("rejects mismatched verified SetupIntent and provider-record conflicts", async () => {

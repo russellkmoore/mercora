@@ -281,6 +281,9 @@ export function createSubscriptionAcquisitionService(args: {
       const currency = normalizeStripeCurrency(input.currency);
       const acquisitionId = await stableId("acq", input.customerId, input.idempotencyKey);
       const existing = await repository.findAcquisitionById(acquisitionId);
+      if (existing?.status === "failed") {
+        throw new SubscriptionAcquisitionConflictError();
+      }
       const plan = existing
         ? { ...existing.acquisition.plan, active: false, shippingRequired: false }
         : await repository.findPlanById(input.planId, currency);
@@ -342,6 +345,9 @@ export function createSubscriptionAcquisitionService(args: {
       }
       const stored = await repository.findAcquisitionBySetupIntent(setupIntentId);
       if (!stored || stored.acquisition.customerId !== customerId) throw new SubscriptionNotFoundError();
+      if (stored.status === "failed") {
+        throw new SubscriptionNotFoundError("Subscription request is no longer available");
+      }
 
       if (stored.status === "completed" && stored.stripeSubscriptionId) {
         const local = await repository.findSubscriptionByStripeSubscription(stored.stripeSubscriptionId);
