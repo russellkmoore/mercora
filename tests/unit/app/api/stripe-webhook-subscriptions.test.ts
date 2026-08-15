@@ -44,8 +44,30 @@ function event(type: Stripe.Event.Type, id: string, invoiceId = 'in_ordering'): 
 }
 
 function runtime(options: { priorFailure?: boolean; paidOrder?: boolean } = {}) {
+  const acquisition = {
+    id: 'acq-ordering',
+    setupIntentId: 'seti_ordering',
+    customerId: 'customer-ordering',
+    stripeCustomerId: 'cus_ordering',
+    plan: {
+      id: 'plan-ordering', productId: 'product-ordering', variantId: 'variant-ordering',
+      price: Money.fromMinor(2_500, 'USD'), stripePriceId: 'price_ordering',
+      cadence: { unit: 'month' as const, count: 1 },
+    },
+    quantity: 1,
+    consent: {
+      termsVersion: '2026-08', acceptedAt: '2026-08-01T00:00:00.000Z', source: 'checkout' as const,
+    },
+  };
+  const findAcquisition = vi.fn<
+    SubscriptionWebhookRuntime['repository']['findAcquisitionByStripeSubscription']
+  >(async () => ({
+    acquisition,
+    status: 'completed',
+    stripeSubscriptionId: 'sub_ordering',
+  }));
   const repository = {
-    findAcquisitionByStripeSubscription: vi.fn(),
+    findAcquisitionByStripeSubscription: findAcquisition,
     findSubscriptionByStripeSubscription: vi.fn(async () => ({
       id: 'subscription-ordering',
       acquisitionId: 'acq-ordering',
@@ -140,8 +162,24 @@ describe('subscription Stripe webhook classification', () => {
     const duplicate = runtime({ priorFailure: true });
     await handleSubscriptionStripeEvent(event('invoice.paid', 'evt_duplicate'), duplicate);
     expect(duplicate.repository.recordSubscriptionEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ eventType: 'renewed', outcome: 'duplicate' }),
+      expect.objectContaining({ eventType: 'payment_recovered', outcome: 'duplicate' }),
     );
+  });
+
+  it('ignores unrelated paid and failed subscription invoices before provider or order work', async () => {
+    for (const type of ['invoice.paid', 'invoice.payment_failed'] as const) {
+      const dependencies = runtime();
+      dependencies.repository.findAcquisitionByStripeSubscription.mockResolvedValue(undefined);
+      await expect(handleSubscriptionStripeEvent(
+        event(type, `evt_unrelated_${type}`),
+        dependencies,
+      )).resolves.toBe('ignored');
+      expect(mocks.fulfillSubscriptionInvoice).not.toHaveBeenCalled();
+      expect(dependencies.repository.findSubscriptionByStripeSubscription).not.toHaveBeenCalled();
+      expect(dependencies.repository.recordSubscriptionEvent).not.toHaveBeenCalled();
+      expect(dependencies.database.prepare).not.toHaveBeenCalled();
+      mocks.fulfillSubscriptionInvoice.mockClear();
+    }
   });
 
   it('records failure→paid recovery and makes paid→late-failure stale by invoice identity', async () => {

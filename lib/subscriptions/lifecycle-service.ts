@@ -178,7 +178,14 @@ export async function reconcileSubscriptionLifecycle(
       assertSignedBinding(acquisition, refreshed.binding, args.stripeSubscriptionId);
       snapshot = refreshed.snapshot;
     }
-    assertLifecycleSnapshot(snapshot);
+    try {
+      assertLifecycleSnapshot(snapshot);
+    } catch (error) {
+      throw new SubscriptionWebhookPermanentError(
+        'Authoritative subscription lifecycle is invalid',
+        { cause: error },
+      );
+    }
     const applied = await args.repository.compareAndApplyLifecycle({
       subscriptionId: stored.id,
       expected: stored.latestLifecycleEvent,

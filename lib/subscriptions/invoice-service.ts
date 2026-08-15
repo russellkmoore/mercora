@@ -72,7 +72,6 @@ export interface FulfillSubscriptionInvoiceArgs {
   stripeInvoiceId: string;
   /** Signed invoice routing hint; the provider read must verify it exactly. */
   stripeSubscriptionId: string;
-  now?: Date;
 }
 
 export interface FulfillSubscriptionInvoiceResult {
@@ -367,7 +366,7 @@ function assertExistingBinding(
         parseJson(row.shipping_address, 'Subscription order shipping address'),
         expectedOrder.shipping_address,
       ) ||
-      !canonicalJsonEqual(
+      !canonicalJsonContains(
         parseJson(row.external_references, 'Subscription order external references'),
         expectedOrder.external_references,
       )) {
@@ -377,7 +376,7 @@ function assertExistingBinding(
     row.extensions,
     'Subscription order extensions',
   );
-  if (!canonicalJsonEqual(extensions, expectedOrder.extensions) ||
+  if (!canonicalJsonContains(extensions, expectedOrder.extensions) ||
       extensions?.[SUBSCRIPTION_ACQUISITION_EXTENSION] !== context.acquisition_id ||
       extensions.subscription_id !== context.subscription_id ||
       extensions.subscription_plan_id !== context.plan_id) {
@@ -402,6 +401,17 @@ function canonicalJsonEqual(left: unknown, right: unknown): boolean {
   return JSON.stringify(canonicalJson(left)) === JSON.stringify(canonicalJson(right));
 }
 
+function canonicalJsonContains(actual: unknown, expected: unknown): boolean {
+  if (expected === null || typeof expected !== 'object') {
+    return canonicalJsonEqual(actual, expected);
+  }
+  if (Array.isArray(expected)) return canonicalJsonEqual(actual, expected);
+  if (actual === null || typeof actual !== 'object' || Array.isArray(actual)) return false;
+  return Object.entries(expected as Record<string, unknown>).every(
+    ([key, value]) => canonicalJsonContains((actual as Record<string, unknown>)[key], value),
+  );
+}
+
 async function recoverOrReturnExisting(
   database: D1Database,
   context: InvoiceSubscriptionContextRow,
@@ -412,7 +422,11 @@ async function recoverOrReturnExisting(
   const existing = await findExistingInvoiceOrder(database, invoice.stripeInvoiceId);
   if (!existing) return null;
   assertExistingBinding(existing, context, invoice, pendingOrder);
-  if (existing.payment_status === 'paid' && existing.status === 'processing') {
+  const advancedPaidOrder = existing.payment_status === 'paid'
+    && ['processing', 'shipped', 'delivered'].includes(existing.status);
+  const settledRefundOrder = existing.payment_status === 'refunded'
+    && ['refunded', 'cancelled'].includes(existing.status);
+  if (advancedPaidOrder || settledRefundOrder) {
     return { order: hydrateExisting(existing), created: false };
   }
   if (existing.payment_status !== 'pending' || existing.status !== 'pending') {
@@ -465,7 +479,7 @@ export async function fulfillSubscriptionInvoice(
   if (invoice.stripeInvoiceId !== args.stripeInvoiceId) {
     throw new Error('Provider returned a different subscription invoice');
   }
-  const now = args.now ?? new Date(invoice.verifiedPaidAt * 1_000);
+  const now = new Date(invoice.verifiedPaidAt * 1_000);
   const pendingOrder = createPendingOrder(context, invoice, now);
   const existing = await recoverOrReturnExisting(
     args.database,
