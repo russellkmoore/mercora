@@ -33,6 +33,7 @@ describe('real D1 Workers harness', () => {
       '0018_add_email_preferences.sql',
       '0019_add_content_publishing.sql',
       '0020_add_redirect_map.sql',
+      '0021_add_subscriptions.sql',
     ]);
   });
 
