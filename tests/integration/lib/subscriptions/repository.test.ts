@@ -66,6 +66,25 @@ function provider(acq: SubscriptionAcquisition): ProviderSubscriptionBinding {
   };
 }
 
+async function seedCompletedSubscription(
+  repository: ReturnType<typeof createSubscriptionRepository>,
+) {
+  const candidate = acquisition();
+  const binding = provider(candidate);
+  await repository.bindProviderCustomer({
+    customerId: candidate.customerId,
+    stripeCustomerId: candidate.stripeCustomerId,
+  });
+  await repository.reserveAcquisition(candidate);
+  await repository.recordProviderCreated({ acquisition: candidate, provider: binding });
+  return repository.completeAcquisitionFromLifecycleWebhook({
+    acquisition: candidate,
+    provider: binding,
+    lifecycle: { status: "active", quantity: 1, cancelAtPeriodEnd: false },
+    lifecycleEvent: { id: "evt_initial", createdAt: 10 },
+  });
+}
+
 describe("subscription repository on D1", () => {
   beforeAll(async () => {
     await applyTestMigrations();
@@ -273,6 +292,81 @@ describe("subscription repository on D1", () => {
     };
     await expect(repo.recordSubscriptionEvent(event)).resolves.toBe(true);
     await expect(repo.recordSubscriptionEvent(event)).resolves.toBe(false);
+  });
+
+  it("serializes concurrent identical lifecycle CAS attempts into applied and already-applied", async () => {
+    const repo = createSubscriptionRepository(env.DB);
+    const subscription = await seedCompletedSubscription(repo);
+    const args = {
+      subscriptionId: subscription.id,
+      expected: { id: "evt_initial", createdAt: 10 },
+      incoming: { id: "evt_pause", createdAt: 20 },
+      snapshot: {
+        status: "active" as const,
+        quantity: 1,
+        pauseCollection: { behavior: "void" as const },
+        cancelAtPeriodEnd: false,
+      },
+    };
+
+    const decisions = await Promise.all([
+      repo.compareAndApplyLifecycle(args),
+      repo.compareAndApplyLifecycle(args),
+    ]);
+
+    expect(decisions.sort()).toEqual(["already_applied", "applied"]);
+    await expect(repo.findSubscriptionByStripeSubscription("sub_one")).resolves.toMatchObject({
+      status: "active",
+      pauseCollection: { behavior: "void" },
+      latestLifecycleEvent: { id: "evt_pause", createdAt: 20 },
+      version: 2,
+    });
+  });
+
+  it("allows only one equal-time different-id lifecycle CAS winner", async () => {
+    const repo = createSubscriptionRepository(env.DB);
+    const subscription = await seedCompletedSubscription(repo);
+    const expected = { id: "evt_initial", createdAt: 10 };
+    const [left, right] = await Promise.all([
+      repo.compareAndApplyLifecycle({
+        subscriptionId: subscription.id,
+        expected,
+        incoming: { id: "evt_equal_a", createdAt: 20 },
+        snapshot: {
+          status: "active",
+          quantity: 2,
+          pauseCollection: { behavior: "void" },
+          cancelAtPeriodEnd: false,
+        },
+      }),
+      repo.compareAndApplyLifecycle({
+        subscriptionId: subscription.id,
+        expected,
+        incoming: { id: "evt_equal_b", createdAt: 20 },
+        snapshot: {
+          status: "canceled",
+          quantity: 3,
+          cancelAtPeriodEnd: false,
+          canceledAt: 20,
+          endedAt: 20,
+        },
+      }),
+    ]);
+
+    expect([left, right].sort()).toEqual(["applied", "conflict"]);
+    const stored = await repo.findSubscriptionByStripeSubscription("sub_one");
+    expect(stored?.latestLifecycleEvent.createdAt).toBe(20);
+    expect(["evt_equal_a", "evt_equal_b"]).toContain(stored?.latestLifecycleEvent.id);
+    if (stored?.latestLifecycleEvent.id === "evt_equal_a") {
+      expect(stored).toMatchObject({
+        quantity: 2,
+        status: "active",
+        pauseCollection: { behavior: "void" },
+      });
+    } else {
+      expect(stored).toMatchObject({ quantity: 3, status: "canceled", canceledAt: 20, endedAt: 20 });
+    }
+    expect(stored?.version).toBe(2);
   });
 
   it("does not complete when the deterministic local subscription id is occupied", async () => {

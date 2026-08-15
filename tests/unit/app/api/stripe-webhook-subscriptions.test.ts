@@ -545,6 +545,33 @@ describe('subscription Stripe webhook classification', () => {
     ]);
   });
 
+  it('uses a distinct failure delivery key for each provider attempt alias event', async () => {
+    mocks.recordSubscriptionInvoiceFailure
+      .mockResolvedValueOnce({ outcome: 'applied', notify: true })
+      .mockResolvedValueOnce({ outcome: 'applied', notify: true });
+    const failed = runtime();
+    const attemptRequired = runtime();
+
+    await handleSubscriptionStripeEvent(
+      event('invoice.payment_failed', 'evt_failure_alias_one'),
+      failed,
+    );
+    await handleSubscriptionStripeEvent(
+      event('invoice.payment_attempt_required', 'evt_failure_alias_two'),
+      attemptRequired,
+    );
+
+    const scopes = [failed, attemptRequired].map((dependencies) => (
+      dependencies.lifecycleEmailSender.mock.calls[0]?.[0].deliveryScope
+    ));
+    expect(scopes).toEqual(['evt_failure_alias_one', 'evt_failure_alias_two']);
+    const keys = await Promise.all(scopes.map((scope) => subscriptionLifecycleEmailKey(
+      scope!,
+      'payment_failed',
+    )));
+    expect(keys[0]).not.toBe(keys[1]);
+  });
+
   it('permanently rejects a malformed signed lifecycle object and audits failure when bound', async () => {
     const dependencies = runtime();
     const malformed = event('customer.subscription.updated', 'evt_malformed');
