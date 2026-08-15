@@ -1,21 +1,37 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { ClerkMigrationClient } from "@/scripts/shopify-migration/adapters/clerk";
 import type { CommandRunner } from "@/scripts/shopify-migration/adapters/d1";
 import type { MediaObjectStore } from "@/scripts/shopify-migration/adapters/media";
 import type { ExecutionPlan, MigrationConfig } from "@/scripts/shopify-migration/lib/config";
+import type { MediaRewrite } from "@/scripts/shopify-migration/transformers/_shared";
 import {
   orchestrateMigration,
   type MigrationAdapterRunners,
   type MigrationApplyFactories,
   type MigrationSource,
   type MigrationSourceBundle,
+  type TargetBoundClerkMigrationClient,
 } from "@/scripts/shopify-migration/orchestrator";
 
+const accountId = "a".repeat(32);
+const clerkInstanceId = "ins_preview_store";
 const wranglerConfig = JSON.stringify({
-  d1_databases: [{ binding: "DB", database_name: "migration-db", database_id: "db-id" }],
-  r2_buckets: [{ binding: "MEDIA", bucket_name: "migration-media" }],
+  account_id: accountId,
+  vars: { CLERK_INSTANCE_ID: clerkInstanceId },
+  d1_databases: [{
+    binding: "DB", database_name: "migration-db", database_id: "db-id", preview_database_id: "preview-db-id",
+  }],
+  r2_buckets: [{ binding: "MEDIA", bucket_name: "migration-media", preview_bucket_name: "migration-media-preview" }],
 });
+
+const preflightReceipt = {
+  version: 1 as const,
+  target: "preview" as const,
+  databaseName: "migration-db",
+  databaseId: "preview-db-id",
+  environment: null,
+  projectDigest: "b".repeat(64),
+};
 
 function execution(overrides: Partial<ExecutionPlan> = {}): ExecutionPlan {
   return {
@@ -125,15 +141,25 @@ describe("Shopify migration orchestrator", () => {
   it("applies strictly in media, Clerk, then D1 order", async () => {
     const events: string[] = [];
     const mediaStore = {} as MediaObjectStore;
-    const clerkClient = {} as ClerkMigrationClient;
+    const clerkClient = {
+      verifyTarget: vi.fn(async () => { events.push("clerk-preflight"); }),
+    } as unknown as TargetBoundClerkMigrationClient;
     const commandRunner = {} as CommandRunner;
     const plan = execution({
       dryRun: false,
       apply: true,
+      target: "preview",
       includeSensitive: true,
       confirmedSensitiveData: true,
+      confirmedPreview: true,
     });
     const records = bundle({
+      collections: [{
+        id: 1,
+        title: "Tea",
+        handle: "tea",
+        image: { src: "https://cdn.shopify.com/tea.jpg", width: 100, height: 100 },
+      }],
       customers: [{
         id: 42,
         email: "customer@example.test",
@@ -147,7 +173,18 @@ describe("Shopify migration orchestrator", () => {
       createCommandRunner: vi.fn(() => { events.push("d1-factory"); return commandRunner; }),
     };
     const runners: MigrationAdapterRunners = {
-      importMedia: vi.fn(async () => { events.push("media-run"); return []; }),
+      preflightD1: vi.fn(async () => { events.push("d1-preflight"); return preflightReceipt; }),
+      importMedia: vi.fn(async (plans: readonly MediaRewrite[]) => {
+        events.push("media-run");
+        return plans.map((media) => ({
+          objectKey: media.objectKey,
+          publicPath: media.publicPath,
+          contentType: media.contentType,
+          status: "written" as const,
+          byteLength: 10,
+          sha256: "c".repeat(64),
+        }));
+      }),
       provisionClerk: vi.fn(async (plans) => {
         events.push("clerk-run");
         return {
@@ -169,21 +206,170 @@ describe("Shopify migration orchestrator", () => {
       source: source(records),
       projectRoot: "/repo",
       wranglerConfigText: wranglerConfig,
+      remoteTargetBinding: { cloudflareAccountId: accountId, clerkInstanceId },
       applyFactories: factories,
       runners,
       now: () => new Date("2026-08-14T12:00:00.000Z"),
     });
 
     expect(events).toEqual([
+      "d1-factory",
+      "d1-preflight",
+      "clerk-factory",
+      "clerk-preflight",
       "media-factory",
       "media-run",
-      "clerk-factory",
       "clerk-run",
-      "d1-factory",
       "d1-run",
     ]);
-    expect(result).toMatchObject({ dryRun: false, clerk: { created: 1 }, media: { persisted: 0 } });
+    expect(result).toMatchObject({ dryRun: false, clerk: { created: 1 }, media: { persisted: 1 } });
     expect(JSON.stringify(result)).not.toContain("customer@example.test");
     expect(JSON.stringify(result)).not.toContain("Private");
+  });
+
+  it("rejects local external-write plans before constructing any adapter", async () => {
+    const factories: MigrationApplyFactories = {
+      createMediaStore: vi.fn(),
+      createClerkClient: vi.fn(),
+      createCommandRunner: vi.fn(),
+    };
+    await expect(orchestrateMigration({
+      config: config(execution({
+        dryRun: false,
+        apply: true,
+        includeSensitive: true,
+        confirmedSensitiveData: true,
+      })),
+      domain,
+      source: source(bundle({
+        collections: [{ id: 1, title: "Tea", handle: "tea", image: { src: "https://cdn.shopify.com/tea.jpg" } }],
+        customers: [{ id: 42, email: "customer@example.test", verified_email: true }],
+      })),
+      projectRoot: "/repo",
+      wranglerConfigText: wranglerConfig,
+      applyFactories: factories,
+      runners: {} as MigrationAdapterRunners,
+    })).rejects.toThrow("Local apply cannot use remote R2 or Clerk");
+    expect(factories.createCommandRunner).not.toHaveBeenCalled();
+    expect(factories.createMediaStore).not.toHaveBeenCalled();
+    expect(factories.createClerkClient).not.toHaveBeenCalled();
+  });
+
+  it("rejects remote target identity mismatches before preflight or client construction", async () => {
+    const factories: MigrationApplyFactories = {
+      createMediaStore: vi.fn(),
+      createClerkClient: vi.fn(),
+      createCommandRunner: vi.fn(),
+    };
+    const preflightD1 = vi.fn();
+    const preview = execution({ dryRun: false, apply: true, target: "preview", confirmedPreview: true });
+    await expect(orchestrateMigration({
+      config: config(preview),
+      domain,
+      source: source(bundle()),
+      projectRoot: "/repo",
+      wranglerConfigText: wranglerConfig,
+      remoteTargetBinding: { cloudflareAccountId: "f".repeat(32) },
+      applyFactories: factories,
+      runners: { preflightD1 } as unknown as MigrationAdapterRunners,
+    })).rejects.toThrow("Cloudflare credential account does not match");
+    expect(preflightD1).not.toHaveBeenCalled();
+    expect(factories.createCommandRunner).not.toHaveBeenCalled();
+    expect(factories.createMediaStore).not.toHaveBeenCalled();
+    expect(factories.createClerkClient).not.toHaveBeenCalled();
+  });
+
+  it("rejects a Clerk instance mismatch before D1 preflight or client construction", async () => {
+    const factories: MigrationApplyFactories = {
+      createMediaStore: vi.fn(),
+      createClerkClient: vi.fn(),
+      createCommandRunner: vi.fn(),
+    };
+    const preflightD1 = vi.fn();
+    const preview = execution({
+      dryRun: false,
+      apply: true,
+      target: "preview",
+      confirmedPreview: true,
+      includeSensitive: true,
+      confirmedSensitiveData: true,
+    });
+    await expect(orchestrateMigration({
+      config: config(preview),
+      domain,
+      source: source(bundle({ customers: [{ id: 42, email: "customer@example.test", verified_email: true }] })),
+      projectRoot: "/repo",
+      wranglerConfigText: wranglerConfig,
+      remoteTargetBinding: { cloudflareAccountId: accountId, clerkInstanceId: "ins_wrong_store" },
+      applyFactories: factories,
+      runners: { preflightD1 } as unknown as MigrationAdapterRunners,
+    })).rejects.toThrow("Clerk instance does not match");
+    expect(preflightD1).not.toHaveBeenCalled();
+    expect(factories.createCommandRunner).not.toHaveBeenCalled();
+    expect(factories.createClerkClient).not.toHaveBeenCalled();
+  });
+
+  it("runs D1 preflight before constructing mutating media or Clerk adapters", async () => {
+    const factories: MigrationApplyFactories = {
+      createMediaStore: vi.fn(),
+      createClerkClient: vi.fn(),
+      createCommandRunner: vi.fn(() => ({} as CommandRunner)),
+    };
+    const preflightD1 = vi.fn(async () => { throw new Error("D1 preflight failed"); });
+    await expect(orchestrateMigration({
+      config: config(execution({ dryRun: false, apply: true, target: "preview", confirmedPreview: true })),
+      domain,
+      source: source(bundle({
+        collections: [{ id: 1, title: "Tea", handle: "tea", image: { src: "https://cdn.shopify.com/tea.jpg" } }],
+      })),
+      projectRoot: "/repo",
+      wranglerConfigText: wranglerConfig,
+      remoteTargetBinding: { cloudflareAccountId: accountId },
+      applyFactories: factories,
+      runners: { preflightD1 } as unknown as MigrationAdapterRunners,
+    })).rejects.toThrow("D1 preflight failed");
+    expect(preflightD1).toHaveBeenCalledOnce();
+    expect(factories.createMediaStore).not.toHaveBeenCalled();
+    expect(factories.createClerkClient).not.toHaveBeenCalled();
+  });
+
+  it("stops after a Clerk credential-instance mismatch without constructing media or running writes", async () => {
+    const verifyTarget = vi.fn(async () => { throw new Error("Clerk credential instance does not match"); });
+    const factories: MigrationApplyFactories = {
+      createMediaStore: vi.fn(),
+      createClerkClient: vi.fn(async () => ({ verifyTarget } as unknown as TargetBoundClerkMigrationClient)),
+      createCommandRunner: vi.fn(() => ({} as CommandRunner)),
+    };
+    const provisionClerk = vi.fn();
+    const runD1 = vi.fn();
+    await expect(orchestrateMigration({
+      config: config(execution({
+        dryRun: false,
+        apply: true,
+        target: "preview",
+        confirmedPreview: true,
+        includeSensitive: true,
+        confirmedSensitiveData: true,
+      })),
+      domain,
+      source: source(bundle({
+        collections: [{ id: 1, title: "Tea", handle: "tea", image: { src: "https://cdn.shopify.com/tea.jpg" } }],
+        customers: [{ id: 42, email: "customer@example.test", verified_email: true }],
+      })),
+      projectRoot: "/repo",
+      wranglerConfigText: wranglerConfig,
+      remoteTargetBinding: { cloudflareAccountId: accountId, clerkInstanceId },
+      applyFactories: factories,
+      runners: {
+        preflightD1: vi.fn(async () => preflightReceipt),
+        importMedia: vi.fn(),
+        provisionClerk,
+        runD1,
+      } as unknown as MigrationAdapterRunners,
+    })).rejects.toThrow("Clerk credential instance does not match");
+    expect(verifyTarget).toHaveBeenCalledWith(clerkInstanceId, "development");
+    expect(factories.createMediaStore).not.toHaveBeenCalled();
+    expect(provisionClerk).not.toHaveBeenCalled();
+    expect(runD1).not.toHaveBeenCalled();
   });
 });

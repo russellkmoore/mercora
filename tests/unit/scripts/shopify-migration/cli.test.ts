@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,6 +9,7 @@ import {
   createClerkRestMigrationClient,
   createFileMigrationSource,
   createShopifyApiMigrationSource,
+  assertPrivateMigrationRoots,
   parseMigrationCli,
 } from "@/scripts/shopify-migration/cli";
 
@@ -149,6 +150,101 @@ describe("Shopify migration CLI", () => {
     expect(requested.some((path) => path.endsWith("customers.json") || path.endsWith("orders.json"))).toBe(false);
   });
 
+  it("extracts blog articles sequentially with a bounded per-blog pipeline", async () => {
+    let activeArticles = 0;
+    let maximumActiveArticles = 0;
+    const responseRows: Record<string, unknown[]> = {
+      custom_collections: [], smart_collections: [], collects: [], products: [], pages: [], redirects: [],
+      blogs: [{ id: 7, title: "One", handle: "one" }, { id: 8, title: "Two", handle: "two" }],
+      articles: [],
+    };
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      const isArticle = url.pathname.endsWith("articles.json");
+      if (isArticle) {
+        activeArticles += 1;
+        maximumActiveArticles = Math.max(maximumActiveArticles, activeArticles);
+        await Promise.resolve();
+        activeArticles -= 1;
+      }
+      const key = url.pathname.split("/").at(-1)!.replace(".json", "");
+      return new Response(JSON.stringify({ [key]: responseRows[key] ?? [] }), {
+        headers: { "content-type": "application/json" },
+      });
+    }));
+    const parsed = parseMigrationCli({
+      ...environment,
+      MIGRATION_SOURCE_MODE: "api",
+      SHOPIFY_STORE_URL: "https://store.myshopify.com",
+      SHOPIFY_ACCESS_TOKEN: "private-token",
+      SHOPIFY_API_VERSION: "2026-07",
+    }, [], "/repo");
+    await createShopifyApiMigrationSource(parsed.config, parsed).extract(false);
+    expect(maximumActiveArticles).toBe(1);
+  });
+
+  it("requires read_all_orders confirmation and reconciles the historical source count", async () => {
+    const apiEnvironment = {
+      ...environment,
+      MIGRATION_SOURCE_MODE: "api",
+      SHOPIFY_STORE_URL: "https://store.myshopify.com",
+      SHOPIFY_ACCESS_TOKEN: "private-token",
+      SHOPIFY_API_VERSION: "2026-07",
+    };
+    const sensitive = ["--include-sensitive", "--confirm-sensitive-data"];
+    expect(() => parseMigrationCli(apiEnvironment, sensitive, "/repo")).toThrow("read-all-orders");
+    expect(() => parseMigrationCli(
+      apiEnvironment,
+      [...sensitive, "--confirm-shopify-read-all-orders"],
+      "/repo",
+    )).toThrow("expected Shopify order count");
+
+    const requestedOrders: URL[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      const key = url.pathname.split("/").at(-1)!.replace(".json", "");
+      if (key === "orders") requestedOrders.push(url);
+      const rows = key === "orders" ? [{ id: 1 }] : [];
+      return new Response(JSON.stringify({ [key]: rows }), { headers: { "content-type": "application/json" } });
+    }));
+    const parsed = parseMigrationCli(
+      apiEnvironment,
+      [...sensitive, "--confirm-shopify-read-all-orders", "--expected-shopify-order-count=1"],
+      "/repo",
+    );
+    await expect(createShopifyApiMigrationSource(parsed.config, parsed).extract(true)).resolves.toMatchObject({
+      orders: [{ id: 1 }],
+    });
+    expect(requestedOrders[0].searchParams.get("status")).toBe("any");
+
+    const mismatch = { ...parsed, expectedShopifyOrderCount: 2 };
+    await expect(createShopifyApiMigrationSource(mismatch.config, mismatch).extract(true))
+      .rejects.toThrow("does not match the confirmed source count");
+  });
+
+  it("requires canonical migration roots outside the repository", async () => {
+    const createdProjectRoot = await mkdtemp(join(tmpdir(), "mercora-project-"));
+    const createdOutsideInput = await mkdtemp(join(tmpdir(), "mercora-private-input-"));
+    const createdOutsideOutput = await mkdtemp(join(tmpdir(), "mercora-private-output-"));
+    temporaryDirectories.push(createdProjectRoot, createdOutsideInput, createdOutsideOutput);
+    const projectRoot = await realpath(createdProjectRoot);
+    const outsideInput = await realpath(createdOutsideInput);
+    const outsideOutput = await realpath(createdOutsideOutput);
+    expect(() => assertPrivateMigrationRoots({
+      sourceMode: "file",
+      inputRoot: outsideInput,
+      outputRoot: outsideOutput,
+      execution: parseMigrationCli({ ...environment, MIGRATION_INPUT_ROOT: outsideInput }, [], projectRoot).config.execution,
+    }, projectRoot)).not.toThrow();
+    const inside = join(projectRoot, "input");
+    await mkdir(inside);
+    expect(() => assertPrivateMigrationRoots({
+      sourceMode: "file",
+      inputRoot: inside,
+      execution: parseMigrationCli({ ...environment, MIGRATION_INPUT_ROOT: inside }, [], projectRoot).config.execution,
+    }, projectRoot)).toThrow("outside the project repository");
+  });
+
   it("forwards Clerk abort signals and emits only the narrow migration user shape", async () => {
     const controller = new AbortController();
     const fetchRequest = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
@@ -205,5 +301,37 @@ describe("Shopify migration CLI", () => {
     expect(error).toBeInstanceOf(ClerkRetryableRequestError);
     expect((error as ClerkRetryableRequestError).retryAfterMs).toBe(2_000);
     expect(String(error)).not.toContain("private provider message");
+  });
+
+  it("binds the Clerk secret to the expected instance and environment", async () => {
+    const fetchRequest = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({
+      id: "ins_preview_store",
+      environment_type: "development",
+    }), { headers: { "content-type": "application/json" } }));
+    const client = createClerkRestMigrationClient("sk_test_private", fetchRequest);
+    await expect(client.verifyTarget("ins_preview_store", "development")).resolves.toBeUndefined();
+    await expect(client.verifyTarget("ins_other_store", "development"))
+      .rejects.toThrow("does not match the confirmed migration target");
+    expect(String(fetchRequest.mock.calls[0][0])).toBe("https://api.clerk.com/v1/instance");
+  });
+
+  it("aborts a stalled Clerk instance preflight at its fixed bound", async () => {
+    vi.useFakeTimers();
+    try {
+      let observedSignal: AbortSignal | undefined;
+      const client = createClerkRestMigrationClient("sk_test_private", vi.fn((_input, init) => {
+        observedSignal = init?.signal as AbortSignal;
+        return new Promise<Response>((_resolve, reject) => {
+          observedSignal!.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+        });
+      }));
+      const pending = client.verifyTarget("ins_preview_store", "development");
+      const rejected = expect(pending).rejects.toBeInstanceOf(ClerkRetryableRequestError);
+      await vi.advanceTimersByTimeAsync(30_000);
+      await rejected;
+      expect(observedSignal?.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
