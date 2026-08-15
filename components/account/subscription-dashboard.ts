@@ -47,6 +47,12 @@ const MAX_EPOCH_SECONDS = 8_640_000_000;
 const STATUS_SET = new Set<string>(SUBSCRIPTION_STATUSES);
 const ID_PATTERN = /^[^\s/]{1,128}$/;
 
+class SubscriptionResponseTooLargeError extends Error {
+  constructor() {
+    super('Subscription response is too large');
+  }
+}
+
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return value !== null
     && typeof value === 'object'
@@ -111,13 +117,47 @@ function parseSummary(value: unknown): CustomerSubscriptionSummary {
 }
 
 async function readBoundedJson(response: Response): Promise<unknown> {
-  const declared = Number(response.headers.get('content-length') ?? 0);
-  if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) {
-    throw new Error('Subscription response is too large');
+  const declaredHeader = response.headers.get('content-length');
+  if (declaredHeader !== null) {
+    if (!/^\d+$/.test(declaredHeader)) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new Error('Subscription service returned an invalid response');
+    }
+    const declared = Number(declaredHeader);
+    if (!Number.isSafeInteger(declared)) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new Error('Subscription service returned an invalid response');
+    }
+    if (declared > MAX_RESPONSE_BYTES) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new SubscriptionResponseTooLargeError();
+    }
   }
-  const text = await response.text();
-  if (new TextEncoder().encode(text).byteLength > MAX_RESPONSE_BYTES) {
-    throw new Error('Subscription response is too large');
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('Subscription service returned an invalid response');
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+  let received = 0;
+  let text = '';
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      received += chunk.value.byteLength;
+      if (received > MAX_RESPONSE_BYTES) {
+        await reader.cancel().catch(() => undefined);
+        throw new SubscriptionResponseTooLargeError();
+      }
+      text += decoder.decode(chunk.value, { stream: true });
+    }
+    text += decoder.decode();
+  } catch (error) {
+    if (error instanceof SubscriptionResponseTooLargeError) {
+      throw error;
+    }
+    await reader.cancel().catch(() => undefined);
+    throw new Error('Subscription service returned an invalid response');
+  } finally {
+    reader.releaseLock();
   }
   try {
     return JSON.parse(text) as unknown;
