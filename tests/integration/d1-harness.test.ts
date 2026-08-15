@@ -32,7 +32,56 @@ describe('real D1 Workers harness', () => {
       '0017_add_product_recommendations.sql',
       '0018_add_email_preferences.sql',
       '0019_add_content_publishing.sql',
+      '0020_add_redirect_map.sql',
     ]);
+  });
+
+  it('adds an empty redirect map without changing a populated baseline', async () => {
+    const customerId = 'O05-POPULATED-CUSTOMER';
+    await env.DB.prepare(`
+      INSERT OR IGNORE INTO customers (id, type, person, created_at, updated_at)
+      VALUES (?, 'person', ?, ?, ?)
+    `).bind(
+      customerId,
+      JSON.stringify({ email: 'existing-o05@example.com' }),
+      '2026-08-01T00:00:00.000Z',
+      '2026-08-01T00:00:00.000Z',
+    ).run();
+
+    const customer = await env.DB.prepare(
+      'SELECT id FROM customers WHERE id = ?',
+    ).bind(customerId).first<{ id: string }>();
+    const redirects = await env.DB.prepare(
+      'SELECT COUNT(*) AS count FROM redirect_map',
+    ).first<{ count: number }>();
+
+    expect(customer?.id).toBe(customerId);
+    expect(redirects?.count).toBe(0);
+  });
+
+  it('enforces redirect safety constraints in D1', async () => {
+    await env.DB.prepare(`
+      INSERT INTO redirect_map (source_path, target_path, status_code, entity_type)
+      VALUES ('/products/old-handle', '/product/new-handle', 308, 'product')
+    `).run();
+
+    const row = await env.DB.prepare(
+      "SELECT target_path, status_code FROM redirect_map WHERE source_path = '/products/old-handle'",
+    ).first<{ target_path: string; status_code: number }>();
+    expect(row).toEqual({ target_path: '/product/new-handle', status_code: 308 });
+
+    await expect(env.DB.prepare(
+      "INSERT INTO redirect_map (source_path, target_path) VALUES ('/products/loop', '/products/loop')",
+    ).run()).rejects.toThrow();
+    await expect(env.DB.prepare(
+      "INSERT INTO redirect_map (source_path, target_path) VALUES ('/products/external', '//example.test')",
+    ).run()).rejects.toThrow();
+    await expect(env.DB.prepare(
+      "INSERT INTO redirect_map (source_path, target_path, status_code) VALUES ('/products/temp', '/product/temp', 302)",
+    ).run()).rejects.toThrow();
+    await expect(env.DB.prepare(
+      "INSERT INTO redirect_map (source_path, target_path) VALUES ('/products/chain', '/pages/other')",
+    ).run()).rejects.toThrow();
   });
 
   it('adds empty email preference state without changing a populated baseline', async () => {

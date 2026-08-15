@@ -130,3 +130,6 @@ export * from "./email-deliveries";
 
 // Store-neutral content publishing
 export * from "./blog";
+
+// Exact legacy URL redirects populated by migration tooling
+export * from "./redirect-map";
