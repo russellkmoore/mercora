@@ -37,6 +37,11 @@ export default function OrderItemCard({ item, authoritativeLine }: OrderItemCard
         <div className="text-xs text-gray-500">
           {quantity} × {unitPrice.format()}
         </div>
+        {item?.giftCardCustomization && (
+          <div className="text-xs text-gray-500">
+            For {item.giftCardCustomization.recipientName || item.giftCardCustomization.recipientEmail}
+          </div>
+        )}
       </div>
 
       <div className="text-sm font-medium text-right min-w-[64px]">
