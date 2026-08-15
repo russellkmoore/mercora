@@ -57,6 +57,11 @@ export const TAIL_ROUTE_PATHS: ReadonlySet<string> = new Set([
   '/api/orders/:id',
   '/api/orders/refund',
   '/api/payment-intent',
+  '/api/setup-intent',
+  '/api/subscriptions',
+  '/api/subscriptions/:id/cancel',
+  '/api/subscriptions/:id/pause',
+  '/api/subscriptions/:id/resume',
   '/api/webhooks/stripe',
 ]);
 
@@ -67,7 +72,7 @@ const ENUM_FIELDS: Record<string, ReadonlySet<string>> = {
   ]),
   operation: new Set([
     'audit_write', 'claim', 'complete', 'create', 'finalize', 'persist',
-    'process', 'rebuild', 'record_failure', 'send', 'stage', 'transition',
+    'process', 'read', 'rebuild', 'record_failure', 'send', 'stage', 'transition',
     'validate',
   ]),
   outcome: new Set([
