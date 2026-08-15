@@ -39,6 +39,11 @@ export type SubscriptionEventOutcome =
   | "ignored_stale"
   | "refresh_required"
   | "failed";
+export type SubscriptionAcquisitionStatus =
+  | "pending"
+  | "provider_created"
+  | "completed"
+  | "failed";
 
 export interface SubscriptionConsentRecord {
   termsVersion: string;
@@ -80,14 +85,79 @@ export const subscriptionPlans = sqliteTable("subscription_plans", {
     ${table.unitAmountMinor} >= 0
     AND (${table.isActive} = 0 OR ${table.unitAmountMinor} > 0)
   `),
+  check("subscription_plans_id_check", sql`length(${table.id}) BETWEEN 1 AND 128`),
+  check("subscription_plans_product_id_check", sql`length(${table.productId}) BETWEEN 1 AND 128`),
+  check("subscription_plans_variant_id_check", sql`length(${table.variantId}) BETWEEN 1 AND 128`),
+  check("subscription_plans_price_id_check", sql`
+    length(${table.stripePriceId}) BETWEEN 7 AND 255
+    AND ${table.stripePriceId} GLOB 'price_*'
+  `),
+  check("subscription_plans_cadence_unit_check", sql`
+    ${table.cadenceUnit} IN ('day', 'week', 'month', 'year')
+  `),
+  check("subscription_plans_active_check", sql`${table.isActive} IN (0, 1)`),
   check("subscription_plans_cadence_count_check", sql`${table.cadenceCount} BETWEEN 1 AND 365`),
+]);
+
+export const subscriptionAcquisitions = sqliteTable("subscription_acquisitions", {
+  id: text("id").primaryKey(),
+  setupIntentId: text("setup_intent_id").notNull().unique(),
+  planId: text("plan_id").notNull().references(() => subscriptionPlans.id, { onDelete: "restrict" }),
+  customerId: text("customer_id").notNull().references(() => customers.id, { onDelete: "restrict" }),
+  stripeCustomerId: text("stripe_customer_id").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  shippingAddress: text("shipping_address", { mode: "json" }).$type<Address>(),
+  consentRecord: text("consent_record", { mode: "json" }).$type<SubscriptionConsentRecord>().notNull(),
+  status: text("status", {
+    enum: ["pending", "provider_created", "completed", "failed"],
+  }).notNull().default("pending"),
+  stripeSubscriptionId: text("stripe_subscription_id").unique(),
+  createdAt: text("created_at").notNull().default(isoNow),
+  updatedAt: text("updated_at").notNull().default(isoNow),
+}, (table) => [
+  index("subscription_acquisitions_customer_status_idx").on(table.customerId, table.status),
+  index("subscription_acquisitions_plan_idx").on(table.planId),
+  check("subscription_acquisitions_id_check", sql`length(${table.id}) BETWEEN 1 AND 128`),
+  check("subscription_acquisitions_setup_intent_check", sql`
+    length(${table.setupIntentId}) BETWEEN 6 AND 255
+    AND ${table.setupIntentId} GLOB 'seti_*'
+  `),
+  check("subscription_acquisitions_customer_check", sql`
+    length(${table.stripeCustomerId}) BETWEEN 5 AND 255
+    AND ${table.stripeCustomerId} GLOB 'cus_*'
+  `),
+  check("subscription_acquisitions_quantity_check", sql`${table.quantity} BETWEEN 1 AND 1000`),
+  check("subscription_acquisitions_address_check", sql`
+    ${table.shippingAddress} IS NULL OR (
+      length(${table.shippingAddress}) <= 32768
+      AND json_valid(${table.shippingAddress})
+      AND json_type(${table.shippingAddress}) = 'object'
+    )
+  `),
+  check("subscription_acquisitions_consent_check", sql`
+    length(${table.consentRecord}) BETWEEN 2 AND 16384
+    AND json_valid(${table.consentRecord})
+    AND json_type(${table.consentRecord}) = 'object'
+  `),
+  check("subscription_acquisitions_status_check", sql`
+    ${table.status} IN ('pending', 'provider_created', 'completed', 'failed')
+  `),
+  check("subscription_acquisitions_subscription_check", sql`
+    ${table.stripeSubscriptionId} IS NULL OR (
+      length(${table.stripeSubscriptionId}) BETWEEN 5 AND 255
+      AND ${table.stripeSubscriptionId} GLOB 'sub_*'
+    )
+  `),
 ]);
 
 export const customerSubscriptions = sqliteTable("customer_subscriptions", {
   id: text("id").primaryKey(),
   planId: text("plan_id").notNull().references(() => subscriptionPlans.id, { onDelete: "restrict" }),
   customerId: text("customer_id").notNull().references(() => customers.id, { onDelete: "restrict" }),
-  sourceOrderId: text("source_order_id").notNull().unique().references(() => orders.id, { onDelete: "restrict" }),
+  acquisitionId: text("acquisition_id").notNull().unique().references(
+    () => subscriptionAcquisitions.id,
+    { onDelete: "restrict" },
+  ),
   stripeSubscriptionId: text("stripe_subscription_id").notNull().unique(),
   stripeCustomerId: text("stripe_customer_id").notNull(),
   quantity: integer("quantity").notNull().default(1),
@@ -107,6 +177,7 @@ export const customerSubscriptions = sqliteTable("customer_subscriptions", {
   consentRecord: text("consent_record", { mode: "json" }).$type<SubscriptionConsentRecord>().notNull(),
   currentPeriodStart: integer("current_period_start"),
   currentPeriodEnd: integer("current_period_end"),
+  pauseCollection: text("pause_collection", { mode: "json" }).$type<Record<string, unknown>>(),
   cancelAtPeriodEnd: integer("cancel_at_period_end", { mode: "boolean" }).notNull().default(false),
   cancelAt: integer("cancel_at"),
   canceledAt: integer("canceled_at"),
@@ -119,6 +190,33 @@ export const customerSubscriptions = sqliteTable("customer_subscriptions", {
   index("customer_subscriptions_customer_status_idx").on(table.customerId, table.status),
   index("customer_subscriptions_plan_idx").on(table.planId),
   check("customer_subscriptions_quantity_check", sql`${table.quantity} BETWEEN 1 AND 1000`),
+  check("customer_subscriptions_id_check", sql`length(${table.id}) BETWEEN 1 AND 128`),
+  check("customer_subscriptions_subscription_id_check", sql`
+    length(${table.stripeSubscriptionId}) BETWEEN 5 AND 255
+    AND ${table.stripeSubscriptionId} GLOB 'sub_*'
+  `),
+  check("customer_subscriptions_customer_id_check", sql`
+    length(${table.stripeCustomerId}) BETWEEN 5 AND 255
+    AND ${table.stripeCustomerId} GLOB 'cus_*'
+  `),
+  check("customer_subscriptions_status_check", sql`
+    ${table.status} IN (
+      'incomplete', 'incomplete_expired', 'trialing', 'active', 'past_due',
+      'paused', 'canceled', 'unpaid'
+    )
+  `),
+  check("customer_subscriptions_address_check", sql`
+    ${table.shippingAddress} IS NULL OR (
+      length(${table.shippingAddress}) <= 32768
+      AND json_valid(${table.shippingAddress})
+      AND json_type(${table.shippingAddress}) = 'object'
+    )
+  `),
+  check("customer_subscriptions_consent_check", sql`
+    length(${table.consentRecord}) BETWEEN 2 AND 16384
+    AND json_valid(${table.consentRecord})
+    AND json_type(${table.consentRecord}) = 'object'
+  `),
   check("customer_subscriptions_period_check", sql`
     (${table.currentPeriodStart} IS NULL OR ${table.currentPeriodStart} >= 0)
     AND (${table.currentPeriodEnd} IS NULL OR (
@@ -126,9 +224,20 @@ export const customerSubscriptions = sqliteTable("customer_subscriptions", {
       AND (${table.currentPeriodStart} IS NULL OR ${table.currentPeriodEnd} >= ${table.currentPeriodStart})
     ))
   `),
+  check("customer_subscriptions_pause_check", sql`
+    ${table.pauseCollection} IS NULL OR (
+      length(${table.pauseCollection}) <= 16384
+      AND json_valid(${table.pauseCollection})
+      AND json_type(${table.pauseCollection}) = 'object'
+    )
+  `),
+  check("customer_subscriptions_cancel_period_check", sql`${table.cancelAtPeriodEnd} IN (0, 1)`),
   check("customer_subscriptions_cancel_at_check", sql`${table.cancelAt} IS NULL OR ${table.cancelAt} >= 0`),
   check("customer_subscriptions_canceled_at_check", sql`${table.canceledAt} IS NULL OR ${table.canceledAt} >= 0`),
   check("customer_subscriptions_event_created_check", sql`${table.latestLifecycleEventCreatedAt} >= 0`),
+  check("customer_subscriptions_event_id_check", sql`
+    length(${table.latestLifecycleEventId}) BETWEEN 1 AND 255
+  `),
   check("customer_subscriptions_version_check", sql`${table.version} >= 1`),
 ]);
 
@@ -166,6 +275,28 @@ export const subscriptionEvents = sqliteTable("subscription_events", {
   ),
   index("subscription_events_provider_event_idx").on(table.providerEventId),
   check("subscription_events_created_check", sql`${table.providerEventCreatedAt} >= 0`),
+  check("subscription_events_id_check", sql`length(${table.id}) BETWEEN 1 AND 128`),
+  check("subscription_events_provider_id_check", sql`
+    length(${table.providerEventId}) BETWEEN 1 AND 255
+  `),
+  check("subscription_events_type_check", sql`
+    ${table.eventType} IN (
+      'created', 'updated', 'paused', 'resumed', 'canceled', 'renewed',
+      'payment_failed', 'payment_recovered', 'skipped'
+    )
+  `),
+  check("subscription_events_outcome_check", sql`
+    ${table.outcome} IN (
+      'applied', 'duplicate', 'ignored_stale', 'refresh_required', 'failed'
+    )
+  `),
+  check("subscription_events_details_check", sql`
+    ${table.details} IS NULL OR (
+      length(${table.details}) <= 32768
+      AND json_valid(${table.details})
+      AND json_type(${table.details}) = 'object'
+    )
+  `),
 ]);
 
 export const subscriptionInvoiceOrders = sqliteTable("subscription_invoice_orders", {
@@ -188,6 +319,21 @@ export const subscriptionInvoiceOrders = sqliteTable("subscription_invoice_order
     table.verifiedPaidAt,
   ),
   check("subscription_invoice_orders_amount_check", sql`${table.paidAmountMinor} >= 0`),
+  check("subscription_invoice_orders_invoice_id_check", sql`
+    length(${table.stripeInvoiceId}) BETWEEN 4 AND 255
+    AND ${table.stripeInvoiceId} GLOB 'in_*'
+  `),
+  check("subscription_invoice_orders_payment_intent_check", sql`
+    ${table.stripePaymentIntentId} IS NULL OR (
+      length(${table.stripePaymentIntentId}) BETWEEN 4 AND 255
+      AND ${table.stripePaymentIntentId} GLOB 'pi_*'
+    )
+  `),
+  check("subscription_invoice_orders_currency_check", sql`
+    length(${table.currencyCode}) = 3
+    AND ${table.currencyCode} = upper(${table.currencyCode})
+    AND ${table.currencyCode} NOT GLOB '*[^A-Z]*'
+  `),
   check("subscription_invoice_orders_verified_check", sql`${table.verifiedPaidAt} >= 0`),
   check("subscription_invoice_orders_period_check", sql`
     (${table.periodStart} IS NULL OR ${table.periodStart} >= 0)
@@ -200,6 +346,8 @@ export const subscriptionInvoiceOrders = sqliteTable("subscription_invoice_order
 
 export type SubscriptionPlanRow = typeof subscriptionPlans.$inferSelect;
 export type SubscriptionPlanInsert = typeof subscriptionPlans.$inferInsert;
+export type SubscriptionAcquisitionRow = typeof subscriptionAcquisitions.$inferSelect;
+export type SubscriptionAcquisitionInsert = typeof subscriptionAcquisitions.$inferInsert;
 export type CustomerSubscriptionRow = typeof customerSubscriptions.$inferSelect;
 export type CustomerSubscriptionInsert = typeof customerSubscriptions.$inferInsert;
 export type SubscriptionEventRow = typeof subscriptionEvents.$inferSelect;
