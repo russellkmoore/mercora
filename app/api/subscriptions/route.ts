@@ -10,6 +10,7 @@ import {
 } from "@/lib/subscriptions/acquisition-service";
 import { recordTelemetry } from "@/lib/observability/telemetry";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { readBoundedUtf8RequestBody } from "@/lib/subscriptions/bounded-request-body";
 
 const MAX_BODY_BYTES = 2_048;
 
@@ -21,13 +22,11 @@ function acquisitionEnabled(): boolean {
 }
 
 async function setupIntentFromRequest(request: Request): Promise<string | null> {
-  const declared = Number(request.headers.get("content-length") ?? 0);
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return null;
-  const text = await request.text();
-  if (new TextEncoder().encode(text).byteLength > MAX_BODY_BYTES) return null;
+  const body = await readBoundedUtf8RequestBody(request, MAX_BODY_BYTES);
+  if (!body.ok) return null;
   let value: unknown;
   try {
-    value = JSON.parse(text);
+    value = JSON.parse(body.text);
   } catch {
     return null;
   }

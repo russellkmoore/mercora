@@ -9,15 +9,14 @@ import {
   SubscriptionNotFoundError,
 } from "@/lib/subscriptions/acquisition-service";
 import { recordTelemetry } from "@/lib/observability/telemetry";
+import { readBoundedUtf8RequestBody } from "@/lib/subscriptions/bounded-request-body";
 
 async function cancellationMode(request: Request): Promise<"period_end" | "immediate" | null> {
-  const declared = Number(request.headers.get("content-length") ?? 0);
-  if (Number.isFinite(declared) && declared > 1_024) return null;
-  const text = await request.text();
-  if (new TextEncoder().encode(text).byteLength > 1_024) return null;
+  const body = await readBoundedUtf8RequestBody(request, 1_024);
+  if (!body.ok) return null;
   let value: unknown;
   try {
-    value = JSON.parse(text);
+    value = JSON.parse(body.text);
   } catch {
     return null;
   }

@@ -8,12 +8,12 @@ import {
   SubscriptionNotFoundError,
 } from "@/lib/subscriptions/acquisition-service";
 import { recordTelemetry } from "@/lib/observability/telemetry";
+import { readBoundedUtf8RequestBody } from "@/lib/subscriptions/bounded-request-body";
 
 async function hasEmptyBoundedBody(request: Request): Promise<boolean> {
-  const declared = Number(request.headers.get("content-length") ?? 0);
-  if (Number.isFinite(declared) && declared > 1_024) return false;
-  const text = await request.text();
-  if (new TextEncoder().encode(text).byteLength > 1_024) return false;
+  const body = await readBoundedUtf8RequestBody(request, 1_024);
+  if (!body.ok) return false;
+  const { text } = body;
   if (!text.trim()) return true;
   try {
     const value: unknown = JSON.parse(text);
