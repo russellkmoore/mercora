@@ -48,12 +48,61 @@ CREATE UNIQUE INDEX subscription_plans_active_cadence_unique
   ON subscription_plans(product_id, variant_id, currency_code, cadence_unit, cadence_count)
   WHERE is_active = 1;
 
+-- A verified SetupIntent is the durable acquisition key. This row exists before
+-- provider subscription creation, so route retries converge on one provider
+-- idempotency key without storing a payment method or other payment secret.
+-- One acquisition represents exactly one plan/variant; a checkout offering
+-- multiple subscription lines creates one independently retryable acquisition
+-- per line.
+CREATE TABLE subscription_acquisitions (
+  id TEXT PRIMARY KEY CHECK (length(id) BETWEEN 1 AND 128),
+  setup_intent_id TEXT NOT NULL UNIQUE CHECK (
+    length(setup_intent_id) BETWEEN 6 AND 255
+    AND setup_intent_id GLOB 'seti_*'
+  ),
+  plan_id TEXT NOT NULL REFERENCES subscription_plans(id) ON DELETE RESTRICT,
+  customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
+  stripe_customer_id TEXT NOT NULL CHECK (
+    length(stripe_customer_id) BETWEEN 5 AND 255
+    AND stripe_customer_id GLOB 'cus_*'
+  ),
+  quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity BETWEEN 1 AND 1000),
+  shipping_address TEXT CHECK (
+    shipping_address IS NULL OR (
+      length(shipping_address) <= 32768
+      AND json_valid(shipping_address)
+      AND json_type(shipping_address) = 'object'
+    )
+  ),
+  consent_record TEXT NOT NULL CHECK (
+    length(consent_record) BETWEEN 2 AND 16384
+    AND json_valid(consent_record)
+    AND json_type(consent_record) = 'object'
+  ),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (
+    status IN ('pending', 'provider_created', 'completed', 'failed')
+  ),
+  stripe_subscription_id TEXT UNIQUE CHECK (
+    stripe_subscription_id IS NULL OR (
+      length(stripe_subscription_id) BETWEEN 5 AND 255
+      AND stripe_subscription_id GLOB 'sub_*'
+    )
+  ),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE INDEX subscription_acquisitions_customer_status_idx
+  ON subscription_acquisitions(customer_id, status);
+CREATE INDEX subscription_acquisitions_plan_idx
+  ON subscription_acquisitions(plan_id);
+
 CREATE TABLE customer_subscriptions (
   id TEXT PRIMARY KEY CHECK (length(id) BETWEEN 1 AND 128),
   plan_id TEXT NOT NULL REFERENCES subscription_plans(id) ON DELETE RESTRICT,
   customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
-  -- orderPaid retries and recovery converge on this unique acquisition key.
-  source_order_id TEXT NOT NULL UNIQUE REFERENCES orders(id) ON DELETE RESTRICT,
+  acquisition_id TEXT NOT NULL UNIQUE
+    REFERENCES subscription_acquisitions(id) ON DELETE RESTRICT,
   stripe_subscription_id TEXT NOT NULL UNIQUE CHECK (
     length(stripe_subscription_id) BETWEEN 5 AND 255
     AND stripe_subscription_id GLOB 'sub_*'
@@ -84,6 +133,13 @@ CREATE TABLE customer_subscriptions (
     current_period_end IS NULL OR (
       current_period_end >= 0
       AND (current_period_start IS NULL OR current_period_end >= current_period_start)
+    )
+  ),
+  pause_collection TEXT CHECK (
+    pause_collection IS NULL OR (
+      length(pause_collection) <= 16384
+      AND json_valid(pause_collection)
+      AND json_type(pause_collection) = 'object'
     )
   ),
   cancel_at_period_end INTEGER NOT NULL DEFAULT 0 CHECK (cancel_at_period_end IN (0, 1)),
