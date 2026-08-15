@@ -13,6 +13,7 @@ import {
 import { SubscriptionAcquisitionConflictError } from "@/lib/subscriptions/repository";
 import { recordTelemetry } from "@/lib/observability/telemetry";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { readBoundedUtf8RequestBody } from "@/lib/subscriptions/bounded-request-body";
 
 const MAX_BODY_BYTES = 16_384;
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{8,128}$/;
@@ -76,13 +77,11 @@ function parseAddress(value: unknown): Address | undefined | null {
 }
 
 async function parseBody(request: Request): Promise<SetupIntentBody | null> {
-  const declared = Number(request.headers.get("content-length") ?? 0);
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return null;
-  const text = await request.text();
-  if (new TextEncoder().encode(text).byteLength > MAX_BODY_BYTES) return null;
+  const body = await readBoundedUtf8RequestBody(request, MAX_BODY_BYTES);
+  if (!body.ok) return null;
   let value: unknown;
   try {
-    value = JSON.parse(text);
+    value = JSON.parse(body.text);
   } catch {
     return null;
   }

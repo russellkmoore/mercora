@@ -30,7 +30,10 @@ import { GET as list, POST as finalize } from "@/app/api/subscriptions/route";
 import { POST as pause } from "@/app/api/subscriptions/[id]/pause/route";
 import { POST as resume } from "@/app/api/subscriptions/[id]/resume/route";
 import { POST as cancel } from "@/app/api/subscriptions/[id]/cancel/route";
-import { SubscriptionProviderConflictError } from "@/lib/subscriptions/acquisition-service";
+import {
+  SubscriptionNotFoundError,
+  SubscriptionProviderConflictError,
+} from "@/lib/subscriptions/acquisition-service";
 
 function request(path: string, body: unknown, headers: Record<string, string> = {}) {
   return new NextRequest(`https://store.example${path}`, {
@@ -38,6 +41,91 @@ function request(path: string, body: unknown, headers: Record<string, string> = 
     headers: { origin: "https://store.example", ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+}
+
+type MutationRouteCase = {
+  name: string;
+  path: string;
+  body: unknown;
+  limit: number;
+  invoke: (request: NextRequest) => Promise<Response>;
+  service: "begin" | "finalize" | "act";
+};
+
+const mutationRoutes: MutationRouteCase[] = [
+  {
+    name: "setup intent",
+    path: "/api/setup-intent",
+    body: {
+      planId: "plan_one", quantity: 1,
+      consent: { termsVersion: "terms-1", accepted: true },
+    },
+    limit: 16_384,
+    invoke: (value) => setup(value),
+    service: "begin",
+  },
+  {
+    name: "finalization",
+    path: "/api/subscriptions",
+    body: { setupIntentId: "seti_one" },
+    limit: 2_048,
+    invoke: (value) => finalize(value),
+    service: "finalize",
+  },
+  {
+    name: "pause",
+    path: "/api/subscriptions/subscription_acq_one/pause",
+    body: {},
+    limit: 1_024,
+    invoke: (value) => pause(value, {
+      params: Promise.resolve({ id: "subscription_acq_one" }),
+    }),
+    service: "act",
+  },
+  {
+    name: "resume",
+    path: "/api/subscriptions/subscription_acq_one/resume",
+    body: {},
+    limit: 1_024,
+    invoke: (value) => resume(value, {
+      params: Promise.resolve({ id: "subscription_acq_one" }),
+    }),
+    service: "act",
+  },
+  {
+    name: "cancel",
+    path: "/api/subscriptions/subscription_acq_one/cancel",
+    body: { mode: "period_end" },
+    limit: 1_024,
+    invoke: (value) => cancel(value, {
+      params: Promise.resolve({ id: "subscription_acq_one" }),
+    }),
+    service: "act",
+  },
+];
+
+function streamedRequest(
+  path: string,
+  chunk: Uint8Array,
+  headers: Record<string, string> = {},
+) {
+  const cancelBody = vi.fn();
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(chunk);
+    },
+    cancel: cancelBody,
+  });
+  const init: NonNullable<ConstructorParameters<typeof NextRequest>[1]> & {
+    duplex: "half";
+  } = {
+    method: "POST",
+    headers: { origin: "https://store.example", ...headers },
+    body,
+    duplex: "half",
+  };
+  const value = new NextRequest(`https://store.example${path}`, init);
+  return { value, cancelBody };
 }
 
 describe("subscription customer routes", () => {
@@ -217,6 +305,102 @@ describe("subscription customer routes", () => {
     expect(response.status).toBe(502);
     expect(await response.json()).toEqual({
       error: "Subscription provider response could not be verified",
+    });
+  });
+
+  describe.each(mutationRoutes)("$name request body and route contracts", (route) => {
+    it.each(["abc", "-1"])("rejects malformed Content-Length %s before reading", async (length) => {
+      const { value, cancelBody } = streamedRequest(
+        route.path,
+        new TextEncoder().encode(JSON.stringify(route.body)),
+        {
+          "content-length": length,
+          ...(route.name === "setup intent" ? { "idempotency-key": "checkout-key-001" } : {}),
+        },
+      );
+      const response = await route.invoke(value);
+      expect(response.status).toBe(400);
+      expect(cancelBody).toHaveBeenCalledOnce();
+      expect(mocks[route.service]).not.toHaveBeenCalled();
+    });
+
+    it("cancels an actually oversized streamed body", async () => {
+      const { value, cancelBody } = streamedRequest(
+        route.path,
+        new Uint8Array(route.limit + 1).fill(0x20),
+        route.name === "setup intent" ? { "idempotency-key": "checkout-key-001" } : {},
+      );
+      const response = await route.invoke(value);
+      expect(response.status).toBe(400);
+      expect(cancelBody).toHaveBeenCalledOnce();
+      expect(mocks[route.service]).not.toHaveBeenCalled();
+    });
+
+    it("cancels invalid UTF-8 without exposing decoder details", async () => {
+      const { value, cancelBody } = streamedRequest(
+        route.path,
+        new Uint8Array([0x7b, 0x22, 0xff]),
+        route.name === "setup intent" ? { "idempotency-key": "checkout-key-001" } : {},
+      );
+      const response = await route.invoke(value);
+      expect(response.status).toBe(400);
+      expect(cancelBody).toHaveBeenCalledOnce();
+      expect(await response.json()).toEqual({
+        error: route.name === "cancel"
+          ? "Invalid cancellation request"
+          : "Invalid subscription request",
+      });
+      expect(mocks[route.service]).not.toHaveBeenCalled();
+    });
+
+    it("enforces auth, origin, feature, and rate limit before service construction", async () => {
+      mocks.auth.mockResolvedValueOnce({ userId: null });
+      expect((await route.invoke(request(route.path, route.body, {
+        "idempotency-key": "checkout-key-001",
+      }))).status).toBe(401);
+
+      expect((await route.invoke(request(route.path, route.body, {
+        origin: "https://attacker.example",
+        "idempotency-key": "checkout-key-001",
+      }))).status).toBe(403);
+
+      mocks.getStoreConfig.mockReturnValueOnce({
+        commerce: {
+          currency: "USD",
+          subscriptionTermsVersion: "terms-1",
+          features: { subscriptionAcquisition: false, subscriptionReconciliation: false },
+        },
+      });
+      expect((await route.invoke(request(route.path, route.body, {
+        "idempotency-key": "checkout-key-001",
+      }))).status).toBe(404);
+
+      mocks.rateLimit.mockResolvedValueOnce(new Response("limited", { status: 429 }));
+      expect((await route.invoke(request(route.path, route.body, {
+        "idempotency-key": "checkout-key-001",
+      }))).status).toBe(429);
+      expect(mocks.getService).not.toHaveBeenCalled();
+    });
+
+    it("masks owner misses and unexpected provider failures", async () => {
+      mocks[route.service].mockRejectedValueOnce(new SubscriptionNotFoundError("private owner"));
+      const missing = await route.invoke(request(route.path, route.body, {
+        "idempotency-key": "checkout-key-001",
+      }));
+      expect(missing.status).toBe(404);
+      expect(JSON.stringify(await missing.json())).not.toContain("private owner");
+
+      mocks[route.service].mockRejectedValueOnce(new Error("provider private@example.test"));
+      const failed = await route.invoke(request(route.path, route.body, {
+        "idempotency-key": "checkout-key-001",
+      }));
+      expect(failed.status).toBe(503);
+      expect(JSON.stringify(await failed.json())).not.toContain("private@example.test");
+      expect(mocks.telemetry).toHaveBeenCalledWith(
+        expect.stringMatching(/^subscription\./),
+        expect.objectContaining({ retryable: true }),
+        expect.any(Error),
+      );
     });
   });
 });
