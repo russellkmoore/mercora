@@ -3,8 +3,18 @@ import type { CustomerProvisioningPlan } from "../../transformers/sensitive/cust
 import { safeClerkUserId } from "../../transformers/sensitive/_shared.js";
 
 const MAX_CLERK_RESULTS = 2;
-const MAX_CLERK_PLANS = 100_000;
+const MAX_CLERK_PLANS = 1_000;
+const DEFAULT_OPERATION_TIMEOUT_MS = 10_000;
+const MAX_OPERATION_TIMEOUT_MS = 30_000;
+const DEFAULT_MAX_ATTEMPTS = 3;
+const MAX_ATTEMPTS = 3;
+const BASE_RETRY_DELAY_MS = 250;
+const MAX_RETRY_DELAY_MS = 5_000;
 const SAFE_SOURCE_FINGERPRINT = /^[a-f0-9]{64}$/;
+
+export interface ClerkRequestContext {
+  signal: AbortSignal;
+}
 
 export interface ClerkMigrationUser {
   id: string;
@@ -17,15 +27,55 @@ export interface ClerkMigrationClient {
       externalId?: readonly string[];
       emailAddress?: readonly string[];
       limit: number;
-    }): Promise<{ data: readonly ClerkMigrationUser[] }>;
+    }, context?: ClerkRequestContext): Promise<{ data: readonly ClerkMigrationUser[] }>;
     createUser(params: {
       emailAddress: readonly [string];
       firstName?: string;
       lastName?: string;
       externalId: string;
       skipLegalChecks: true;
-    }): Promise<ClerkMigrationUser>;
+    }, context?: ClerkRequestContext): Promise<ClerkMigrationUser>;
   };
+}
+
+export interface ClerkRetryDirective {
+  retryable: boolean;
+  /** Parsed Retry-After duration. Values are capped by the adapter. */
+  retryAfterMs?: number;
+}
+
+export type ClerkErrorClassifier = (error: unknown) => ClerkRetryDirective;
+export type ClerkOperationRunner = <T>(
+  operation: (signal: AbortSignal) => Promise<T>,
+  timeoutMs: number,
+) => Promise<T>;
+export type ClerkRetrySleeper = (delayMs: number) => Promise<void>;
+
+export interface ClerkProvisioningOptions {
+  operationTimeoutMs?: number;
+  maxAttempts?: number;
+  runOperation?: ClerkOperationRunner;
+  sleep?: ClerkRetrySleeper;
+  classifyError?: ClerkErrorClassifier;
+}
+
+/**
+ * Narrow error seam for a Clerk SDK wrapper. The wrapper may parse an HTTP
+ * Retry-After header, convert it to milliseconds, and throw this redacted
+ * error without exposing a provider response or request payload.
+ */
+export class ClerkRetryableRequestError extends Error {
+  constructor(readonly retryAfterMs?: number) {
+    super("Clerk migration request may be retried");
+    this.name = "ClerkRetryableRequestError";
+  }
+}
+
+class ClerkOperationTimeoutError extends Error {
+  constructor() {
+    super("Clerk migration request timed out");
+    this.name = "ClerkOperationTimeoutError";
+  }
 }
 
 export type ClerkReconciliationReason =
@@ -65,12 +115,130 @@ function assertAuthorizedExecution(execution: ExecutionPlan): void {
   if (!execution.includeSensitive || !execution.confirmedSensitiveData) {
     throw new Error("Clerk identity resolution requires confirmed sensitive-data access");
   }
+  if (!(["local", "preview", "production"] as const).includes(execution.target)) {
+    throw new Error("Clerk identity resolution target is invalid");
+  }
+  if (execution.target === "preview" && !execution.confirmedPreview) {
+    throw new Error("Clerk preview identity resolution requires explicit preview confirmation");
+  }
+  if (execution.target === "production" && !execution.confirmedProduction) {
+    throw new Error("Clerk production identity resolution requires explicit production confirmation");
+  }
+  if (execution.confirmedPreview && execution.target !== "preview") {
+    throw new Error("Clerk preview confirmation does not match the execution target");
+  }
+  if (execution.confirmedProduction && execution.target !== "production") {
+    throw new Error("Clerk production confirmation does not match the execution target");
+  }
+  if (execution.confirmedClerkAutoVerification && !execution.createClerkUsers) {
+    throw new Error("Clerk auto-verification confirmation requires identity creation authorization");
+  }
   if (
     execution.createClerkUsers &&
     !execution.confirmedClerkAutoVerification
   ) {
     throw new Error("Clerk identity creation requires explicit auto-verification confirmation");
   }
+}
+
+function boundedInteger(value: number, minimum: number, maximum: number, name: string): number {
+  if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
+    throw new RangeError(`${name} must be an integer between ${minimum} and ${maximum}`);
+  }
+  return value;
+}
+
+const defaultRunOperation: ClerkOperationRunner = async (operation, timeoutMs) => {
+  const controller = new AbortController();
+  return await new Promise((resolve, reject) => {
+    let settled = false;
+    const settle = (callback: () => void): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      callback();
+    };
+    const timer = setTimeout(() => {
+      controller.abort();
+      settle(() => reject(new ClerkOperationTimeoutError()));
+    }, timeoutMs);
+    void Promise.resolve().then(() => operation(controller.signal)).then(
+      (result) => settle(() => resolve(result)),
+      (error: unknown) => settle(() => reject(error)),
+    );
+  });
+};
+
+const defaultSleep: ClerkRetrySleeper = async (delayMs) => {
+  await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+};
+
+const defaultClassifyError: ClerkErrorClassifier = (error) => ({
+  retryable: error instanceof ClerkRetryableRequestError || error instanceof ClerkOperationTimeoutError,
+  ...(error instanceof ClerkRetryableRequestError && error.retryAfterMs !== undefined
+    ? { retryAfterMs: error.retryAfterMs }
+    : {}),
+});
+
+function retryDelay(directive: ClerkRetryDirective, attempt: number): number {
+  const retryAfter = directive.retryAfterMs;
+  if (retryAfter !== undefined && Number.isFinite(retryAfter) && retryAfter >= 0) {
+    return Math.min(Math.ceil(retryAfter), MAX_RETRY_DELAY_MS);
+  }
+  return Math.min(BASE_RETRY_DELAY_MS * (2 ** (attempt - 1)), MAX_RETRY_DELAY_MS);
+}
+
+async function clerkRequest<T>(
+  operation: (signal: AbortSignal) => Promise<T>,
+  runtime: Required<ClerkProvisioningOptions>,
+): Promise<T> {
+  for (let attempt = 1; attempt <= runtime.maxAttempts; attempt += 1) {
+    try {
+      return await runtime.runOperation(operation, runtime.operationTimeoutMs);
+    } catch (error) {
+      const directive = runtime.classifyError(error);
+      if (!directive.retryable || attempt === runtime.maxAttempts) throw error;
+      await runtime.sleep(retryDelay(directive, attempt));
+    }
+  }
+  throw new Error("Clerk migration request failed");
+}
+
+function provisioningRuntime(options: ClerkProvisioningOptions): Required<ClerkProvisioningOptions> {
+  return {
+    operationTimeoutMs: boundedInteger(
+      options.operationTimeoutMs ?? DEFAULT_OPERATION_TIMEOUT_MS,
+      1,
+      MAX_OPERATION_TIMEOUT_MS,
+      "Clerk operation timeout",
+    ),
+    maxAttempts: boundedInteger(
+      options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+      1,
+      MAX_ATTEMPTS,
+      "Clerk request attempts",
+    ),
+    runOperation: options.runOperation ?? defaultRunOperation,
+    sleep: options.sleep ?? defaultSleep,
+    classifyError: options.classifyError ?? defaultClassifyError,
+  };
+}
+
+function userListData(value: unknown): readonly ClerkMigrationUser[] {
+  if (!value || typeof value !== "object" || !Array.isArray((value as { data?: unknown }).data)) {
+    throw new TypeError("Clerk provider returned an invalid user list");
+  }
+  const users = (value as { data: unknown[] }).data;
+  if (users.length > MAX_CLERK_RESULTS) throw new RangeError("Clerk provider returned too many users");
+  if (users.some((user) => {
+    if (!user || typeof user !== "object") return true;
+    const candidate = user as { id?: unknown; externalId?: unknown };
+    return typeof candidate.id !== "string" ||
+      (candidate.externalId !== null && typeof candidate.externalId !== "string");
+  })) {
+    throw new TypeError("Clerk provider returned an invalid user");
+  }
+  return users as unknown as readonly ClerkMigrationUser[];
 }
 
 function parseProvisioningIdentity(plan: CustomerProvisioningPlan): ProvisioningIdentity {
@@ -124,6 +292,7 @@ function exactExternalUser(
       ? { id: null }
       : { id: null, reason: "external-identity-invalid" };
   }
+  if (users.length !== 1) return { id: null, reason: "external-identity-ambiguous" };
   const id = safeClerkUserId(exact[0].id);
   return id ? { id } : { id: null, reason: "external-identity-invalid" };
 }
@@ -147,8 +316,10 @@ export async function provisionClerkCustomers(
   plans: readonly CustomerProvisioningPlan[],
   execution: ExecutionPlan,
   client: ClerkMigrationClient,
+  options: ClerkProvisioningOptions = {},
 ): Promise<ClerkProvisioningResult> {
   assertAuthorizedExecution(execution);
+  const runtime = provisioningRuntime(options);
   if (plans.length > MAX_CLERK_PLANS) throw new RangeError("Clerk provisioning batch is too large");
   const sourceFingerprints = new Set<string>();
   for (const plan of plans) {
@@ -177,10 +348,13 @@ export async function provisionClerkCustomers(
 
     let externalUsers: readonly ClerkMigrationUser[];
     try {
-      externalUsers = (await client.users.getUserList({
-        externalId: [plan.sourceFingerprint],
-        limit: MAX_CLERK_RESULTS,
-      })).data;
+      externalUsers = userListData(await clerkRequest(
+        (signal) => client.users.getUserList({
+          externalId: [plan.sourceFingerprint],
+          limit: MAX_CLERK_RESULTS,
+        }, { signal }),
+        runtime,
+      ));
     } catch {
       pushReconciliation(reconciliation, plan.sourceFingerprint, "provider-request-failed");
       continue;
@@ -202,20 +376,6 @@ export async function provisionClerkCustomers(
       continue;
     }
 
-    let emailUsers: readonly ClerkMigrationUser[];
-    try {
-      emailUsers = (await client.users.getUserList({
-        emailAddress: [identity.email],
-        limit: MAX_CLERK_RESULTS,
-      })).data;
-    } catch {
-      pushReconciliation(reconciliation, plan.sourceFingerprint, "provider-request-failed");
-      continue;
-    }
-    if (emailUsers.length > 0) {
-      pushReconciliation(reconciliation, plan.sourceFingerprint, "email-conflict");
-      continue;
-    }
     if (!identity.sourceVerified) {
       pushReconciliation(reconciliation, plan.sourceFingerprint, "source-email-unverified");
       continue;
@@ -225,14 +385,35 @@ export async function provisionClerkCustomers(
       continue;
     }
 
+    let emailUsers: readonly ClerkMigrationUser[];
     try {
-      const user = await client.users.createUser({
-        emailAddress: [identity.email],
-        ...(identity.firstName ? { firstName: identity.firstName } : {}),
-        ...(identity.lastName ? { lastName: identity.lastName } : {}),
-        externalId: plan.sourceFingerprint,
-        skipLegalChecks: true,
-      });
+      emailUsers = userListData(await clerkRequest(
+        (signal) => client.users.getUserList({
+          emailAddress: [identity.email],
+          limit: MAX_CLERK_RESULTS,
+        }, { signal }),
+        runtime,
+      ));
+    } catch {
+      pushReconciliation(reconciliation, plan.sourceFingerprint, "provider-request-failed");
+      continue;
+    }
+    if (emailUsers.length > 0) {
+      pushReconciliation(reconciliation, plan.sourceFingerprint, "email-conflict");
+      continue;
+    }
+
+    try {
+      const user = await clerkRequest(
+        (signal) => client.users.createUser({
+          emailAddress: [identity.email],
+          ...(identity.firstName ? { firstName: identity.firstName } : {}),
+          ...(identity.lastName ? { lastName: identity.lastName } : {}),
+          externalId: plan.sourceFingerprint,
+          skipLegalChecks: true,
+        }, { signal }),
+        runtime,
+      );
       const userId = user.externalId === plan.sourceFingerprint
         ? safeClerkUserId(user.id)
         : null;
