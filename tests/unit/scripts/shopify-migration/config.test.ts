@@ -14,6 +14,8 @@ describe("Shopify migration config", () => {
       confirmedPreview: false,
       confirmedProduction: false,
       confirmedOverwrite: false,
+      createClerkUsers: false,
+      confirmedClerkAutoVerification: false,
     });
     expect(config).not.toHaveProperty("wranglerEnvironment");
     expect(config.inputRoot).toBe("/operator/imports");
@@ -91,6 +93,49 @@ describe("Shopify migration config", () => {
       { MIGRATION_INPUT_ROOT: "input" },
       ["--apply", "--overwrite", "--confirm-overwrite"],
     ).execution).toMatchObject({ apply: true, overwrite: true, confirmedOverwrite: true });
+  });
+
+  it("requires independent Clerk creation and auto-verification confirmations", () => {
+    const base = ["--apply", "--include-sensitive", "--confirm-sensitive-data"];
+    expect(() => parseMigrationConfig(
+      { MIGRATION_INPUT_ROOT: "input" },
+      [...base, "--create-clerk-users"],
+    )).toThrow("--confirm-clerk-auto-verification");
+    expect(() => parseMigrationConfig(
+      { MIGRATION_INPUT_ROOT: "input" },
+      ["--apply", "--confirm-clerk-auto-verification"],
+    )).toThrow("requires --create-clerk-users");
+    expect(() => parseMigrationConfig(
+      { MIGRATION_INPUT_ROOT: "input" },
+      ["--create-clerk-users", "--confirm-clerk-auto-verification", "--include-sensitive", "--confirm-sensitive-data"],
+    )).toThrow("may only be used with --apply");
+    expect(() => parseMigrationConfig(
+      { MIGRATION_INPUT_ROOT: "input" },
+      ["--apply", "--create-clerk-users", "--confirm-clerk-auto-verification"],
+    )).toThrow("requires --include-sensitive");
+
+    const config = parseMigrationConfig(
+      { MIGRATION_INPUT_ROOT: "input" },
+      [...base, "--create-clerk-users", "--confirm-clerk-auto-verification"],
+    );
+    expect(config.execution).toMatchObject({
+      apply: true,
+      includeSensitive: true,
+      confirmedSensitiveData: true,
+      createClerkUsers: true,
+      confirmedClerkAutoVerification: true,
+    });
+  });
+
+  it("rejects duplicate Clerk provisioning flags", () => {
+    expect(() => parseMigrationConfig(
+      { MIGRATION_INPUT_ROOT: "input" },
+      ["--create-clerk-users", "--create-clerk-users"],
+    )).toThrow("may only be provided once");
+    expect(() => parseMigrationConfig(
+      { MIGRATION_INPUT_ROOT: "input" },
+      ["--confirm-clerk-auto-verification", "--confirm-clerk-auto-verification"],
+    )).toThrow("may only be provided once");
   });
 
   it("accepts a bounded Wrangler environment without resource-name overrides", () => {

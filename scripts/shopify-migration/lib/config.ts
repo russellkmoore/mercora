@@ -13,6 +13,10 @@ export interface ExecutionPlan {
   confirmedPreview: boolean;
   confirmedProduction: boolean;
   confirmedOverwrite: boolean;
+  /** Explicit opt-in to create Clerk identities during an apply run. */
+  createClerkUsers?: boolean;
+  /** Acknowledges that Clerk auto-verifies email addresses passed to createUser. */
+  confirmedClerkAutoVerification?: boolean;
 }
 
 export interface MigrationConfig {
@@ -92,6 +96,8 @@ export function parseMigrationConfig(
     "--confirm-overwrite",
     "--confirm-preview",
     "--confirm-production",
+    "--create-clerk-users",
+    "--confirm-clerk-auto-verification",
   ]);
   for (const argument of args) {
     if (supported.has(argument)) continue;
@@ -117,6 +123,16 @@ export function parseMigrationConfig(
   const confirmedProduction = hasFlag(args, "--confirm-production");
   const overwrite = hasFlag(args, "--overwrite");
   const confirmedOverwrite = hasFlag(args, "--confirm-overwrite");
+  const createClerkUsersCount = args.filter((argument) => argument === "--create-clerk-users").length;
+  const confirmClerkAutoVerificationCount = args.filter(
+    (argument) => argument === "--confirm-clerk-auto-verification",
+  ).length;
+  if (createClerkUsersCount > 1) throw new Error("--create-clerk-users may only be provided once");
+  if (confirmClerkAutoVerificationCount > 1) {
+    throw new Error("--confirm-clerk-auto-verification may only be provided once");
+  }
+  const createClerkUsers = createClerkUsersCount === 1;
+  const confirmedClerkAutoVerification = confirmClerkAutoVerificationCount === 1;
   if (apply && target !== "local" && !targetArgument) {
     throw new Error("Remote apply requires an explicit --target=preview or --target=production option");
   }
@@ -147,6 +163,18 @@ export function parseMigrationConfig(
   if (!overwrite && confirmedOverwrite) {
     throw new Error("--confirm-overwrite requires --overwrite");
   }
+  if (createClerkUsers && !apply) {
+    throw new Error("--create-clerk-users may only be used with --apply");
+  }
+  if (createClerkUsers && !includeSensitive) {
+    throw new Error("--create-clerk-users requires --include-sensitive");
+  }
+  if (createClerkUsers && !confirmedClerkAutoVerification) {
+    throw new Error("--create-clerk-users requires --confirm-clerk-auto-verification");
+  }
+  if (!createClerkUsers && confirmedClerkAutoVerification) {
+    throw new Error("--confirm-clerk-auto-verification requires --create-clerk-users");
+  }
 
   const inputRootValue = flagValue(args, "--input-root") ?? env.MIGRATION_INPUT_ROOT;
   const outputRootValue = flagValue(args, "--output-root") ?? env.MIGRATION_OUTPUT_ROOT;
@@ -176,6 +204,8 @@ export function parseMigrationConfig(
       confirmedPreview,
       confirmedProduction,
       confirmedOverwrite,
+      createClerkUsers,
+      confirmedClerkAutoVerification,
     },
   };
 
