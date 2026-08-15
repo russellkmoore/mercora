@@ -25,10 +25,8 @@ describe("product subscription acquisition integration", () => {
     expect(source).toContain("<StripeProvider clientSecret={setup.clientSecret}>");
     expect(source).toContain("<PaymentElement");
     expect(source).toContain("setup.ownerId === currentOwner");
-    expect(source).toContain("window.history.replaceState");
     expect(source).toContain("setWorking(false)");
     expect(source).toContain("Retry finalization");
-    expect(source).toContain("setRedirectRetry((value) => value + 1)");
     expect(source).toContain("setConfirmedSetup({ ownerId: setup.ownerId, setupIntentId })");
     expect(source).toContain("finalizeSubscriptionSetup(fetch, confirmedSetup.setupIntentId");
     expect(source).toContain("setConfirmedSetup(null)");
@@ -37,5 +35,22 @@ describe("product subscription acquisition integration", () => {
     expect(source).toContain("if (!available && !setup) return null;");
     expect(source).not.toContain("confirmSetupAndFinalize({");
     expect(source).not.toMatch(/localStorage|sessionStorage|console\.(?:log|error)/);
+  });
+
+  it("mounts redirect sanitization globally, independent of product and acquisition feature state", () => {
+    const layout = fs.readFileSync(path.join(root, "app/layout.tsx"), "utf8");
+    const handler = fs.readFileSync(
+      path.join(root, "components/subscriptions/SubscriptionSetupReturnHandler.tsx"),
+      "utf8",
+    );
+    const productPage = fs.readFileSync(path.join(root, "app/product/[slug]/page.tsx"), "utf8");
+
+    expect(layout).toContain("<SubscriptionSetupReturnHandler />");
+    expect(handler).toContain("scrubStripeSetupRedirect(");
+    expect(handler).toContain("window.history.replaceState");
+    expect(handler).toContain("completeStripeSetupRedirect({");
+    expect(handler).not.toMatch(/subscriptionAcquisition|termsVersion|productId/);
+    expect(handler).not.toMatch(/localStorage|sessionStorage|setup_intent_client_secret|console\.(?:log|error)/);
+    expect(productPage).toContain('storedProduct.status !== "active"');
   });
 });

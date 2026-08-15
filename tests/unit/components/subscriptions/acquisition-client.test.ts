@@ -11,6 +11,7 @@ import {
   finalizeSubscriptionSetup,
   parseStripeSetupRedirect,
   recurringTotal,
+  scrubStripeSetupRedirect,
   shippingAddressFromSaved,
   type FetchLike,
   type PublicSubscriptionPlan,
@@ -228,6 +229,23 @@ describe("subscription acquisition client", () => {
     )).toEqual({ kind: "malformed" });
   });
 
+  it("scrubs the Stripe secret without product or feature-state authority", () => {
+    const replaceUrl = vi.fn();
+    const redirect = scrubStripeSetupRedirect(
+      "https://store.example/product/retired?setup_intent=seti_one&setup_intent_client_secret=discard-me&redirect_status=succeeded",
+      "https://store.example",
+      replaceUrl,
+    );
+
+    expect(redirect).toEqual({
+      kind: "success",
+      setupIntentId: "seti_one",
+      cleanUrl: "/product/retired",
+    });
+    expect(replaceUrl).toHaveBeenCalledWith("/product/retired");
+    expect(JSON.stringify(redirect)).not.toContain("discard-me");
+  });
+
   it("retains a scrubbed redirect through anonymous state and finalizes only after sign-in", async () => {
     const redirect = parseStripeSetupRedirect(
       "https://store.example/product/tea?setup_intent=seti_one&setup_intent_client_secret=discarded&redirect_status=succeeded",
@@ -282,6 +300,26 @@ describe("subscription acquisition client", () => {
     await expect(completeStripeSetupRedirect(args)).rejects.toThrow("temporarily unavailable");
     await expect(completeStripeSetupRedirect(args)).resolves.toMatchObject({ id: "acq_one" });
     expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("discards a late redirect finalization after an owner switch", async () => {
+    let resolveResponse!: (response: Response) => void;
+    const response = new Promise<Response>((resolve) => { resolveResponse = resolve; });
+    const fetcher = vi.fn(async () => response) as unknown as FetchLike;
+    let currentOwner: string | null = "user_A";
+    const pending = completeStripeSetupRedirect({
+      fetcher,
+      redirect: { kind: "success", setupIntentId: "seti_one", cleanUrl: "/product/tea" },
+      ownerId: "user_A",
+      currentOwner: () => currentOwner,
+    });
+
+    currentOwner = "user_B";
+    resolveResponse(new Response(JSON.stringify({
+      subscription: { id: "acq_one", planId: "plan_one", quantity: 1, status: "provider_created" },
+    }), { status: 202 }));
+
+    await expect(pending).resolves.toBeNull();
   });
 
   it("discards a late setup response after a user switch or sign-out", async () => {

@@ -14,11 +14,8 @@ import { readBoundedUtf8RequestBody } from "@/lib/subscriptions/bounded-request-
 
 const MAX_BODY_BYTES = 2_048;
 
-function acquisitionEnabled(): boolean {
-  const commerce = getStoreConfig().commerce;
-  return commerce.features.subscriptionAcquisition
-    && commerce.features.subscriptionReconciliation
-    && commerce.subscriptionTermsVersion !== undefined;
+function reconciliationEnabled(): boolean {
+  return getStoreConfig().commerce.features.subscriptionReconciliation;
 }
 
 async function setupIntentFromRequest(request: Request): Promise<string | null> {
@@ -60,8 +57,10 @@ export async function POST(request: NextRequest) {
   if (!hasSameOrigin(request)) {
     return NextResponse.json({ error: "Origin validation failed" }, { status: 403 });
   }
-  if (!acquisitionEnabled()) {
-    return NextResponse.json({ error: "Subscription acquisition is unavailable" }, { status: 404 });
+  // Finalization completes a durable acquisition that was already authorized.
+  // Rollback may disable new sales while reconciliation remains enabled.
+  if (!reconciliationEnabled()) {
+    return NextResponse.json({ error: "Subscriptions are unavailable" }, { status: 404 });
   }
   const limited = await enforceRateLimit("PUBLIC_RATE_LIMITER", `subscription-finalize:${userId}`);
   if (limited) return limited;

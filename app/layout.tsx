@@ -54,6 +54,7 @@ import { Suspense } from "react";
 import WebVitals from "@/components/analytics/WebVitals";
 import { getStoreConfig } from "@/lib/store-config";
 import { StoreConfigProvider } from "@/lib/store";
+import SubscriptionSetupReturnHandler from "@/components/subscriptions/SubscriptionSetupReturnHandler";
 
 import {
   ClerkProvider,
@@ -142,6 +143,7 @@ export default function RootLayout({
           suppressHydrationWarning
         >
           <StoreConfigProvider config={config}>
+          <SubscriptionSetupReturnHandler />
           {/* Promotional banner - shown above header when enabled */}
           <Suspense fallback={null}>
             <PromotionalBanner />

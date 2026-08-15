@@ -7,13 +7,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import StripeProvider from "@/components/checkout/StripeProvider";
 import {
   attemptFactsKey,
-  completeStripeSetupRedirect,
   confirmSubscriptionSetup,
   createOwnerBoundSubscriptionSetupAttempt,
   fetchSavedAddressesForPlan,
   fetchSubscriptionPlans,
   finalizeSubscriptionSetup,
-  parseStripeSetupRedirect,
   recurringTotal,
   shippingAddressFromSaved,
   type PublicSubscriptionPlan,
@@ -135,18 +133,9 @@ export default function SubscriptionAcquisitionPanel({
   } | null>(null);
   const [finalizationWorking, setFinalizationWorking] = useState(false);
   const [finalizationRetry, setFinalizationRetry] = useState(0);
-  const [redirectWorkingOwner, setRedirectWorkingOwner] = useState<string | null>(null);
-  const [redirectError, setRedirectError] = useState<{
-    ownerId: string;
-    message: string;
-    retryable: boolean;
-  } | null>(null);
-  const [redirectRetry, setRedirectRetry] = useState(0);
   const attemptRef = useRef<{ facts: string; key: string } | null>(null);
   const ownerRef = useRef<string | null>(null);
   const beginControllerRef = useRef<AbortController | null>(null);
-  const redirectRef = useRef<ReturnType<typeof parseStripeSetupRedirect> | null>(null);
-  const redirectOwnerRef = useRef<string | null>(null);
   const currentOwner = isLoaded && isSignedIn && userId ? userId : null;
   const [stateOwner, setStateOwner] = useState(currentOwner);
   if (stateOwner !== currentOwner) {
@@ -159,8 +148,6 @@ export default function SubscriptionAcquisitionPanel({
       setFinalizationWorking(false);
       setFinalizationRetry(0);
     }
-    setRedirectWorkingOwner(null);
-    setRedirectError(null);
     setAccepted(false);
     setWorking(false);
   }
@@ -196,50 +183,6 @@ export default function SubscriptionAcquisitionPanel({
       });
     return () => controller.abort();
   }, [confirmedSetup, currentOwner, finalizationRetry]);
-
-  useEffect(() => {
-    if (!isLoaded) return;
-    if (redirectRef.current === null) {
-      redirectRef.current = parseStripeSetupRedirect(window.location.href, window.location.origin);
-      if (redirectRef.current.kind !== "none" && redirectRef.current.cleanUrl) {
-        window.history.replaceState(window.history.state, "", redirectRef.current.cleanUrl);
-      }
-    }
-    const redirect = redirectRef.current;
-    if (!currentOwner || redirect.kind === "none" || redirectOwnerRef.current !== null) return;
-    redirectOwnerRef.current = currentOwner;
-    const owner = currentOwner;
-    const controller = new AbortController();
-    setRedirectWorkingOwner(owner);
-    setCheckoutError("");
-    completeStripeSetupRedirect({
-      fetcher: fetch,
-      redirect,
-      ownerId: owner,
-      currentOwner: () => ownerRef.current,
-      signal: controller.signal,
-    }).then((result) => {
-      if (result && ownerRef.current === owner) {
-        redirectRef.current = { kind: "none" };
-        setCompletedOwner(owner);
-      }
-    }).catch((error) => {
-      if (!controller.signal.aborted && ownerRef.current === owner) {
-        setRedirectError({
-          ownerId: owner,
-          message: error instanceof Error ? error.message : "Subscription finalization failed",
-          retryable: redirect.kind === "success",
-        });
-      }
-    }).finally(() => {
-      if (redirectOwnerRef.current === owner) redirectOwnerRef.current = null;
-      if (!controller.signal.aborted && ownerRef.current === owner) setRedirectWorkingOwner(null);
-    });
-    return () => {
-      controller.abort();
-      if (redirectOwnerRef.current === owner) redirectOwnerRef.current = null;
-    };
-  }, [currentOwner, isLoaded, redirectRetry]);
 
   useEffect(() => {
     if (!enabled || !termsVersion || !variantId) return;
@@ -319,9 +262,6 @@ export default function SubscriptionAcquisitionPanel({
   }) : "", [quantity, selectedPlan, selectedShippingAddress, termsVersion]);
 
   if (!enabled || !termsVersion) return null;
-  if (redirectWorkingOwner === currentOwner && currentOwner) {
-    return <p className="text-sm text-gray-400" role="status">Finalizing your subscription request…</p>;
-  }
   if (completedOwner === currentOwner && currentOwner) {
     return (
       <section className="rounded-lg border border-green-700 bg-green-950/30 p-5" aria-live="polite">
@@ -332,28 +272,6 @@ export default function SubscriptionAcquisitionPanel({
         <Link className="mt-3 inline-block text-sm font-semibold text-orange-400 underline" href="/account/subscriptions">
           View subscriptions
         </Link>
-      </section>
-    );
-  }
-  if (redirectError?.ownerId === currentOwner && currentOwner) {
-    return (
-      <section className="rounded-lg border border-red-800 bg-red-950/30 p-5" role="alert">
-        <h2 className="font-semibold text-red-200">Subscription setup needs attention</h2>
-        <p className="mt-2 text-sm text-gray-300">{redirectError.message}</p>
-        <button
-          type="button"
-          className="mt-3 text-sm font-semibold text-orange-400 underline"
-          onClick={() => {
-            setRedirectError(null);
-            if (redirectError.retryable) {
-              setRedirectRetry((value) => value + 1);
-            } else {
-              redirectRef.current = { kind: "none" };
-            }
-          }}
-        >
-          {redirectError.retryable ? "Retry finalization" : "Return to subscription options"}
-        </button>
       </section>
     );
   }
