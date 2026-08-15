@@ -1,4 +1,3 @@
-import type { Order } from "@/lib/types/order";
 import type {
   LifecycleEventCursor,
   SubscriptionAcquisition,
@@ -6,7 +5,6 @@ import type {
   SubscriptionPlanBinding,
   ProviderAcquisitionRequest,
   ProviderSubscriptionBinding,
-  VerifiedSubscriptionInvoice,
 } from "./domain";
 
 /** Narrow persistence contract; implementations must make each method atomic. */
@@ -52,11 +50,6 @@ export interface SubscriptionRepository {
     incoming: LifecycleEventCursor;
     snapshot: SubscriptionLifecycleSnapshot;
   }): Promise<"applied" | "already_applied" | "conflict">;
-  recordVerifiedInvoiceOrder(args: {
-    subscriptionId: string;
-    order: Order;
-    invoice: VerifiedSubscriptionInvoice;
-  }): Promise<{ orderId: string; created: boolean }>;
 }
 
 /** Stripe operations stay behind this injected port and are never imported by core checkout. */
