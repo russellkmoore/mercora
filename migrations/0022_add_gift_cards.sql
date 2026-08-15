@@ -57,6 +57,55 @@ CREATE INDEX gift_card_accounts_status_idx
 CREATE INDEX gift_card_accounts_order_idx
   ON gift_card_accounts(issued_order_id, issued_line_id);
 
+-- The bearer lookup, denomination, issuance provenance, and creation clock are
+-- an immutable financial snapshot. Only the one-way active -> disabled state
+-- transition is mutable after issuance.
+CREATE TRIGGER gift_card_accounts_identity_immutable
+BEFORE UPDATE ON gift_card_accounts
+FOR EACH ROW
+WHEN NOT (
+  NEW.id IS OLD.id
+  AND NEW.code_hash IS OLD.code_hash
+  AND NEW.code_hash_version IS OLD.code_hash_version
+  AND NEW.currency_code IS OLD.currency_code
+  AND NEW.issuance_entry_id IS OLD.issuance_entry_id
+  AND NEW.issuance_business_key IS OLD.issuance_business_key
+  AND NEW.issued_amount_minor IS OLD.issued_amount_minor
+  AND NEW.issued_order_id IS OLD.issued_order_id
+  AND NEW.issued_line_id IS OLD.issued_line_id
+  AND NEW.purchaser_customer_id IS OLD.purchaser_customer_id
+  AND NEW.created_at IS OLD.created_at
+)
+BEGIN
+  SELECT RAISE(ABORT, 'gift-card account identity is immutable');
+END;
+
+CREATE TRIGGER gift_card_accounts_status_transition_guard
+BEFORE UPDATE ON gift_card_accounts
+FOR EACH ROW
+WHEN NOT (
+  (
+    OLD.status = 'active'
+    AND OLD.disabled_at IS NULL
+    AND (
+      (NEW.status = 'active' AND NEW.disabled_at IS NULL)
+      OR (
+        NEW.status = 'disabled'
+        AND NEW.disabled_at IS NOT NULL
+        AND NEW.disabled_at >= OLD.created_at
+      )
+    )
+  )
+  OR (
+    OLD.status = 'disabled'
+    AND NEW.status = 'disabled'
+    AND NEW.disabled_at IS OLD.disabled_at
+  )
+)
+BEGIN
+  SELECT RAISE(ABORT, 'gift-card account status transition is invalid');
+END;
+
 CREATE TABLE gift_card_reservations (
   id TEXT PRIMARY KEY CHECK (length(id) BETWEEN 1 AND 128),
   gift_card_id TEXT NOT NULL,
@@ -102,6 +151,63 @@ CREATE INDEX gift_card_reservations_account_idx
 CREATE INDEX gift_card_reservations_order_idx
   ON gift_card_reservations(committed_order_id);
 
+-- Quote and hold facts are immutable. Mutations may only move an open hold to
+-- exactly one terminal state, or replay that already-durable transition.
+CREATE TRIGGER gift_card_reservations_identity_immutable
+BEFORE UPDATE ON gift_card_reservations
+FOR EACH ROW
+WHEN NOT (
+  NEW.id IS OLD.id
+  AND NEW.gift_card_id IS OLD.gift_card_id
+  AND NEW.currency_code IS OLD.currency_code
+  AND NEW.request_key IS OLD.request_key
+  AND NEW.quote_fingerprint IS OLD.quote_fingerprint
+  AND NEW.requested_amount_minor IS OLD.requested_amount_minor
+  AND NEW.amount_minor IS OLD.amount_minor
+  AND NEW.reserved_at IS OLD.reserved_at
+  AND NEW.expires_at IS OLD.expires_at
+)
+BEGIN
+  SELECT RAISE(ABORT, 'gift-card reservation identity is immutable');
+END;
+
+CREATE TRIGGER gift_card_reservations_transition_guard
+BEFORE UPDATE ON gift_card_reservations
+FOR EACH ROW
+WHEN NOT (
+  (
+    NEW.committed_order_id IS OLD.committed_order_id
+    AND NEW.committed_at IS OLD.committed_at
+    AND NEW.released_at IS OLD.released_at
+    AND NEW.release_reason IS OLD.release_reason
+  )
+  OR (
+    OLD.committed_order_id IS NULL
+    AND OLD.committed_at IS NULL
+    AND OLD.released_at IS NULL
+    AND OLD.release_reason IS NULL
+    AND NEW.committed_order_id IS NOT NULL
+    AND NEW.committed_at IS NOT NULL
+    AND NEW.committed_at >= OLD.reserved_at
+    AND NEW.released_at IS NULL
+    AND NEW.release_reason IS NULL
+  )
+  OR (
+    OLD.committed_order_id IS NULL
+    AND OLD.committed_at IS NULL
+    AND OLD.released_at IS NULL
+    AND OLD.release_reason IS NULL
+    AND NEW.committed_order_id IS NULL
+    AND NEW.committed_at IS NULL
+    AND NEW.released_at IS NOT NULL
+    AND NEW.released_at >= OLD.reserved_at
+    AND NEW.release_reason IS NOT NULL
+  )
+)
+BEGIN
+  SELECT RAISE(ABORT, 'gift-card reservation transition is invalid');
+END;
+
 CREATE TABLE gift_card_ledger_entries (
   id TEXT PRIMARY KEY CHECK (length(id) BETWEEN 1 AND 128),
   gift_card_id TEXT NOT NULL,
@@ -128,6 +234,10 @@ CREATE TABLE gift_card_ledger_entries (
   CHECK (
     (entry_type = 'redemption' AND reservation_id IS NOT NULL AND order_id IS NOT NULL)
     OR (entry_type <> 'redemption' AND reservation_id IS NULL)
+  ),
+  CHECK (
+    (entry_type = 'restoration' AND order_id IS NOT NULL AND related_entry_id IS NOT NULL)
+    OR entry_type <> 'restoration'
   )
 );
 
@@ -190,6 +300,48 @@ WHEN NEW.entry_type = 'redemption' AND NOT EXISTS (
 )
 BEGIN
   SELECT RAISE(ABORT, 'gift-card redemption conflicts with its committed reservation');
+END;
+
+-- A restoration is attributed to the original order and redemption. Its
+-- cumulative positive entries may never restore more than that redemption.
+-- Concurrent INSERTs serialize through SQLite and each sees prior winners.
+CREATE TRIGGER gift_card_ledger_restoration_guard
+BEFORE INSERT ON gift_card_ledger_entries
+FOR EACH ROW
+WHEN NEW.entry_type = 'restoration' AND NOT EXISTS (
+  SELECT 1
+  FROM gift_card_ledger_entries redemption
+  WHERE redemption.id = NEW.related_entry_id
+    AND redemption.entry_type = 'redemption'
+    AND redemption.gift_card_id = NEW.gift_card_id
+    AND redemption.currency_code = NEW.currency_code
+    AND redemption.order_id = NEW.order_id
+    AND NEW.amount_delta_minor <= (
+      -redemption.amount_delta_minor
+      - COALESCE((
+        SELECT SUM(restoration.amount_delta_minor)
+        FROM gift_card_ledger_entries restoration
+        WHERE restoration.entry_type = 'restoration'
+          AND restoration.related_entry_id = redemption.id
+      ), 0)
+    )
+)
+BEGIN
+  SELECT RAISE(ABORT, 'gift-card restoration conflicts with its redemption');
+END;
+
+CREATE TRIGGER gift_card_ledger_append_only_update
+BEFORE UPDATE ON gift_card_ledger_entries
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'gift-card ledger is append-only');
+END;
+
+CREATE TRIGGER gift_card_ledger_append_only_delete
+BEFORE DELETE ON gift_card_ledger_entries
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'gift-card ledger is append-only');
 END;
 
 -- Reservations are accepted only while the account is active and their exact

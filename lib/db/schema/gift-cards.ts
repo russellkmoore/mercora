@@ -173,6 +173,11 @@ export const giftCardLedgerEntries = sqliteTable("gift_card_ledger_entries", {
       AND ${table.reservationId} IS NOT NULL AND ${table.orderId} IS NOT NULL)
     OR (${table.entryType} <> 'redemption' AND ${table.reservationId} IS NULL)
   `),
+  check("gift_card_ledger_restoration_check", sql`
+    (${table.entryType} = 'restoration'
+      AND ${table.orderId} IS NOT NULL AND ${table.relatedEntryId} IS NOT NULL)
+    OR ${table.entryType} <> 'restoration'
+  `),
 ]);
 
 export const giftCardDeliveries = sqliteTable("gift_card_deliveries", {
