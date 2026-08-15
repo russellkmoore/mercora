@@ -52,12 +52,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import SubscriptionAcquisitionPanel from "@/components/subscriptions/SubscriptionAcquisitionPanel";
 
 interface ProductDisplayProps {
   product: Product;
   recommendations: Product[];
   reviews: Review[];
   reviewEligibility?: ProductReviewEligibility;
+  subscription?: {
+    enabled: boolean;
+    termsVersion?: string;
+    termsUrl: string;
+  };
 }
 
 function getMediaUrl(media: any): string {
@@ -85,6 +91,7 @@ export default function ProductDisplay({
   recommendations,
   reviews,
   reviewEligibility,
+  subscription,
 }: ProductDisplayProps) {
   const allImages = useMemo(() => {
     try {
@@ -337,6 +344,17 @@ export default function ProductDisplay({
             ) : (
               <p className="text-lg font-semibold text-orange-500 sm:text-xl">Coming soon</p>
             )}
+
+            {available && selectedVariant?.id && subscription?.enabled ? (
+              <SubscriptionAcquisitionPanel
+                key={selectedVariant.id}
+                productId={product.id}
+                variantId={selectedVariant.id}
+                enabled={subscription.enabled}
+                termsVersion={subscription.termsVersion}
+                termsUrl={subscription.termsUrl}
+              />
+            ) : null}
           </div>
         </div>
       </div>
