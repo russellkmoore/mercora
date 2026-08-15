@@ -155,7 +155,7 @@ SELECT cs.id AS subscription_id,
        c.contacts AS customer_contacts,
        p.name AS product_name,
        v.sku,
-       v.shipping_required
+       cs.shipping_required
 FROM customer_subscriptions cs
 JOIN subscription_acquisitions a
   ON a.id = cs.acquisition_id

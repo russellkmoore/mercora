@@ -261,8 +261,10 @@ describe('subscription invoice orders in real D1', () => {
     await expect(fulfillSubscriptionInvoice(args)).resolves.toMatchObject({ created: true });
   });
 
-  it('permits a digital renewal without shipping while retaining the exact variant binding', async () => {
+  it('keeps a digital renewal addressless after the catalog variant becomes physical', async () => {
     await seedSubscription({ shippingRequired: false, withAddress: false });
+    await env.DB.prepare(`UPDATE product_variants SET shipping_required = 1
+      WHERE id = 'variant-renewal'`).run();
     const result = await fulfillSubscriptionInvoice({
       database: env.DB,
       provider,
@@ -283,6 +285,26 @@ describe('subscription invoice orders in real D1', () => {
         quantity: 2,
       }),
     ]);
+  });
+
+  it('keeps a physical renewal bound to its address after the catalog variant becomes digital', async () => {
+    await seedSubscription({ shippingRequired: true, withAddress: true });
+    await env.DB.prepare(`UPDATE product_variants SET shipping_required = 0
+      WHERE id = 'variant-renewal'`).run();
+    const result = await fulfillSubscriptionInvoice({
+      database: env.DB,
+      provider,
+      stripeInvoiceId: invoice.stripeInvoiceId,
+      stripeSubscriptionId: 'sub_renewal',
+    });
+    expect(result.order.shipping_address).toEqual(expect.objectContaining({
+      line1: '1 Main St',
+      postal_code: '80202',
+      country: 'US',
+    }));
+    expect(result.order.extensions).toMatchObject({
+      subscription_shipping_required: true,
+    });
   });
 
   it('fails before order persistence when the durable customer email is unavailable', async () => {
