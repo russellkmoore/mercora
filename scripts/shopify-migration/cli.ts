@@ -1,15 +1,14 @@
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
   ClerkRetryableRequestError,
   provisionClerkCustomers,
-  type ClerkMigrationClient,
   type ClerkMigrationUser,
   type ClerkRequestContext,
 } from "./adapters/clerk/index.js";
-import { createNodeCommandRunner, runD1Import } from "./adapters/d1/index.js";
+import { createNodeCommandRunner, preflightD1Target, runD1Import } from "./adapters/d1/index.js";
 import { createR2S3MediaStore, importMediaPlans } from "./adapters/media/index.js";
 import { extractFileRecords } from "./extractors/file-based/index.js";
 import { extractFromShopifyApi } from "./extractors/shopify-api/index.js";
@@ -36,6 +35,7 @@ import {
   type MigrationRunReport,
   type MigrationSource,
   type MigrationSourceBundle,
+  type TargetBoundClerkMigrationClient,
 } from "./orchestrator.js";
 import type { ImportedReviewAttribution, VerifiedReviewProvenance } from "./transformers/sensitive/index.js";
 
@@ -52,7 +52,12 @@ const EXTRA_VALUE_FLAGS = new Set([
   "--judge-me-file",
   "--review-attributions",
   "--verified-purchases",
+  "--expected-shopify-order-count",
 ]);
+const EXTRA_BOOLEAN_FLAGS = new Set(["--confirm-shopify-read-all-orders"]);
+const MAX_MIGRATION_BLOGS = 1_000;
+const MAX_MIGRATION_ARTICLES = 50_000;
+const MAX_ARTICLES_PER_BLOG = 10_000;
 
 interface ReviewAttributionRow extends ImportedReviewAttribution {
   reviewFingerprint: string;
@@ -70,6 +75,8 @@ export interface ParsedMigrationCli {
   judgeMeFile?: string;
   reviewAttributionsFile?: string;
   verifiedPurchasesFile?: string;
+  expectedShopifyOrderCount?: number;
+  remoteTargetBinding?: { cloudflareAccountId?: string; clerkInstanceId?: string };
 }
 
 export interface MigrationCliDependencies {
@@ -115,6 +122,7 @@ function safeName(value: string | undefined, name: string, maximum = 255): strin
 
 function configArgs(args: readonly string[]): string[] {
   return args.filter((argument) => {
+    if (EXTRA_BOOLEAN_FLAGS.has(argument)) return false;
     const equals = argument.indexOf("=");
     return equals < 0 || !EXTRA_VALUE_FLAGS.has(argument.slice(0, equals));
   });
@@ -129,6 +137,7 @@ export function parseMigrationCli(
     const equals = argument.indexOf("=");
     if (equals > 0 && EXTRA_VALUE_FLAGS.has(argument.slice(0, equals))) continue;
     if ([...EXTRA_VALUE_FLAGS].some((flag) => argument === flag)) throw new Error(`${argument} requires a value`);
+    if (EXTRA_BOOLEAN_FLAGS.has(argument)) continue;
   }
   const config = parseMigrationConfig(env, configArgs(args), cwd);
   const fulfillmentType = ownValue(args, "--fulfillment-type", env.MIGRATION_FULFILLMENT_TYPE);
@@ -166,6 +175,50 @@ export function parseMigrationCli(
   if (judgeMeFile && !config.inputRoot) {
     throw new Error("Judge.me file input requires MIGRATION_INPUT_ROOT even when Shopify API extraction is used");
   }
+  const confirmReadAllCount = args.filter((argument) => argument === "--confirm-shopify-read-all-orders").length;
+  if (confirmReadAllCount > 1) throw new Error("--confirm-shopify-read-all-orders may only be provided once");
+  const confirmedReadAllOrders = confirmReadAllCount === 1 || env.MIGRATION_CONFIRM_SHOPIFY_READ_ALL_ORDERS === "1";
+  const expectedOrderCountValue = ownValue(
+    args,
+    "--expected-shopify-order-count",
+    env.MIGRATION_EXPECTED_SHOPIFY_ORDER_COUNT,
+  );
+  let expectedShopifyOrderCount: number | undefined;
+  if (expectedOrderCountValue !== undefined) {
+    if (!/^(?:0|[1-9][0-9]{0,7})$/u.test(expectedOrderCountValue)) {
+      throw new Error("Expected Shopify order count must be an integer from 0 to 99,999,999");
+    }
+    expectedShopifyOrderCount = Number(expectedOrderCountValue);
+  }
+  if (config.sourceMode === "api" && config.execution.includeSensitive) {
+    if (!confirmedReadAllOrders) {
+      throw new Error("Historical order API extraction requires --confirm-shopify-read-all-orders");
+    }
+    if (expectedShopifyOrderCount === undefined) {
+      throw new Error("Historical order API extraction requires an expected Shopify order count");
+    }
+  } else if (confirmedReadAllOrders || expectedShopifyOrderCount !== undefined) {
+    throw new Error("Shopify read_all_orders confirmation and count are only valid for sensitive API extraction");
+  }
+
+  const remoteTargetBinding = config.execution.apply && config.execution.target !== "local"
+    ? {
+      cloudflareAccountId: safeName(
+        env.MIGRATION_CLOUDFLARE_ACCOUNT_ID,
+        "MIGRATION_CLOUDFLARE_ACCOUNT_ID",
+        32,
+      ).toLowerCase(),
+      ...(env.MIGRATION_CLERK_INSTANCE_ID
+        ? { clerkInstanceId: safeName(env.MIGRATION_CLERK_INSTANCE_ID, "MIGRATION_CLERK_INSTANCE_ID", 204) }
+        : {}),
+    }
+    : undefined;
+  if (remoteTargetBinding && !/^[a-f0-9]{32}$/u.test(remoteTargetBinding.cloudflareAccountId)) {
+    throw new Error("MIGRATION_CLOUDFLARE_ACCOUNT_ID must be a 32-character account ID");
+  }
+  if (remoteTargetBinding?.clerkInstanceId && !/^ins_[A-Za-z0-9_-]{4,200}$/u.test(remoteTargetBinding.clerkInstanceId)) {
+    throw new Error("MIGRATION_CLERK_INSTANCE_ID is invalid");
+  }
 
   return {
     config,
@@ -189,6 +242,8 @@ export function parseMigrationCli(
     ...(judgeMeFile ? { judgeMeFile } : {}),
     ...(reviewAttributionsFile ? { reviewAttributionsFile } : {}),
     ...(verifiedPurchasesFile ? { verifiedPurchasesFile } : {}),
+    ...(expectedShopifyOrderCount !== undefined ? { expectedShopifyOrderCount } : {}),
+    ...(remoteTargetBinding ? { remoteTargetBinding } : {}),
   };
 }
 
@@ -249,11 +304,26 @@ export function createShopifyApiMigrationSource(config: MigrationConfig, parsed:
           ? extractFromShopifyApi<ShopifyOrder>(client, "orders.json", "orders", { query: { status: "any" } })
           : Promise.resolve({ records: [] as ShopifyOrder[] }),
       ]);
-      const articles = (await Promise.all(blogs.records.map((blog) => {
+      if (blogs.records.length > MAX_MIGRATION_BLOGS) {
+        throw new Error("Shopify blog count exceeds the migration safety limit");
+      }
+      const articles: ShopifyArticle[] = [];
+      for (const blog of blogs.records) {
         const id = String(blog.id);
         if (!/^[1-9][0-9]*$/u.test(id)) throw new Error("Shopify blog ID is invalid for article extraction");
-        return extractFromShopifyApi<ShopifyArticle>(client, `blogs/${id}/articles.json`, "articles");
-      }))).flatMap((result) => result.records);
+        const remaining = MAX_MIGRATION_ARTICLES - articles.length;
+        if (remaining < 1) throw new Error("Shopify article count exceeds the migration safety limit");
+        const result = await extractFromShopifyApi<ShopifyArticle>(
+          client,
+          `blogs/${id}/articles.json`,
+          "articles",
+          { maxRecords: Math.min(MAX_ARTICLES_PER_BLOG, remaining) },
+        );
+        articles.push(...result.records);
+      }
+      if (includeSensitive && orders.records.length !== parsed.expectedShopifyOrderCount) {
+        throw new Error("Shopify historical order count does not match the confirmed source count");
+      }
       return {
         collections: [
           ...custom.records.map((record) => ({ ...record, collection_type: "custom" as const })),
@@ -299,8 +369,35 @@ function canonicalProjectConfig(projectRoot: string): { projectRoot: string; tex
   return { projectRoot: canonicalRoot, text: readFileSync(configPath, "utf8") };
 }
 
+function isWithin(root: string, candidate: string): boolean {
+  const path = relative(root, candidate);
+  return path === "" || (!path.startsWith("..") && !isAbsolute(path));
+}
+
+/** Reject migration artifacts that could be committed with the application source. */
+export function assertPrivateMigrationRoots(config: MigrationConfig, projectRoot: string): void {
+  const canonicalRoots = [
+    ...(config.inputRoot ? [["input", config.inputRoot] as const] : []),
+    ...(config.outputRoot ? [["output", config.outputRoot] as const] : []),
+  ].map(([name, path]) => {
+    const canonical = realpathSync(path);
+    if (canonical !== path || !lstatSync(canonical).isDirectory()) {
+      throw new Error(`Migration ${name} root must be an existing canonical directory`);
+    }
+    if (isWithin(projectRoot, canonical)) {
+      throw new Error(`Migration ${name} root must be outside the project repository`);
+    }
+    return [name, canonical] as const;
+  });
+  if (canonicalRoots.length === 2 && canonicalRoots[0][1] === canonicalRoots[1][1]) {
+    throw new Error("Migration input and output roots must be separate directories");
+  }
+}
+
 const CLERK_USERS_URL = "https://api.clerk.com/v1/users";
+const CLERK_INSTANCE_URL = "https://api.clerk.com/v1/instance";
 const MAX_CLERK_RESPONSE_BYTES = 1024 * 1024;
+const CLERK_INSTANCE_TIMEOUT_MS = 30_000;
 
 function retryAfterMilliseconds(value: string | null): number | undefined {
   if (!value) return undefined;
@@ -408,7 +505,7 @@ function clerkUser(value: unknown): ClerkMigrationUser {
 export function createClerkRestMigrationClient(
   secretKey: string,
   fetchImplementation: typeof fetch = fetch,
-): ClerkMigrationClient {
+): TargetBoundClerkMigrationClient {
   if (!secretKey || secretKey.length > 2_048 || /[\0\r\n]/u.test(secretKey)) {
     throw new Error("CLERK_SECRET_KEY is invalid");
   }
@@ -417,6 +514,27 @@ export function createClerkRestMigrationClient(
     return context.signal;
   };
   return {
+    async verifyTarget(instanceId, environmentType) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), CLERK_INSTANCE_TIMEOUT_MS);
+      let value: unknown;
+      try {
+        value = await clerkRequest(secretKey, fetchImplementation, new URL(CLERK_INSTANCE_URL), {
+          method: "GET",
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        throw new Error("Clerk instance response is invalid");
+      }
+      const instance = value as { id?: unknown; environment_type?: unknown; environmentType?: unknown };
+      const actualEnvironment = instance.environment_type ?? instance.environmentType;
+      if (instance.id !== instanceId || actualEnvironment !== environmentType) {
+        throw new Error("Clerk credential instance does not match the confirmed migration target");
+      }
+    },
     users: {
       async getUserList(params, context) {
         const url = new URL(CLERK_USERS_URL);
@@ -450,15 +568,22 @@ export function createClerkRestMigrationClient(
 
 function defaultFactories(env: Environment): MigrationApplyFactories {
   return {
-    createMediaStore(bucketName) {
+    createMediaStore(bucketName, cloudflareAccountId) {
+      const credentialAccountId = required(env.CLOUDFLARE_ACCOUNT_ID, "CLOUDFLARE_ACCOUNT_ID").toLowerCase();
+      if (credentialAccountId !== cloudflareAccountId) {
+        throw new Error("R2 credential account does not match the confirmed migration target");
+      }
       return createR2S3MediaStore({
         bucketName,
-        accountId: required(env.CLOUDFLARE_ACCOUNT_ID, "CLOUDFLARE_ACCOUNT_ID"),
+        accountId: cloudflareAccountId,
         accessKeyId: required(env.R2_ACCESS_KEY_ID, "R2_ACCESS_KEY_ID"),
         secretAccessKey: required(env.R2_SECRET_ACCESS_KEY, "R2_SECRET_ACCESS_KEY"),
       });
     },
-    async createClerkClient(): Promise<ClerkMigrationClient> {
+    async createClerkClient(clerkInstanceId): Promise<TargetBoundClerkMigrationClient> {
+      if (required(env.MIGRATION_CLERK_INSTANCE_ID, "MIGRATION_CLERK_INSTANCE_ID") !== clerkInstanceId) {
+        throw new Error("Clerk credentials do not match the confirmed migration target");
+      }
       return createClerkRestMigrationClient(required(env.CLERK_SECRET_KEY, "CLERK_SECRET_KEY"));
     },
     createCommandRunner: () => createNodeCommandRunner(),
@@ -470,6 +595,7 @@ export async function runMigrationCli(dependencies: MigrationCliDependencies = {
   const cwd = dependencies.cwd ?? process.cwd();
   const parsed = parseMigrationCli(env, dependencies.args ?? process.argv.slice(2), cwd);
   const project = canonicalProjectConfig(parsed.projectRoot);
+  assertPrivateMigrationRoots(parsed.config, project.projectRoot);
   const inputRoot = parsed.config.inputRoot;
   const reviewAttributions = parsed.reviewAttributionsFile
     ? keyedRows(readJsonFile<ReviewAttributionRow>(inputRoot!, parsed.reviewAttributionsFile), "Review attributions")
@@ -492,8 +618,10 @@ export async function runMigrationCli(dependencies: MigrationCliDependencies = {
     projectRoot: project.projectRoot,
     wranglerConfigText: project.text,
     ...(parsed.expectedDatabaseName ? { expectedDatabaseName: parsed.expectedDatabaseName } : {}),
+    ...(parsed.remoteTargetBinding ? { remoteTargetBinding: parsed.remoteTargetBinding } : {}),
     ...(parsed.config.execution.apply ? { applyFactories: dependencies.applyFactories ?? defaultFactories(env) } : {}),
     runners: {
+      preflightD1: preflightD1Target,
       importMedia: importMediaPlans,
       provisionClerk: provisionClerkCustomers,
       runD1: runD1Import,

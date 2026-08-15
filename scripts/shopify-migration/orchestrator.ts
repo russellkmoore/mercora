@@ -23,6 +23,7 @@ import {
   type CommandRunner,
   type D1ApplyResult,
   type D1DryRunResult,
+  type D1PreflightReceipt,
   type MaterializedD1Input,
 } from "./adapters/d1/index.js";
 import type { ClerkMigrationClient, ClerkProvisioningResult } from "./adapters/clerk/index.js";
@@ -85,12 +86,23 @@ export interface MigrationDomainOptions {
 }
 
 export interface MigrationApplyFactories {
-  createMediaStore(bucketName: string): MediaObjectStore;
-  createClerkClient(): Promise<ClerkMigrationClient>;
+  createMediaStore(bucketName: string, cloudflareAccountId: string): MediaObjectStore;
+  createClerkClient(clerkInstanceId: string): Promise<TargetBoundClerkMigrationClient>;
   createCommandRunner(): CommandRunner;
 }
 
+export interface TargetBoundClerkMigrationClient extends ClerkMigrationClient {
+  verifyTarget(instanceId: string, environmentType: "development" | "production"): Promise<void>;
+}
+
 export interface MigrationAdapterRunners {
+  preflightD1(options: {
+    execution: MigrationConfig["execution"];
+    projectRoot: string;
+    wranglerEnvironment?: string;
+    expectedDatabaseName?: string;
+    commandRunner: CommandRunner;
+  }): Promise<D1PreflightReceipt>;
   importMedia(
     plans: readonly MediaRewrite[],
     options: {
@@ -114,7 +126,13 @@ export interface MigrationAdapterRunners {
     expectedDatabaseName?: string;
     mediaEvidence?: readonly AppliedMediaImportResult[];
     commandRunner: CommandRunner;
+    preflightReceipt?: D1PreflightReceipt;
   }): Promise<D1DryRunResult | D1ApplyResult>;
+}
+
+export interface RemoteTargetBinding {
+  cloudflareAccountId?: string;
+  clerkInstanceId?: string;
 }
 
 export interface OrchestrateMigrationOptions {
@@ -124,6 +142,7 @@ export interface OrchestrateMigrationOptions {
   projectRoot: string;
   wranglerConfigText: string;
   expectedDatabaseName?: string;
+  remoteTargetBinding?: RemoteTargetBinding;
   applyFactories?: MigrationApplyFactories;
   runners?: MigrationAdapterRunners;
   now?: () => Date;
@@ -231,6 +250,52 @@ function assertMode(config: MigrationConfig): void {
   if (config.execution.includeSensitive !== config.execution.confirmedSensitiveData) {
     throw new Error("Sensitive migration data requires matching explicit confirmation");
   }
+}
+
+function selectedWranglerIdentity(
+  config: unknown,
+  environment: string | undefined,
+): { cloudflareAccountId: string; clerkInstanceId: string | null } {
+  if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("Wrangler target identity is invalid");
+  const root = config as Record<string, unknown>;
+  const selected = environment
+    ? (root.env as Record<string, unknown> | undefined)?.[environment]
+    : root;
+  if (!selected || typeof selected !== "object" || Array.isArray(selected)) {
+    throw new Error("Wrangler target identity section is missing");
+  }
+  const section = selected as Record<string, unknown>;
+  const accountId = section.account_id ?? root.account_id;
+  if (typeof accountId !== "string" || !/^[a-f0-9]{32}$/iu.test(accountId)) {
+    throw new Error("Selected Wrangler target requires an explicit Cloudflare account_id");
+  }
+  const vars = section.vars;
+  const clerkInstanceId = vars && typeof vars === "object" && !Array.isArray(vars)
+    ? (vars as Record<string, unknown>).CLERK_INSTANCE_ID
+    : undefined;
+  if (clerkInstanceId !== undefined && (
+    typeof clerkInstanceId !== "string" || !/^ins_[A-Za-z0-9_-]{4,200}$/u.test(clerkInstanceId)
+  )) throw new Error("Selected Wrangler CLERK_INSTANCE_ID is invalid");
+  return {
+    cloudflareAccountId: accountId.toLowerCase(),
+    clerkInstanceId: typeof clerkInstanceId === "string" ? clerkInstanceId : null,
+  };
+}
+
+function bindRemoteTarget(
+  config: unknown,
+  environment: string | undefined,
+  supplied: RemoteTargetBinding | undefined,
+  requireClerk: boolean,
+): { cloudflareAccountId: string; clerkInstanceId: string | null } {
+  const selected = selectedWranglerIdentity(config, environment);
+  if (!supplied?.cloudflareAccountId || supplied.cloudflareAccountId.toLowerCase() !== selected.cloudflareAccountId) {
+    throw new Error("Cloudflare credential account does not match the confirmed Wrangler target");
+  }
+  if (requireClerk && (
+    !selected.clerkInstanceId || !supplied.clerkInstanceId || supplied.clerkInstanceId !== selected.clerkInstanceId
+  )) throw new Error("Clerk instance does not match the confirmed Wrangler target");
+  return selected;
 }
 
 export async function orchestrateMigration(options: OrchestrateMigrationOptions): Promise<MigrationRunReport> {
@@ -382,14 +447,42 @@ export async function orchestrateMigration(options: OrchestrateMigrationOptions)
   if (!options.applyFactories || !options.runners) {
     throw new Error("Apply mode requires explicit adapter factories and runners");
   }
-  const mediaStore = options.applyFactories.createMediaStore(mediaTarget.bucketName);
-  const mediaResults = await options.runners.importMedia(mediaPlans, {
+  const needsMedia = mediaPlans.length > 0;
+  const needsClerk = options.config.execution.includeSensitive && customerPlans.records.length > 0;
+  if (options.config.execution.target === "local" && (needsMedia || needsClerk)) {
+    throw new Error("Local apply cannot use remote R2 or Clerk; remove external-write plans or use a confirmed remote target");
+  }
+  const remoteIdentity = options.config.execution.target === "local"
+    ? null
+    : bindRemoteTarget(
+      wrangler,
+      options.config.wranglerEnvironment,
+      options.remoteTargetBinding,
+      needsClerk,
+    );
+  const commandRunner = options.applyFactories.createCommandRunner();
+  const preflightReceipt = await options.runners.preflightD1({
+    execution: options.config.execution,
+    projectRoot: options.projectRoot,
+    ...(options.config.wranglerEnvironment ? { wranglerEnvironment: options.config.wranglerEnvironment } : {}),
+    ...(options.expectedDatabaseName ? { expectedDatabaseName: options.expectedDatabaseName } : {}),
+    commandRunner,
+  });
+  let clerkClient: TargetBoundClerkMigrationClient | undefined;
+  if (needsClerk) {
+    clerkClient = await options.applyFactories.createClerkClient(remoteIdentity!.clerkInstanceId!);
+    await clerkClient.verifyTarget(
+      remoteIdentity!.clerkInstanceId!,
+      options.config.execution.target === "production" ? "production" : "development",
+    );
+  }
+  const mediaResults = needsMedia ? await options.runners.importMedia(mediaPlans, {
     execution: options.config.execution,
     wranglerConfigText: options.wranglerConfigText,
     ...(options.config.wranglerEnvironment ? { wranglerEnvironment: options.config.wranglerEnvironment } : {}),
     allowedHosts: options.domain.allowedMediaHosts,
-    store: mediaStore,
-  });
+    store: options.applyFactories.createMediaStore(mediaTarget.bucketName, remoteIdentity!.cloudflareAccountId),
+  }) : [];
   if (mediaResults.some((result) => result.status === "planned")) {
     throw new Error("Apply media phase returned unpersisted plans");
   }
@@ -397,9 +490,8 @@ export async function orchestrateMigration(options: OrchestrateMigrationOptions)
 
   let clerk: ClerkProvisioningResult = { idMap: new Map(), created: 0, existing: 0, reconciliation: [] };
   let customers = preflightCustomers;
-  if (options.config.execution.includeSensitive && customerPlans.records.length > 0) {
-    const clerkClient = await options.applyFactories.createClerkClient();
-    clerk = await options.runners.provisionClerk(customerPlans.records, options.config.execution, clerkClient);
+  if (needsClerk) {
+    clerk = await options.runners.provisionClerk(customerPlans.records, options.config.execution, clerkClient!);
     customers = materializeCustomers(customerPlans.records, clerk.idMap);
   }
   const orders = options.config.execution.includeSensitive
@@ -432,7 +524,6 @@ export async function orchestrateMigration(options: OrchestrateMigrationOptions)
     redirects: redirects.records,
   };
   buildD1ImportPlan(finalInput, { overwrite: options.config.execution.overwrite });
-  const commandRunner = options.applyFactories.createCommandRunner();
   const d1 = await options.runners.runD1({
     input: finalInput,
     execution: options.config.execution,
@@ -441,6 +532,7 @@ export async function orchestrateMigration(options: OrchestrateMigrationOptions)
     ...(options.expectedDatabaseName ? { expectedDatabaseName: options.expectedDatabaseName } : {}),
     mediaEvidence,
     commandRunner,
+    preflightReceipt,
   });
   if (d1.dryRun) throw new Error("Apply D1 phase unexpectedly returned a dry-run result");
 
