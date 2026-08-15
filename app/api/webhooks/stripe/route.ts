@@ -49,6 +49,7 @@ import {
   handleRefundLifecycle,
 } from '@/app/api/webhooks/stripe/handlers/refund-handlers';
 import { recordTelemetry } from '@/lib/observability/telemetry';
+import { handleSubscriptionStripeEvent } from '@/app/api/webhooks/stripe/handlers/subscription-handlers';
 
 function retryableResponse(message: string) {
   return NextResponse.json(
@@ -138,9 +139,18 @@ export async function POST(req: NextRequest) {
         outcome = 'ignored';
         break;
 
+      case 'invoice.paid':
       case 'invoice.payment_succeeded':
-        await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice);
-        outcome = 'ignored';
+      case 'invoice.payment_failed':
+      case 'invoice.payment_attempt_required':
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted':
+      case 'customer.subscription.paused':
+      case 'customer.subscription.resumed':
+      case 'customer.subscription.pending_update_applied':
+      case 'customer.subscription.pending_update_expired':
+        outcome = await handleSubscriptionStripeEvent(event);
         break;
 
       case 'charge.refunded':
@@ -280,26 +290,6 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     // - Final order confirmation
     // - Customer onboarding
     // - Thank you emails
-    
-  } catch (error) {
-    recordTelemetry('webhook.processing_failed', {
-      operation: 'process', outcome: 'failed', provider: 'd1', retryable: true,
-      path: '/api/webhooks/stripe', trigger: 'webhook',
-    }, error);
-  }
-}
-
-/**
- * Handle successful invoice payment
- * For subscription or recurring payment scenarios
- */
-async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
-  try {
-    // Handle subscription payment
-    // You can add additional logic here:
-    // - Update subscription status
-    // - Send invoice receipts
-    // - Handle plan upgrades/downgrades
     
   } catch (error) {
     recordTelemetry('webhook.processing_failed', {
