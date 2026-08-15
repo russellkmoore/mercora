@@ -7,7 +7,10 @@ const { getCloudflareContext, bucket } = vi.hoisted(() => ({
 
 vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext }));
 
-import { GET, HEAD, resolvePublicMediaKey } from "@/app/media/[...key]/route";
+import * as mediaRoute from "@/app/media/[...key]/route";
+import { resolvePublicMediaKey } from "@/lib/media/public-key";
+
+const { GET, HEAD } = mediaRoute;
 
 function context(...key: string[]) {
   return { params: Promise.resolve({ key }) };
@@ -49,6 +52,10 @@ describe("same-origin public media route", () => {
     getCloudflareContext.mockResolvedValue({ env: { MEDIA: bucket } });
     bucket.get.mockResolvedValue(object());
     bucket.head.mockResolvedValue(object({ body: undefined }));
+  });
+
+  it("exports only Next-compatible route handlers", () => {
+    expect(Object.keys(mediaRoute).sort()).toEqual(["GET", "HEAD"]);
   });
 
   it.each(["products", "categories", "blog", "pages"])(
