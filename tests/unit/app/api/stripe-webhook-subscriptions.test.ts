@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type Stripe from 'stripe';
 import type { SubscriptionWebhookRuntime } from '@/app/api/webhooks/stripe/handlers/subscription-handlers';
 import { Money } from '@/lib/money';
+import { SubscriptionWebhookPermanentError } from '@/lib/subscriptions/lifecycle-service';
 
 const mocks = vi.hoisted(() => ({
   reconciliationEnabled: true,
@@ -179,6 +180,34 @@ describe('subscription Stripe webhook classification', () => {
       expect(dependencies.repository.recordSubscriptionEvent).not.toHaveBeenCalled();
       expect(dependencies.database.prepare).not.toHaveBeenCalled();
       mocks.fulfillSubscriptionInvoice.mockClear();
+    }
+  });
+
+  it('permanently rejects paid and failed invoices for a terminally failed acquisition', async () => {
+    for (const type of ['invoice.paid', 'invoice.payment_failed'] as const) {
+      const dependencies = runtime();
+      const current = await dependencies.repository.findAcquisitionByStripeSubscription(
+        'sub_ordering',
+      );
+      dependencies.repository.findAcquisitionByStripeSubscription.mockResolvedValue({
+        ...current!,
+        status: 'failed',
+      });
+      await expect(handleSubscriptionStripeEvent(
+        event(type, `evt_terminal_${type}`),
+        dependencies,
+      )).resolves.toBe('permanent_rejection');
+      expect(mocks.fulfillSubscriptionInvoice).not.toHaveBeenCalled();
+      expect(dependencies.repository.findSubscriptionByStripeSubscription).not.toHaveBeenCalled();
+      expect(dependencies.repository.recordSubscriptionEvent).not.toHaveBeenCalled();
+      expect(dependencies.database.prepare).not.toHaveBeenCalled();
+      expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+        'webhook.payment_verification_rejected',
+        expect.objectContaining({ operation: 'process', retryable: false }),
+        expect.any(SubscriptionWebhookPermanentError),
+      );
+      mocks.fulfillSubscriptionInvoice.mockClear();
+      mocks.recordTelemetry.mockClear();
     }
   });
 

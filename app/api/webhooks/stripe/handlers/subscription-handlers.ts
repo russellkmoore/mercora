@@ -194,6 +194,9 @@ async function handlePaidInvoice(
     stripeSubscriptionId,
   );
   if (!acquisition) return 'ignored';
+  if (acquisition.status === 'failed') {
+    throw new SubscriptionWebhookPermanentError('Subscription acquisition is terminally failed');
+  }
   const result = await fulfillSubscriptionInvoice({
     database: runtime.database,
     provider: runtime.invoiceProvider,
@@ -236,6 +239,9 @@ async function handleFailedInvoice(
     stripeSubscriptionId,
   );
   if (!acquisition) return 'ignored';
+  if (acquisition.status === 'failed') {
+    throw new SubscriptionWebhookPermanentError('Subscription acquisition is terminally failed');
+  }
   const stored = await runtime.repository.findSubscriptionByStripeSubscription(
     stripeSubscriptionId,
   );
