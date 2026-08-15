@@ -26,7 +26,8 @@ describe("commerce capability resolution", () => {
     const subscriptions = vi.fn();
     const resolved = resolveCommerceCapabilities(
       {
-        giftCards: false,
+        giftCardAcquisition: false,
+        giftCardReconciliation: false,
         subscriptionAcquisition: false,
         subscriptionReconciliation: false,
       },
@@ -42,7 +43,8 @@ describe("commerce capability resolution", () => {
 
   it("fails configuration instead of silently enabling an absent provider", () => {
     expect(() => resolveCommerceCapabilities({
-      giftCards: false,
+      giftCardAcquisition: false,
+      giftCardReconciliation: false,
       subscriptionAcquisition: false,
       subscriptionReconciliation: true,
     })).toThrow(CommerceCapabilityConfigurationError);
@@ -67,7 +69,8 @@ describe("commerce capability resolution", () => {
     const subscriptions = vi.fn(() => subscriptionCapability);
     const resolved = resolveCommerceCapabilities(
       {
-        giftCards: false,
+        giftCardAcquisition: false,
+        giftCardReconciliation: false,
         subscriptionAcquisition: false,
         subscriptionReconciliation: true,
       },
@@ -87,11 +90,69 @@ describe("commerce capability resolution", () => {
 
   it("requires reconciliation before enabling new subscription sales", () => {
     expect(() => resolveCommerceCapabilities({
-      giftCards: false,
+      giftCardAcquisition: false,
+      giftCardReconciliation: false,
       subscriptionAcquisition: true,
       subscriptionReconciliation: false,
     }, {
       subscriptions: () => ({ orderPaid: vi.fn() }),
     })).toThrow("requires lifecycle and invoice reconciliation");
+  });
+
+  it("requires gift-card reconciliation before accepting new tender", () => {
+    expect(() => resolveCommerceCapabilities({
+      giftCardAcquisition: true,
+      giftCardReconciliation: false,
+      subscriptionAcquisition: false,
+      subscriptionReconciliation: false,
+    }, {
+      giftCards: () => ({
+        resolveTender: vi.fn(),
+        verifyReservedTender: vi.fn(),
+        applyTender: vi.fn(),
+        releaseTender: vi.fn(),
+      }),
+    })).toThrow("requires reservation reconciliation");
+  });
+
+  it("keeps reconciliation installed while acquisition rejects nonempty tokens", async () => {
+    const capability = {
+      resolveTender: vi.fn(),
+      verifyReservedTender: vi.fn(async () => undefined),
+      applyTender: vi.fn(async () => undefined),
+      releaseTender: vi.fn(async () => undefined),
+    };
+    const factory = vi.fn(() => capability);
+    const resolved = resolveCommerceCapabilities({
+      giftCardAcquisition: false,
+      giftCardReconciliation: true,
+      subscriptionAcquisition: false,
+      subscriptionReconciliation: false,
+    }, { giftCards: factory });
+
+    expect(factory).toHaveBeenCalledOnce();
+    await expect(resolved.giftCards.resolveTender({
+      currency: "USD",
+      amountDue: Money.fromMinor(100, "USD"),
+    })).resolves.toEqual({ amount: Money.zero("USD") });
+    expect(capability.resolveTender).not.toHaveBeenCalled();
+    await expect(resolved.giftCards.resolveTender({
+      token: "GC-NOT-USED",
+      currency: "USD",
+      amountDue: Money.fromMinor(100, "USD"),
+    })).rejects.toThrow("disabled");
+    await resolved.giftCards.applyTender({ order: paidOrder() });
+    expect(capability.applyTender).toHaveBeenCalledOnce();
+  });
+
+  it("rejects disabled bearer input and protected nonzero settlement", async () => {
+    await expect(noOpCommerceCapabilities.giftCards.resolveTender({
+      token: "GC-NOT-USED",
+      currency: "USD",
+      amountDue: Money.fromMinor(100, "USD"),
+    })).rejects.toThrow("disabled");
+    await expect(noOpCommerceCapabilities.giftCards.applyTender({
+      order: paidOrder({ checkout_tender: Money.fromMinor(100, "USD").toJSON() }),
+    })).rejects.toThrow("disabled");
   });
 });

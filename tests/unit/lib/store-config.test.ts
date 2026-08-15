@@ -42,17 +42,21 @@ describe("resolveStoreConfig", () => {
   it("keeps optional money capabilities off unless explicitly enabled", () => {
     expect(resolveStoreConfig({}).commerce.features).toEqual({
       recommendations: true,
-      giftCards: false,
+      giftCardAcquisition: false,
+      giftCardReconciliation: false,
       subscriptionAcquisition: false,
       subscriptionReconciliation: false,
     });
     expect(resolveStoreConfig({
       STORE_FEATURE_RECOMMENDATIONS: "false",
+      STORE_FEATURE_GIFT_CARD_ACQUISITION: "true",
+      STORE_FEATURE_GIFT_CARD_RECONCILIATION: "true",
       STORE_FEATURE_SUBSCRIPTION_ACQUISITION: "true",
       STORE_FEATURE_SUBSCRIPTION_RECONCILIATION: "true",
     }).commerce.features).toEqual({
       recommendations: false,
-      giftCards: false,
+      giftCardAcquisition: true,
+      giftCardReconciliation: true,
       subscriptionAcquisition: true,
       subscriptionReconciliation: true,
     });
