@@ -32,6 +32,7 @@ interface PlanRow {
   cadence_unit: SubscriptionCadenceUnit;
   cadence_count: number;
   is_active: number;
+  shipping_required: number;
 }
 
 interface AcquisitionRow {
@@ -48,6 +49,7 @@ interface AcquisitionRow {
   customer_id: string;
   stripe_customer_id: string;
   quantity: number;
+  shipping_required: number;
   shipping_address: string | null;
   consent_record: string;
   status: AcquisitionStatus;
@@ -62,6 +64,7 @@ interface SubscriptionRow {
   stripe_subscription_id: string;
   stripe_customer_id: string;
   quantity: number;
+  shipping_required: number;
   status: SubscriptionStatus;
   shipping_address: string | null;
   consent_record: string;
@@ -85,6 +88,7 @@ export interface CustomerSubscriptionRecord {
   stripeSubscriptionId: string;
   stripeCustomerId: string;
   quantity: number;
+  shippingRequired: boolean;
   status: SubscriptionStatus;
   shippingAddress?: Address;
   consent: SubscriptionConsent;
@@ -132,6 +136,7 @@ function mapPlan(row: PlanRow): SubscriptionPlanBinding {
     price: Money.fromMinor(row.unit_amount_minor, row.currency_code),
     stripePriceId: row.stripe_price_id,
     cadence: { unit: row.cadence_unit, count: row.cadence_count },
+    shippingRequired: row.shipping_required === 1,
     active: row.is_active === 1,
   };
 }
@@ -149,6 +154,7 @@ function mapAcquisition(row: AcquisitionRow): StoredAcquisition {
       price: Money.fromMinor(row.unit_amount_minor, row.currency_code),
       stripePriceId: row.stripe_price_id,
       cadence: { unit: row.cadence_unit, count: row.cadence_count },
+      shippingRequired: row.shipping_required === 1,
     },
     quantity: row.quantity,
     shippingAddress: parseJson<Address>(row.shipping_address, "subscription shipping address"),
@@ -171,6 +177,7 @@ function mapSubscription(row: SubscriptionRow): CustomerSubscriptionRecord {
     stripeSubscriptionId: row.stripe_subscription_id,
     stripeCustomerId: row.stripe_customer_id,
     quantity: row.quantity,
+    shippingRequired: row.shipping_required === 1,
     status: row.status,
     shippingAddress: parseJson<Address>(row.shipping_address, "subscription shipping address"),
     consent: parseJson<SubscriptionConsent>(row.consent_record, "subscription consent")!,
@@ -194,13 +201,13 @@ function mapSubscription(row: SubscriptionRow): CustomerSubscriptionRecord {
 function acquisitionSelect(where: string): string {
   return `SELECT id, setup_intent_id, plan_id, product_id, variant_id,
     currency_code, unit_amount_minor, stripe_price_id, cadence_unit,
-    cadence_count, customer_id, stripe_customer_id, quantity,
+    cadence_count, customer_id, stripe_customer_id, quantity, shipping_required,
     shipping_address, consent_record, status, stripe_subscription_id
     FROM subscription_acquisitions WHERE ${where} LIMIT 1`;
 }
 
 const SUBSCRIPTION_SELECT = `SELECT id, plan_id, customer_id, acquisition_id,
-  stripe_subscription_id, stripe_customer_id, quantity, status, shipping_address,
+  stripe_subscription_id, stripe_customer_id, quantity, shipping_required, status, shipping_address,
   consent_record, current_period_start, current_period_end, pause_collection,
   cancel_at_period_end, cancel_at, canceled_at, ended_at,
   latest_lifecycle_event_created_at, latest_lifecycle_event_id, version
@@ -215,6 +222,8 @@ function providerMatches(left: ProviderSubscriptionBinding, right: ProviderSubsc
     && left.price.equals(right.price)
     && left.cadence.unit === right.cadence.unit
     && left.cadence.count === right.cadence.count
+    && (left.shippingRequired === undefined || right.shippingRequired === undefined
+      || left.shippingRequired === right.shippingRequired)
     && left.quantity === right.quantity;
 }
 
@@ -228,6 +237,7 @@ function providerFromStored(stored: StoredAcquisition): ProviderSubscriptionBind
     stripePriceId: stored.acquisition.plan.stripePriceId,
     price: stored.acquisition.plan.price,
     cadence: stored.acquisition.plan.cadence,
+    shippingRequired: stored.acquisition.plan.shippingRequired,
     quantity: stored.acquisition.quantity,
   };
 }
@@ -276,12 +286,16 @@ export function createSubscriptionRepository(database: D1Database) {
     },
 
     async findActivePlan(args) {
-      const row = await database.prepare(`SELECT id, product_id, variant_id,
-        currency_code, unit_amount_minor, stripe_price_id, cadence_unit,
-        cadence_count, is_active FROM subscription_plans
-        WHERE product_id = ? AND variant_id = ? AND currency_code = ?
+      const row = await database.prepare(`SELECT sp.id, sp.product_id, sp.variant_id,
+        sp.currency_code, sp.unit_amount_minor, sp.stripe_price_id, sp.cadence_unit,
+        sp.cadence_count, sp.is_active, COALESCE(pv.shipping_required, 1) AS shipping_required
+        FROM subscription_plans sp
+        INNER JOIN products p ON p.id = sp.product_id AND p.status = 'active'
+        INNER JOIN product_variants pv ON pv.id = sp.variant_id
+          AND pv.product_id = sp.product_id AND pv.status = 'active'
+        WHERE sp.product_id = ? AND sp.variant_id = ? AND sp.currency_code = ?
           AND stripe_price_id = ? AND cadence_unit = ? AND cadence_count = ?
-          AND is_active = 1 LIMIT 1`)
+          AND sp.is_active = 1 LIMIT 1`)
         .bind(args.productId, args.variantId, args.currency.toUpperCase(), args.stripePriceId,
           args.cadenceUnit, args.cadenceCount).first<PlanRow>();
       return row ? mapPlan(row) : undefined;
@@ -299,7 +313,7 @@ export function createSubscriptionRepository(database: D1Database) {
           AND (? = 1 OR sp.is_active = 1) LIMIT 1`)
         .bind(planId, currency.toUpperCase(), options.allowInactive ? 1 : 0)
         .first<PlanRow & { shipping_required: number }>();
-      return row ? { ...mapPlan(row), shippingRequired: row.shipping_required === 1 } : undefined;
+      return row ? mapPlan(row) : undefined;
     },
 
     async findAcquisitionBySetupIntent(setupIntentId) {
@@ -319,16 +333,30 @@ export function createSubscriptionRepository(database: D1Database) {
       const result = await database.prepare(`INSERT OR IGNORE INTO subscription_acquisitions
         (id, setup_intent_id, plan_id, product_id, variant_id, currency_code,
          unit_amount_minor, stripe_price_id, cadence_unit, cadence_count,
-         customer_id, stripe_customer_id, quantity, shipping_address, consent_record)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+         customer_id, stripe_customer_id, quantity, shipping_required,
+         shipping_address, consent_record)
+        SELECT ?, ?, sp.id, sp.product_id, sp.variant_id, sp.currency_code,
+          sp.unit_amount_minor, sp.stripe_price_id, sp.cadence_unit, sp.cadence_count,
+          ?, ?, ?, ?, ?, ?
+        FROM subscription_plans sp
+        INNER JOIN products p ON p.id = sp.product_id AND p.status = 'active'
+        INNER JOIN product_variants pv ON pv.id = sp.variant_id
+          AND pv.product_id = sp.product_id AND pv.status = 'active'
+        WHERE sp.id = ? AND sp.product_id = ? AND sp.variant_id = ?
+          AND sp.currency_code = ? AND sp.unit_amount_minor = ?
+          AND sp.stripe_price_id = ? AND sp.cadence_unit = ?
+          AND sp.cadence_count = ? AND sp.is_active = 1
+          AND COALESCE(pv.shipping_required, 1) = ?`)
         .bind(
-          acquisition.id, acquisition.setupIntentId, acquisition.plan.id,
-          acquisition.plan.productId, acquisition.plan.variantId, acquisition.plan.price.currency,
-          acquisition.plan.price.toMinorUnits(), acquisition.plan.stripePriceId,
-          acquisition.plan.cadence.unit, acquisition.plan.cadence.count,
+          acquisition.id, acquisition.setupIntentId,
           acquisition.customerId, acquisition.stripeCustomerId, acquisition.quantity,
+          acquisition.plan.shippingRequired ? 1 : 0,
           acquisition.shippingAddress ? JSON.stringify(acquisition.shippingAddress) : null,
           JSON.stringify(acquisition.consent),
+          acquisition.plan.id, acquisition.plan.productId, acquisition.plan.variantId,
+          acquisition.plan.price.currency, acquisition.plan.price.toMinorUnits(),
+          acquisition.plan.stripePriceId, acquisition.plan.cadence.unit,
+          acquisition.plan.cadence.count, acquisition.plan.shippingRequired ? 1 : 0,
         ).run();
       const winner = await findAcquisition("setup_intent_id", acquisition.setupIntentId);
       if (!winner || !subscriptionAcquisitionsEqual(winner.acquisition, acquisition)) {
@@ -365,17 +393,18 @@ export function createSubscriptionRepository(database: D1Database) {
       const results = await database.batch([
         database.prepare(`INSERT OR IGNORE INTO customer_subscriptions
           (id, plan_id, customer_id, acquisition_id, stripe_subscription_id,
-           stripe_customer_id, quantity, status, shipping_address, consent_record,
+           stripe_customer_id, quantity, shipping_required, status, shipping_address, consent_record,
            current_period_start, current_period_end, pause_collection,
            cancel_at_period_end, cancel_at, canceled_at, ended_at,
            latest_lifecycle_event_created_at, latest_lifecycle_event_id)
-          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
           FROM subscription_acquisitions
           WHERE id = ? AND status IN ('provider_created', 'completed')
             AND stripe_subscription_id = ?`)
           .bind(id, acquisition.plan.id, acquisition.customerId, acquisition.id,
             provider.stripeSubscriptionId, acquisition.stripeCustomerId, acquisition.quantity,
-            lifecycle.status, acquisition.shippingAddress ? JSON.stringify(acquisition.shippingAddress) : null,
+            acquisition.plan.shippingRequired ? 1 : 0, lifecycle.status,
+            acquisition.shippingAddress ? JSON.stringify(acquisition.shippingAddress) : null,
             JSON.stringify(acquisition.consent), lifecycle.currentPeriodStart ?? null,
             lifecycle.currentPeriodEnd ?? null,
             lifecycle.pauseCollection ? JSON.stringify(lifecycle.pauseCollection) : null,
@@ -390,7 +419,8 @@ export function createSubscriptionRepository(database: D1Database) {
               SELECT 1 FROM customer_subscriptions cs
               WHERE cs.id = ? AND cs.plan_id = ? AND cs.customer_id = ?
                 AND cs.acquisition_id = ? AND cs.stripe_subscription_id = ?
-                AND cs.stripe_customer_id = ? AND cs.quantity = ? AND cs.status = ?
+                AND cs.stripe_customer_id = ? AND cs.quantity = ?
+                AND cs.shipping_required = ? AND cs.status = ?
                 AND cs.shipping_address IS ? AND cs.consent_record = ?
                 AND cs.current_period_start IS ? AND cs.current_period_end IS ?
                 AND cs.pause_collection IS ? AND cs.cancel_at_period_end = ?
@@ -400,7 +430,8 @@ export function createSubscriptionRepository(database: D1Database) {
             )`)
           .bind(acquisition.id, provider.stripeSubscriptionId, id, acquisition.plan.id,
             acquisition.customerId, acquisition.id, provider.stripeSubscriptionId,
-            acquisition.stripeCustomerId, acquisition.quantity, lifecycle.status,
+            acquisition.stripeCustomerId, acquisition.quantity,
+            acquisition.plan.shippingRequired ? 1 : 0, lifecycle.status,
             acquisition.shippingAddress ? JSON.stringify(acquisition.shippingAddress) : null,
             JSON.stringify(acquisition.consent), lifecycle.currentPeriodStart ?? null,
             lifecycle.currentPeriodEnd ?? null,
@@ -414,7 +445,9 @@ export function createSubscriptionRepository(database: D1Database) {
       if (!winner || winner.acquisitionId !== acquisition.id || winner.planId !== acquisition.plan.id
         || winner.id !== id || winner.customerId !== acquisition.customerId
         || winner.stripeCustomerId !== acquisition.stripeCustomerId
-        || winner.quantity !== acquisition.quantity || winner.status !== lifecycle.status
+        || winner.quantity !== acquisition.quantity
+        || winner.shippingRequired !== acquisition.plan.shippingRequired
+        || winner.status !== lifecycle.status
         || JSON.stringify(winner.shippingAddress) !== JSON.stringify(acquisition.shippingAddress)
         || JSON.stringify(winner.consent) !== JSON.stringify(acquisition.consent)
         || winner.currentPeriodStart !== lifecycle.currentPeriodStart

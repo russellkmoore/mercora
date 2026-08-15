@@ -36,6 +36,7 @@ describe("subscription Drizzle schema", () => {
     const names = getTableConfig(customerSubscriptions).columns.map(({ name }) => name);
     expect(names).toContain("acquisition_id");
     expect(names).toContain("shipping_address");
+    expect(names).toContain("shipping_required");
     expect(names).toContain("consent_record");
     expect(names).toContain("pause_collection");
     expect(names).toContain("cancel_at");
@@ -82,9 +83,13 @@ describe("subscription Drizzle schema", () => {
       "subscription_acquisitions_setup_intent_check",
       "subscription_provider_customers_stripe_id_check",
       "subscription_acquisitions_address_check",
+      "subscription_acquisitions_shipping_required_check",
+      "subscription_acquisitions_shipping_mode_check",
       "subscription_acquisitions_consent_check",
       "customer_subscriptions_subscription_id_check",
       "customer_subscriptions_pause_check",
+      "customer_subscriptions_shipping_required_check",
+      "customer_subscriptions_shipping_mode_check",
       "subscription_events_details_check",
       "subscription_invoice_orders_invoice_id_check",
       "subscription_invoice_orders_payment_intent_check",
@@ -109,6 +114,7 @@ describe("subscription Drizzle schema", () => {
       "customer_id",
       "stripe_customer_id",
       "quantity",
+      "shipping_required",
       "shipping_address",
       "consent_record",
       "status",
@@ -132,13 +138,14 @@ describe("subscription Drizzle schema", () => {
 
   it("links lifecycle state through the complete reserved acquisition identity", () => {
     const foreignKeys = getTableConfig(customerSubscriptions).foreignKeys;
-    const binding = foreignKeys.find((key) => key.reference().columns.length === 5);
+    const binding = foreignKeys.find((key) => key.reference().columns.length === 6);
     expect(binding?.reference().columns.map(({ name }) => name)).toEqual([
       "acquisition_id",
       "plan_id",
       "customer_id",
       "stripe_customer_id",
       "stripe_subscription_id",
+      "shipping_required",
     ]);
     expect(binding?.reference().foreignColumns.map(({ name }) => name)).toEqual([
       "id",
@@ -146,6 +153,7 @@ describe("subscription Drizzle schema", () => {
       "customer_id",
       "stripe_customer_id",
       "stripe_subscription_id",
+      "shipping_required",
     ]);
   });
 

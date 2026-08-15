@@ -142,6 +142,7 @@ export const subscriptionAcquisitions = sqliteTable("subscription_acquisitions",
   customerId: text("customer_id").notNull(),
   stripeCustomerId: text("stripe_customer_id").notNull(),
   quantity: integer("quantity").notNull().default(1),
+  shippingRequired: integer("shipping_required", { mode: "boolean" }).notNull(),
   shippingAddress: text("shipping_address", { mode: "json" }).$type<Address>(),
   consentRecord: text("consent_record", { mode: "json" }).$type<SubscriptionConsentRecord>().notNull(),
   status: text("status", {
@@ -188,6 +189,7 @@ export const subscriptionAcquisitions = sqliteTable("subscription_acquisitions",
     table.customerId,
     table.stripeCustomerId,
     table.stripeSubscriptionId,
+    table.shippingRequired,
   ),
   check("subscription_acquisitions_id_check", sql`length(${table.id}) BETWEEN 1 AND 128`),
   check("subscription_acquisitions_setup_intent_check", sql`
@@ -215,12 +217,19 @@ export const subscriptionAcquisitions = sqliteTable("subscription_acquisitions",
     AND ${table.stripeCustomerId} GLOB 'cus_*'
   `),
   check("subscription_acquisitions_quantity_check", sql`${table.quantity} BETWEEN 1 AND 1000`),
+  check("subscription_acquisitions_shipping_required_check", sql`
+    ${table.shippingRequired} IN (0, 1)
+  `),
   check("subscription_acquisitions_address_check", sql`
     ${table.shippingAddress} IS NULL OR (
       length(${table.shippingAddress}) <= 32768
       AND json_valid(${table.shippingAddress})
       AND json_type(${table.shippingAddress}) = 'object'
     )
+  `),
+  check("subscription_acquisitions_shipping_mode_check", sql`
+    (${table.shippingRequired} = 1 AND ${table.shippingAddress} IS NOT NULL)
+    OR (${table.shippingRequired} = 0 AND ${table.shippingAddress} IS NULL)
   `),
   check("subscription_acquisitions_consent_check", sql`
     length(${table.consentRecord}) BETWEEN 2 AND 16384
@@ -246,6 +255,7 @@ export const customerSubscriptions = sqliteTable("customer_subscriptions", {
   stripeSubscriptionId: text("stripe_subscription_id").notNull().unique(),
   stripeCustomerId: text("stripe_customer_id").notNull(),
   quantity: integer("quantity").notNull().default(1),
+  shippingRequired: integer("shipping_required", { mode: "boolean" }).notNull(),
   status: text("status", {
     enum: [
       "incomplete",
@@ -280,6 +290,7 @@ export const customerSubscriptions = sqliteTable("customer_subscriptions", {
       table.customerId,
       table.stripeCustomerId,
       table.stripeSubscriptionId,
+      table.shippingRequired,
     ],
     foreignColumns: [
       subscriptionAcquisitions.id,
@@ -287,6 +298,7 @@ export const customerSubscriptions = sqliteTable("customer_subscriptions", {
       subscriptionAcquisitions.customerId,
       subscriptionAcquisitions.stripeCustomerId,
       subscriptionAcquisitions.stripeSubscriptionId,
+      subscriptionAcquisitions.shippingRequired,
     ],
   }).onDelete("restrict"),
   foreignKey({
@@ -299,6 +311,9 @@ export const customerSubscriptions = sqliteTable("customer_subscriptions", {
   index("customer_subscriptions_customer_status_idx").on(table.customerId, table.status),
   index("customer_subscriptions_plan_idx").on(table.planId),
   check("customer_subscriptions_quantity_check", sql`${table.quantity} BETWEEN 1 AND 1000`),
+  check("customer_subscriptions_shipping_required_check", sql`
+    ${table.shippingRequired} IN (0, 1)
+  `),
   check("customer_subscriptions_id_check", sql`length(${table.id}) BETWEEN 1 AND 128`),
   check("customer_subscriptions_subscription_id_check", sql`
     length(${table.stripeSubscriptionId}) BETWEEN 5 AND 255
@@ -320,6 +335,10 @@ export const customerSubscriptions = sqliteTable("customer_subscriptions", {
       AND json_valid(${table.shippingAddress})
       AND json_type(${table.shippingAddress}) = 'object'
     )
+  `),
+  check("customer_subscriptions_shipping_mode_check", sql`
+    (${table.shippingRequired} = 1 AND ${table.shippingAddress} IS NOT NULL)
+    OR (${table.shippingRequired} = 0 AND ${table.shippingAddress} IS NULL)
   `),
   check("customer_subscriptions_consent_check", sql`
     length(${table.consentRecord}) BETWEEN 2 AND 16384

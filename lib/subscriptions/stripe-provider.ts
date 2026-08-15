@@ -296,6 +296,8 @@ export class StripeSubscriptionAdapter implements SubscriptionProvider {
         mercora_acquisition_id: request.id,
         mercora_plan_id: request.plan.id,
         mercora_setup_intent_id: request.setupIntentId,
+        mercora_binding_version: "2",
+        mercora_shipping_required: request.plan.shippingRequired ? "true" : "false",
       },
       collection_method: "charge_automatically",
       payment_behavior: "default_incomplete",

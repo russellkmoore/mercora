@@ -39,6 +39,7 @@ function acquisition(overrides: Partial<SubscriptionAcquisition> = {}): Subscrip
       price: Money.fromMinor(1100, "USD"),
       stripePriceId: "price_plan",
       cadence: { unit: "month", count: 1 },
+      shippingRequired: true,
     },
     quantity: 1,
     shippingAddress: { line1: "1 Main", city: "Denver", country: "US" },
@@ -60,6 +61,7 @@ function provider(acq: SubscriptionAcquisition): ProviderSubscriptionBinding {
     stripePriceId: acq.plan.stripePriceId,
     price: acq.plan.price,
     cadence: acq.plan.cadence,
+    shippingRequired: acq.plan.shippingRequired,
     quantity: acq.quantity,
   };
 }
@@ -111,6 +113,114 @@ describe("subscription repository on D1", () => {
     expect([left.created, right.created].sort()).toEqual([false, true]);
     await expect(repo.reserveAcquisition(acquisition({ quantity: 2 })))
       .rejects.toBeInstanceOf(SubscriptionAcquisitionConflictError);
+  });
+
+  it("atomically races reservation against deactivation without persisting a late acquisition", async () => {
+    const repo = createSubscriptionRepository(env.DB);
+    await repo.bindProviderCustomer({ customerId: "user_one", stripeCustomerId: "cus_one" });
+    const candidate = acquisition();
+    let openBarrier!: () => void;
+    const barrier = new Promise<void>((resolve) => { openBarrier = resolve; });
+    const reservation = (async () => {
+      await barrier;
+      return repo.reserveAcquisition(candidate);
+    })();
+    const deactivation = (async () => {
+      await barrier;
+      return env.DB.prepare("UPDATE subscription_plans SET is_active = 0 WHERE id = 'plan'").run();
+    })();
+    openBarrier();
+    const [reserved] = await Promise.allSettled([reservation, deactivation]);
+    const row = await env.DB.prepare("SELECT id FROM subscription_acquisitions WHERE id = 'acq_one'")
+      .first<{ id: string }>();
+    if (reserved.status === "fulfilled") {
+      expect(row).toEqual({ id: "acq_one" });
+    } else {
+      expect(reserved.reason).toBeInstanceOf(SubscriptionAcquisitionConflictError);
+      expect(row).toBeNull();
+    }
+  });
+
+  it("rejects a new reservation after any catalog deactivation but converges an existing retry", async () => {
+    const repo = createSubscriptionRepository(env.DB);
+    await repo.bindProviderCustomer({ customerId: "user_one", stripeCustomerId: "cus_one" });
+    const candidate = acquisition();
+    await expect(repo.reserveAcquisition(candidate)).resolves.toMatchObject({ created: true });
+    await env.DB.prepare("UPDATE subscription_plans SET is_active = 0 WHERE id = 'plan'").run();
+    await expect(repo.reserveAcquisition(candidate)).resolves.toMatchObject({ created: false });
+    await expect(repo.reserveAcquisition(acquisition({ id: "acq_late", setupIntentId: "seti_late" })))
+      .rejects.toBeInstanceOf(SubscriptionAcquisitionConflictError);
+    await expect(env.DB.prepare("SELECT count(*) AS count FROM subscription_acquisitions")
+      .first()).resolves.toEqual({ count: 1 });
+
+    await env.DB.prepare("UPDATE subscription_plans SET is_active = 1 WHERE id = 'plan'").run();
+    await env.DB.prepare("UPDATE products SET status = 'inactive' WHERE id = 'prod'").run();
+    await expect(repo.reserveAcquisition(acquisition({ id: "acq_product", setupIntentId: "seti_product" })))
+      .rejects.toBeInstanceOf(SubscriptionAcquisitionConflictError);
+    await env.DB.prepare("UPDATE products SET status = 'active' WHERE id = 'prod'").run();
+    await env.DB.prepare("UPDATE product_variants SET status = 'inactive' WHERE id = 'var'").run();
+    await expect(repo.reserveAcquisition(acquisition({ id: "acq_variant", setupIntentId: "seti_variant" })))
+      .rejects.toBeInstanceOf(SubscriptionAcquisitionConflictError);
+    await expect(env.DB.prepare("SELECT count(*) AS count FROM subscription_acquisitions")
+      .first()).resolves.toEqual({ count: 1 });
+  });
+
+  it("persists immutable physical and digital shipping mode through lifecycle binding", async () => {
+    const repo = createSubscriptionRepository(env.DB);
+    await repo.bindProviderCustomer({ customerId: "user_one", stripeCustomerId: "cus_one" });
+    const physical = acquisition();
+    const physicalProvider = provider(physical);
+    await repo.reserveAcquisition(physical);
+    await repo.recordProviderCreated({ acquisition: physical, provider: physicalProvider });
+    await repo.completeAcquisitionFromLifecycleWebhook({
+      acquisition: physical,
+      provider: physicalProvider,
+      lifecycle: { status: "active", quantity: 1, cancelAtPeriodEnd: false },
+      lifecycleEvent: { id: "evt_physical", createdAt: 10 },
+    });
+    await env.DB.prepare("UPDATE product_variants SET shipping_required = 0 WHERE id = 'var'").run();
+    await expect(repo.findSubscriptionByStripeSubscription("sub_one"))
+      .resolves.toMatchObject({ shippingRequired: true, shippingAddress: physical.shippingAddress });
+
+    await env.DB.prepare("DELETE FROM subscription_events").run();
+    await env.DB.prepare("DELETE FROM customer_subscriptions").run();
+    await env.DB.prepare("DELETE FROM subscription_acquisitions").run();
+    const digital = acquisition({
+      id: "acq_digital",
+      setupIntentId: "seti_digital",
+      plan: { ...physical.plan, shippingRequired: false },
+      shippingAddress: undefined,
+    });
+    const digitalProvider = { ...provider(digital), stripeSubscriptionId: "sub_digital" };
+    await repo.reserveAcquisition(digital);
+    await repo.recordProviderCreated({ acquisition: digital, provider: digitalProvider });
+    await repo.completeAcquisitionFromLifecycleWebhook({
+      acquisition: digital,
+      provider: digitalProvider,
+      lifecycle: { status: "active", quantity: 1, cancelAtPeriodEnd: false },
+      lifecycleEvent: { id: "evt_digital", createdAt: 20 },
+    });
+    await env.DB.prepare("UPDATE product_variants SET shipping_required = 1 WHERE id = 'var'").run();
+    await expect(repo.findSubscriptionByStripeSubscription("sub_digital"))
+      .resolves.toMatchObject({ shippingRequired: false, shippingAddress: undefined });
+  });
+
+  it("rejects a lifecycle row whose immutable shipping mode differs from its acquisition", async () => {
+    const repo = createSubscriptionRepository(env.DB);
+    await repo.bindProviderCustomer({ customerId: "user_one", stripeCustomerId: "cus_one" });
+    const candidate = acquisition();
+    const binding = provider(candidate);
+    await repo.reserveAcquisition(candidate);
+    await repo.recordProviderCreated({ acquisition: candidate, provider: binding });
+    await expect(env.DB.prepare(`INSERT INTO customer_subscriptions
+      (id, plan_id, customer_id, acquisition_id, stripe_subscription_id,
+       stripe_customer_id, quantity, shipping_required, status, consent_record,
+       latest_lifecycle_event_created_at, latest_lifecycle_event_id)
+      VALUES ('subscription_bad_mode', 'plan', 'user_one', 'acq_one', 'sub_one',
+       'cus_one', 1, 0, 'active', ?, 10, 'evt_bad_mode')`)
+      .bind(JSON.stringify(candidate.consent)).run()).rejects.toThrow();
+    await expect(env.DB.prepare("SELECT count(*) AS count FROM customer_subscriptions")
+      .first()).resolves.toEqual({ count: 0 });
   });
 
   it("does not revive a failed acquisition from a lifecycle event", async () => {
@@ -179,18 +289,20 @@ describe("subscription repository on D1", () => {
     await env.DB.prepare(`INSERT INTO subscription_acquisitions
       (id, setup_intent_id, plan_id, product_id, variant_id, currency_code,
        unit_amount_minor, stripe_price_id, cadence_unit, cadence_count,
-       customer_id, stripe_customer_id, quantity, consent_record, status,
+       customer_id, stripe_customer_id, quantity, shipping_required,
+       shipping_address, consent_record, status,
        stripe_subscription_id)
       VALUES ('other', 'seti_other', 'plan', 'prod', 'var', 'USD', 1100,
-       'price_plan', 'month', 1, 'user_two', 'cus_two', 1, ?,
-       'provider_created', 'sub_two')`).bind(JSON.stringify(candidate.consent)).run();
+       'price_plan', 'month', 1, 'user_two', 'cus_two', 1, 1, ?, ?,
+       'provider_created', 'sub_two')`)
+      .bind(JSON.stringify(candidate.shippingAddress), JSON.stringify(candidate.consent)).run();
     await env.DB.prepare(`INSERT INTO customer_subscriptions
       (id, plan_id, customer_id, acquisition_id, stripe_subscription_id,
-       stripe_customer_id, quantity, status, consent_record,
+       stripe_customer_id, quantity, shipping_required, status, shipping_address, consent_record,
        latest_lifecycle_event_created_at, latest_lifecycle_event_id)
       VALUES ('subscription_acq_one', 'plan', 'user_two', 'other', 'sub_two',
-       'cus_two', 1, 'active', ?, 1, 'evt_other')`)
-      .bind(JSON.stringify(candidate.consent)).run();
+       'cus_two', 1, 1, 'active', ?, ?, 1, 'evt_other')`)
+      .bind(JSON.stringify(candidate.shippingAddress), JSON.stringify(candidate.consent)).run();
 
     await expect(repo.completeAcquisitionFromLifecycleWebhook({
       acquisition: candidate,
@@ -212,10 +324,10 @@ describe("subscription repository on D1", () => {
     await repo.recordProviderCreated({ acquisition: candidate, provider: binding });
     await env.DB.prepare(`INSERT INTO customer_subscriptions
       (id, plan_id, customer_id, acquisition_id, stripe_subscription_id,
-       stripe_customer_id, quantity, status, shipping_address, consent_record,
+       stripe_customer_id, quantity, shipping_required, status, shipping_address, consent_record,
        latest_lifecycle_event_created_at, latest_lifecycle_event_id)
       VALUES ('subscription_other', 'plan', 'user_one', 'acq_one', 'sub_one',
-       'cus_one', 1, 'active', ?, ?, 10, 'evt_one')`)
+       'cus_one', 1, 1, 'active', ?, ?, 10, 'evt_one')`)
       .bind(JSON.stringify(candidate.shippingAddress), JSON.stringify(candidate.consent)).run();
 
     await expect(repo.completeAcquisitionFromLifecycleWebhook({
