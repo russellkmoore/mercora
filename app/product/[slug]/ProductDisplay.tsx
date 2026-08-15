@@ -345,11 +345,12 @@ export default function ProductDisplay({
               <p className="text-lg font-semibold text-orange-500 sm:text-xl">Coming soon</p>
             )}
 
-            {available && selectedVariant?.id && subscription?.enabled ? (
+            {selectedVariant?.id && subscription?.enabled ? (
               <SubscriptionAcquisitionPanel
                 key={selectedVariant.id}
                 productId={product.id}
                 variantId={selectedVariant.id}
+                available={available}
                 enabled={subscription.enabled}
                 termsVersion={subscription.termsVersion}
                 termsUrl={subscription.termsUrl}

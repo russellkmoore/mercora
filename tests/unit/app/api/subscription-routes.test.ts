@@ -63,7 +63,16 @@ describe("subscription customer routes", () => {
     mocks.begin.mockResolvedValue({
       acquisitionId: "acq_one", setupIntentId: "seti_one", clientSecret: "secret",
     });
-    mocks.finalize.mockResolvedValue({ id: "acq_one", status: "provider_created" });
+    mocks.finalize.mockResolvedValue({
+      id: "acq_one",
+      planId: "plan_one",
+      quantity: 2,
+      status: "provider_created",
+      currentPeriodStart: 1_797_033_600,
+      currentPeriodEnd: 1_799_712_000,
+      cancelAtPeriodEnd: false,
+      pauseCollection: { behavior: "void" },
+    });
     mocks.act.mockResolvedValue({ subscription: { id: "subscription_acq_one" }, reconciliationPending: true });
   });
 
@@ -123,6 +132,14 @@ describe("subscription customer routes", () => {
     expect(denied.status).toBe(403);
     const accepted = await finalize(request("/api/subscriptions", { setupIntentId: "seti_one" }));
     expect(accepted.status).toBe(202);
+    expect(await accepted.json()).toEqual({
+      subscription: {
+        id: "acq_one",
+        planId: "plan_one",
+        quantity: 2,
+        status: "provider_created",
+      },
+    });
     expect(mocks.finalize).toHaveBeenCalledWith("user_one", "seti_one");
   });
 

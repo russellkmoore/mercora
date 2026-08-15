@@ -7,10 +7,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import StripeProvider from "@/components/checkout/StripeProvider";
 import {
   attemptFactsKey,
+  completeStripeSetupRedirect,
   confirmSetupAndFinalize,
-  createSubscriptionSetupAttempt,
+  createOwnerBoundSubscriptionSetupAttempt,
   fetchSavedAddressesForPlan,
   fetchSubscriptionPlans,
+  parseStripeSetupRedirect,
+  recurringTotal,
   shippingAddressFromSaved,
   type PublicSubscriptionPlan,
   type SavedSubscriptionAddress,
@@ -19,6 +22,7 @@ import {
 export interface SubscriptionAcquisitionPanelProps {
   productId: string;
   variantId: string;
+  available: boolean;
   enabled: boolean;
   termsVersion?: string;
   termsUrl: string;
@@ -30,12 +34,7 @@ function cadenceLabel(plan: PublicSubscriptionPlan): string {
 }
 
 function formatPlanPrice(plan: PublicSubscriptionPlan): string {
-  return new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency: plan.price.currency,
-    minimumFractionDigits: plan.price.precision,
-    maximumFractionDigits: plan.price.precision,
-  }).format(plan.price.amount);
+  return recurringTotal(plan, 1)?.formatted ?? "Unavailable";
 }
 
 function addressLabel(saved: SavedSubscriptionAddress): string {
@@ -46,12 +45,17 @@ function addressLabel(saved: SavedSubscriptionAddress): string {
 }
 
 function SetupPaymentForm(props: {
+  ownerId: string;
+  currentOwner: () => string | null;
   onComplete: () => void;
   onError: (message: string) => void;
 }) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
+  const requestRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => requestRef.current?.abort(), []);
 
   return (
     <form
@@ -59,6 +63,9 @@ function SetupPaymentForm(props: {
       onSubmit={async (event) => {
         event.preventDefault();
         if (!stripe || !elements || submitting) return;
+        const controller = new AbortController();
+        requestRef.current?.abort();
+        requestRef.current = controller;
         setSubmitting(true);
         props.onError("");
         try {
@@ -67,12 +74,15 @@ function SetupPaymentForm(props: {
             elements,
             fetcher: fetch,
             returnUrl: window.location.href,
+            signal: controller.signal,
           });
-          props.onComplete();
+          if (!controller.signal.aborted && props.currentOwner() === props.ownerId) props.onComplete();
         } catch (error) {
-          props.onError(error instanceof Error ? error.message : "Subscription setup failed");
+          if (!controller.signal.aborted && props.currentOwner() === props.ownerId) {
+            props.onError(error instanceof Error ? error.message : "Subscription setup failed");
+          }
         } finally {
-          setSubmitting(false);
+          if (!controller.signal.aborted && props.currentOwner() === props.ownerId) setSubmitting(false);
         }
       }}
     >
@@ -91,6 +101,7 @@ function SetupPaymentForm(props: {
 export default function SubscriptionAcquisitionPanel({
   productId,
   variantId,
+  available,
   enabled,
   termsVersion,
   termsUrl,
@@ -101,7 +112,7 @@ export default function SubscriptionAcquisitionPanel({
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [planError, setPlanError] = useState("");
   const [planRetry, setPlanRetry] = useState(0);
-  const [quantity, setQuantity] = useState(1);
+  const [quantityText, setQuantityText] = useState("1");
   const [addresses, setAddresses] = useState<SavedSubscriptionAddress[]>([]);
   const [addressesOwner, setAddressesOwner] = useState<string | null>(null);
   const [addressId, setAddressId] = useState("");
@@ -112,11 +123,85 @@ export default function SubscriptionAcquisitionPanel({
     acquisitionId: string;
     setupIntentId: string;
     clientSecret: string;
+    ownerId: string;
   } | null>(null);
   const [working, setWorking] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
-  const [completed, setCompleted] = useState(false);
+  const [completedOwner, setCompletedOwner] = useState<string | null>(null);
+  const [redirectWorkingOwner, setRedirectWorkingOwner] = useState<string | null>(null);
+  const [redirectError, setRedirectError] = useState<{
+    ownerId: string;
+    message: string;
+    retryable: boolean;
+  } | null>(null);
+  const [redirectRetry, setRedirectRetry] = useState(0);
   const attemptRef = useRef<{ facts: string; key: string } | null>(null);
+  const ownerRef = useRef<string | null>(null);
+  const beginControllerRef = useRef<AbortController | null>(null);
+  const redirectRef = useRef<ReturnType<typeof parseStripeSetupRedirect> | null>(null);
+  const redirectOwnerRef = useRef<string | null>(null);
+  const currentOwner = isLoaded && isSignedIn && userId ? userId : null;
+  const [stateOwner, setStateOwner] = useState(currentOwner);
+  if (stateOwner !== currentOwner) {
+    setStateOwner(currentOwner);
+    setSetup(null);
+    setCheckoutError("");
+    setCompletedOwner(null);
+    setRedirectWorkingOwner(null);
+    setRedirectError(null);
+    setAccepted(false);
+    setWorking(false);
+  }
+
+  useEffect(() => {
+    ownerRef.current = currentOwner;
+    beginControllerRef.current?.abort();
+    attemptRef.current = null;
+  }, [currentOwner]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (redirectRef.current === null) {
+      redirectRef.current = parseStripeSetupRedirect(window.location.href, window.location.origin);
+      if (redirectRef.current.kind !== "none" && redirectRef.current.cleanUrl) {
+        window.history.replaceState(window.history.state, "", redirectRef.current.cleanUrl);
+      }
+    }
+    const redirect = redirectRef.current;
+    if (!currentOwner || redirect.kind === "none" || redirectOwnerRef.current !== null) return;
+    redirectOwnerRef.current = currentOwner;
+    const owner = currentOwner;
+    const controller = new AbortController();
+    setRedirectWorkingOwner(owner);
+    setCheckoutError("");
+    completeStripeSetupRedirect({
+      fetcher: fetch,
+      redirect,
+      ownerId: owner,
+      currentOwner: () => ownerRef.current,
+      signal: controller.signal,
+    }).then((result) => {
+      if (result && ownerRef.current === owner) {
+        redirectRef.current = { kind: "none" };
+        setCompletedOwner(owner);
+      }
+    }).catch((error) => {
+      if (!controller.signal.aborted && ownerRef.current === owner) {
+        setRedirectError({
+          ownerId: owner,
+          message: error instanceof Error ? error.message : "Subscription finalization failed",
+          retryable: redirect.kind === "success",
+        });
+      }
+    }).finally(() => {
+      if (redirectOwnerRef.current === owner) redirectOwnerRef.current = null;
+      if (!controller.signal.aborted && ownerRef.current === owner) setRedirectWorkingOwner(null);
+    });
+    return () => {
+      controller.abort();
+      if (redirectOwnerRef.current === owner) redirectOwnerRef.current = null;
+    };
+  }, [currentOwner, isLoaded, redirectRetry]);
 
   useEffect(() => {
     if (!enabled || !termsVersion || !variantId) return;
@@ -184,7 +269,11 @@ export default function SubscriptionAcquisitionPanel({
     }
   }, [selectedPlan?.shippingRequired, selectedSavedAddress]);
 
-  const facts = useMemo(() => selectedPlan && termsVersion ? attemptFactsKey({
+  const parsedQuantity = Number(quantityText);
+  const quantity = Number.isSafeInteger(parsedQuantity) && parsedQuantity >= 1 && parsedQuantity <= 1000
+    ? parsedQuantity : null;
+  const total = selectedPlan && quantity !== null ? recurringTotal(selectedPlan, quantity) : null;
+  const facts = useMemo(() => selectedPlan && termsVersion && quantity !== null ? attemptFactsKey({
     planId: selectedPlan.id,
     quantity,
     shippingAddress: selectedPlan.shippingRequired ? selectedShippingAddress : undefined,
@@ -192,6 +281,45 @@ export default function SubscriptionAcquisitionPanel({
   }) : "", [quantity, selectedPlan, selectedShippingAddress, termsVersion]);
 
   if (!enabled || !termsVersion) return null;
+  if (redirectWorkingOwner === currentOwner && currentOwner) {
+    return <p className="text-sm text-gray-400" role="status">Finalizing your subscription request…</p>;
+  }
+  if (completedOwner === currentOwner && currentOwner) {
+    return (
+      <section className="rounded-lg border border-green-700 bg-green-950/30 p-5" aria-live="polite">
+        <h2 className="font-semibold text-green-300">Subscription request received</h2>
+        <p className="mt-2 text-sm text-gray-300">
+          Your payment method is confirmed. The subscription is pending secure reconciliation.
+        </p>
+        <Link className="mt-3 inline-block text-sm font-semibold text-orange-400 underline" href="/account/subscriptions">
+          View subscriptions
+        </Link>
+      </section>
+    );
+  }
+  if (redirectError?.ownerId === currentOwner && currentOwner) {
+    return (
+      <section className="rounded-lg border border-red-800 bg-red-950/30 p-5" role="alert">
+        <h2 className="font-semibold text-red-200">Subscription setup needs attention</h2>
+        <p className="mt-2 text-sm text-gray-300">{redirectError.message}</p>
+        <button
+          type="button"
+          className="mt-3 text-sm font-semibold text-orange-400 underline"
+          onClick={() => {
+            setRedirectError(null);
+            if (redirectError.retryable) {
+              setRedirectRetry((value) => value + 1);
+            } else {
+              redirectRef.current = { kind: "none" };
+            }
+          }}
+        >
+          {redirectError.retryable ? "Retry finalization" : "Return to subscription options"}
+        </button>
+      </section>
+    );
+  }
+  if (!available) return null;
   if (loadingPlans) return <p className="text-sm text-gray-400" role="status">Checking subscription options…</p>;
   if (planError) {
     return (
@@ -215,20 +343,6 @@ export default function SubscriptionAcquisitionPanel({
   }
   if (!selectedPlan) return null;
 
-  if (completed) {
-    return (
-      <section className="rounded-lg border border-green-700 bg-green-950/30 p-5" aria-live="polite">
-        <h2 className="font-semibold text-green-300">Subscription request received</h2>
-        <p className="mt-2 text-sm text-gray-300">
-          Your payment method is confirmed. The subscription is pending secure reconciliation.
-        </p>
-        <Link className="mt-3 inline-block text-sm font-semibold text-orange-400 underline" href="/account/subscriptions">
-          View subscriptions
-        </Link>
-      </section>
-    );
-  }
-
   return (
     <section className="rounded-lg border border-orange-700/70 bg-neutral-950 p-4 sm:p-5" aria-labelledby="subscribe-heading">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -250,7 +364,7 @@ export default function SubscriptionAcquisitionPanel({
                 setAccepted(false);
                 setSetup(null);
                 setCheckoutError("");
-                setCompleted(false);
+                setCompletedOwner(null);
               }}
             >
               {plans.map((plan) => (
@@ -265,6 +379,9 @@ export default function SubscriptionAcquisitionPanel({
 
       <p className="mt-3 text-xs leading-relaxed text-gray-400">
         Recurring charges continue {cadenceLabel(selectedPlan)} until canceled. You can request cancellation from your account.
+      </p>
+      <p className="mt-2 text-sm font-semibold text-white" aria-live="polite">
+        Recurring total: {total?.formatted ?? "Unavailable"} {cadenceLabel(selectedPlan)}
       </p>
 
       {!isLoaded ? <p className="mt-4 text-sm text-gray-400">Checking your account…</p> : null}
@@ -287,13 +404,12 @@ export default function SubscriptionAcquisitionPanel({
               min={1}
               max={1000}
               inputMode="numeric"
-              value={quantity}
+              value={quantityText}
               onChange={(event) => {
-                const next = Number(event.target.value);
-                setQuantity(Number.isSafeInteger(next) ? Math.min(1000, Math.max(1, next)) : 1);
+                setQuantityText(event.target.value.slice(0, 16));
                 setSetup(null);
                 setCheckoutError("");
-                setCompleted(false);
+                setCompletedOwner(null);
               }}
               className="mt-1 block w-24 rounded border border-neutral-600 bg-neutral-900 px-3 py-2 text-white"
             />
@@ -310,7 +426,7 @@ export default function SubscriptionAcquisitionPanel({
                     setAddressId(event.target.value);
                     setSetup(null);
                     setCheckoutError("");
-                    setCompleted(false);
+                    setCompletedOwner(null);
                   }}
                   className="mt-1 block w-full rounded border border-neutral-600 bg-neutral-900 px-3 py-2 text-white disabled:opacity-50"
                 >
@@ -331,6 +447,14 @@ export default function SubscriptionAcquisitionPanel({
             </div>
           ) : null}
 
+          {quantity === null || total === null ? (
+            <p className="text-sm text-red-300" role="alert">Enter a valid quantity and recurring amount.</p>
+          ) : (
+            <p className="rounded border border-neutral-700 bg-neutral-900 p-3 text-sm text-gray-200">
+              You will confirm a recurring total of <strong>{total.formatted}</strong> {cadenceLabel(selectedPlan)}.
+            </p>
+          )}
+
           <label className="flex items-start gap-3 text-sm text-gray-300">
             <input
               type="checkbox"
@@ -347,9 +471,18 @@ export default function SubscriptionAcquisitionPanel({
           {checkoutError ? <p className="text-sm text-red-300" role="alert">{checkoutError}</p> : null}
           <button
             type="button"
-            disabled={working || !accepted || (selectedPlan.shippingRequired
+            disabled={working || !accepted || quantity === null || total === null || !currentOwner
+              || (selectedPlan.shippingRequired
               && !selectedShippingAddress)}
             onClick={async () => {
+              if (!currentOwner || quantity === null || total === null) {
+                setCheckoutError("Enter a valid subscription quantity");
+                return;
+              }
+              const owner = currentOwner;
+              const controller = new AbortController();
+              beginControllerRef.current?.abort();
+              beginControllerRef.current = controller;
               setWorking(true);
               setCheckoutError("");
               try {
@@ -359,18 +492,20 @@ export default function SubscriptionAcquisitionPanel({
                 if (selectedPlan.shippingRequired && !selectedShippingAddress) {
                   throw new Error("Select a valid saved shipping address");
                 }
-                const result = await createSubscriptionSetupAttempt(fetch, {
+                const result = await createOwnerBoundSubscriptionSetupAttempt(fetch, {
                   planId: selectedPlan.id,
                   quantity,
                   shippingAddress: selectedShippingAddress,
                   termsVersion,
                   idempotencyKey: attemptRef.current.key,
-                });
-                setSetup(result);
+                }, owner, () => ownerRef.current, controller.signal);
+                if (result) setSetup(result);
               } catch (error) {
-                setCheckoutError(error instanceof Error ? error.message : "Subscription setup failed");
+                if (!controller.signal.aborted && ownerRef.current === owner) {
+                  setCheckoutError(error instanceof Error ? error.message : "Subscription setup failed");
+                }
               } finally {
-                setWorking(false);
+                if (!controller.signal.aborted && ownerRef.current === owner) setWorking(false);
               }
             }}
             className="w-full rounded bg-orange-500 px-5 py-3 font-bold text-black transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
@@ -380,10 +515,15 @@ export default function SubscriptionAcquisitionPanel({
         </div>
       ) : null}
 
-      {setup ? (
+      {setup && setup.ownerId === currentOwner ? (
         <div className="mt-5 space-y-4 rounded bg-white p-4 text-black">
           <StripeProvider clientSecret={setup.clientSecret}>
-            <SetupPaymentForm onComplete={() => setCompleted(true)} onError={setCheckoutError} />
+            <SetupPaymentForm
+              ownerId={setup.ownerId}
+              currentOwner={() => ownerRef.current}
+              onComplete={() => setCompletedOwner(setup.ownerId)}
+              onError={setCheckoutError}
+            />
           </StripeProvider>
           {checkoutError ? <p className="text-sm text-red-700" role="alert">{checkoutError}</p> : null}
           <button type="button" className="text-sm text-neutral-700 underline" onClick={() => setSetup(null)}>
