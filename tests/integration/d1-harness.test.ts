@@ -34,6 +34,7 @@ describe('real D1 Workers harness', () => {
       '0019_add_content_publishing.sql',
       '0020_add_redirect_map.sql',
       '0021_add_subscriptions.sql',
+      '0022_add_gift_cards.sql',
     ]);
   });
 
