@@ -34,7 +34,8 @@
     "cf-typecheck": "wrangler types --env-interface CloudflareEnv --strict-vars false ./cloudflare-env.d.ts --check",
     "token:generate": "tsx scripts/manage-tokens.ts generate",
     "token:list": "tsx scripts/manage-tokens.ts list",
-    "token:revoke": "tsx scripts/manage-tokens.ts revoke"
+    "token:revoke": "tsx scripts/manage-tokens.ts revoke",
+    "migrate:shopify": "tsx scripts/shopify-migration/cli.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.7.4",
