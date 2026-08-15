@@ -162,6 +162,8 @@ describe("subscription plan management on real D1", () => {
     expect(deactivated).toMatchObject({ active: false, unitAmountMinor: 1299 });
     expect(deactivated.updatedAt).toBe("2026-08-15T01:02:03.005Z");
     expect(verify).toHaveBeenCalledTimes(1);
+    await expect(service.update(PLAN.id, { active: false }, created.updatedAt))
+      .rejects.toBeInstanceOf(SubscriptionPlanConflictError);
     await expect(service.update(PLAN.id, { active: true }, created.updatedAt))
       .rejects.toBeInstanceOf(SubscriptionPlanConflictError);
     await expect(service.listPublic({ limit: 20, offset: 0 }))
@@ -227,6 +229,93 @@ describe("subscription plan management on real D1", () => {
     )).rejects.toBeInstanceOf(SubscriptionPlanPriceUnavailableError);
     const stored = await service.getAdmin(PLAN.id);
     expect(stored).toMatchObject({ unitAmountMinor: 1299, active: false });
+  });
+
+  it.each([
+    ["malformed", "{not-json"],
+    ["currency-drifted", JSON.stringify({ amount: 1500, currency: "EUR" })],
+  ])("deactivates through %s catalog price data without provider validation", async (_label, price) => {
+    const seeded = createSubscriptionPlanService(env.DB, { priceVerifier: ACCEPT_PRICE });
+    const created = await seeded.create(PLAN);
+    await env.DB.prepare("UPDATE product_variants SET price = ? WHERE id = ?")
+      .bind(price, PLAN.variantId).run();
+    const verify = vi.fn(async () => {
+      throw new SubscriptionPlanPriceUnavailableError(new Error("provider unavailable"));
+    });
+    const service = createSubscriptionPlanService(env.DB, { priceVerifier: { verify } });
+
+    const deactivated = await service.update(PLAN.id, { active: false }, created.updatedAt);
+
+    expect(deactivated).toMatchObject({ id: PLAN.id, active: false, unitAmountMinor: 1299 });
+    expect(verify).not.toHaveBeenCalled();
+    await expect(env.DB.prepare("SELECT is_active FROM subscription_plans WHERE id = ?")
+      .bind(PLAN.id).first<{ is_active: number }>()).resolves.toEqual({ is_active: 0 });
+  });
+
+  it("deactivates a plan whose catalog binding is missing", async () => {
+    const seeded = createSubscriptionPlanService(env.DB, { priceVerifier: ACCEPT_PRICE });
+    const created = await seeded.create(PLAN);
+    let catalogReads = 0;
+    const missingCatalogStatement = {
+      bind() { return this; },
+      first: async () => null,
+    } as unknown as D1PreparedStatement;
+    const missingCatalog = new Proxy(env.DB, {
+      get(target, property) {
+        if (property === "prepare") {
+          return (query: string) => {
+            if (query.includes("JOIN products p")) {
+              catalogReads += 1;
+              return missingCatalogStatement;
+            }
+            return target.prepare(query);
+          };
+        }
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) as D1Database;
+    const verify = vi.fn(async () => {
+      throw new SubscriptionPlanPriceUnavailableError(new Error("provider unavailable"));
+    });
+    const service = createSubscriptionPlanService(missingCatalog, { priceVerifier: { verify } });
+
+    const deactivated = await service.update(
+      PLAN.id,
+      { active: false },
+      created.updatedAt,
+    );
+
+    expect(deactivated).toMatchObject({
+      id: PLAN.id,
+      product: { id: PLAN.productId },
+      variant: { id: PLAN.variantId },
+      active: false,
+    });
+    expect(catalogReads).toBe(0);
+    expect(verify).not.toHaveBeenCalled();
+    await expect(env.DB.prepare("SELECT is_active FROM subscription_plans WHERE id = ?")
+      .bind(PLAN.id).first<{ is_active: number }>()).resolves.toEqual({ is_active: 0 });
+  });
+
+  it("does not apply the rollback bypass to a simultaneous binding change", async () => {
+    const seeded = createSubscriptionPlanService(env.DB, { priceVerifier: ACCEPT_PRICE });
+    const created = await seeded.create(PLAN);
+    await env.DB.prepare("UPDATE product_variants SET price = '{not-json' WHERE id = ?")
+      .bind(PLAN.variantId).run();
+    const verify = vi.fn(async () => undefined);
+    const service = createSubscriptionPlanService(env.DB, { priceVerifier: { verify } });
+
+    await expect(service.update(
+      PLAN.id,
+      { active: false, unitAmountMinor: 1300 },
+      created.updatedAt,
+    )).rejects.toThrow("Stored catalog variant price is invalid");
+    expect(verify).not.toHaveBeenCalled();
+    await expect(env.DB.prepare(`SELECT unit_amount_minor, is_active
+      FROM subscription_plans WHERE id = ?`).bind(PLAN.id)
+      .first<{ unit_amount_minor: number; is_active: number }>())
+      .resolves.toEqual({ unit_amount_minor: 1299, is_active: 1 });
   });
 
   it("does not resolve a lazy provider factory for list/get but does for a binding write", async () => {
