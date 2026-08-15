@@ -72,6 +72,13 @@ describe("subscription foundation on real D1", () => {
   it("preserves a populated baseline and starts capability state empty", async () => {
     await applyFoundationOnPopulatedBaseline();
 
+    // Simulate old application code continuing to write only the pre-0021
+    // order schema after the additive tables have been deployed.
+    await env.DB.prepare(`
+      INSERT OR IGNORE INTO orders (id, customer_id, total_amount, currency_code, items)
+      VALUES ('old-code-after-0021', 'user_existing', ?, 'USD', '[]')
+    `).bind(JSON.stringify({ amount: 100, currency: "USD" })).run();
+
     const product = await env.DB.prepare(
       "SELECT id FROM products WHERE id = 'prod-existing'",
     ).first<{ id: string }>();
@@ -85,6 +92,9 @@ describe("subscription foundation on real D1", () => {
     `).first<Record<string, number>>();
 
     expect(product?.id).toBe("prod-existing");
+    expect(await env.DB.prepare(
+      "SELECT id FROM orders WHERE id = 'old-code-after-0021'",
+    ).first<{ id: string }>()).toEqual({ id: "old-code-after-0021" });
     expect(counts).toEqual({ plans: 0, acquisitions: 0, subscriptions: 0, events: 0, invoice_orders: 0 });
   });
 
