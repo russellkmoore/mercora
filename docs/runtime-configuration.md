@@ -16,7 +16,7 @@ time.
 | Contact and legal links | `STORE_SUPPORT_EMAIL`, `STORE_SENDER_EMAIL`, `STORE_REPLY_TO_EMAIL`, `STORE_MERCHANT_NOTIFICATION_EMAIL`, `STORE_POSTAL_ADDRESS`, `STORE_SUPPORT_HOURS`, `NEXT_PUBLIC_PRIVACY_URL`, `NEXT_PUBLIC_TERMS_URL`, `NEXT_PUBLIC_RETURNS_URL` |
 | Commerce formatting | `STORE_LOCALE` (canonical BCP 47 locale, defaults to `en-US`), `STORE_CURRENCY` (must match active catalog variant currency; Mercora checkout is single-currency per cart) |
 | Subscription reconciliation | `STORE_FEATURE_SUBSCRIPTION_RECONCILIATION=true` (defaults off; keep enabled after the first subscription is sold) |
-| Optional subscription acquisition | `STORE_FEATURE_SUBSCRIPTION_ACQUISITION=true` (defaults off and requires reconciliation enabled) |
+| Optional subscription acquisition | `STORE_FEATURE_SUBSCRIPTION_ACQUISITION=true` plus a bounded `STORE_SUBSCRIPTION_TERMS_VERSION` matching the published recurring terms (defaults off and requires reconciliation enabled) |
 | Outbound email | `EMAIL_PROVIDER=cloudflare\|resend`; Cloudflare `EMAIL` binding (recommended) or encrypted `RESEND_API_KEY` |
 
 `NEXT_PUBLIC_*` values are intentionally public. Store credentials (Stripe
