@@ -17,6 +17,7 @@ import {
 } from '@/lib/services/order-confirmation';
 import { runPaidOrderInventoryEffect } from '@/lib/services/inventory-adjustments';
 import { recordTelemetry } from '@/lib/observability/telemetry';
+import { subscriptionAcquisitionIdFromOrder } from '@/lib/commerce/capabilities';
 
 const EFFECT_LEASE_MS = 5 * 60 * 1000;
 const MAX_EFFECT_ERROR = 2_000;
@@ -60,6 +61,14 @@ export interface OrderEffectDrainResult {
   failed: number;
 }
 
+export interface StagePaidOrderEffectOptions {
+  includeEmail?: boolean;
+  includeGiftCard?: boolean;
+  /** Renewal invoice orders suppress this to avoid recursive acquisition. */
+  includeSubscription?: boolean;
+  now?: Date;
+}
+
 class EffectNeedsReviewError extends Error {}
 
 async function resolveDatabase(database?: D1Database): Promise<D1Database> {
@@ -87,7 +96,9 @@ function couponEffectKey(orderId: string, code: string): string {
 
 function effectDefinitions(
   order: Order,
-  includeEmail: boolean
+  includeEmail: boolean,
+  includeSubscription: boolean,
+  includeGiftCard: boolean,
 ): EffectDefinition[] {
   if (!order.id) throw new Error('Cannot stage effects for an order without an id');
   const definitions: EffectDefinition[] = [
@@ -96,9 +107,16 @@ function effectDefinitions(
       key: couponEffectKey(order.id!, code),
       type: 'coupon' as const,
     })),
-    { key: `paid:${order.id}:gift-card:v1`, type: 'gift_card' },
-    { key: `paid:${order.id}:subscription:v1`, type: 'subscription' },
   ];
+  if (includeGiftCard) {
+    definitions.push({ key: `paid:${order.id}:gift-card:v1`, type: 'gift_card' });
+  }
+  if (includeSubscription && subscriptionAcquisitionIdFromOrder(order)) {
+    definitions.push({
+      key: `paid:${order.id}:subscription:v1`,
+      type: 'subscription',
+    });
+  }
   if (includeEmail) {
     definitions.push({
       key: `paid:${order.id}:confirmation-email:v1`,
@@ -118,12 +136,26 @@ function effectDefinitions(
  */
 export async function stagePaidOrderEffects(
   order: Order,
-  options: { includeEmail?: boolean; database?: D1Database; now?: Date } = {}
+  options: StagePaidOrderEffectOptions & { database?: D1Database } = {}
 ): Promise<void> {
-  if (!order.id) throw new Error('Cannot stage effects for an order without an id');
   const database = await resolveDatabase(options.database);
+  await database.batch(preparePaidOrderEffectStatements(database, order, options));
+}
+
+/** Build effect inserts for callers that must compose them into a larger D1 batch. */
+export function preparePaidOrderEffectStatements(
+  database: D1Database,
+  order: Order,
+  options: StagePaidOrderEffectOptions = {},
+): D1PreparedStatement[] {
+  if (!order.id) throw new Error('Cannot stage effects for an order without an id');
   const now = (options.now ?? new Date()).toISOString();
-  const statements = effectDefinitions(order, options.includeEmail !== false).map(({ key, type }) =>
+  return effectDefinitions(
+    order,
+    options.includeEmail !== false,
+    options.includeSubscription !== false,
+    options.includeGiftCard !== false,
+  ).map(({ key, type }) =>
     database.prepare(`
 INSERT INTO order_effects (
   effect_key, order_id, effect_type, status, attempt_count,
@@ -133,7 +165,6 @@ INSERT INTO order_effects (
 ON CONFLICT(effect_key) DO NOTHING
 `).bind(key, order.id!, type, now, now)
   );
-  await database.batch(statements);
 }
 
 const CLAIM_SQL = `
