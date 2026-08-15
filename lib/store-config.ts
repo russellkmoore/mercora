@@ -73,7 +73,7 @@ export type StoreConfig = {
     features: {
       recommendations: boolean;
       giftCards: boolean;
-      subscriptions: boolean;
+      subscriptionAcquisition: boolean;
     };
   };
   deployment: {
@@ -149,7 +149,7 @@ export const storeDefaults: StoreConfig = {
       },
       { code: "other", label: "Other", legacyAliases: [] },
     ],
-    features: { recommendations: true, giftCards: false, subscriptions: false },
+    features: { recommendations: true, giftCards: false, subscriptionAcquisition: false },
   },
   deployment: {
     // A host must opt in explicitly. Preview deployments must never be indexed
@@ -419,6 +419,19 @@ export function resolveStoreConfig(env: Environment = {}): StoreConfig {
       currency: currency(env),
       freeShippingThresholdCents: parseOptionalCents(env["STORE_FREE_SHIPPING_THRESHOLD_CENTS"]),
       carriers: parseCarrierDefinitions(env["STORE_CARRIERS_JSON"]),
+      features: {
+        recommendations: bool(
+          env,
+          "STORE_FEATURE_RECOMMENDATIONS",
+          storeDefaults.commerce.features.recommendations,
+        ),
+        giftCards: storeDefaults.commerce.features.giftCards,
+        subscriptionAcquisition: bool(
+          env,
+          "STORE_FEATURE_SUBSCRIPTION_ACQUISITION",
+          storeDefaults.commerce.features.subscriptionAcquisition,
+        ),
+      },
     },
     deployment: {
       indexable: bool(env, "NEXT_PUBLIC_ROBOTS_INDEX", storeDefaults.deployment.indexable),

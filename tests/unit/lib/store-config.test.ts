@@ -39,6 +39,22 @@ describe("resolveStoreConfig", () => {
       .toBe(storeDefaults.commerce.currency);
   });
 
+  it("keeps optional money capabilities off unless explicitly enabled", () => {
+    expect(resolveStoreConfig({}).commerce.features).toEqual({
+      recommendations: true,
+      giftCards: false,
+      subscriptionAcquisition: false,
+    });
+    expect(resolveStoreConfig({
+      STORE_FEATURE_RECOMMENDATIONS: "false",
+      STORE_FEATURE_SUBSCRIPTION_ACQUISITION: "true",
+    }).commerce.features).toEqual({
+      recommendations: false,
+      giftCards: false,
+      subscriptionAcquisition: true,
+    });
+  });
+
   it("derives sender identity from a renamed store", () => {
     const config = resolveStoreConfig({
       NEXT_PUBLIC_STORE_NAME: "Acme Store",
