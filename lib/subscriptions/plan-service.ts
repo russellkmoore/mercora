@@ -114,6 +114,16 @@ interface PlanRow extends StoredPlanRow {
   shipping_required: number | null;
 }
 
+interface AdminPlanRow extends StoredPlanRow {
+  product_name: string | null;
+  product_status: string | null;
+  variant_sku: string | null;
+  variant_status: string | null;
+  option_values: string | null;
+  variant_price: string | null;
+  shipping_required: number | null;
+}
+
 interface CatalogRow {
   product_id: string;
   product_name: string;
@@ -139,6 +149,18 @@ const PLAN_SELECT = `SELECT
 FROM subscription_plans sp
 JOIN products p ON p.id = sp.product_id
 JOIN product_variants pv ON pv.id = sp.variant_id AND pv.product_id = sp.product_id`;
+
+const ADMIN_PLAN_SELECT = `SELECT
+  sp.id, sp.product_id, sp.variant_id, sp.currency_code,
+  sp.unit_amount_minor, sp.stripe_price_id, sp.cadence_unit,
+  sp.cadence_count, sp.is_active, sp.created_at, sp.updated_at,
+  p.name AS product_name, p.status AS product_status,
+  pv.sku AS variant_sku, pv.status AS variant_status,
+  pv.option_values, pv.price AS variant_price,
+  pv.shipping_required
+FROM subscription_plans sp
+LEFT JOIN products p ON p.id = sp.product_id
+LEFT JOIN product_variants pv ON pv.id = sp.variant_id AND pv.product_id = sp.product_id`;
 
 const STORED_PLAN_SELECT = `SELECT
   id, product_id, variant_id, currency_code, unit_amount_minor,
@@ -288,6 +310,9 @@ function mapPublic(row: PlanRow): PublicSubscriptionPlan {
     throw new Error("Stored active subscription amount is invalid");
   }
   assertCadence({ unit: row.cadence_unit, count: row.cadence_count });
+  if (parseVariantCurrency(row.variant_price) !== row.currency_code) {
+    throw new Error("Stored catalog variant currency does not match the subscription plan");
+  }
   return {
     id: row.id,
     product: { id: row.product_id, label: productLabel(row.product_name) },
@@ -298,29 +323,47 @@ function mapPublic(row: PlanRow): PublicSubscriptionPlan {
   };
 }
 
-function mapAdmin(row: PlanRow): AdminSubscriptionPlan {
-  const publicFields = row.unit_amount_minor > 0 ? mapPublic(row) : {
-    id: row.id,
-    product: { id: row.product_id, label: productLabel(row.product_name) },
-    variant: { id: row.variant_id, label: variantLabel(row.variant_sku, row.option_values) },
-    price: Money.fromMinor(row.unit_amount_minor, row.currency_code).toMach(),
-    cadence: { unit: row.cadence_unit as SubscriptionPlanCadenceUnit, count: row.cadence_count },
-    shippingRequired: row.shipping_required !== 0,
-  };
-  assertWrite({
+function safeAdminProductLabel(row: AdminPlanRow): string {
+  if (row.product_name === null) return row.product_id;
+  try {
+    return productLabel(row.product_name);
+  } catch {
+    return row.product_id;
+  }
+}
+
+function safeAdminVariantLabel(row: AdminPlanRow): string {
+  if (row.variant_sku === null || row.option_values === null) return row.variant_id;
+  try {
+    return variantLabel(row.variant_sku, row.option_values);
+  } catch {
+    return row.variant_id;
+  }
+}
+
+function mapAdmin(row: AdminPlanRow): AdminSubscriptionPlan {
+  const value: SubscriptionPlanWrite = {
     id: row.id, productId: row.product_id, variantId: row.variant_id,
     currency: row.currency_code, unitAmountMinor: row.unit_amount_minor,
     stripePriceId: row.stripe_price_id,
     cadence: { unit: row.cadence_unit as SubscriptionPlanCadenceUnit, count: row.cadence_count },
     active: row.is_active === 1,
-  });
+  };
+  assertWrite(value);
   assertVersion(row.created_at);
   assertVersion(row.updated_at);
   return {
-    ...publicFields,
-    unitAmountMinor: row.unit_amount_minor,
-    stripePriceId: row.stripe_price_id,
-    active: row.is_active === 1,
+    id: value.id,
+    product: { id: value.productId, label: safeAdminProductLabel(row) },
+    variant: { id: value.variantId, label: safeAdminVariantLabel(row) },
+    price: Money.fromMinor(value.unitAmountMinor, value.currency).toMach(),
+    cadence: value.cadence,
+    // Missing or malformed catalog evidence is never treated as shippable.
+    // This projection exists to keep the exact deactivation control reachable.
+    shippingRequired: row.shipping_required === 1,
+    unitAmountMinor: value.unitAmountMinor,
+    stripePriceId: value.stripePriceId,
+    active: value.active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -419,6 +462,11 @@ export function createSubscriptionPlanService(
     return await database.prepare(`${PLAN_SELECT} WHERE sp.id = ? LIMIT 1`).bind(id).first<PlanRow>();
   }
 
+  async function findAdminRow(id: string): Promise<AdminPlanRow | null> {
+    return await database.prepare(`${ADMIN_PLAN_SELECT} WHERE sp.id = ? LIMIT 1`)
+      .bind(id).first<AdminPlanRow>();
+  }
+
   async function findStoredRow(id: string): Promise<StoredPlanRow | null> {
     return await database.prepare(`${STORED_PLAN_SELECT} WHERE id = ? LIMIT 1`)
       .bind(id).first<StoredPlanRow>();
@@ -473,7 +521,7 @@ export function createSubscriptionPlanService(
       if (options.active !== undefined && typeof options.active !== "boolean") validation("Active filter is invalid");
       const where = options.active === undefined ? "" : " WHERE sp.is_active = ?";
       const bindings = options.active === undefined ? [] : [options.active ? 1 : 0];
-      const pageStatement = database.prepare(`${PLAN_SELECT}${where} ORDER BY sp.id ASC LIMIT ? OFFSET ?`)
+      const pageStatement = database.prepare(`${ADMIN_PLAN_SELECT}${where} ORDER BY sp.id ASC LIMIT ? OFFSET ?`)
         .bind(...bindings, options.limit, options.offset);
       const countStatement = database.prepare(`SELECT COUNT(*) AS count FROM subscription_plans sp${where}`)
         .bind(...bindings);
@@ -481,7 +529,7 @@ export function createSubscriptionPlanService(
       const total = (count.results[0] as unknown as CountRow | undefined)?.count;
       if (!Number.isSafeInteger(total) || (total as number) < 0) throw new Error("Invalid plan count");
       return {
-        plans: (page.results as unknown as PlanRow[]).map(mapAdmin),
+        plans: (page.results as unknown as AdminPlanRow[]).map(mapAdmin),
         total: total as number,
         limit: options.limit,
         offset: options.offset,
@@ -490,7 +538,7 @@ export function createSubscriptionPlanService(
 
     async getAdmin(id: string): Promise<AdminSubscriptionPlan> {
       assertSubscriptionPlanId(id);
-      const row = await findRow(id);
+      const row = await findAdminRow(id);
       if (!row) throw new SubscriptionPlanNotFoundError();
       return mapAdmin(row);
     },

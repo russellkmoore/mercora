@@ -3,11 +3,12 @@ import type { SetupIntent, StripeElements } from "@stripe/stripe-js";
 import {
   attemptFactsKey,
   completeStripeSetupRedirect,
-  confirmSetupAndFinalize,
+  confirmSubscriptionSetup,
   createOwnerBoundSubscriptionSetupAttempt,
   createSubscriptionSetupAttempt,
   fetchSavedAddressesForPlan,
   fetchSubscriptionPlans,
+  finalizeSubscriptionSetup,
   parseStripeSetupRedirect,
   recurringTotal,
   shippingAddressFromSaved,
@@ -117,12 +118,12 @@ describe("subscription acquisition client", () => {
         status: 202,
       });
     }) as unknown as FetchLike;
-    await confirmSetupAndFinalize({
+    const confirmed = await confirmSubscriptionSetup({
       stripe: stripe as never,
       elements: {} as StripeElements,
-      fetcher,
       returnUrl: "https://store.example/product/tea",
     });
+    await finalizeSubscriptionSetup(fetcher, confirmed.id);
     expect(order).toEqual(["confirm", "finalize"]);
     expect(stripe.confirmSetup).toHaveBeenCalledWith(expect.objectContaining({
       redirect: "if_required",
@@ -131,19 +132,38 @@ describe("subscription acquisition client", () => {
   });
 
   it("stops before finalization when Stripe confirmation fails", async () => {
-    const fetcher = vi.fn() as unknown as FetchLike;
-    await expect(confirmSetupAndFinalize({
+    await expect(confirmSubscriptionSetup({
       stripe: { confirmSetup: vi.fn(async () => ({ error: { message: "Card declined" } })) } as never,
       elements: {} as StripeElements,
-      fetcher,
       returnUrl: "https://store.example/product/tea",
     })).rejects.toThrow("Card declined");
-    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("retries a confirmed SetupIntent finalization without calling Stripe again", async () => {
+    const setupIntent = { id: "seti_retry", status: "succeeded" } as SetupIntent;
+    const stripe = { confirmSetup: vi.fn(async () => ({ setupIntent })) };
+    const confirmed = await confirmSubscriptionSetup({
+      stripe: stripe as never,
+      elements: {} as StripeElements,
+      returnUrl: "https://store.example/product/tea",
+    });
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: "temporarily unavailable" }), { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        subscription: { id: "acq_one", planId: "plan_one", quantity: 1, status: "provider_created" },
+      }), { status: 202 })) as unknown as FetchLike;
+
+    await expect(finalizeSubscriptionSetup(fetcher, confirmed.id)).rejects.toThrow("finalization");
+    await expect(finalizeSubscriptionSetup(fetcher, confirmed.id)).resolves.toMatchObject({ id: "acq_one" });
+
+    expect(stripe.confirmSetup).toHaveBeenCalledTimes(1);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    for (const call of (fetcher as ReturnType<typeof vi.fn>).mock.calls) {
+      expect(JSON.parse(String(call[1]?.body))).toEqual({ setupIntentId: "seti_retry" });
+    }
   });
 
   it("rejects malformed or non-202 finalization responses", async () => {
-    const setupIntent = { id: "seti_one", status: "succeeded" } as SetupIntent;
-    const stripe = { confirmSetup: vi.fn(async () => ({ setupIntent })) };
     for (const response of [
       new Response(JSON.stringify({ subscription: null }), { status: 202 }),
       new Response(JSON.stringify({
@@ -151,12 +171,7 @@ describe("subscription acquisition client", () => {
       }), { status: 200 }),
     ]) {
       const fetcher = vi.fn(async () => response.clone()) as unknown as FetchLike;
-      await expect(confirmSetupAndFinalize({
-        stripe: stripe as never,
-        elements: {} as StripeElements,
-        fetcher,
-        returnUrl: "https://store.example/product/tea",
-      })).rejects.toThrow("finalization");
+      await expect(finalizeSubscriptionSetup(fetcher, "seti_one")).rejects.toThrow("finalization");
     }
   });
 

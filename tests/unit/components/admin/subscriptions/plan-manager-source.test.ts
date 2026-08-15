@@ -28,5 +28,6 @@ describe("admin subscription plan management UI", () => {
     expect(source).toContain("setPlans([])");
     expect(source).toContain("!loading && !error && plans.length > 0");
     expect(source).toContain("disabled={loading || loadingDetail || !!actionId}");
+    expect(source).toContain("if (controller.signal.aborted) return;");
   });
 });
