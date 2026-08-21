@@ -10,6 +10,7 @@ import {
   assertIssueGiftCardInput,
   assertReserveGiftCardInput,
   giftCardIssuanceBusinessKey,
+  giftCardRestorationBusinessKey,
   giftCardRedemptionBusinessKey,
   type GiftCardAccount,
   type GiftCardCodeHash,
@@ -274,6 +275,25 @@ export function createGiftCardRepository(database: D1Database) {
           input.purchaserCustomerId ?? null,
           input.createdAt,
         ),
+        ...(input.delivery ? [database.prepare(`INSERT INTO gift_card_deliveries (
+          id, gift_card_id, order_id, order_line_id, recipient_email, recipient_name,
+          email_idempotency_key, status, attempt_count, claim_token, lease_expires_at,
+          code_ciphertext, code_nonce, code_key_version, created_at, updated_at, completed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 0, NULL, NULL, ?, ?, ?, ?, ?, NULL)
+        ON CONFLICT(gift_card_id) DO NOTHING`).bind(
+          input.delivery.id,
+          input.id,
+          input.issuedOrderId ?? null,
+          input.issuedLineId ?? null,
+          input.delivery.recipientEmail,
+          input.delivery.recipientName ?? null,
+          input.delivery.emailIdempotencyKey,
+          input.delivery.codeCiphertext,
+          input.delivery.codeNonce,
+          input.delivery.codeKeyVersion,
+          input.createdAt,
+          input.createdAt,
+        )] : []),
       ]);
       const account = await findAccountById(input.id);
       const issuanceRow = await database.prepare(
@@ -291,6 +311,24 @@ export function createGiftCardRepository(database: D1Database) {
         || issuance.orderId !== input.issuedOrderId
       ) {
         throw new GiftCardConflictError("Gift-card issuance ledger conflicts with durable state");
+      }
+      if (input.delivery) {
+        const delivery = await database.prepare(`SELECT id, gift_card_id, recipient_email,
+          recipient_name, email_idempotency_key, code_ciphertext, code_nonce, code_key_version
+          FROM gift_card_deliveries WHERE gift_card_id = ? LIMIT 1`).bind(input.id).first<{
+            id: string; gift_card_id: string; recipient_email: string; recipient_name: string | null;
+            email_idempotency_key: string; code_ciphertext: string | null; code_nonce: string | null;
+            code_key_version: number | null;
+          }>();
+        if (!delivery || delivery.id !== input.delivery.id || delivery.gift_card_id !== input.id ||
+          delivery.recipient_email !== input.delivery.recipientEmail ||
+          delivery.recipient_name !== (input.delivery.recipientName ?? null) ||
+          delivery.email_idempotency_key !== input.delivery.emailIdempotencyKey ||
+          delivery.code_ciphertext !== input.delivery.codeCiphertext ||
+          delivery.code_nonce !== input.delivery.codeNonce ||
+          delivery.code_key_version !== input.delivery.codeKeyVersion) {
+          throw new GiftCardConflictError('Gift-card delivery conflicts with durable state');
+        }
       }
       return { created: (result[0]?.meta.changes ?? 0) === 1, account, issuance };
     },
@@ -475,6 +513,66 @@ export function createGiftCardRepository(database: D1Database) {
         throw new GiftCardConflictError("Gift-card settlement conflicts with durable state");
       }
       return { created: inserted?.id === entryId, entry };
+    },
+
+    /** Restore a bounded amount of one settled redemption exactly once per refund key. */
+    async restoreRedemption(args: {
+      redemptionEntryId: string;
+      orderId: string;
+      refundKey: string;
+      amount: Money;
+      restoredAt: number;
+      entryId?: string;
+    }): Promise<{ created: boolean; entry: GiftCardLedgerEntry }> {
+      assertGiftCardId(args.redemptionEntryId, 'gift-card redemption entry id');
+      assertOrderId(args.orderId);
+      assertGiftCardMoney(args.amount, { positive: true });
+      assertGiftCardEpoch(args.restoredAt, 'gift-card restoration time');
+      const businessKey = giftCardRestorationBusinessKey(args.redemptionEntryId, args.refundKey);
+      const entryId = args.entryId ?? `gift_ledger_${crypto.randomUUID()}`;
+      assertGiftCardId(entryId, 'gift-card ledger entry id');
+      const existing = async (): Promise<GiftCardLedgerEntry | undefined> => {
+        const row = await database.prepare(`${LEDGER_SELECT} WHERE business_key = ? LIMIT 1`)
+          .bind(businessKey).first<LedgerRow>();
+        return row ? mapLedger(row) : undefined;
+      };
+      const validate = (entry: GiftCardLedgerEntry): GiftCardLedgerEntry => {
+        if (
+          entry.entryType !== 'restoration' || entry.orderId !== args.orderId ||
+          entry.relatedEntryId !== args.redemptionEntryId || !entry.amountDelta.equals(args.amount)
+        ) throw new GiftCardConflictError('Gift-card restoration conflicts with durable state');
+        return entry;
+      };
+      const prior = await existing();
+      if (prior) return { created: false, entry: validate(prior) };
+
+      let inserted: { id: string } | null;
+      try {
+        inserted = await database.prepare(`INSERT INTO gift_card_ledger_entries (
+        id, gift_card_id, currency_code, entry_type, amount_delta_minor,
+        business_key, order_id, reservation_id, related_entry_id, created_at
+      ) SELECT ?, redemption.gift_card_id, redemption.currency_code, 'restoration', ?,
+        ?, redemption.order_id, NULL, redemption.id, ?
+      FROM gift_card_ledger_entries redemption
+      WHERE redemption.id = ? AND redemption.entry_type = 'redemption'
+        AND redemption.order_id = ? AND redemption.currency_code = ?
+      ON CONFLICT DO NOTHING RETURNING id`).bind(
+        entryId,
+        args.amount.toMinorUnits(),
+        businessKey,
+        args.restoredAt,
+        args.redemptionEntryId,
+        args.orderId,
+        args.amount.currency,
+      ).first<{ id: string }>();
+      } catch {
+        const raced = await existing();
+        if (raced) return { created: false, entry: validate(raced) };
+        throw new GiftCardConflictError('Gift-card redemption cannot be restored');
+      }
+      const entry = await existing();
+      if (!entry) throw new GiftCardConflictError('Gift-card redemption cannot be restored');
+      return { created: inserted?.id === entryId, entry: validate(entry) };
     },
 
     async releaseReservation(args: {

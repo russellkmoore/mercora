@@ -90,6 +90,15 @@ export interface IssueGiftCardInput {
   issuedLineId?: string;
   purchaserCustomerId?: string;
   createdAt: number;
+  delivery?: {
+    id: string;
+    recipientEmail: string;
+    recipientName?: string;
+    emailIdempotencyKey: string;
+    codeCiphertext: string;
+    codeNonce: string;
+    codeKeyVersion: number;
+  };
 }
 
 export interface ReserveGiftCardInput {
@@ -167,6 +176,14 @@ export function giftCardRedemptionBusinessKey(reservationId: string): string {
   return `gift-card/redemption/${reservationId}/v1`;
 }
 
+export function giftCardRestorationBusinessKey(redemptionEntryId: string, refundKey: string): string {
+  assertGiftCardId(redemptionEntryId, 'gift-card redemption entry id');
+  assertBoundedText(refundKey, 'gift-card refund key', 1, 128);
+  const key = `gift-card/restoration/${redemptionEntryId}/${refundKey}/v1`;
+  assertGiftCardBusinessKey(key);
+  return key;
+}
+
 export function assertIssueGiftCardInput(input: IssueGiftCardInput): void {
   assertGiftCardId(input.id);
   assertGiftCardCodeHash(input.codeHash);
@@ -181,6 +198,19 @@ export function assertIssueGiftCardInput(input: IssueGiftCardInput): void {
   }
   if (input.purchaserCustomerId !== undefined) {
     assertGiftCardId(input.purchaserCustomerId, "gift-card purchaser customer id");
+  }
+  if (input.delivery !== undefined) {
+    assertGiftCardId(input.delivery.id, 'gift-card delivery id');
+    assertBoundedText(input.delivery.recipientEmail, 'gift-card delivery recipient', 3, 320);
+    if (input.delivery.recipientName !== undefined) {
+      assertBoundedText(input.delivery.recipientName, 'gift-card delivery recipient name', 1, 200);
+    }
+    assertBoundedText(input.delivery.emailIdempotencyKey, 'gift-card delivery idempotency key', 1, 256);
+    if (
+      !Number.isSafeInteger(input.delivery.codeKeyVersion) || input.delivery.codeKeyVersion < 1 ||
+      typeof input.delivery.codeCiphertext !== 'string' || input.delivery.codeCiphertext.length > 128 ||
+      typeof input.delivery.codeNonce !== 'string' || input.delivery.codeNonce.length > 32
+    ) throw new TypeError('gift-card delivery encryption state is invalid');
   }
 }
 

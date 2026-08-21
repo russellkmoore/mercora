@@ -50,6 +50,7 @@ import {
 } from '@/app/api/webhooks/stripe/handlers/refund-handlers';
 import { recordTelemetry } from '@/lib/observability/telemetry';
 import { handleSubscriptionStripeEvent } from '@/app/api/webhooks/stripe/handlers/subscription-handlers';
+import { resolveRuntimeCommerceCapabilities } from '@/lib/commerce/runtime';
 
 const MAX_STRIPE_SIGNATURE_BYTES = 4_096;
 const MAX_STRIPE_WEBHOOK_BODY_BYTES = 1_048_576;
@@ -319,6 +320,7 @@ async function handlePaymentSucceeded(
       paymentIntentId: paymentIntent.id,
       enforceOwnership: false,
       sendEmail: true,
+      capabilities: await resolveRuntimeCommerceCapabilities(),
     });
     return 'handled';
   } catch (error) {

@@ -19,6 +19,10 @@ export interface OrderItem {
   total_price: Money;
   product_name: string;
   variant_options?: VariantOption[];
+  /** Immutable fulfillment snapshot; absent legacy items are physical. */
+  fulfillment_type?: 'physical' | 'digital';
+  /** Bounded delivery data for a digital gift-card purchase; never a bearer code. */
+  gift_card?: import('@/lib/types/cartitem').GiftCardCustomization;
   created_at?: string;
 }
 
