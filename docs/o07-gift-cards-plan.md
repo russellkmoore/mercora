@@ -99,3 +99,37 @@ refund foundations` → `O07 gift cards`.
 O07 remains one draft PR based on `agent/o06-subscriptions`; it must not merge
 or rebase against the unrelated BeauTeas `main` history. The expected reviewer
 assignment is Russell.
+
+## Implementation status and completion audit (2026-08-21)
+
+This section is deliberately a release gate rather than a progress claim. A
+passing focused test, build, or local commit does not make O07 ready to hand
+off. Only the conditions in wave 7 do.
+
+| Wave | Status | Evidence / remaining release gate |
+| --- | --- | --- |
+| 1. Authoritative calculation and snapshots | Implemented | Server checkout classifies the bounded digital gift-card line, omits shipping for digital-only orders, retains physical shipping for mixed orders, excludes gift cards from inventory mutation, and snapshots tender-eligible value without a bearer code. Focused checkout-pricing coverage is present. |
+| 2. Checkout and MCP tender lifecycle | Implemented | Stable request identity drives reservation/release; partial tender follows the cash payment boundary and wholly gift-funded orders use the no-cash finalizer. MCP uses the same authoritative checkout path. Final suite still needs to exercise the finished paths together. |
+| 3. Issuance and delivery | Implemented and focused-tested | Paid effects issue deterministic account identities and encrypted retry records. Delivery has a durable claim/lease/retry path. Real-D1 coverage proves issue-once/retry behavior, corrupted retry material becomes review-only, and the bearer code is absent from persisted state. |
+| 4. Refund convergence | In progress | The deterministic allocation and idempotent restoration primitive exist. The HTTP cash-provider leg, gift-restoration leg, and terminal dual-leg convergence must all be finalized and regression-tested before handoff. |
+| 5. Safe presentation surfaces | In progress | Customer/admin projections are intentionally secret-safe and bearer-code-free. Their authorization, pagination/input bounds, enumeration/rate-limit behavior, and UI/API tests remain a final completion gate. |
+| 6. Runtime composition and audit | Partially implemented | The five-minute scheduler drains gift-card delivery only when reconciliation is enabled; this is tested with acquisition disabled. Final operational documentation and full cross-surface audit remain. |
+| 7. Stack validation and handoff | Not started | Confirm the O06 ancestry without rewriting O07, run final lint/typecheck/build/unit/Worker/API/MCP/UI validation on the completed tree, then perform the separately authorized push and one draft PR assignment. No provider, email, deployment, or external write occurs during development validation. |
+
+### Current focused verification
+
+- `tests/integration/lib/gift-cards/repository.test.ts` covers real-D1 ledger,
+  reservation, settlement, and restoration atomicity/concurrency.
+- `tests/integration/lib/services/gift-card-fulfillment.test.ts` covers
+  idempotent issuance, retryable encrypted delivery, corrupt-material review,
+  and bearer-code non-persistence.
+- `tests/unit/lib/gift-cards/{code,config,customization,domain,encryption,
+  capability,runtime}.test.ts` covers the codec/configuration boundaries,
+  bounded line customization, key rotation, and lazy runtime behavior.
+- `tests/unit/worker-cron-routing.test.ts` proves reconciliation-only scheduler
+  delivery retries work while acquisition is disabled and that disabled
+  reconciliation does not open that boundary.
+
+The final regression matrix must add finished refund-route and customer/admin
+surface tests, then be rerun as one clean suite after all concurrent O07 work
+has landed. Until then, this branch is explicitly **not PR-ready**.
