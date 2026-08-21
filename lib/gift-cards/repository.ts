@@ -515,6 +515,24 @@ export function createGiftCardRepository(database: D1Database) {
       return { created: inserted?.id === entryId, entry };
     },
 
+    async findSettledRedemption(args: {
+      reservationId: string;
+      orderId: string;
+    }): Promise<GiftCardLedgerEntry | undefined> {
+      assertGiftCardId(args.reservationId, 'gift-card reservation id');
+      assertOrderId(args.orderId);
+      const businessKey = giftCardRedemptionBusinessKey(args.reservationId);
+      const row = await database.prepare(`${LEDGER_SELECT} WHERE business_key = ? LIMIT 1`)
+        .bind(businessKey).first<LedgerRow>();
+      if (!row) return undefined;
+      const entry = mapLedger(row);
+      if (
+        entry.entryType !== 'redemption' || entry.reservationId !== args.reservationId ||
+        entry.orderId !== args.orderId || entry.amountDelta.isNegative() === false
+      ) throw new GiftCardConflictError('Gift-card redemption conflicts with durable state');
+      return entry;
+    },
+
     /** Restore a bounded amount of one settled redemption exactly once per refund key. */
     async restoreRedemption(args: {
       redemptionEntryId: string;
