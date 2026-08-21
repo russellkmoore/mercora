@@ -17,6 +17,7 @@ describe('stable cart-line UI projection', () => {
   it('uses the exact safe checkout-line projection', () => {
     const checkout = readFileSync(join(root, 'components/checkout/CheckoutClient.tsx'), 'utf8');
     expect(checkout).toContain('items: items.map(projectCartLineForCheckout)');
-    expect(checkout).not.toContain('giftCardToken');
+    expect(checkout).toContain('giftCardToken: giftCardToken.trim()');
+    expect(checkout).toContain('giftCardRequestKey: giftCardRequestKey.current');
   });
 });

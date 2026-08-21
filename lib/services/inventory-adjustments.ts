@@ -3,6 +3,7 @@ import type { Order, OrderItem } from '@/lib/types/order';
 import type { ProductInventory } from '@/lib/types';
 import { canFulfillInventory } from '@/lib/inventory/availability';
 import { recordTelemetry } from '@/lib/observability/telemetry';
+import { isGiftCardOrderLine } from '@/lib/gift-cards/checkout';
 
 const ADJUSTMENT_LEASE_MS = 5 * 60 * 1000;
 const MAX_ADJUSTMENT_ERROR = 2_000;
@@ -94,6 +95,9 @@ function validateAdjustment(input: InventoryAdjustmentInput): void {
 function aggregateOrderDemand(items: OrderItem[]): Map<string, number> {
   const demand = new Map<string, number>();
   for (const item of items) {
+    // Gift cards are stored value, not catalog stock. Their face value is
+    // issued by the paid-order effect and must never mutate variant inventory.
+    if (isGiftCardOrderLine(item)) continue;
     if (!item.variant_id || item.variant_id.length > 256) {
       throw new Error('Paid order item has no valid variant id');
     }

@@ -1,16 +1,19 @@
 import { toWireMoney } from '../../money';
 import {
   finalizeOrderPayment,
+  finalizeZeroCashGiftOrder,
   PaymentVerificationError,
 } from '../../services/order-finalization';
 import type { MACHAddress as Address } from '../../types/mach/Address';
 import {
   getOwnedMcpOrder,
   getOwnedMcpOrderBinding,
+  getOwnedMcpZeroCashOrder,
 } from '../checkout';
 import { requireOwnedSession } from '../session';
 import { buildMcpOrderDelivery } from '../order-delivery';
 import type { MCPToolResponse, OrderRequest, OrderResponse } from '../types';
+import { resolveRuntimeCommerceCapabilities } from '@/lib/commerce/runtime';
 
 const ZERO_TOTAL = toWireMoney(0);
 
@@ -64,16 +67,62 @@ export async function placeOrder(
   const { orderId, paymentIntentId } = request;
   if (
     typeof orderId !== 'string' ||
-    !/^MCP-[A-Z0-9]+-\d+-[A-F0-9]{8}$/.test(orderId) ||
-    typeof paymentIntentId !== 'string' ||
-    !/^pi_[A-Za-z0-9_]+$/.test(paymentIntentId)
+    !/^MCP-[A-Z0-9]+-\d+-[A-F0-9]{8}$/.test(orderId)
   ) {
     return orderFailure(
       sessionId,
       agentId,
       startTime,
       'PAYMENT_REQUIRED',
-      'A valid orderId and paymentIntentId from create_payment_intent are required.',
+      'A valid orderId from create_payment_intent is required.',
+      ['Call create_payment_intent', 'Complete payment if required', 'Retry place_order'],
+    );
+  }
+
+  if (paymentIntentId === undefined || paymentIntentId === '') {
+    const pending = await getOwnedMcpZeroCashOrder({ orderId, agentId, sessionId });
+    if (!pending) {
+      return orderFailure(
+        sessionId, agentId, startTime, 'PAYMENT_NOT_BOUND',
+        'The gift-funded order is not bound to this agent and session.',
+        ['Create a new checkout for this session'],
+      );
+    }
+    try {
+      const result = await finalizeZeroCashGiftOrder({
+        orderId,
+        enforceOwnership: false,
+        sendEmail: true,
+        capabilities: await resolveRuntimeCommerceCapabilities(),
+      });
+      const order = result.order;
+      return {
+        success: true,
+        data: {
+          orderId: order.id!, status: order.status,
+          total: toWireMoney(order.total_amount, order.currency_code),
+          tracking_number: order.tracking_number,
+          estimated_delivery: calculateEstimatedDelivery(order.shipping_address, order.shipping_method || 'standard'),
+        },
+        context: { session_id: sessionId, agent_id: agentId, processing_time_ms: Date.now() - startTime },
+        metadata: {
+          can_fulfill_percentage: 100, estimated_satisfaction: 95,
+          next_actions: ['Save the order confirmation', 'Use get_order_status for updates'],
+        },
+      };
+    } catch (error) {
+      console.error(`[mcp] Failed to finalize gift-funded order ${orderId}:`, error);
+      return orderFailure(
+        sessionId, agentId, startTime, 'ORDER_FINALIZATION_FAILED',
+        'The gift-funded order could not be finalized.',
+        ['Retry place_order; finalization is idempotent'],
+      );
+    }
+  }
+  if (typeof paymentIntentId !== 'string' || !/^pi_[A-Za-z0-9_]+$/.test(paymentIntentId)) {
+    return orderFailure(
+      sessionId, agentId, startTime, 'PAYMENT_REQUIRED',
+      'A valid PaymentIntent from create_payment_intent is required.',
       ['Call create_payment_intent', 'Complete payment', 'Retry place_order'],
     );
   }

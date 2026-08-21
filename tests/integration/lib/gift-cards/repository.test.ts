@@ -210,6 +210,50 @@ describe("gift-card repository on real D1", () => {
     });
   });
 
+  it('restores a settled redemption exactly once per refund key and never exceeds it', async () => {
+    const repository = createGiftCardRepository(env.DB);
+    await repository.issueAccount(issuance());
+    await repository.reserve(reservation('reservation_restore_repository', 600));
+    await insertPendingOrder('gift-order-restore-repository');
+    const committed = await repository.commitReservation({
+      reservationId: 'reservation_restore_repository',
+      orderId: 'gift-order-restore-repository',
+      expectedAmount: Money.fromMinor(600, 'USD'),
+      committedAt: now + 100,
+    });
+    const redemption = await repository.settleReservation({
+      reservationId: committed.id,
+      orderId: 'gift-order-restore-repository',
+      settledAt: now + 101,
+    });
+    const first = await repository.restoreRedemption({
+      redemptionEntryId: redemption.entry.id,
+      orderId: 'gift-order-restore-repository',
+      refundKey: 'refund-restore-1',
+      amount: Money.fromMinor(400, 'USD'),
+      restoredAt: now + 200,
+    });
+    const retry = await repository.restoreRedemption({
+      redemptionEntryId: redemption.entry.id,
+      orderId: 'gift-order-restore-repository',
+      refundKey: 'refund-restore-1',
+      amount: Money.fromMinor(400, 'USD'),
+      restoredAt: now + 201,
+    });
+    expect(first.created).toBe(true);
+    expect(retry.created).toBe(false);
+    await expect(repository.readBalance(giftCardId, now + 201)).resolves.toMatchObject({
+      ledgerBalance: Money.fromMinor(800, 'USD'),
+    });
+    await expect(repository.restoreRedemption({
+      redemptionEntryId: redemption.entry.id,
+      orderId: 'gift-order-restore-repository',
+      refundKey: 'refund-restore-overage',
+      amount: Money.fromMinor(201, 'USD'),
+      restoredAt: now + 202,
+    })).rejects.toBeInstanceOf(GiftCardConflictError);
+  });
+
   it("serializes commit against release with exactly one terminal winner", async () => {
     const repository = createGiftCardRepository(env.DB);
     await repository.issueAccount(issuance());

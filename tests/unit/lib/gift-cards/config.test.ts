@@ -3,6 +3,7 @@ import { resolveStoreConfig } from "@/lib/store-config";
 import {
   GiftCardRuntimeConfigurationError,
   parseGiftCardCodeKeyRing,
+  parseGiftCardDeliveryKeyRing,
 } from "@/lib/gift-cards/config";
 
 const current = "current-gift-card-hmac-key-material-0001";
@@ -51,5 +52,17 @@ describe("gift-card runtime configuration", () => {
     });
     expect(JSON.stringify(config)).not.toContain(current);
     expect(config).not.toHaveProperty("giftCardCodeKeyRing");
+  });
+
+  it('parses an independently versioned AES-GCM delivery key ring', () => {
+    expect(parseGiftCardDeliveryKeyRing({
+      GIFT_CARD_DELIVERY_CURRENT_VERSION: '1',
+      GIFT_CARD_DELIVERY_KEYS_JSON: JSON.stringify({
+        1: 'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+      }),
+    })).toEqual({
+      currentVersion: 1,
+      keys: { 1: 'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=' },
+    });
   });
 });

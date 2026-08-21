@@ -37,6 +37,57 @@ export interface FinalizeOrderResult {
 }
 
 /**
+ * Finalize an order wholly funded by a committed gift-card reservation. This
+ * is intentionally separate from PaymentIntent finalization: no Stripe object
+ * is created, retrieved, or simulated for a zero-cash transaction.
+ */
+export async function finalizeZeroCashGiftOrder(args: {
+  orderId: string;
+  customerId?: string;
+  enforceOwnership?: boolean;
+  sendEmail?: boolean;
+  capabilities: CommerceCapabilities;
+}): Promise<FinalizeOrderResult> {
+  const db = await getDbAsync();
+  const [record] = await db.select().from(orders).where(eq(orders.id, args.orderId)).limit(1);
+  if (!record) throw new PaymentVerificationError('Pending order not found');
+  const order = hydrateOrder(record);
+  if (args.enforceOwnership && order.customer_id && order.customer_id !== args.customerId) {
+    throw new PaymentVerificationError('Order does not belong to the authenticated customer');
+  }
+  const extensions = asObject(record.extensions);
+  const total = Money.fromStored(extensions.checkout_total ?? order.total_amount, order.currency_code);
+  const tender = Money.fromStored(extensions.checkout_tender ?? 0, order.currency_code);
+  if (!total.isZero() || tender.isZero() || !order.id) {
+    throw new PaymentVerificationError('Order is not eligible for zero-cash gift-card finalization');
+  }
+  if (order.payment_status !== 'paid') {
+    await args.capabilities.giftCards.verifyReservedTender({
+      order,
+      state: extensions.checkout_tender_state,
+      expectedTender: tender,
+    });
+  }
+  await stagePaidOrderEffects(order, { includeEmail: args.sendEmail !== false });
+  const promotion = await promoteOrderToPaid({
+    orderId: order.id,
+    amountReceived: Money.zero(order.currency_code),
+  });
+  if (!promotion.order || promotion.order.payment_status !== 'paid') {
+    throw new Error('Order payment promotion lost without a paid winner');
+  }
+  try {
+    await stagePaidOrderEffects(promotion.order, { includeEmail: args.sendEmail !== false });
+    await drainOrderEffects({ orderId: promotion.order.id!, capabilities: args.capabilities, limit: 25 });
+  } catch (error) {
+    recordTelemetry('paid_effect.drain_failed', {
+      operation: 'process', outcome: 'failed', provider: 'd1', retryable: true, trigger: 'request',
+    }, error);
+  }
+  return { paid: true, promoted: promotion.promoted, order: promotion.order };
+}
+
+/**
  * Verify a captured PaymentIntent and atomically promote exactly one pending
  * order. Client returns and signed webhooks both call this routine.
  */

@@ -2,9 +2,15 @@ import {
   MAX_GIFT_CARD_CODE_KEY_VERSIONS,
   type GiftCardKeyRing,
 } from "./code";
+import {
+  MAX_GIFT_CARD_DELIVERY_KEY_VERSIONS,
+  type GiftCardEncryptionKeyRing,
+} from './encryption';
 
 export const GIFT_CARD_HMAC_CURRENT_VERSION_ENV = "GIFT_CARD_CODE_HMAC_CURRENT_VERSION";
 export const GIFT_CARD_HMAC_KEYS_ENV = "GIFT_CARD_CODE_HMAC_KEYS_JSON";
+export const GIFT_CARD_DELIVERY_CURRENT_VERSION_ENV = 'GIFT_CARD_DELIVERY_CURRENT_VERSION';
+export const GIFT_CARD_DELIVERY_KEYS_ENV = 'GIFT_CARD_DELIVERY_KEYS_JSON';
 
 const MIN_KEY_BYTES = 32;
 const MAX_KEY_BYTES = 4_096;
@@ -83,6 +89,44 @@ export function parseGiftCardCodeKeyRing(
       currentVersion,
       keys: Object.freeze(resolved),
     });
+  } catch (error) {
+    if (error instanceof GiftCardRuntimeConfigurationError) throw error;
+    throw new GiftCardRuntimeConfigurationError();
+  }
+}
+
+/** Parse the server-only AES-GCM delivery retry key ring. */
+export function parseGiftCardDeliveryKeyRing(
+  environment: GiftCardSecretEnvironment,
+): GiftCardEncryptionKeyRing {
+  try {
+    const currentVersion = positiveSafeInteger(
+      typeof environment[GIFT_CARD_DELIVERY_CURRENT_VERSION_ENV] === 'string'
+        ? environment[GIFT_CARD_DELIVERY_CURRENT_VERSION_ENV].trim() : undefined,
+    );
+    const serialized = environment[GIFT_CARD_DELIVERY_KEYS_ENV];
+    if (currentVersion === null || typeof serialized !== 'string' || serialized.length < 2 ||
+        serialized.length > MAX_KEY_RING_JSON_LENGTH) throw new GiftCardRuntimeConfigurationError();
+    const parsed: unknown = JSON.parse(serialized);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new GiftCardRuntimeConfigurationError();
+    }
+    const keys = parsed as Record<string, unknown>;
+    const versions = Object.keys(keys);
+    if (versions.length < 1 || versions.length > MAX_GIFT_CARD_DELIVERY_KEY_VERSIONS) {
+      throw new GiftCardRuntimeConfigurationError();
+    }
+    const resolved: Record<number, string> = {};
+    for (const rawVersion of versions) {
+      const version = positiveSafeInteger(rawVersion);
+      const key = keys[rawVersion];
+      if (version === null || typeof key !== 'string' || !/^base64:[A-Za-z0-9+/]+={0,2}$/.test(key)) {
+        throw new GiftCardRuntimeConfigurationError();
+      }
+      resolved[version] = key;
+    }
+    if (!Object.hasOwn(resolved, currentVersion)) throw new GiftCardRuntimeConfigurationError();
+    return Object.freeze({ currentVersion, keys: Object.freeze(resolved) });
   } catch (error) {
     if (error instanceof GiftCardRuntimeConfigurationError) throw error;
     throw new GiftCardRuntimeConfigurationError();

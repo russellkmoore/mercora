@@ -15,6 +15,11 @@ import {
 import { cancelPaymentIntent, createPaymentIntent } from '@/lib/stripe';
 import type { Address, Order } from '@/lib/types';
 import type { AgentSession } from './types';
+import { resolveRuntimeCommerceCapabilities } from '@/lib/commerce/runtime';
+import { createCartLineId } from '@/lib/gift-cards/line-identity';
+import { hasPhysicalCheckoutLines } from '@/lib/gift-cards/checkout';
+import { finalizeZeroCashGiftOrder } from '@/lib/services/order-finalization';
+import { noOpCommerceCapabilities } from '@/lib/commerce/capabilities';
 
 export interface McpCheckoutRequest {
   shippingAddress: unknown;
@@ -22,14 +27,17 @@ export interface McpCheckoutRequest {
   shippingOption?: string;
   discountCodes?: string[];
   giftCardToken?: string;
+  giftCardRequestKey?: string;
 }
 
 export interface McpCheckoutResult {
-  clientSecret: string;
-  paymentIntentId: string;
+  clientSecret?: string;
+  paymentIntentId?: string;
   orderId: string;
   amount: ReturnType<typeof toWireMoney>;
   quote: CheckoutQuote;
+  /** The order was paid and finalized without a Stripe PaymentIntent. */
+  noCash: boolean;
 }
 
 export function normalizeMcpAddress(value: unknown): Address {
@@ -87,8 +95,13 @@ export async function createMcpCheckout(args: {
   const shippingMethodId = args.input.shippingMethodId ?? args.input.shippingOption;
   if (!isBoundedString(shippingMethodId, 128)) throw new Error('Shipping method is required');
 
-  const quote = await priceCheckout({
+  const requiresGiftCardRuntime = typeof args.input.giftCardToken === 'string' && args.input.giftCardToken !== '';
+  const capabilities = requiresGiftCardRuntime
+    ? await resolveRuntimeCommerceCapabilities()
+    : noOpCommerceCapabilities;
+  const pricingInput = {
     items: args.session.cart.map((item) => ({
+      lineId: createCartLineId({ productId: item.productId, variantId: item.variantId }),
       productId: item.productId,
       variantId: item.variantId,
       quantity: item.quantity,
@@ -97,16 +110,18 @@ export async function createMcpCheckout(args: {
     shippingMethodId,
     discountCodes: args.input.discountCodes,
     giftCardToken: args.input.giftCardToken,
-  });
+    giftCardRequestKey: args.input.giftCardRequestKey,
+  };
+  const quote = requiresGiftCardRuntime
+    ? await priceCheckout(pricingInput, { capabilities })
+    : await priceCheckout(pricingInput);
   await assertCheckoutInventoryAvailable(quote.items);
 
   const total = Money.fromStored(quote.total);
-  if (!total.gt(Money.zero(total.currency))) {
-    throw new Error('Checkout requires a positive payment amount');
-  }
-
   const orderId = newMcpOrderId(args.agentId);
-  const paymentIntent = await createPaymentIntent({
+  let paymentIntent: Awaited<ReturnType<typeof createPaymentIntent>> | undefined;
+  try {
+    paymentIntent = total.gt(Money.zero(total.currency)) ? await createPaymentIntent({
     amount: total.toMinorUnits(),
     currency: total.currency.toLowerCase(),
     automatic_payment_methods: { enabled: true },
@@ -129,19 +144,34 @@ export async function createMcpCheckout(args: {
       name: shippingAddress.recipient || 'Customer',
     },
     description: `Order ${orderId}`,
-  });
+    }) : undefined;
+  } catch (error) {
+    if (quote.tenderState !== undefined) {
+      await capabilities.giftCards.releaseTender?.({
+        state: quote.tenderState,
+        reason: 'cash payment initialization failed',
+      }).catch(() => undefined);
+    }
+    throw error;
+  }
 
-  const providerAmount = Number(paymentIntent.amount);
-  const providerCurrency = String(paymentIntent.currency || '').toUpperCase();
-  if (
+  const providerAmount = paymentIntent ? Number(paymentIntent.amount) : total.toMinorUnits();
+  const providerCurrency = paymentIntent ? String(paymentIntent.currency || '').toUpperCase() : total.currency;
+  if (paymentIntent && (
     !Number.isSafeInteger(providerAmount) ||
     providerAmount !== total.toMinorUnits() ||
     providerCurrency !== total.currency ||
     !paymentIntent.client_secret
-  ) {
+  )) {
     await cancelPaymentIntent(paymentIntent.id).catch((error) =>
       console.error(`[mcp] Failed to cancel invalid PaymentIntent ${paymentIntent.id}:`, error)
     );
+    if (quote.tenderState !== undefined) {
+      await capabilities.giftCards.releaseTender?.({
+        state: quote.tenderState,
+        reason: 'cash payment validation failed',
+      }).catch(() => undefined);
+    }
     throw new Error('Payment provider returned an invalid intent');
   }
 
@@ -153,7 +183,7 @@ export async function createMcpCheckout(args: {
     agent_id: args.agentId,
     mcp_session_id: args.session.sessionId,
     email: shippingAddress.email,
-    payment_intent_id: paymentIntent.id,
+    ...(paymentIntent ? { payment_intent_id: paymentIntent.id } : {}),
     checkout_catalog_subtotal: catalogSubtotal.toJSON(),
     checkout_subtotal: catalogSubtotal.subtract(merchandiseDiscount).toJSON(),
     checkout_discount: quote.discount,
@@ -179,30 +209,50 @@ export async function createMcpCheckout(args: {
       status: 'pending',
       total_amount: Money.fromMinor(providerAmount, providerCurrency).toJSON(),
       currency_code: providerCurrency,
-      shipping_address: shippingAddress,
+      shipping_address: hasPhysicalCheckoutLines(quote.items) ? shippingAddress : null,
       billing_address: shippingAddress,
       items: quote.items,
-      shipping_method: quote.shippingMethod.label,
-      payment_method: 'stripe',
+      shipping_method: hasPhysicalCheckoutLines(quote.items) ? quote.shippingMethod.label : null,
+      payment_method: paymentIntent ? 'stripe' : 'gift_card',
       payment_status: 'pending',
-      external_references: { payment_intent_id: paymentIntent.id },
+      external_references: paymentIntent ? { payment_intent_id: paymentIntent.id } : null,
       extensions,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
   } catch (error) {
-    await cancelPaymentIntent(paymentIntent.id).catch((cancelError) =>
+    if (quote.tenderState !== undefined) {
+      await capabilities.giftCards.releaseTender?.({ state: quote.tenderState, reason: 'checkout persistence failed' })
+        .catch(() => undefined);
+    }
+    if (paymentIntent) await cancelPaymentIntent(paymentIntent.id).catch((cancelError) =>
       console.error(`[mcp] Failed to cancel orphaned PaymentIntent ${paymentIntent.id}:`, cancelError)
     );
     throw error;
   }
 
+  if (!paymentIntent) {
+    const finalized = await finalizeZeroCashGiftOrder({
+      orderId,
+      enforceOwnership: false,
+      sendEmail: true,
+      capabilities,
+    });
+    return {
+      orderId: finalized.order.id!,
+      amount: toWireMoney(total.toJSON()),
+      quote,
+      noCash: true,
+    };
+  }
+
   return {
-    clientSecret: paymentIntent.client_secret,
+    clientSecret: paymentIntent.client_secret!,
     paymentIntentId: paymentIntent.id,
     orderId,
     amount: toWireMoney(Money.fromMinor(providerAmount, providerCurrency).toJSON()),
     quote,
+    noCash: false,
   };
 }
 
@@ -242,6 +292,29 @@ export async function getOwnedMcpOrderBinding(args: {
     extensions.agent_id !== args.agentId ||
     extensions.mcp_session_id !== args.sessionId ||
     extensions.payment_intent_id !== args.paymentIntentId
+  ) return null;
+  return hydrateOrder(record);
+}
+
+/** Fetch an already-finalized gift-funded MCP order without accepting a PI substitute. */
+export async function getOwnedMcpZeroCashOrder(args: {
+  orderId: string;
+  agentId: string;
+  sessionId: string;
+}): Promise<Order | null> {
+  const db = await getDbAsync();
+  const [record] = await db.select().from(orders).where(and(
+    eq(orders.id, args.orderId),
+    eq(orders.payment_method, 'gift_card'),
+  )).limit(1);
+  if (!record) return null;
+  const extensions = asRecord(record.extensions);
+  const external = asRecord(record.external_references);
+  if (
+    extensions.agent_id !== args.agentId ||
+    extensions.mcp_session_id !== args.sessionId ||
+    typeof extensions.payment_intent_id === 'string' ||
+    typeof external.payment_intent_id === 'string'
   ) return null;
   return hydrateOrder(record);
 }

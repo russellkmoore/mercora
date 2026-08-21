@@ -4,7 +4,10 @@ const mocks = vi.hoisted(() => ({
   requireOwnedSession: vi.fn(),
   getBinding: vi.fn(),
   getOwnedOrder: vi.fn(),
+  getZeroCash: vi.fn(),
   finalize: vi.fn(),
+  finalizeZeroCash: vi.fn(),
+  capabilities: { giftCards: {}, subscriptions: {} },
   buildDelivery: vi.fn(),
 }));
 
@@ -12,11 +15,19 @@ vi.mock('@/lib/mcp/session', () => ({ requireOwnedSession: mocks.requireOwnedSes
 vi.mock('@/lib/mcp/checkout', () => ({
   getOwnedMcpOrderBinding: mocks.getBinding,
   getOwnedMcpOrder: mocks.getOwnedOrder,
+  getOwnedMcpZeroCashOrder: mocks.getZeroCash,
 }));
 vi.mock('@/lib/services/order-finalization', () => {
   class PaymentVerificationError extends Error {}
-  return { finalizeOrderPayment: mocks.finalize, PaymentVerificationError };
+  return {
+    finalizeOrderPayment: mocks.finalize,
+    finalizeZeroCashGiftOrder: mocks.finalizeZeroCash,
+    PaymentVerificationError,
+  };
 });
+vi.mock('@/lib/commerce/runtime', () => ({
+  resolveRuntimeCommerceCapabilities: vi.fn(async () => mocks.capabilities),
+}));
 vi.mock('@/lib/mcp/order-delivery', () => ({
   buildMcpOrderDelivery: mocks.buildDelivery,
 }));
@@ -43,6 +54,8 @@ beforeEach(() => {
   });
   mocks.getBinding.mockResolvedValue(paidOrder);
   mocks.finalize.mockResolvedValue({ paid: true, promoted: true, order: paidOrder });
+  mocks.getZeroCash.mockResolvedValue(paidOrder);
+  mocks.finalizeZeroCash.mockResolvedValue({ paid: true, promoted: false, order: paidOrder });
   mocks.buildDelivery.mockResolvedValue({
     shipment: {
       carrier: 'ups',
@@ -88,6 +101,18 @@ describe('MCP order finalization', () => {
     }, 'session-1', 'attacker');
     expect(result.error?.code).toBe('PAYMENT_NOT_BOUND');
     expect(mocks.finalize).not.toHaveBeenCalled();
+  });
+
+  it('accepts no PaymentIntent only for its owned zero-cash gift-funded order', async () => {
+    const result = await placeOrder({ orderId: paidOrder.id }, 'session-1', 'agent-1');
+    expect(mocks.getZeroCash).toHaveBeenCalledWith({
+      orderId: paidOrder.id, agentId: 'agent-1', sessionId: 'session-1',
+    });
+    expect(mocks.finalizeZeroCash).toHaveBeenCalledWith(expect.objectContaining({
+      orderId: paidOrder.id, capabilities: mocks.capabilities,
+    }));
+    expect(mocks.finalize).not.toHaveBeenCalled();
+    expect(result.success).toBe(true);
   });
 
   it('does not reveal orders belonging to another agent', async () => {
