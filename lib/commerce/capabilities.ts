@@ -204,7 +204,12 @@ export function resolveCommerceCapabilities(
         await giftCards.releaseTender(args);
       },
       restoreTender: async (args) => {
-        if (!args.amount.isZero()) throw new CommerceCapabilityDisabledError();
+        if (!giftCards.restoreTender) {
+          throw new CommerceCapabilityConfigurationError(
+            "Gift-card reconciliation restoration is not configured",
+          );
+        }
+        await giftCards.restoreTender(args);
       },
     };
 

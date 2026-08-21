@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   recordTelemetry: vi.fn(),
   writes: [] as Array<Record<string, unknown>>,
   order: {} as Record<string, any>,
+  restoreTender: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/unified-auth', () => ({
@@ -19,6 +20,11 @@ vi.mock('@/lib/stripe', () => ({
   getStripeClient: () => ({
     refunds: { create: mocks.refundsCreate, retrieve: mocks.refundsRetrieve },
   }),
+}));
+vi.mock('@/lib/commerce/runtime', () => ({
+  resolveRuntimeCommerceCapabilities: vi.fn(async () => ({
+    giftCards: { restoreTender: mocks.restoreTender },
+  })),
 }));
 vi.mock('@/lib/payments/refund-ledger-store', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/payments/refund-ledger-store')>();
@@ -86,6 +92,8 @@ beforeEach(() => {
   mocks.mutateRefundLedger.mockReset();
   mocks.mutateRefundLedger.mockImplementation(mutateLedgerSuccess);
   mocks.writes.length = 0;
+  mocks.restoreTender.mockReset();
+  mocks.restoreTender.mockResolvedValue(undefined);
   mocks.order = {
     id: 'WEB-REFUND-1',
     status: 'processing',
@@ -106,6 +114,86 @@ beforeEach(() => {
 });
 
 describe('refund route durable ordering', () => {
+  it('splits a mixed tender refund, settles cash first, then restores the gift tender', async () => {
+    mocks.order.extensions = {
+      payment_intent_id: 'pi_refund',
+      checkout_tender: { amount: 600, currency: 'USD' },
+      checkout_tender_state: { v: 1, reservationId: 'gift_reservation_refund' },
+      refunds: [], refunds_version: 0,
+    };
+    mocks.refundsCreate.mockResolvedValue({
+      id: 're_mixed', amount: 400, status: 'succeeded', payment_intent: 'pi_refund',
+    });
+
+    const response = await POST(request({ amount: 700 }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.refundsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 400, payment_intent: 'pi_refund' }), expect.anything()
+    );
+    expect(mocks.restoreTender).toHaveBeenCalledWith(expect.objectContaining({
+      refundKey: expect.stringMatching(/^refund:[a-f0-9]{64}$/),
+      amount: expect.objectContaining({}),
+    }));
+    const entry = mocks.order.extensions.refunds[0];
+    expect(entry).toMatchObject({
+      cash_amount: 400, gift_amount: 300, gift_restoration_status: 'succeeded',
+      status: 'succeeded', stripe_refund_id: 're_mixed',
+    });
+  });
+
+  it('finalizes a fully gift-funded refund without contacting Stripe', async () => {
+    mocks.order.external_references = null;
+    mocks.order.extensions = {
+      checkout_tender: { amount: 1_000, currency: 'USD' },
+      checkout_tender_state: { v: 1, reservationId: 'gift_reservation_refund' },
+      refunds: [], refunds_version: 0,
+    };
+
+    const response = await POST(request({ type: 'full', amount: undefined, items: [] }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.refundsCreate).not.toHaveBeenCalled();
+    expect(mocks.refundsRetrieve).not.toHaveBeenCalled();
+    expect(mocks.restoreTender).toHaveBeenCalledOnce();
+    expect(mocks.order.extensions.refunds[0]).toMatchObject({
+      cash_amount: 0, gift_amount: 1_000, gift_restoration_status: 'succeeded',
+      status: 'succeeded', provider_status: 'not_applicable',
+    });
+    expect(mocks.order.payment_status).toBe('refunded');
+  });
+
+  it('keeps a cash-settled mixed refund pending until idempotent gift restoration succeeds', async () => {
+    mocks.order.extensions = {
+      payment_intent_id: 'pi_refund',
+      checkout_tender: { amount: 600, currency: 'USD' },
+      checkout_tender_state: { v: 1, reservationId: 'gift_reservation_refund' },
+      refunds: [], refunds_version: 0,
+    };
+    mocks.refundsCreate.mockResolvedValue({
+      id: 're_restore', amount: 400, status: 'succeeded', payment_intent: 'pi_refund',
+    });
+    mocks.restoreTender.mockRejectedValueOnce(new Error('D1 transient'));
+
+    const first = await POST(request({ amount: 700 }));
+    expect(first.status).toBe(503);
+    expect(mocks.order.extensions.refunds[0]).toMatchObject({
+      status: 'pending', stripe_refund_id: 're_restore', gift_restoration_status: 'pending',
+    });
+
+    mocks.refundsRetrieve.mockResolvedValue({
+      id: 're_restore', amount: 400, status: 'succeeded', payment_intent: 'pi_refund',
+    });
+    const retry = await POST(request({ amount: 700 }));
+    expect(retry.status).toBe(200);
+    expect(mocks.refundsCreate).toHaveBeenCalledOnce();
+    expect(mocks.refundsRetrieve).toHaveBeenCalledWith('re_restore');
+    expect(mocks.restoreTender).toHaveBeenCalledTimes(2);
+    expect(mocks.order.extensions.refunds[0]).toMatchObject({
+      status: 'succeeded', gift_restoration_status: 'succeeded',
+    });
+  });
+
   it('persists pending before Stripe and forwards the key as SDK options', async () => {
     mocks.refundsCreate.mockImplementation(async (_params, options) => {
       expect(mocks.writes).toHaveLength(1);

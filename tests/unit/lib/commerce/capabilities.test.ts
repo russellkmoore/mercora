@@ -121,6 +121,7 @@ describe("commerce capability resolution", () => {
       verifyReservedTender: vi.fn(async () => undefined),
       applyTender: vi.fn(async () => undefined),
       releaseTender: vi.fn(async () => undefined),
+      restoreTender: vi.fn(async () => undefined),
     };
     const factory = vi.fn(() => capability);
     const resolved = resolveCommerceCapabilities({
@@ -143,6 +144,11 @@ describe("commerce capability resolution", () => {
     })).rejects.toThrow("disabled");
     await resolved.giftCards.applyTender({ order: paidOrder() });
     expect(capability.applyTender).toHaveBeenCalledOnce();
+    await resolved.giftCards.restoreTender!({
+      order: paidOrder(), state: { v: 1, reservationId: 'gift_reservation_one' },
+      refundKey: 'refund-one', amount: Money.fromMinor(100, 'USD'),
+    });
+    expect(capability.restoreTender).toHaveBeenCalledOnce();
   });
 
   it("rejects disabled bearer input and protected nonzero settlement", async () => {
