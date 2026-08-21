@@ -15,10 +15,21 @@ import type { Order } from '@/lib/types/order';
 import { escapeHtmlText } from '@/lib/utils/maintenance-html';
 
 const DELIVERY_LEASE_SECONDS = 10 * 60;
+// A delivery that keeps failing without an explicit needs-review signal (e.g. a
+// permanently bouncing address) is escalated to needs_review after this many
+// attempts so it stops being reclaimed on every drain cycle forever.
+const MAX_DELIVERY_ATTEMPTS = 8;
 
 interface GiftCardFulfillmentEnvironment extends Record<string, unknown> { DB?: D1Database }
 
 function epochSeconds(): number { return Math.floor(Date.now() / 1_000); }
+
+/** Midnight-UTC epoch second of a validated YYYY-MM-DD scheduled delivery date. */
+function scheduledDeliverAfter(deliveryDate: string | undefined): number {
+  if (!deliveryDate) return 0;
+  const [year, month, day] = deliveryDate.split('-').map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / 1_000);
+}
 
 async function stableId(prefix: string, orderId: string, lineId: string): Promise<string> {
   const bytes = new TextEncoder().encode(`${prefix}\u0000v1\u0000${orderId}\u0000${lineId}`);
@@ -43,7 +54,7 @@ async function issueLine(args: {
   repository: ReturnType<typeof createGiftCardRepository>;
   order: Order;
   line: Order['items'][number];
-  hmac: GiftCardKeyRing;
+  resolveHmac: () => GiftCardKeyRing;
   deliveryKeys: GiftCardEncryptionKeyRing;
   now: number;
 }): Promise<string> {
@@ -53,9 +64,10 @@ async function issueLine(args: {
   const existing = await args.repository.findAccountById(giftCardId);
   if (existing) return giftCardId;
   const deliveryId = await stableId('gift_delivery', args.order.id, args.line.id);
+  const deliverAfter = scheduledDeliverAfter(recipient.deliveryDate);
   const code = generateGiftCardCode();
   try {
-    const codeHash = await digestGiftCardCode(code, args.hmac);
+    const codeHash = await digestGiftCardCode(code, args.resolveHmac());
     if (!codeHash) throw new Error('Generated gift-card code is invalid');
     const encrypted = await encryptGiftCardDeliveryCode({
       giftCardId, deliveryId, code, keyRing: args.deliveryKeys,
@@ -76,6 +88,7 @@ async function issueLine(args: {
         codeCiphertext: encrypted.ciphertext,
         codeNonce: encrypted.nonce,
         codeKeyVersion: encrypted.keyVersion,
+        ...(deliverAfter > 0 ? { deliverAfter } : {}),
       },
     });
   } finally {
@@ -95,15 +108,20 @@ async function deliverOne(args: {
   const claimed = await args.database.prepare(`UPDATE gift_card_deliveries
     SET status = 'processing', attempt_count = attempt_count + 1, claim_token = ?,
         lease_expires_at = ?, updated_at = ?
-    WHERE gift_card_id = ? AND (status = 'pending' OR (status = 'processing' AND lease_expires_at <= ?))
+    WHERE gift_card_id = ? AND deliver_after <= ?
+      AND (status = 'pending' OR (status = 'processing' AND lease_expires_at <= ?))
     RETURNING id, recipient_email, recipient_name, email_idempotency_key, code_ciphertext,
-      code_nonce, code_key_version`).bind(
-    token, args.now + DELIVERY_LEASE_SECONDS, args.now, args.giftCardId, args.now,
+      code_nonce, code_key_version, attempt_count`).bind(
+    token, args.now + DELIVERY_LEASE_SECONDS, args.now, args.giftCardId, args.now, args.now,
   ).first<{
     id: string; recipient_email: string; recipient_name: string | null; email_idempotency_key: string;
     code_ciphertext: string | null; code_nonce: string | null; code_key_version: number | null;
+    attempt_count: number;
   }>();
   if (!claimed) return;
+  // attempt_count is post-increment (SQLite RETURNING sees the new row). Once a
+  // non-terminal failure has exhausted the retry budget, park for review.
+  const exhausted = claimed.attempt_count >= MAX_DELIVERY_ATTEMPTS;
   if (!claimed.code_ciphertext || !claimed.code_nonce || !claimed.code_key_version) {
     await args.database.prepare(`UPDATE gift_card_deliveries SET status = 'needs_review',
       claim_token = NULL, lease_expires_at = NULL, completed_at = ?, updated_at = ?
@@ -126,14 +144,15 @@ async function deliverOne(args: {
       ...(claimed.recipient_name ? { recipientName: claimed.recipient_name } : {}),
     });
     const result = await sendEmail({ ...message, to: claimed.recipient_email }, { idempotencyKey: claimed.email_idempotency_key });
-    const status = result.success ? 'sent' : result.needsReview ? 'needs_review' : 'pending';
+    const status = result.success ? 'sent' : (result.needsReview || exhausted) ? 'needs_review' : 'pending';
     await args.database.prepare(`UPDATE gift_card_deliveries SET status = ?, claim_token = NULL,
       lease_expires_at = NULL, completed_at = ?, updated_at = ? WHERE id = ? AND claim_token = ?`)
       .bind(status, status === 'sent' || status === 'needs_review' ? args.now : null, args.now, claimed.id, token).run();
   } catch {
-    await args.database.prepare(`UPDATE gift_card_deliveries SET status = 'pending', claim_token = NULL,
-      lease_expires_at = NULL, updated_at = ? WHERE id = ? AND claim_token = ?`)
-      .bind(args.now, claimed.id, token).run();
+    const status = exhausted ? 'needs_review' : 'pending';
+    await args.database.prepare(`UPDATE gift_card_deliveries SET status = ?, claim_token = NULL,
+      lease_expires_at = NULL, completed_at = ?, updated_at = ? WHERE id = ? AND claim_token = ?`)
+      .bind(status, exhausted ? args.now : null, args.now, claimed.id, token).run();
   } finally {
     code = undefined;
   }
@@ -153,14 +172,17 @@ export async function fulfillPaidGiftCards(order: Order, options: {
   const repository = createGiftCardRepository(database);
   const now = options.now ?? epochSeconds();
   const deliveryKeys = parseGiftCardDeliveryKeyRing(environment);
+  // Resolve the HMAC ring lazily: a fully re-run (all cards already issued)
+  // order effect never needs the code secret.
   let hmac: GiftCardKeyRing | undefined;
+  const resolveHmac = () => (hmac ??= parseGiftCardCodeKeyRing(environment));
   const cards: string[] = [];
   for (const line of lines) {
     if (!order.id || !line.id) throw new Error('Gift-card line lacks immutable identity');
-    const id = await stableId('gift_card', order.id, line.id);
-    if (!await repository.findAccountById(id)) hmac ??= parseGiftCardCodeKeyRing(environment);
-    cards.push(await issueLine({ repository, order, line, hmac: hmac!, deliveryKeys, now }));
+    cards.push(await issueLine({ repository, order, line, resolveHmac, deliveryKeys, now }));
   }
+  // Cards with a future scheduled date are claimed only once due; the scheduler
+  // drain picks them up. Immediate cards send here.
   for (const giftCardId of cards) await deliverOne({ database, giftCardId, keys: deliveryKeys, now });
 }
 
@@ -176,8 +198,9 @@ export async function drainGiftCardDeliveries(options: {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new Error('Gift-card delivery limit is invalid');
   const now = options.now ?? epochSeconds();
   const rows = await environment.DB.prepare(`SELECT gift_card_id FROM gift_card_deliveries
-    WHERE status = 'pending' OR (status = 'processing' AND lease_expires_at <= ?)
-    ORDER BY updated_at, id LIMIT ?`).bind(now, limit).all<{ gift_card_id: string }>();
+    WHERE deliver_after <= ?
+      AND (status = 'pending' OR (status = 'processing' AND lease_expires_at <= ?))
+    ORDER BY updated_at, id LIMIT ?`).bind(now, now, limit).all<{ gift_card_id: string }>();
   const keys = parseGiftCardDeliveryKeyRing(environment);
   for (const row of rows.results ?? []) {
     await deliverOne({ database: environment.DB, giftCardId: row.gift_card_id, keys, now });

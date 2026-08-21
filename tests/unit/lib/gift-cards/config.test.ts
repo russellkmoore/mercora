@@ -65,4 +65,12 @@ describe("gift-card runtime configuration", () => {
       keys: { 1: 'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=' },
     });
   });
+
+  it('rejects a delivery key that does not decode to a 32-byte AES-256 key', () => {
+    expect(() => parseGiftCardDeliveryKeyRing({
+      GIFT_CARD_DELIVERY_CURRENT_VERSION: '1',
+      // Valid base64 shape, but only 16 decoded bytes.
+      GIFT_CARD_DELIVERY_KEYS_JSON: JSON.stringify({ 1: 'base64:AAAAAAAAAAAAAAAAAAAAAA==' }),
+    })).toThrow('Gift-card runtime configuration is unavailable');
+  });
 });

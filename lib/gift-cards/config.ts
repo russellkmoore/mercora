@@ -3,6 +3,7 @@ import {
   type GiftCardKeyRing,
 } from "./code";
 import {
+  GIFT_CARD_DELIVERY_KEY_BYTES,
   MAX_GIFT_CARD_DELIVERY_KEY_VERSIONS,
   type GiftCardEncryptionKeyRing,
 } from './encryption';
@@ -23,6 +24,16 @@ export class GiftCardRuntimeConfigurationError extends Error {
   constructor() {
     super("Gift-card runtime configuration is unavailable");
     this.name = "GiftCardRuntimeConfigurationError";
+  }
+}
+
+/** Decoded byte length of a standard-base64 payload, or -1 if it is not decodable. */
+function decodedByteLength(payload: string): number {
+  if (payload.length === 0 || payload.length % 4 !== 0) return -1;
+  try {
+    return atob(payload).length;
+  } catch {
+    return -1;
   }
 }
 
@@ -121,6 +132,11 @@ export function parseGiftCardDeliveryKeyRing(
       const version = positiveSafeInteger(rawVersion);
       const key = keys[rawVersion];
       if (version === null || typeof key !== 'string' || !/^base64:[A-Za-z0-9+/]+={0,2}$/.test(key)) {
+        throw new GiftCardRuntimeConfigurationError();
+      }
+      // AES-256-GCM needs an exactly 32-byte key. Reject a wrong-length key at
+      // configuration load rather than deep inside the first encrypt/decrypt.
+      if (decodedByteLength(key.slice('base64:'.length)) !== GIFT_CARD_DELIVERY_KEY_BYTES) {
         throw new GiftCardRuntimeConfigurationError();
       }
       resolved[version] = key;

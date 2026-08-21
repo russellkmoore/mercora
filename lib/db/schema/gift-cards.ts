@@ -193,6 +193,7 @@ export const giftCardDeliveries = sqliteTable("gift_card_deliveries", {
     enum: ["pending", "processing", "sent", "needs_review"],
   }).notNull().default("pending"),
   attemptCount: integer("attempt_count").notNull().default(0),
+  deliverAfter: integer("deliver_after").notNull().default(0),
   claimToken: text("claim_token"),
   leaseExpiresAt: integer("lease_expires_at"),
   codeCiphertext: text("code_ciphertext"),
@@ -203,7 +204,7 @@ export const giftCardDeliveries = sqliteTable("gift_card_deliveries", {
   completedAt: integer("completed_at"),
 }, (table) => [
   index("gift_card_deliveries_retry_idx")
-    .on(table.status, table.leaseExpiresAt, table.updatedAt),
+    .on(table.status, table.deliverAfter, table.leaseExpiresAt, table.updatedAt),
   check("gift_card_deliveries_id_check", sql`length(${table.id}) BETWEEN 1 AND 128`),
   check("gift_card_deliveries_recipient_check", sql`
     length(${table.recipientEmail}) BETWEEN 3 AND 320
