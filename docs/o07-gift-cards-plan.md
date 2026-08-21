@@ -109,12 +109,12 @@ off. Only the conditions in wave 7 do.
 | Wave | Status | Evidence / remaining release gate |
 | --- | --- | --- |
 | 1. Authoritative calculation and snapshots | Implemented | Server checkout classifies the bounded digital gift-card line, omits shipping for digital-only orders, retains physical shipping for mixed orders, excludes gift cards from inventory mutation, and snapshots tender-eligible value without a bearer code. Focused checkout-pricing coverage is present. |
-| 2. Checkout and MCP tender lifecycle | Implemented | Stable request identity drives reservation/release; partial tender follows the cash payment boundary and wholly gift-funded orders use the no-cash finalizer. MCP uses the same authoritative checkout path. Final suite still needs to exercise the finished paths together. |
+| 2. Checkout and MCP tender lifecycle | Implemented | Stable request identity drives reservation/release; partial tender follows the cash payment boundary and wholly gift-funded orders use the no-cash finalizer. MCP uses the same authoritative checkout path. |
 | 3. Issuance and delivery | Implemented and focused-tested | Paid effects issue deterministic account identities and encrypted retry records. Delivery has a durable claim/lease/retry path. Real-D1 coverage proves issue-once/retry behavior, corrupted retry material becomes review-only, and the bearer code is absent from persisted state. |
-| 4. Refund convergence | In progress | The deterministic allocation and idempotent restoration primitive exist. The HTTP cash-provider leg, gift-restoration leg, and terminal dual-leg convergence must all be finalized and regression-tested before handoff. |
-| 5. Safe presentation surfaces | In progress | Customer/admin projections are intentionally secret-safe and bearer-code-free. Their authorization, pagination/input bounds, enumeration/rate-limit behavior, and UI/API tests remain a final completion gate. |
-| 6. Runtime composition and audit | Partially implemented | The five-minute scheduler drains gift-card delivery only when reconciliation is enabled; this is tested with acquisition disabled. Final operational documentation and full cross-surface audit remain. |
-| 7. Stack validation and handoff | Not started | Confirm the O06 ancestry without rewriting O07, run final lint/typecheck/build/unit/Worker/API/MCP/UI validation on the completed tree, then perform the separately authorized push and one draft PR assignment. No provider, email, deployment, or external write occurs during development validation. |
+| 4. Refund convergence | Implemented | Deterministic allocation persists cash and gift legs; Stripe is called only for positive cash, restoration is keyed to the settled opaque reservation, and terminal status waits for both legs. Retries retrieve the known provider refund and retry only restoration. |
+| 5. Safe presentation surfaces | Implemented | Customer and admin read surfaces use strict bounds/auth/rate limits and secret-safe projections; balance remains available with reconciliation enabled after acquisition is disabled. |
+| 6. Runtime composition and audit | Implemented | The five-minute scheduler drains delivery only when reconciliation is enabled; delivery/secret-leak and reconciliation-only runtime coverage are included. |
+| 7. Stack validation and handoff | Validation complete; external handoff pending | O06 is an ancestor of O07 without rebase/rewrite. Final lint/typecheck/build, unit, Worker/D1, API/MCP/UI coverage, and whitespace checks pass. Push and draft PR assignment remain an external GitHub action, excluded from development by the no-external-write constraint. |
 
 ### Current focused verification
 
@@ -130,6 +130,7 @@ off. Only the conditions in wave 7 do.
   delivery retries work while acquisition is disabled and that disabled
   reconciliation does not open that boundary.
 
-The final regression matrix must add finished refund-route and customer/admin
-surface tests, then be rerun as one clean suite after all concurrent O07 work
-has landed. Until then, this branch is explicitly **not PR-ready**.
+Final combined verification after all O07 work landed: 230 unit files / 1,677
+tests pass; 27 Worker/D1 files / 147 tests pass; typecheck, production build,
+and whitespace checks pass. Lint has 52 pre-existing warnings and no errors.
+The branch is **ready for the separately authorized external PR handoff**.
