@@ -23,7 +23,9 @@ export async function POST(request: NextRequest) {
   try {
     const { env } = await getCloudflareContext({ async: true });
     const raw = env as unknown as Record<string, unknown> & { DB?: D1Database };
-    if (String(raw.STORE_FEATURE_GIFT_CARD_ACQUISITION ?? '').trim().toLowerCase() !== 'true' || !raw.DB) {
+    // Existing-card redemption and balance checks remain available during a
+    // sales rollback; only new issuance is controlled by acquisition.
+    if (String(raw.STORE_FEATURE_GIFT_CARD_RECONCILIATION ?? '').trim().toLowerCase() !== 'true' || !raw.DB) {
       return NextResponse.json({ valid: false });
     }
     const keyRing = parseGiftCardCodeKeyRing(raw);

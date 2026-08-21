@@ -42,7 +42,8 @@ import {
   FileEdit,
   MessageSquare,
   Newspaper,
-  Repeat2
+  Repeat2,
+  Gift
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStoreConfig } from "@/lib/store";
@@ -84,6 +85,12 @@ const navItems: NavItem[] = [
     href: "/admin/orders",
     icon: ClipboardList,
     description: "Order management"
+  },
+  {
+    label: "Gift cards",
+    href: "/admin/gift-cards",
+    icon: Gift,
+    description: "Stored-value operations",
   },
   {
     label: "Reviews",
