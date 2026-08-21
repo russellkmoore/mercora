@@ -95,6 +95,24 @@ function harness(options: {
         createdAt: requestIdentity.reservedAt + 10,
       },
     })),
+    findSettledRedemption: vi.fn(async () => ({
+      id: "entry_one",
+      giftCardId: "gift_one",
+      entryType: "redemption" as const,
+      amountDelta: Money.fromMinor(-700, "USD"),
+      businessKey: "gift-card/redemption/gift_reservation_one/v1",
+      orderId: "order_one",
+      reservationId: "gift_reservation_one",
+      createdAt: requestIdentity.reservedAt + 10,
+    })),
+    restoreRedemption: vi.fn(async () => ({
+      created: true,
+      entry: {
+        id: 'restore_one', giftCardId: 'gift_one', entryType: 'restoration' as const,
+        amountDelta: Money.fromMinor(100, 'USD'), businessKey: 'gift-card/restoration/entry_one/refund-one/v1',
+        orderId: 'order_one', relatedEntryId: 'entry_one', createdAt: requestIdentity.reservedAt + 20,
+      },
+    })),
     releaseReservation: vi.fn(async () => ({ released: true, reservation: durableReservation })),
   };
   const resolveLookupRuntime = vi.fn(async () => ({ repository, keyRing }));
@@ -108,6 +126,20 @@ function harness(options: {
 }
 
 describe("repository-backed gift-card capability", () => {
+  it('restores a settled tender using only its opaque reservation state', async () => {
+    const { capability, repository } = harness();
+    await capability.restoreTender({
+      order: order(), state: { v: 1, reservationId: 'gift_reservation_one' },
+      refundKey: 'refund-one', amount: Money.fromMinor(100, 'USD'),
+    });
+    expect(repository.findSettledRedemption).toHaveBeenCalledWith({
+      reservationId: 'gift_reservation_one', orderId: 'order_one',
+    });
+    expect(repository.restoreRedemption).toHaveBeenCalledWith(expect.objectContaining({
+      redemptionEntryId: 'entry_one', refundKey: 'refund-one', amount: Money.fromMinor(100, 'USD'),
+    }));
+  });
+
   it("does zero runtime work without a bearer token", async () => {
     const { capability, resolveLookupRuntime, resolveRepository } = harness();
     await expect(capability.resolveTender({

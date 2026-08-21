@@ -22,6 +22,8 @@ type GiftCardRepository = Pick<ReturnType<typeof createGiftCardRepository>,
   | "reserve"
   | "commitReservation"
   | "settleReservation"
+  | "findSettledRedemption"
+  | "restoreRedemption"
   | "releaseReservation"
 >;
 
@@ -270,6 +272,33 @@ export function createRepositoryBackedGiftCardCapability(
         });
       } catch (error) {
         if (error instanceof GiftCardRuntimeConfigurationError) throw error;
+        throw new GiftCardTenderReconciliationError();
+      }
+    },
+
+    async restoreTender({ order, state, refundKey, amount }) {
+      if (!(amount instanceof Money)) throw new GiftCardTenderReconciliationError();
+      if (amount.isZero()) return;
+      const parsed = exactState(state);
+      if (!parsed || !order.id) throw new GiftCardTenderReconciliationError();
+      try {
+        assertGiftCardMoney(amount, { positive: true });
+        const repository = await dependencies.resolveRepository();
+        const redemption = await repository.findSettledRedemption({
+          reservationId: parsed.reservationId,
+          orderId: order.id,
+        });
+        if (!redemption) throw new GiftCardTenderReconciliationError();
+        await repository.restoreRedemption({
+          redemptionEntryId: redemption.id,
+          orderId: order.id,
+          refundKey,
+          amount,
+          restoredAt: epochNow(dependencies),
+        });
+      } catch (error) {
+        if (error instanceof GiftCardRuntimeConfigurationError) throw error;
+        if (error instanceof GiftCardTenderReconciliationError) throw error;
         throw new GiftCardTenderReconciliationError();
       }
     },
