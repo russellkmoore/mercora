@@ -182,7 +182,13 @@ function eligibleLineIndexes(
   context: EligibilityContext
 ): number[] | null {
   if (!eligibilityMatches(promotion, context)) return null;
-  let eligible = catalog.map((_, index) => index);
+  // Gift cards are stored value at face value. Discounting a gift-card line
+  // would let a buyer acquire a full-value card for less than face value
+  // (issuance always credits the catalog unit_price), so no promotion may ever
+  // target one. They still count toward cart-minimum thresholds via `subtotal`.
+  let eligible = catalog
+    .map((_, index) => index)
+    .filter((index) => catalog[index].product.type !== 'gift_card');
   for (const condition of promotion.rules.conditions ?? []) {
     if (condition.type === 'cart_minimum' || condition.type === 'cart_subtotal') {
       if (condition.operator !== 'gte') return null;
@@ -779,7 +785,7 @@ export async function priceCheckout(
       throw new Error('Optional tender capability returned non-serializable server state');
     }
   }
-  if (tender.currency !== currency || tender.isNegative() || tender.gt(beforeTender)) {
+  if (tender.currency !== currency || tender.isNegative() || tender.gt(tenderEligible)) {
     throw new Error('Optional tender capability returned an invalid amount');
   }
   const total = beforeTender.subtract(tender);

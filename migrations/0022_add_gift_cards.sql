@@ -403,6 +403,9 @@ CREATE TABLE gift_card_deliveries (
   attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (
     attempt_count BETWEEN 0 AND 9007199254740991
   ),
+  deliver_after INTEGER NOT NULL DEFAULT 0 CHECK (
+    deliver_after BETWEEN 0 AND 9007199254740991
+  ),
   claim_token TEXT,
   lease_expires_at INTEGER CHECK (lease_expires_at BETWEEN 0 AND 9007199254740991),
   code_ciphertext TEXT CHECK (
@@ -434,4 +437,4 @@ CREATE TABLE gift_card_deliveries (
 );
 
 CREATE INDEX gift_card_deliveries_retry_idx
-  ON gift_card_deliveries(status, lease_expires_at, updated_at);
+  ON gift_card_deliveries(status, deliver_after, lease_expires_at, updated_at);

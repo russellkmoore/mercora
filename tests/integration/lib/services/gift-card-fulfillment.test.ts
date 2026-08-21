@@ -141,6 +141,57 @@ describe('gift-card issuance and durable delivery on real D1', () => {
     expect(JSON.stringify(durableState)).not.toContain(deliveredCode);
   });
 
+  it('holds a scheduled card until its delivery date, then sends', async () => {
+    const order = giftOrder();
+    order.items[0].gift_card!.deliveryDate = '2030-01-01';
+    const due = Math.floor(Date.UTC(2030, 0, 1) / 1_000);
+    await insertOrder(order);
+
+    // Paid effect issues the card but must not email the recipient before the date.
+    await fulfillPaidGiftCards(order, { environment: runtimeEnvironment(), now });
+    expect(mocks.send).not.toHaveBeenCalled();
+    const scheduled = await env.DB.prepare(`SELECT status, attempt_count, deliver_after
+      FROM gift_card_deliveries WHERE order_id = ?`).bind(order.id)
+      .first<{ status: string; attempt_count: number; deliver_after: number }>();
+    expect(scheduled).toEqual({ status: 'pending', attempt_count: 0, deliver_after: due });
+
+    // A drain before the date claims nothing.
+    await expect(drainGiftCardDeliveries({ environment: runtimeEnvironment(), now: now + 1 }))
+      .resolves.toEqual({ attempted: 0 });
+    expect(mocks.send).not.toHaveBeenCalled();
+
+    // Once due, the drain delivers.
+    mocks.send.mockResolvedValueOnce({ success: true, id: 'provider-scheduled' });
+    await expect(drainGiftCardDeliveries({ environment: runtimeEnvironment(), now: due }))
+      .resolves.toEqual({ attempted: 1 });
+    expect(mocks.send).toHaveBeenCalledTimes(1);
+    await expect(env.DB.prepare(`SELECT status FROM gift_card_deliveries WHERE order_id = ?`)
+      .bind(order.id).first()).resolves.toMatchObject({ status: 'sent' });
+  });
+
+  it('escalates a permanently failing delivery to review after the attempt budget', async () => {
+    const order = giftOrder();
+    await insertOrder(order);
+    mocks.send.mockResolvedValue({ success: false, error: 'permanent bounce' });
+
+    // Attempt 1 happens in the paid effect; drain until the budget is exhausted.
+    await fulfillPaidGiftCards(order, { environment: runtimeEnvironment(), now });
+    for (let attempt = 1; attempt <= 7; attempt += 1) {
+      await drainGiftCardDeliveries({ environment: runtimeEnvironment(), now: now + attempt });
+    }
+
+    const parked = await env.DB.prepare(`SELECT status, attempt_count, completed_at
+      FROM gift_card_deliveries WHERE order_id = ?`).bind(order.id)
+      .first<{ status: string; attempt_count: number; completed_at: number }>();
+    expect(parked).toEqual({ status: 'needs_review', attempt_count: 8, completed_at: now + 7 });
+
+    // A terminal review row is no longer reclaimed.
+    const sends = mocks.send.mock.calls.length;
+    await expect(drainGiftCardDeliveries({ environment: runtimeEnvironment(), now: now + 8 }))
+      .resolves.toEqual({ attempted: 0 });
+    expect(mocks.send).toHaveBeenCalledTimes(sends);
+  });
+
   it('moves corrupted retry material to review without rendering or sending a bearer code', async () => {
     const order = giftOrder();
     await insertOrder(order);
