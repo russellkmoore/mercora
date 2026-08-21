@@ -39,11 +39,16 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { CartItem } from "@/lib/types/cartitem";
+import type { CartItem, StableCartItem } from "@/lib/types/cartitem";
 import type { Address } from "@/lib/types";
 import type { BillingInfo } from "@/lib/types/billing";
 import type { ShippingOption } from "@/lib/types/shipping";
 import { Money, cartSubtotal, type StoredMoney } from "@/lib/money";
+import {
+  MAX_CART_LINE_QUANTITY,
+  normalizeCartItemForStore,
+  sameCartLineFacts,
+} from "@/lib/gift-cards/line-identity";
 
 /**
  * Interface for applied discount information
@@ -63,7 +68,7 @@ export interface AppliedDiscount {
 interface CartState {
   // === Cart Items ===
   /** Array of items currently in the shopping cart */
-  items: CartItem[];
+  items: StableCartItem[];
 
   // === Discount Information ===
   /** Array of applied discounts and their details */
@@ -87,9 +92,9 @@ interface CartState {
   /** Add an item to the cart (merges quantities if item exists) */
   addItem: (item: CartItem) => void;
   /** Remove an item completely from the cart */
-  removeItem: (variantId: string) => void;
+  removeItem: (lineId: string) => void;
   /** Update the quantity of a specific item */
-  updateQuantity: (variantId: string, quantity: number) => void;
+  updateQuantity: (lineId: string, quantity: number) => void;
   /** Clear all items from the cart */
   clearCart: () => void;
   /** Calculate total price of all items in cart */
@@ -151,43 +156,51 @@ export const useCartStore = create<CartState>()(
        * If item already exists, increases quantity; otherwise adds new item
        */
       addItem: (item) => {
+        const normalized = normalizeCartItemForStore(item);
+        if (!normalized) return;
         const items = get().items;
-        const existing = items.find((i) => i.variantId === item.variantId);
+        const existing = items.find((existingItem) => sameCartLineFacts(existingItem, normalized));
 
         if (existing) {
-          // Merge quantities for existing items
+          const quantity = existing.quantity + normalized.quantity;
+          if (quantity > MAX_CART_LINE_QUANTITY) return;
           set({
             items: items.map((i) =>
-              i.variantId === item.variantId
-                ? { ...i, quantity: i.quantity + item.quantity }
+              i.lineId === existing.lineId
+                ? { ...i, quantity }
                 : i
             ),
           });
         } else {
-          // Add new item to cart
-          set({ items: [...items, item] });
+          let lineId = normalized.lineId;
+          let suffix = 2;
+          while (items.some((existingItem) => existingItem.lineId === lineId)) {
+            lineId = `${normalized.lineId}_${suffix}`;
+            suffix += 1;
+          }
+          set({ items: [...items, { ...normalized, lineId }] });
         }
       },
 
       /**
-       * Remove item completely from cart by variant ID
+       * Remove item completely from cart by stable line ID
        */
-      removeItem: (variantId) => {
-        set({ items: get().items.filter((i) => i.variantId !== variantId) });
+      removeItem: (lineId) => {
+        set({ items: get().items.filter((i) => i.lineId !== lineId) });
       },
 
       /**
        * Update item quantity with validation (removes if quantity < 1)
        */
-      updateQuantity: (variantId, quantity) => {
+      updateQuantity: (lineId, quantity) => {
         if (quantity < 1) {
           // Remove item if quantity becomes invalid
-          get().removeItem(variantId);
-        } else {
+          get().removeItem(lineId);
+        } else if (Number.isSafeInteger(quantity) && quantity <= MAX_CART_LINE_QUANTITY) {
           // Update quantity for specified item
           set({
             items: get().items.map((i) =>
-              i.variantId === variantId ? { ...i, quantity } : i
+              i.lineId === lineId ? { ...i, quantity } : i
             ),
           });
         }
@@ -351,7 +364,7 @@ export const useCartStore = create<CartState>()(
     {
       name: 'cart-storage',
       skipHydration: true,
-      version: 1,
+      version: 2,
       migrate: (persistedState: unknown) => migrateCartState(persistedState),
     }
   )
@@ -361,17 +374,42 @@ function sumDiscounts(discounts: AppliedDiscount[], currency = 'USD'): Money {
   return discounts.reduce((total, discount) => total.add(Money.fromStored(discount.amount, currency)), Money.zero(currency));
 }
 
-function migrateCartState(persistedState: unknown): unknown {
+export function migrateCartState(persistedState: unknown): unknown {
   if (!persistedState || typeof persistedState !== 'object') return persistedState;
   const state = persistedState as { items?: unknown[]; taxAmount?: unknown; totalDiscount?: unknown; appliedDiscounts?: unknown[]; shippingOption?: { cost?: unknown } };
   const toStored = (value: unknown): StoredMoney => typeof value === 'number' ? Money.fromMajor(value).toJSON() : Money.fromStored(value).toJSON();
   return {
     ...state,
-    items: state.items?.map((item) => {
-      if (!item || typeof item !== 'object') return item;
+    items: state.items?.reduce<StableCartItem[]>((items, item) => {
+      if (!item || typeof item !== 'object') return items;
       const cartItem = item as { price?: unknown };
-      return { ...cartItem, ...(cartItem.price !== undefined && { price: toStored(cartItem.price) }) };
-    }),
+      let normalized: StableCartItem | null = null;
+      try {
+        normalized = normalizeCartItemForStore({
+          ...cartItem,
+          ...(cartItem.price !== undefined && { price: toStored(cartItem.price) }),
+        });
+      } catch {
+        return items;
+      }
+      if (!normalized) return items;
+      const existing = items.find((candidate) => sameCartLineFacts(candidate, normalized));
+      if (existing) {
+        existing.quantity = Math.min(
+          MAX_CART_LINE_QUANTITY,
+          existing.quantity + normalized.quantity,
+        );
+        return items;
+      }
+      let lineId = normalized.lineId;
+      let suffix = 2;
+      while (items.some((candidate) => candidate.lineId === lineId)) {
+        lineId = `${normalized.lineId}_${suffix}`;
+        suffix += 1;
+      }
+      items.push({ ...normalized, lineId });
+      return items;
+    }, []),
     taxAmount: state.taxAmount === undefined ? undefined : toStored(state.taxAmount),
     totalDiscount: state.totalDiscount === undefined ? Money.zero().toJSON() : toStored(state.totalDiscount),
     appliedDiscounts: state.appliedDiscounts?.map((discount) => {

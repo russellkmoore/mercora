@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   drainOrderEffects: vi.fn(),
   drainInventoryAdjustments: vi.fn(),
+  drainGiftCardDeliveries: vi.fn(),
   regenerateAnalytics: vi.fn(),
   runRecommendationCron: vi.fn(),
   recordTelemetry: vi.fn(),
@@ -13,6 +14,9 @@ vi.mock('@/lib/services/order-effects', () => ({
 }));
 vi.mock('@/lib/services/inventory-adjustments', () => ({
   drainInventoryAdjustments: mocks.drainInventoryAdjustments,
+}));
+vi.mock('@/lib/services/gift-card-fulfillment', () => ({
+  drainGiftCardDeliveries: mocks.drainGiftCardDeliveries,
 }));
 vi.mock('@/lib/analytics/generate-insights', () => ({
   regenerateAnalytics: mocks.regenerateAnalytics,
@@ -41,6 +45,7 @@ function context(): { ctx: ExecutionContext; waits: Promise<unknown>[] } {
 beforeEach(() => {
   mocks.drainOrderEffects.mockResolvedValue({ claimed: 0, succeeded: 0, failed: 0 });
   mocks.drainInventoryAdjustments.mockResolvedValue({ claimed: 0, succeeded: 0, failed: 0 });
+  mocks.drainGiftCardDeliveries.mockResolvedValue({ attempted: 0 });
   mocks.regenerateAnalytics.mockResolvedValue(undefined);
   mocks.runRecommendationCron.mockResolvedValue(undefined);
 });
@@ -64,6 +69,30 @@ describe('Worker scheduled routing behavior', () => {
       },
       recoveryError,
     );
+  });
+
+  it('retries encrypted gift-card delivery under reconciliation even when acquisition is disabled', async () => {
+    const { ctx, waits } = context();
+    const runtime = {
+      DB: {} as D1Database,
+      STORE_FEATURE_GIFT_CARD_ACQUISITION: 'false',
+      STORE_FEATURE_GIFT_CARD_RECONCILIATION: 'true',
+    } as unknown as CloudflareEnv;
+
+    handleScheduled(controller('*/5 * * * *'), runtime, ctx);
+    await Promise.all(waits);
+
+    expect(mocks.drainGiftCardDeliveries).toHaveBeenCalledWith({
+      environment: runtime,
+      limit: 25,
+    });
+  });
+
+  it('does not open the gift-card retry boundary while reconciliation is disabled', async () => {
+    const { ctx, waits } = context();
+    handleScheduled(controller('*/5 * * * *'), { DB: {} } as CloudflareEnv, ctx);
+    await Promise.all(waits);
+    expect(mocks.drainGiftCardDeliveries).not.toHaveBeenCalled();
   });
 
   it('reports analytics failure while preserving background completion', async () => {

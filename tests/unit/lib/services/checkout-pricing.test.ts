@@ -99,6 +99,161 @@ describe('server-authoritative checkout pricing', () => {
     expect(orderPaid).not.toHaveBeenCalled();
   });
 
+  it('snapshots a digital gift-card line without shipping and excludes its value from tender', async () => {
+    const resolveTender = vi.fn(async ({ currency, amountDue }: { currency: string; amountDue: Money }) => {
+      expect(amountDue).toEqual(Money.zero(currency));
+      return { amount: Money.zero(currency) };
+    });
+    const quote = await priceCheckout({
+      items: [{
+        lineId: 'line_0123456789abcdef', productId: 'gift_product', variantId: 'gift_variant', quantity: 1,
+        giftCardCustomization: { recipientEmail: 'recipient@example.test', recipientName: 'Recipient' },
+      }],
+      shippingAddress: address,
+      shippingMethodId: '',
+      giftCardToken: 'GC-2345-2345-2345-2345-2345-2345-2345',
+      giftCardRequestKey: 'checkout-gift-1',
+    }, {
+      dependencies: dependencies({
+        getProduct: vi.fn(async () => ({
+          id: 'gift_product', name: 'Gift card', type: 'gift_card', fulfillment_type: 'digital',
+          status: 'active', tax_category: 'txcd_99999999', default_variant_id: 'gift_variant',
+        })),
+        getProductVariant: vi.fn(async () => ({
+          id: 'gift_variant', product_id: 'gift_product', sku: 'GIFT', status: 'active',
+          option_values: [], shipping_required: false, price: Money.fromMinor(2_500).toJSON(),
+        })),
+      }) as any,
+      capabilities: {
+        giftCards: { resolveTender, verifyReservedTender: vi.fn(), applyTender: vi.fn() },
+        subscriptions: { orderPaid: vi.fn() },
+      },
+    });
+
+    expect(quote.shipping).toEqual({ amount: 0, currency: 'USD' });
+    expect(quote.shippingMethod).toEqual({ id: 'digital', label: 'Digital delivery' });
+    expect(quote.items[0]).toMatchObject({
+      id: 'line_0123456789abcdef', fulfillment_type: 'digital',
+      gift_card: { recipientEmail: 'recipient@example.test' },
+    });
+    expect(resolveTender).toHaveBeenCalledOnce();
+  });
+
+  it('never lets a promotion discount a gift-card line below face value', async () => {
+    const deps = dependencies({
+      getProduct: vi.fn(async (id: string) => id === 'gift_product'
+        ? {
+            id, name: 'Gift card', type: 'gift_card', fulfillment_type: 'digital',
+            status: 'active', tax_category: 'txcd_99999999', default_variant_id: 'gift_variant',
+          }
+        : {
+            id, name: id, status: 'active', categories: ['other'],
+            tax_category: 'txcd_99999999', default_variant_id: 'var_other',
+          }),
+      getProductVariant: vi.fn(async (id: string) => id === 'gift_variant'
+        ? {
+            id, product_id: 'gift_product', sku: 'GIFT', status: 'active',
+            option_values: [], shipping_required: false, price: Money.fromMinor(2_500).toJSON(),
+          }
+        : {
+            id, product_id: 'prod_other', sku: 'OTHER', status: 'active',
+            option_values: [], price: Money.fromMinor(2_000).toJSON(),
+          }),
+      validateCouponCode: vi.fn(async () => ({
+        canBeUsed: true,
+        coupon: { promotion_id: 'promo_half', code: 'HALF' },
+      })),
+      getPromotionById: vi.fn(async () => ({
+        id: 'promo_half',
+        name: 'Half off',
+        type: 'cart',
+        status: 'active',
+        stackable: true,
+        rules: { actions: [{ type: 'percentage_discount', value: 50 }] },
+      })),
+    });
+
+    const quote = await priceCheckout({
+      items: [
+        {
+          lineId: 'line_0123456789abcdef', productId: 'gift_product', variantId: 'gift_variant', quantity: 1,
+          giftCardCustomization: { recipientEmail: 'recipient@example.test' },
+        },
+        { productId: 'prod_other', variantId: 'var_other', quantity: 1 },
+      ],
+      shippingAddress: address,
+      shippingMethodId: 'standard',
+      discountCodes: ['HALF'],
+    }, { dependencies: deps as any });
+
+    // The gift-card line keeps its full $25 face value; only the $20 merchandise
+    // line is discounted (50% => $10). Issuance credits unit_price, so any gift
+    // discount would hand out free stored value.
+    expect(quote.lineAllocations[0]).toMatchObject({
+      lineId: quote.items[0].id,
+      merchandiseDiscount: { amount: 0, currency: 'USD' },
+      promotionCodes: [],
+    });
+    expect(quote.lineAllocations[1]).toMatchObject({
+      lineId: quote.items[1].id,
+      merchandiseDiscount: { amount: 1_000, currency: 'USD' },
+      promotionCodes: ['HALF'],
+    });
+  });
+
+  it('rejects gift-card tender that exceeds the non-gift eligible amount', async () => {
+    // An all-gift cart has zero tender-eligible value. A capability returning a
+    // positive tender would let stored value fund the gift-card purchase.
+    const resolveTender = vi.fn(async ({ currency }: { currency: string }) => ({
+      amount: Money.fromMinor(2_500, currency),
+    }));
+    await expect(priceCheckout({
+      items: [{
+        lineId: 'line_0123456789abcdef', productId: 'gift_product', variantId: 'gift_variant', quantity: 1,
+        giftCardCustomization: { recipientEmail: 'recipient@example.test' },
+      }],
+      shippingAddress: address,
+      shippingMethodId: '',
+      giftCardToken: 'GC-2345-2345-2345-2345-2345-2345-2345',
+      giftCardRequestKey: 'checkout-gift-1',
+    }, {
+      dependencies: dependencies({
+        getProduct: vi.fn(async () => ({
+          id: 'gift_product', name: 'Gift card', type: 'gift_card', fulfillment_type: 'digital',
+          status: 'active', tax_category: 'txcd_99999999', default_variant_id: 'gift_variant',
+        })),
+        getProductVariant: vi.fn(async () => ({
+          id: 'gift_variant', product_id: 'gift_product', sku: 'GIFT', status: 'active',
+          option_values: [], shipping_required: false, price: Money.fromMinor(2_500).toJSON(),
+        })),
+      }) as any,
+      capabilities: {
+        giftCards: { resolveTender, verifyReservedTender: vi.fn(), applyTender: vi.fn() },
+        subscriptions: { orderPaid: vi.fn() },
+      },
+    })).rejects.toThrow('invalid amount');
+  });
+
+  it('rejects recipient metadata on a non-gift digital product', async () => {
+    await expect(priceCheckout({
+      items: [{
+        productId: 'download', variantId: 'download_variant', quantity: 1,
+        giftCardCustomization: { recipientEmail: 'recipient@example.test' },
+      }],
+      shippingAddress: address,
+      shippingMethodId: '',
+    }, { dependencies: dependencies({
+      getProduct: vi.fn(async () => ({
+        id: 'download', name: 'Download', fulfillment_type: 'digital', status: 'active',
+        tax_category: 'txcd_99999999', default_variant_id: 'download_variant',
+      })),
+      getProductVariant: vi.fn(async () => ({
+        id: 'download_variant', product_id: 'download', sku: 'DL', status: 'active',
+        option_values: [], shipping_required: false, price: Money.fromMinor(500).toJSON(),
+      })),
+    }) as any })).rejects.toThrow('gift-card catalog items');
+  });
+
   it('uses the shared enabled shipping defaults on a fresh install', async () => {
     const quote = await priceCheckout({
       items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],

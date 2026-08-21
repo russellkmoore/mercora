@@ -16,6 +16,7 @@ export interface AuthoritativeCheckoutQuote {
 }
 
 export interface AuthoritativeCheckoutLine {
+  lineId?: string;
   productId: string;
   variantId?: string;
   name: string;
@@ -72,20 +73,22 @@ export default function OrderSummary({
       <div className="space-y-1">
         {authoritativeQuote
           ? authoritativeQuote.items.map((line, idx) => {
-              const item = items.find((candidate) =>
-                candidate.productId === line.productId &&
-                candidate.variantId === line.variantId
-              );
+              const item = line.lineId
+                ? items.find((candidate) => candidate.lineId === line.lineId)
+                : items[idx] ?? items.find((candidate) =>
+                  candidate.productId === line.productId &&
+                  candidate.variantId === line.variantId
+                );
               return (
                 <OrderItemCard
-                  key={`${line.productId}:${line.variantId ?? ''}:${idx}`}
+                  key={line.lineId ?? item?.lineId ?? `${line.productId}:${line.variantId ?? ''}:${idx}`}
                   item={item}
                   authoritativeLine={line}
                 />
               );
             })
-          : items.map((item, idx) => (
-              <OrderItemCard key={idx} item={item} />
+          : items.map((item) => (
+              <OrderItemCard key={item.lineId} item={item} />
             ))}
       </div>
 

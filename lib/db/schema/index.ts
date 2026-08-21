@@ -136,3 +136,6 @@ export * from "./redirect-map";
 
 // Optional, default-off Stripe subscription foundation
 export * from "./subscriptions";
+
+// Optional, default-off gift-card ledger and delivery foundation
+export * from "./gift-cards";

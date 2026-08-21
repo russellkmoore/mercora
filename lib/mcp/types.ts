@@ -100,7 +100,8 @@ export interface CartRequest {
 
 export interface OrderRequest {
   orderId: string;
-  paymentIntentId: string;
+  /** Omitted only for a zero-cash, gift-funded order finalized by checkout. */
+  paymentIntentId?: string;
   shippingAddress?: Address;
   billingAddress?: Address;
   paymentMethod?: string;
