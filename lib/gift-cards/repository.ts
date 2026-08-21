@@ -277,9 +277,9 @@ export function createGiftCardRepository(database: D1Database) {
         ),
         ...(input.delivery ? [database.prepare(`INSERT INTO gift_card_deliveries (
           id, gift_card_id, order_id, order_line_id, recipient_email, recipient_name,
-          email_idempotency_key, status, attempt_count, claim_token, lease_expires_at,
+          email_idempotency_key, status, attempt_count, deliver_after, claim_token, lease_expires_at,
           code_ciphertext, code_nonce, code_key_version, created_at, updated_at, completed_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 0, NULL, NULL, ?, ?, ?, ?, ?, NULL)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, NULL, NULL, ?, ?, ?, ?, ?, NULL)
         ON CONFLICT(gift_card_id) DO NOTHING`).bind(
           input.delivery.id,
           input.id,
@@ -288,6 +288,7 @@ export function createGiftCardRepository(database: D1Database) {
           input.delivery.recipientEmail,
           input.delivery.recipientName ?? null,
           input.delivery.emailIdempotencyKey,
+          input.delivery.deliverAfter ?? 0,
           input.delivery.codeCiphertext,
           input.delivery.codeNonce,
           input.delivery.codeKeyVersion,

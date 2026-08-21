@@ -98,6 +98,8 @@ export interface IssueGiftCardInput {
     codeCiphertext: string;
     codeNonce: string;
     codeKeyVersion: number;
+    /** Earliest epoch second the recipient may be emailed; 0 means immediately. */
+    deliverAfter?: number;
   };
 }
 
@@ -211,6 +213,9 @@ export function assertIssueGiftCardInput(input: IssueGiftCardInput): void {
       typeof input.delivery.codeCiphertext !== 'string' || input.delivery.codeCiphertext.length > 128 ||
       typeof input.delivery.codeNonce !== 'string' || input.delivery.codeNonce.length > 32
     ) throw new TypeError('gift-card delivery encryption state is invalid');
+    if (input.delivery.deliverAfter !== undefined) {
+      assertGiftCardEpoch(input.delivery.deliverAfter, 'gift-card delivery schedule');
+    }
   }
 }
 
