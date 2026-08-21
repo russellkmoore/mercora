@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   assertInventory: vi.fn(),
   createPaymentIntent: vi.fn(),
   cancelPaymentIntent: vi.fn(),
+  finalizeZeroCash: vi.fn(),
+  capabilities: { giftCards: {}, subscriptions: {} },
   inserted: undefined as Record<string, unknown> | undefined,
   insertError: undefined as Error | undefined,
 }));
@@ -19,6 +21,12 @@ vi.mock('@/lib/services/inventory-adjustments', () => ({
 vi.mock('@/lib/stripe', () => ({
   createPaymentIntent: mocks.createPaymentIntent,
   cancelPaymentIntent: mocks.cancelPaymentIntent,
+}));
+vi.mock('@/lib/commerce/runtime', () => ({
+  resolveRuntimeCommerceCapabilities: vi.fn(async () => mocks.capabilities),
+}));
+vi.mock('@/lib/services/order-finalization', () => ({
+  finalizeZeroCashGiftOrder: mocks.finalizeZeroCash,
 }));
 vi.mock('@/lib/db', () => ({
   getDbAsync: vi.fn(async () => ({
@@ -87,6 +95,9 @@ beforeEach(() => {
     client_secret: 'secret',
   });
   mocks.cancelPaymentIntent.mockResolvedValue(undefined);
+  mocks.finalizeZeroCash.mockResolvedValue({
+    paid: true, promoted: true, order: { id: 'MCP-AGENT1-123456-A1B2C3D4' },
+  });
 });
 
 describe('MCP authoritative checkout', () => {
@@ -113,7 +124,10 @@ describe('MCP authoritative checkout', () => {
     });
 
     expect(mocks.priceCheckout).toHaveBeenCalledWith(expect.objectContaining({
-      items: [{ productId: 'catalog-product', variantId: 'catalog-variant', quantity: 2 }],
+      items: [expect.objectContaining({
+        lineId: expect.stringMatching(/^line_[0-9a-f]{16}$/),
+        productId: 'catalog-product', variantId: 'catalog-variant', quantity: 2,
+      })],
     }));
     expect(mocks.inserted?.items).toEqual(quote.items);
     expect(mocks.inserted?.total_amount).toEqual({ amount: 3149, currency: 'USD' });
@@ -156,5 +170,36 @@ describe('MCP authoritative checkout', () => {
       },
     })).rejects.toThrow('D1 unavailable');
     expect(mocks.cancelPaymentIntent).toHaveBeenCalledWith('pi_mcp_1');
+  });
+
+  it('finalizes a wholly gift-funded order without creating a Stripe PaymentIntent', async () => {
+    mocks.priceCheckout.mockResolvedValue({
+      ...quote,
+      tender: money(3149),
+      total: money(0),
+      tenderState: { v: 1, reservationId: 'gift_reservation_1' },
+    });
+    const result = await createMcpCheckout({
+      agentId: 'agent-1',
+      session,
+      input: {
+        shippingAddress: {
+          line1: '1 Main', city: 'Denver', region: 'CO', postal_code: '80202', country: 'US',
+        },
+        shippingMethodId: 'standard',
+        giftCardToken: 'opaque-gift-token',
+        giftCardRequestKey: 'mcp-gift-request-1',
+      },
+    });
+    expect(mocks.createPaymentIntent).not.toHaveBeenCalled();
+    expect(mocks.finalizeZeroCash).toHaveBeenCalledWith(expect.objectContaining({
+      enforceOwnership: false,
+      capabilities: mocks.capabilities,
+    }));
+    expect(mocks.inserted).toMatchObject({
+      payment_method: 'gift_card', payment_status: 'pending', external_references: null,
+    });
+    expect(result).toMatchObject({ noCash: true, amount: { amount: 0, currency: 'USD' } });
+    expect(result.paymentIntentId).toBeUndefined();
   });
 });

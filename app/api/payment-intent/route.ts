@@ -14,6 +14,13 @@ import {
   InventoryUnavailableError,
 } from '@/lib/services/inventory-adjustments';
 import { recordTelemetry } from '@/lib/observability/telemetry';
+import { resolveRuntimeCommerceCapabilities } from '@/lib/commerce/runtime';
+import { hasPhysicalCheckoutLines } from '@/lib/gift-cards/checkout';
+import { finalizeZeroCashGiftOrder } from '@/lib/services/order-finalization';
+import {
+  noOpCommerceCapabilities,
+  type CommerceCapabilities,
+} from '@/lib/commerce/capabilities';
 
 interface PaymentIntentRequest {
   items: CheckoutLineInput[];
@@ -21,6 +28,7 @@ interface PaymentIntentRequest {
   shippingMethodId: string;
   discountCodes?: string[];
   giftCardToken?: string;
+  giftCardRequestKey?: string;
 }
 
 function normalizeAddress(value: unknown): Address | null {
@@ -81,22 +89,28 @@ export async function POST(request: NextRequest) {
   if (
     !shippingAddress ||
     !isBoundedString(input.shippingMethodId, 128) ||
-    (input.giftCardToken !== undefined && !isBoundedString(input.giftCardToken, 512))
+    (input.giftCardToken !== undefined && !isBoundedString(input.giftCardToken, 512)) ||
+    (input.giftCardRequestKey !== undefined && !isBoundedString(input.giftCardRequestKey, 256))
   ) {
     return NextResponse.json({ error: 'Invalid checkout details' }, { status: 400 });
   }
 
   const { userId } = await auth();
-  let quote;
+  let quote: Awaited<ReturnType<typeof priceCheckout>>;
+  let capabilities: CommerceCapabilities;
   try {
+    capabilities = input.giftCardToken
+      ? await resolveRuntimeCommerceCapabilities()
+      : noOpCommerceCapabilities;
     quote = await priceCheckout({
       items: input.items,
       shippingAddress,
       shippingMethodId: input.shippingMethodId,
       discountCodes: input.discountCodes,
       giftCardToken: input.giftCardToken,
+      giftCardRequestKey: input.giftCardRequestKey,
       customerId: userId ?? undefined,
-    });
+    }, { capabilities });
   } catch (error) {
     recordTelemetry('payment.pricing_rejected', {
       operation: 'validate', outcome: 'rejected', path: '/api/payment-intent',
@@ -108,13 +122,6 @@ export async function POST(request: NextRequest) {
   }
 
   const total = Money.fromStored(quote.total);
-  if (!total.gt(Money.zero(total.currency))) {
-    return NextResponse.json(
-      { error: 'This checkout requires a positive payment amount' },
-      { status: 400 }
-    );
-  }
-
   try {
     await assertCheckoutInventoryAvailable(quote.items);
   } catch (error) {
@@ -163,8 +170,8 @@ export async function POST(request: NextRequest) {
   }
 
   const orderId = newOrderId(userId);
-  let paymentIntent: Awaited<ReturnType<typeof createPaymentIntent>>;
-  try {
+  let paymentIntent: Awaited<ReturnType<typeof createPaymentIntent>> | undefined;
+  if (total.gt(Money.zero(total.currency))) try {
     paymentIntent = await createPaymentIntent({
       amount: total.toMinorUnits(),
       currency: total.currency.toLowerCase(),
@@ -188,6 +195,12 @@ export async function POST(request: NextRequest) {
       description: `Order ${orderId}`,
     });
   } catch (error) {
+    if (quote.tenderState !== undefined) {
+      await capabilities.giftCards.releaseTender?.({
+        state: quote.tenderState,
+        reason: 'cash payment initialization failed',
+      }).catch(() => undefined);
+    }
     recordTelemetry('payment.intent_create_failed', {
       operation: 'create', outcome: 'failed', provider: 'stripe',
       retryable: true, path: '/api/payment-intent',
@@ -195,14 +208,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Payment provider is unavailable' }, { status: 503 });
   }
 
-  const providerAmount = Number(paymentIntent.amount);
-  const providerCurrency = String(paymentIntent.currency || '').toUpperCase();
-  if (
+  const providerAmount = paymentIntent ? Number(paymentIntent.amount) : total.toMinorUnits();
+  const providerCurrency = paymentIntent ? String(paymentIntent.currency || '').toUpperCase() : total.currency;
+  if (paymentIntent && (
     !Number.isSafeInteger(providerAmount) ||
     providerAmount !== total.toMinorUnits() ||
     providerCurrency !== total.currency ||
     !paymentIntent.client_secret
-  ) {
+  )) {
     recordTelemetry('payment.intent_invalid', {
       operation: 'validate', outcome: 'invalid', provider: 'stripe',
       http_status: 502, path: '/api/payment-intent',
@@ -213,6 +226,12 @@ export async function POST(request: NextRequest) {
         retryable: true, path: '/api/payment-intent',
       }, error);
     });
+    if (quote.tenderState !== undefined) {
+      await capabilities.giftCards.releaseTender?.({
+        state: quote.tenderState,
+        reason: 'cash payment validation failed',
+      }).catch(() => undefined);
+    }
     return NextResponse.json({ error: 'Payment provider returned an invalid intent' }, { status: 502 });
   }
 
@@ -222,7 +241,7 @@ export async function POST(request: NextRequest) {
   const shippingDiscount = Money.fromStored(quote.shippingDiscount, quote.currency);
   const extensions = {
     email: shippingAddress.email,
-    payment_intent_id: paymentIntent.id,
+    ...(paymentIntent ? { payment_intent_id: paymentIntent.id } : {}),
     checkout_catalog_subtotal: catalogSubtotal.toJSON(),
     checkout_subtotal: catalogSubtotal.subtract(merchandiseDiscount).toJSON(),
     checkout_discount: quote.discount,
@@ -235,7 +254,7 @@ export async function POST(request: NextRequest) {
     checkout_line_allocations: quote.lineAllocations,
     checkout_tender: quote.tender,
     checkout_tender_state: quote.tenderState,
-    checkout_total: Money.fromMinor(providerAmount, providerCurrency).toJSON(),
+    checkout_total: total.toJSON(),
     discount_codes: quote.discountCodes,
     tax_source: quote.taxSource,
   };
@@ -246,15 +265,15 @@ export async function POST(request: NextRequest) {
       id: orderId,
       customer_id: userId,
       status: 'pending',
-      total_amount: Money.fromMinor(providerAmount, providerCurrency).toJSON(),
+      total_amount: total.toJSON(),
       currency_code: providerCurrency,
-      shipping_address: shippingAddress,
+      shipping_address: hasPhysicalCheckoutLines(quote.items) ? shippingAddress : null,
       billing_address: shippingAddress,
       items: quote.items,
-      shipping_method: quote.shippingMethod.label,
-      payment_method: 'stripe',
+      shipping_method: hasPhysicalCheckoutLines(quote.items) ? quote.shippingMethod.label : null,
+      payment_method: paymentIntent ? 'stripe' : 'gift_card',
       payment_status: 'pending',
-      external_references: { payment_intent_id: paymentIntent.id },
+      external_references: paymentIntent ? { payment_intent_id: paymentIntent.id } : null,
       extensions,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -264,7 +283,11 @@ export async function POST(request: NextRequest) {
       operation: 'persist', outcome: 'failed', provider: 'd1',
       retryable: true, path: '/api/payment-intent',
     }, error);
-    await cancelPaymentIntent(paymentIntent.id).catch((cancelError) => {
+    if (quote.tenderState !== undefined) {
+      await capabilities.giftCards.releaseTender?.({ state: quote.tenderState, reason: 'checkout persistence failed' })
+        .catch(() => undefined);
+    }
+    if (paymentIntent) await cancelPaymentIntent(paymentIntent.id).catch((cancelError) => {
       recordTelemetry('payment.intent_cancel_failed', {
         operation: 'process', outcome: 'failed', provider: 'stripe',
         retryable: true, path: '/api/payment-intent',
@@ -276,6 +299,39 @@ export async function POST(request: NextRequest) {
       { error: 'Could not reserve the order; no payment was accepted' },
       { status: 503 }
     );
+  }
+
+  if (!paymentIntent) {
+    try {
+      const finalized = await finalizeZeroCashGiftOrder({
+        orderId,
+        customerId: userId ?? undefined,
+        enforceOwnership: true,
+        sendEmail: true,
+        capabilities,
+      });
+      return NextResponse.json({
+        noCash: true,
+        orderId: finalized.order.id,
+        amount: toWireMoney(total.toJSON()),
+        quote: {
+          items: quote.items.map((item) => ({
+            productId: item.product_id, variantId: item.variant_id, name: item.product_name,
+            quantity: item.quantity, unitPrice: toWireMoney(item.unit_price, providerCurrency),
+            lineTotal: toWireMoney(item.total_price, providerCurrency),
+          })),
+          subtotal: toWireMoney(quote.subtotal), discount: toWireMoney(quote.discount),
+          shipping: toWireMoney(quote.shipping), tax: toWireMoney(quote.tax),
+          tender: toWireMoney(quote.tender), total: toWireMoney(total.toJSON()),
+          currency: providerCurrency, taxSource: quote.taxSource,
+        },
+      });
+    } catch (error) {
+      recordTelemetry('order.finalization_failed', {
+        operation: 'finalize', outcome: 'failed', retryable: true, path: '/api/payment-intent',
+      }, error);
+      return NextResponse.json({ error: 'Gift-card checkout could not be finalized' }, { status: 409 });
+    }
   }
 
   return NextResponse.json({

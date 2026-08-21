@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
       ? input.discountCodes.filter((code): code is string => typeof code === 'string')
       : undefined,
     giftCardToken: typeof input.giftCardToken === 'string' ? input.giftCardToken : undefined,
+    giftCardRequestKey: typeof input.giftCardRequestKey === 'string' ? input.giftCardRequestKey : undefined,
   }, sessionId, auth.agentId!);
   return NextResponse.json(result, { status: result.success ? 200 : 400 });
 }

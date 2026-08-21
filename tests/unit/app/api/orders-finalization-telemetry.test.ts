@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   finalizeOrderPayment: vi.fn(),
   getDbAsync: vi.fn(),
   recordTelemetry: vi.fn(),
+  capabilities: { giftCards: {}, subscriptions: {} },
 }));
 
 vi.mock('@clerk/nextjs/server', () => ({ auth: mocks.auth }));
@@ -20,6 +21,9 @@ vi.mock('@/lib/services/order-finalization', () => ({
 }));
 vi.mock('@/lib/observability/telemetry', () => ({
   recordTelemetry: mocks.recordTelemetry,
+}));
+vi.mock('@/lib/commerce/runtime', () => ({
+  resolveRuntimeCommerceCapabilities: vi.fn(async () => mocks.capabilities),
 }));
 
 import { POST } from '@/app/api/orders/route';
@@ -54,6 +58,7 @@ describe('order finalization telemetry behavior', () => {
       customerId: undefined,
       enforceOwnership: true,
       sendEmail: true,
+      capabilities: mocks.capabilities,
     });
     expect(mocks.getDbAsync).not.toHaveBeenCalled();
     expect(mocks.recordTelemetry).toHaveBeenCalledWith(

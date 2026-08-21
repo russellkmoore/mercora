@@ -27,6 +27,7 @@ import {
 import { enforceRateLimit, getClientIp } from '@/lib/rate-limit';
 import { recordTelemetry } from '@/lib/observability/telemetry';
 import { toAdminOrder, toCustomerOrder } from '@/lib/models/mach/order-serializer';
+import { resolveRuntimeCommerceCapabilities } from '@/lib/commerce/runtime';
 
 
 
@@ -195,6 +196,7 @@ export async function POST(request: NextRequest) {
       customerId: userId ?? undefined,
       enforceOwnership: true,
       sendEmail: true,
+      capabilities: await resolveRuntimeCommerceCapabilities(),
     });
     return NextResponse.json({
       data: { id: result.order.id },
