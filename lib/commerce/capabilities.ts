@@ -23,6 +23,13 @@ export interface GiftCardCheckoutCapability {
   applyTender(args: { order: Order; state?: unknown }): Promise<void>;
   /** Idempotently release an open reservation when checkout is abandoned. */
   releaseTender?(args: { state?: unknown; reason?: string }): Promise<void>;
+  /** Restore part of a settled tender exactly once for one refund ledger key. */
+  restoreTender?(args: {
+    order: Order;
+    state?: unknown;
+    refundKey: string;
+    amount: Money;
+  }): Promise<void>;
 }
 
 export interface GiftCardTenderRequestIdentity {
@@ -106,6 +113,9 @@ export const noOpCommerceCapabilities: CommerceCapabilities = {
     },
     async releaseTender({ state }) {
       if (state !== undefined) throw new CommerceCapabilityDisabledError();
+    },
+    async restoreTender({ amount }) {
+      if (!amount.isZero()) throw new CommerceCapabilityDisabledError();
     },
   },
   subscriptions: {
@@ -192,6 +202,9 @@ export function resolveCommerceCapabilities(
           );
         }
         await giftCards.releaseTender(args);
+      },
+      restoreTender: async (args) => {
+        if (!args.amount.isZero()) throw new CommerceCapabilityDisabledError();
       },
     };
 
