@@ -3,10 +3,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { fromWireMoney } from "@/lib/money";
+import { resolveProductImageSrc } from "@/lib/utils/product-image";
 
 export default function ProductCard({ product }: { product: any }) {
-  // Extract primary image URL from the new product structure
-  const imageUrl = product.primary_image?.url || product.media?.[0]?.url || "/placeholder.jpg";
+  // Accepts both stored shapes — flat ({url}) and MACH ({file:{url}}) from the
+  // admin editor. Reading only `.url` here made the card fall back to the
+  // placeholder for any product saved through the editor. See
+  // lib/utils/product-image.ts.
+  const imageUrl = resolveProductImageSrc(product.primary_image, product.media, "/placeholder.jpg");
   
   // Get price from first variant. These arrive as MACH wire money (decimal
   // major units), not the minor units Mercora stores.
