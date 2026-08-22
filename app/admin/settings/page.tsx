@@ -53,6 +53,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { parseSettingRows } from "@/lib/admin/settings-parse";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -129,6 +130,14 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
+  // Whether the form is showing STORED settings rather than the defaults below.
+  // Saving while this is false writes those defaults over every setting: one
+  // unparseable row used to abort the whole load (see the JSON.parse loop in
+  // loadSettings), leaving every field on its default, and the next Save then
+  // overwrote all stored settings. The load can no longer fail that way
+  // (lib/admin/settings-parse.ts); this guard makes the blast radius zero if it
+  // ever fails for another reason.
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({
     maintenance_mode: false,
@@ -200,11 +209,23 @@ export default function AdminSettingsPage() {
       const response = await fetch('/api/admin/settings');
       if (response.ok) {
         const { settings } = await response.json() as any;
-        
+
+        // Parse EVERY row before touching state. JSON.parse used to run
+        // unguarded in this loop, so a single non-JSON row aborted the whole
+        // load and the next Save then overwrote every stored setting with the
+        // component defaults. See lib/admin/settings-parse.ts.
+        const { values: parsedValues, nonJsonKeys } = parseSettingRows(settings);
+        if (nonJsonKeys.length > 0) {
+          console.warn(
+            `[admin/settings] ${nonJsonKeys.length} non-JSON setting(s) read as raw strings:`,
+            nonJsonKeys.join(', ')
+          );
+        }
+
         // Parse settings by category
-        settings.forEach((setting: any) => {
-          const value = JSON.parse(setting.value);
-          
+        (settings as any[]).forEach((setting: any) => {
+          const value = parsedValues.get(setting.key) as any;
+
           if (setting.category === 'system') {
             if (setting.key === 'system.maintenance_mode') setSystemSettings(prev => ({ ...prev, maintenance_mode: value }));
             if (setting.key === 'system.maintenance_message') setSystemSettings(prev => ({ ...prev, maintenance_message: value }));
@@ -238,8 +259,17 @@ export default function AdminSettingsPage() {
             if (setting.key === 'social.tiktok') setSocialMediaSettings(prev => ({ ...prev, tiktok: value }));
           }
         });
+
+        // Only now is the form showing STORED values rather than the defaults.
+        // Saving before this point writes those defaults over every setting, so
+        // the Save button stays disabled until it flips.
+        setSettingsLoaded(true);
+      } else {
+        setSettingsLoaded(false);
+        console.error('[admin/settings] settings request failed:', response.status);
       }
     } catch (error) {
+      setSettingsLoaded(false);
       console.error('Error loading settings:', error);
     } finally {
       setLoading(false);
@@ -338,9 +368,15 @@ export default function AdminSettingsPage() {
   };
 
   const handleSave = async () => {
+    // Never write the component defaults over stored settings. See settingsLoaded.
+    if (!settingsLoaded) {
+      console.error('[admin/settings] refusing to save: settings never loaded');
+      return;
+    }
+
     setLoading(true);
     setSaved(false);
-    
+
     try {
       // Build updates array from all settings
       const updates = [
@@ -457,7 +493,12 @@ export default function AdminSettingsPage() {
           )}
           <Button
             onClick={handleSave}
-            disabled={loading}
+            disabled={loading || !settingsLoaded}
+            title={
+              settingsLoaded
+                ? undefined
+                : "Settings haven't loaded, so saving would overwrite them with defaults. Reload the page."
+            }
             className="bg-orange-600 hover:bg-orange-700"
           >
             {loading ? (
@@ -469,6 +510,23 @@ export default function AdminSettingsPage() {
           </Button>
         </div>
       </div>
+
+      {/* Saving before the stored settings load would write the component
+          defaults over every setting, so say so rather than leaving a disabled
+          button with no explanation. */}
+      {!initialLoad && !settingsLoaded && (
+        <div className="bg-red-950 border border-red-800 rounded-lg p-4">
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+            <p className="text-sm text-red-200">
+              <strong>Settings could not be loaded.</strong> The fields below are showing
+              defaults, not your stored values, so saving is disabled to keep it from
+              overwriting them. Reload the page; if it keeps failing, check the browser
+              console.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <div className="flex space-x-1 bg-neutral-800 p-1 rounded-lg">
