@@ -362,81 +362,72 @@ export async function updateProduct(id: string, updates: Partial<Product>): Prom
           updated_at: new Date().toISOString()
         };
         
-        // Update inventory if provided
-        if (variant.inventory) {
-          variantUpdateData.inventory = JSON.stringify(variant.inventory);
+        // PASS JSON VALUES THROUGH UNSERIALIZED. Every JSON-shaped column on
+        // `product_variants` is declared `mode: 'json'` (lib/db/schema/products.ts),
+        // so Drizzle serializes the value itself on write. This loop used to
+        // `JSON.stringify` each one first, which made Drizzle stringify the string
+        // AGAIN and store `"{\"quantity\":250}"` — a JSON *text* scalar, not an
+        // object.
+        //
+        // That stays invisible for a long time because every JavaScript reader
+        // recovers from it (a `Money.fromStored`/parse path re-parses a string
+        // that starts with `{`). SQL does not. The guarded stock decrement in
+        // lib/services/inventory-adjustments.ts matches on
+        // `json_extract(inventory, '$.quantity')`, which returns NULL for a text
+        // scalar, so its compare-and-swap matches zero rows and a sale of an
+        // affected variant is recorded as oversold while its stock never moves.
+        //
+        // `updateProductVariant` elsewhere has always passed values straight
+        // through; this loop was the only writer that did not.
+        const JSON_VARIANT_COLUMNS = [
+          'inventory',
+          'price',
+          'weight',
+          'dimensions',
+          'compare_at_price',
+          'cost',
+          'media',
+          'attributes',
+          'option_values',
+        ] as const;
+
+        for (const column of JSON_VARIANT_COLUMNS) {
+          const value = (variant as unknown as Record<string, unknown>)[column];
+          if (value) {
+            variantUpdateData[column] = value;
+          }
         }
-        
-        // Update price if provided
-        if (variant.price) {
-          variantUpdateData.price = JSON.stringify(variant.price);
-        }
-        
+
         // Update SKU if provided
         if (variant.sku) {
           variantUpdateData.sku = variant.sku;
         }
-        
-        // Update weight if provided
-        if (variant.weight) {
-          variantUpdateData.weight = JSON.stringify(variant.weight);
-        }
-        
-        // Update dimensions if provided
-        if (variant.dimensions) {
-          variantUpdateData.dimensions = JSON.stringify(variant.dimensions);
-        }
-        
+
         // Update barcode if provided
         if (variant.barcode) {
           variantUpdateData.barcode = variant.barcode;
         }
-        
+
         // Update status if provided
         if (variant.status) {
           variantUpdateData.status = variant.status;
         }
-        
+
         // Update position if provided
         if (variant.position !== undefined) {
           variantUpdateData.position = variant.position;
         }
-        
-        // Update compare_at_price if provided
-        if (variant.compare_at_price) {
-          variantUpdateData.compare_at_price = JSON.stringify(variant.compare_at_price);
-        }
-        
-        // Update cost if provided
-        if (variant.cost) {
-          variantUpdateData.cost = JSON.stringify(variant.cost);
-        }
-        
+
         // Update tax_category if provided
         if (variant.tax_category) {
           variantUpdateData.tax_category = variant.tax_category;
         }
-        
+
         // Update shipping_required if provided
         if (variant.shipping_required !== undefined) {
           variantUpdateData.shipping_required = variant.shipping_required ? 1 : 0;
         }
-        
-        // Update media if provided
-        if (variant.media) {
-          variantUpdateData.media = JSON.stringify(variant.media);
-        }
-        
-        // Update attributes if provided
-        if (variant.attributes) {
-          variantUpdateData.attributes = JSON.stringify(variant.attributes);
-        }
-        
-        // Update option_values if provided
-        if (variant.option_values) {
-          variantUpdateData.option_values = JSON.stringify(variant.option_values);
-        }
-        
+
         // Perform the update only if there are fields to update
         const fieldsToUpdate = Object.keys(variantUpdateData).filter(key => key !== 'updated_at');
         if (fieldsToUpdate.length > 0) {
