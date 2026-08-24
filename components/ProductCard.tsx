@@ -41,6 +41,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { Product, ProductVariant } from "@/lib/types";
 import { getDarkBlurPlaceholder } from "@/lib/utils/image-placeholders";
+import { resolveProductImageSrc } from "@/lib/utils/product-image";
 import { normalizeProductRating } from "@/lib/utils/ratings";
 import { StarRating } from "@/components/reviews/StarRating";
 import { Money } from "@/lib/money";
@@ -101,31 +102,15 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
     typeof product.slug === "string"
       ? product.slug
       : Object.values(product.slug || {})[0] || "";
-  // Handle consistent flat JSON structure: {"url": "...", "alt_text": "..."}
-  const imageUrl = (() => {
-    try {
-      if (!product.primary_image) return "/products/placeholder.png";
-      
-      // If it's a JSON string, parse it first
-      let imageData = product.primary_image;
-      if (typeof imageData === "string" && (imageData as string).startsWith("{")) {
-        try {
-          imageData = JSON.parse(imageData);
-        } catch {
-          return "/products/placeholder.png";
-        }
-      }
-      
-      const img = imageData as any;
-      const url = img?.url;
-      
-      if (!url) return "/products/placeholder.png";
-      
-      return url.startsWith("/") ? url : "/" + url;
-    } catch {
-      return "/products/placeholder.png";
-    }
-  })();
+  // Both stored shapes, flat ({url}) and MACH ({file:{url}}), resolve here. This
+  // used to read `img.url` only, so a product saved through the admin editor —
+  // which writes the MACH shape — silently lost its card image to the
+  // placeholder while its PDP kept working. See lib/utils/product-image.ts.
+  const imageUrl = resolveProductImageSrc(
+    product.primary_image,
+    product.media,
+    "/products/placeholder.png"
+  );
   const imageAlt = name;
   const ratingSummary = normalizeProductRating(product.rating);
   const hasRatings = Boolean(ratingSummary && ratingSummary.count > 0);

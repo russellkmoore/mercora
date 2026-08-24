@@ -151,9 +151,14 @@ export default function ProductEditor({
     }
   };
 
-  const saveCurrentVariantData = () => {
-    if (variants.length === 0) return;
-    
+  // Returns the merged variants array. handleSave (and the add/remove/switch
+  // paths) must use THIS return value, not the `variants` state: a React setter
+  // does not update the binding the running function already closed over, so
+  // reading `variants` in the same tick after calling this yields the pre-edit
+  // array and the save silently rewrites the database with the old values.
+  const saveCurrentVariantData = (): any[] => {
+    if (variants.length === 0) return variants;
+
     const updatedVariants = [...variants];
     const currentVariant = updatedVariants[selectedVariantIndex] || {};
     
@@ -187,7 +192,13 @@ export default function ProductEditor({
       compare_at_price: compareAtPrice ? Money.fromMajor(compareAtPrice).toJSON() : undefined,
       cost: cost ? Money.fromMajor(cost).toJSON() : undefined,
       sku: sku || undefined,
-      inventory: inventory ? { quantity: parseInt(inventory) } : undefined,
+      // Merge onto the existing inventory record rather than rebuilding it from
+      // the quantity field alone: `track_inventory` and `allow_backorder` live
+      // on this same object and are what make a variant purchasable at quantity
+      // 0. Overwriting with `{ quantity }` silently stripped them on every edit.
+      inventory: inventory
+        ? { ...(currentVariant.inventory ?? {}), quantity: parseInt(inventory) }
+        : currentVariant.inventory,
       weight: weight ? { value: parseFloat(weight), unit: "lb" } : undefined,
       dimensions: dimensionsObj,
       barcode: barcode || undefined,
@@ -196,17 +207,18 @@ export default function ProductEditor({
       position: variantPosition ? parseInt(variantPosition) : undefined,
       attributes: attributesObj
     };
-    
+
     setVariants(updatedVariants);
+    return updatedVariants;
   };
 
   const addNewVariant = () => {
     // Save current variant data first
-    saveCurrentVariantData();
+    const savedVariants = saveCurrentVariantData();
     
     const newVariant = {
       id: `new-variant-${Date.now()}`,
-      sku: `SKU-${variants.length + 1}`,
+      sku: `SKU-${savedVariants.length + 1}`,
       price: { amount: 0, currency: "USD" },
       option_values: [],
       status: "active",
@@ -214,7 +226,7 @@ export default function ProductEditor({
       shipping_required: true
     };
     
-    const newVariants = [...variants, newVariant];
+    const newVariants = [...savedVariants, newVariant];
     setVariants(newVariants);
     setSelectedVariantIndex(newVariants.length - 1);
     
@@ -512,10 +524,12 @@ export default function ProductEditor({
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Save current variant data before saving
-      if (variants.length > 0 && selectedVariantIndex < variants.length) {
-        saveCurrentVariantData();
-      }
+      // Save current variant data before saving. Use the RETURNED array, not
+      // the `variants` state, which is not yet updated within this handler tick.
+      const savedVariants =
+        variants.length > 0 && selectedVariantIndex < variants.length
+          ? saveCurrentVariantData()
+          : variants;
 
       const productData: Partial<Product> = {
         ...(product?.id && !isNew ? { id: product.id } : {}), // Include ID for existing products
@@ -645,10 +659,10 @@ export default function ProductEditor({
       }
 
       // Add all variants data
-      if (variants.length > 0) {
-        productData.variants = variants;
+      if (savedVariants.length > 0) {
+        productData.variants = savedVariants;
         // Set default variant to first variant
-        productData.default_variant_id = variants[0]?.id;
+        productData.default_variant_id = savedVariants[0]?.id;
       } else if (isNew) {
         // For new products without variants, create a default variant
         const defaultVariant = {
