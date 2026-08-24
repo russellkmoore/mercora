@@ -214,11 +214,11 @@ export default function ProductEditor({
 
   const addNewVariant = () => {
     // Save current variant data first
-    saveCurrentVariantData();
+    const savedVariants = saveCurrentVariantData();
     
     const newVariant = {
       id: `new-variant-${Date.now()}`,
-      sku: `SKU-${variants.length + 1}`,
+      sku: `SKU-${savedVariants.length + 1}`,
       price: { amount: 0, currency: "USD" },
       option_values: [],
       status: "active",
@@ -226,7 +226,7 @@ export default function ProductEditor({
       shipping_required: true
     };
     
-    const newVariants = [...variants, newVariant];
+    const newVariants = [...savedVariants, newVariant];
     setVariants(newVariants);
     setSelectedVariantIndex(newVariants.length - 1);
     
