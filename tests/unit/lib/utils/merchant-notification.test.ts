@@ -75,4 +75,16 @@ describe('merchant new-order notification', () => {
     expect(message.text).not.toContain('Customer email:');
     expect(message.html).toContain('Items to ship');
   });
+
+  it('labels addressless digital orders without inventing fulfillment details', async () => {
+    const digital: MerchantOrderData = { ...order, shippingAddress: undefined };
+    await sendNewOrderMerchantNotification(digital);
+
+    const message = mocks.send.mock.calls.at(-1)?.[0];
+    expect(message.text).toContain('Order items');
+    expect(message.text).toContain('No shipping required');
+    expect(message.text).not.toContain('Ship to');
+    expect(message.html).toContain('No shipping required');
+    expect(message.html).not.toContain('<h3>Ship to</h3>');
+  });
 });

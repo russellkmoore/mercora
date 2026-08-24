@@ -1,13 +1,22 @@
 import Link from "next/link";
+import { getStoreConfig } from "@/lib/store-config";
 
-const links = [
-  ["Overview", "/account"],
-  ["Orders", "/account/orders"],
-  ["Addresses", "/account/addresses"],
-  ["Settings", "/account/settings"],
-] as const;
+export function accountLinks(subscriptionReconciliation: boolean) {
+  return [
+    ["Overview", "/account"],
+    ["Orders", "/account/orders"],
+    ...(subscriptionReconciliation
+      ? [["Subscriptions", "/account/subscriptions"] as const]
+      : []),
+    ["Addresses", "/account/addresses"],
+    ["Settings", "/account/settings"],
+  ] as const;
+}
 
 export function AccountNav() {
+  const links = accountLinks(
+    getStoreConfig().commerce.features.subscriptionReconciliation,
+  );
   return (
     <nav aria-label="Account" className="mb-8 flex flex-wrap gap-2 md:w-48 md:flex-col">
       {links.map(([label, href]) => (

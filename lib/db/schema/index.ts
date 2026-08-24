@@ -133,3 +133,6 @@ export * from "./blog";
 
 // Exact legacy URL redirects populated by migration tooling
 export * from "./redirect-map";
+
+// Optional, default-off Stripe subscription foundation
+export * from "./subscriptions";
