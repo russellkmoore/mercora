@@ -2,13 +2,13 @@
 
 import Image from "next/image";
 import { useCartStore } from "@/lib/stores/cart-store";
-import type { CartItem } from "@/lib/types/cartitem";
+import type { StableCartItem } from "@/lib/types/cartitem";
 import { Button } from "@/components/ui/button";
 import { usePathname } from "next/navigation";
 import { cartItemTotal, Money } from "@/lib/money";
 
 interface CartItemCardProps {
-  item: CartItem;
+  item: StableCartItem;
 }
 
 export default function CartItemCard({ item }: CartItemCardProps) {
@@ -37,7 +37,7 @@ export default function CartItemCard({ item }: CartItemCardProps) {
               variant="outline"
               size="sm"
               className="h-10 w-10 p-0 text-base touch-manipulation bg-neutral-100 text-black border border-gray-300 hover:bg-neutral-200"
-              onClick={() => updateQuantity(item.variantId, item.quantity - 1)}
+              onClick={() => updateQuantity(item.lineId, item.quantity - 1)}
             >
               -
             </Button>
@@ -48,7 +48,7 @@ export default function CartItemCard({ item }: CartItemCardProps) {
               variant="outline"
               size="sm"
               className="h-10 w-10 p-0 text-base touch-manipulation bg-neutral-100 text-black border border-gray-300 hover:bg-neutral-200"
-              onClick={() => updateQuantity(item.variantId, item.quantity + 1)}
+              onClick={() => updateQuantity(item.lineId, item.quantity + 1)}
             >
               +
             </Button>
@@ -57,12 +57,20 @@ export default function CartItemCard({ item }: CartItemCardProps) {
         <p className="text-xs sm:text-sm text-gray-500 mt-1">
           {Money.fromStored(item.price).format()} × {item.quantity} : {cartItemTotal(item).format()}
         </p>
+        {item.giftCardCustomization && (
+          <p className="mt-1 text-xs text-gray-600">
+            For {item.giftCardCustomization.recipientName || item.giftCardCustomization.recipientEmail}
+            {item.giftCardCustomization.deliveryDate
+              ? ` · Delivery ${item.giftCardCustomization.deliveryDate}`
+              : ''}
+          </p>
+        )}
         {!isCheckoutPage && (
           <Button
             variant="outline"
             size="sm"
             className="text-red-600 mt-2 border border-red-200 bg-red-50 hover:bg-orange-500 hover:text-white text-sm h-12 touch-manipulation"
-            onClick={() => removeItem(item.variantId)}
+            onClick={() => removeItem(item.lineId)}
           >
             Remove
           </Button>

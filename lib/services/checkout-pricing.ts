@@ -8,6 +8,11 @@ import {
   noOpCommerceCapabilities,
   type CommerceCapabilities,
 } from '@/lib/commerce/capabilities';
+import {
+  checkoutGiftCardCustomization,
+  hasPhysicalCheckoutLines,
+  isGiftCardOrderLine,
+} from '@/lib/gift-cards/checkout';
 import type { Address, CheckoutLineAllocation, OrderItem, Promotion } from '@/lib/types';
 import {
   allowedShippingCountries,
@@ -20,9 +25,11 @@ export const MAX_CHECKOUT_LINES = 100;
 export const MAX_DISCOUNT_CODES = 25;
 
 export interface CheckoutLineInput {
+  lineId?: string;
   productId: string;
   variantId?: string;
   quantity: number;
+  giftCardCustomization?: unknown;
 }
 
 export interface CheckoutPricingInput {
@@ -31,6 +38,8 @@ export interface CheckoutPricingInput {
   shippingMethodId: string;
   discountCodes?: string[];
   giftCardToken?: string;
+  /** Server-generated request identity, stable across a checkout retry. */
+  giftCardRequestKey?: string;
   customerId?: string;
 }
 
@@ -173,7 +182,13 @@ function eligibleLineIndexes(
   context: EligibilityContext
 ): number[] | null {
   if (!eligibilityMatches(promotion, context)) return null;
-  let eligible = catalog.map((_, index) => index);
+  // Gift cards are stored value at face value. Discounting a gift-card line
+  // would let a buyer acquire a full-value card for less than face value
+  // (issuance always credits the catalog unit_price), so no promotion may ever
+  // target one. They still count toward cart-minimum thresholds via `subtotal`.
+  let eligible = catalog
+    .map((_, index) => index)
+    .filter((index) => catalog[index].product.type !== 'gift_card');
   for (const condition of promotion.rules.conditions ?? []) {
     if (condition.type === 'cart_minimum' || condition.type === 'cart_subtotal') {
       if (condition.operator !== 'gte') return null;
@@ -464,6 +479,37 @@ function allocateLargestRemainder(total: number, weights: number[]): number[] {
   return shares.sort((a, b) => a.index - b.index).map((share) => share.amount);
 }
 
+function hex(bytes: Uint8Array): string {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function tenderQuoteFingerprint(args: {
+  currency: string;
+  items: OrderItem[];
+  merchandiseDiscount: Money;
+  shipping: Money;
+  tax: Money;
+  eligible: Money;
+}): Promise<string> {
+  const canonical = JSON.stringify({
+    v: 1,
+    currency: args.currency,
+    items: args.items.map((item) => ({
+      id: item.id,
+      productId: item.product_id,
+      variantId: item.variant_id,
+      quantity: item.quantity,
+      total: item.total_price,
+      digitalGiftCard: isGiftCardOrderLine(item),
+    })),
+    merchandiseDiscount: args.merchandiseDiscount.toMinorUnits(),
+    shipping: args.shipping.toMinorUnits(),
+    tax: args.tax.toMinorUnits(),
+    eligible: args.eligible.toMinorUnits(),
+  });
+  return hex(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical))));
+}
+
 export async function priceCheckout(
   input: CheckoutPricingInput,
   options: {
@@ -477,6 +523,7 @@ export async function priceCheckout(
     throw new Error(`Checkout requires between 1 and ${MAX_CHECKOUT_LINES} line items`);
   }
 
+  const seenLineIds = new Set<string>();
   const catalog = await Promise.all(input.items.map(async (line, index) => {
     if (
       !line ||
@@ -488,7 +535,10 @@ export async function priceCheckout(
       )) ||
       !Number.isSafeInteger(line.quantity) ||
       line.quantity <= 0 ||
-      line.quantity > 1_000
+      line.quantity > 1_000 ||
+      (line.lineId !== undefined && (
+        typeof line.lineId !== 'string' || !/^line_[0-9a-f]{16}(?:_[2-9]\d*)?$/u.test(line.lineId)
+      ))
     ) {
       throw new Error(`Checkout line ${index} is invalid`);
     }
@@ -504,17 +554,33 @@ export async function priceCheckout(
     }
     const unitPrice = Money.fromStored(variant.price);
     if (unitPrice.isNegative()) throw new Error(`Variant ${variantId} has an invalid catalog price`);
-    return { line, product, variant, unitPrice };
+    const giftCardCustomization = checkoutGiftCardCustomization(line.giftCardCustomization);
+    if (product.type === 'gift_card' && !giftCardCustomization) {
+      throw new Error('Gift-card lines require recipient delivery details');
+    }
+    if (giftCardCustomization && (
+      product.type !== 'gift_card' || product.fulfillment_type !== 'digital' ||
+      variant.shipping_required !== false || line.quantity !== 1
+    )) {
+      throw new Error('Gift-card lines must be single digital gift-card catalog items');
+    }
+    if (line.lineId && seenLineIds.has(line.lineId)) {
+      throw new Error('Checkout contains duplicate line identifiers');
+    }
+    if (line.lineId) seenLineIds.add(line.lineId);
+    return { line, product, variant, unitPrice, giftCardCustomization };
   }));
 
   const currency = catalog[0].unitPrice.currency;
   let subtotal = Money.zero(currency);
-  const orderItems: OrderItem[] = catalog.map(({ line, product, variant, unitPrice }) => {
+  const orderItems: OrderItem[] = catalog.map(({
+    line, product, variant, unitPrice, giftCardCustomization,
+  }) => {
     if (unitPrice.currency !== currency) throw new Error('Checkout cannot mix currencies');
     const totalPrice = unitPrice.times(line.quantity);
     subtotal = subtotal.add(totalPrice);
     return {
-      id: `line_${crypto.randomUUID()}`,
+      id: line.lineId ?? `line_${crypto.randomUUID()}`,
       product_id: product.id,
       variant_id: variant.id,
       sku: variant.sku,
@@ -526,36 +592,42 @@ export async function priceCheckout(
         option_name: option.option_id,
         option_value: option.value,
       })),
+      fulfillment_type: variant.shipping_required === false ? 'digital' : 'physical',
+      ...(giftCardCustomization ? { gift_card: giftCardCustomization } : {}),
     };
   });
+
+  const hasPhysicalLines = hasPhysicalCheckoutLines(orderItems);
 
   const [shippingSettings, storeSettings] = await Promise.all([
     deps.getSettings('shipping'),
     deps.getSettings('store'),
   ]);
+  if (!input.shippingAddress) throw new Error('Checkout requires a billing or shipping address');
   const destinationCountry = input.shippingAddress.country.toUpperCase();
-  if (!allowedShippingCountries(shippingSettings).includes(destinationCountry)) {
-    throw new Error(`Checkout shipping is not available for ${destinationCountry}`);
-  }
-  const methods = enabledShippingMethods(shippingSettings);
-  const method = methods.find((entry) =>
-    entry.id === input.shippingMethodId
-  );
-  if (!method || typeof method.label !== 'string') {
-    throw new Error(`Shipping method ${input.shippingMethodId} is not configured`);
-  }
-  const configuredShippingCost = Number(method.cost);
-  if (!Number.isFinite(configuredShippingCost) || configuredShippingCost < 0) {
-    throw new Error(`Shipping method ${input.shippingMethodId} has an invalid configured cost`);
-  }
-  let shipping = Money.fromMajor(configuredShippingCost, currency);
-  const threshold = freeShippingThreshold(storeSettings);
-  const freeMethods = freeShippingMethodIds(shippingSettings);
-  if (
-    subtotal.gte(Money.fromMajor(threshold, currency)) &&
-    freeMethods.includes(input.shippingMethodId)
-  ) {
-    shipping = Money.zero(currency);
+  let shipping = Money.zero(currency);
+  let shippingMethod: CheckoutQuote['shippingMethod'] = { id: 'digital', label: 'Digital delivery' };
+  if (hasPhysicalLines) {
+    if (!input.shippingMethodId) throw new Error('Checkout shipping method is required');
+    if (!allowedShippingCountries(shippingSettings).includes(destinationCountry)) {
+      throw new Error(`Checkout shipping is not available for ${destinationCountry}`);
+    }
+    const methods = enabledShippingMethods(shippingSettings);
+    const method = methods.find((entry) => entry.id === input.shippingMethodId);
+    if (!method || typeof method.label !== 'string') {
+      throw new Error(`Shipping method ${input.shippingMethodId} is not configured`);
+    }
+    const configuredShippingCost = Number(method.cost);
+    if (!Number.isFinite(configuredShippingCost) || configuredShippingCost < 0) {
+      throw new Error(`Shipping method ${input.shippingMethodId} has an invalid configured cost`);
+    }
+    shipping = Money.fromMajor(configuredShippingCost, currency);
+    const threshold = freeShippingThreshold(storeSettings);
+    const freeMethods = freeShippingMethodIds(shippingSettings);
+    if (subtotal.gte(Money.fromMajor(threshold, currency)) && freeMethods.includes(input.shippingMethodId)) {
+      shipping = Money.zero(currency);
+    }
+    shippingMethod = { id: input.shippingMethodId, label: method.label };
   }
 
   const codes = normalizeCodes(input.discountCodes);
@@ -669,10 +741,40 @@ export async function priceCheckout(
   }));
 
   const beforeTender = discountedMerchandise.add(chargedShipping).add(tax);
+  // Stored value cannot fund stored value. A tender may pay only the other
+  // merchandise plus the shipping/tax attributable to the whole checkout.
+  const giftCardValue = orderItems.reduce((sum, item, index) => isGiftCardOrderLine(item)
+    ? sum.add(pricedCatalog[index].lineTotal.subtract(discounts.perLine[index]).add(lineTaxes[index]))
+    : sum, Money.zero(currency));
+  const tenderEligible = beforeTender.subtract(giftCardValue);
+  if (input.giftCardToken && (
+    typeof input.giftCardRequestKey !== 'string' ||
+    input.giftCardRequestKey.length < 8 ||
+    input.giftCardRequestKey.length > 256 ||
+    input.giftCardRequestKey.trim() !== input.giftCardRequestKey
+  )) {
+    throw new Error('Gift-card tender requires a stable checkout request identity');
+  }
+  const now = Math.floor(Date.now() / 1_000);
   const tenderResolution = await capabilities.giftCards.resolveTender({
     token: input.giftCardToken,
     currency,
-    amountDue: beforeTender,
+    amountDue: tenderEligible,
+    ...(input.giftCardToken ? {
+      requestIdentity: {
+        requestKey: input.giftCardRequestKey!,
+        quoteFingerprint: await tenderQuoteFingerprint({
+          currency,
+          items: orderItems,
+          merchandiseDiscount: discounts.merchandise,
+          shipping: chargedShipping,
+          tax,
+          eligible: tenderEligible,
+        }),
+        reservedAt: now,
+        expiresAt: now + (15 * 60),
+      },
+    } : {}),
   });
   const tender = tenderResolution.amount;
   if (tenderResolution.state !== undefined) {
@@ -683,7 +785,7 @@ export async function priceCheckout(
       throw new Error('Optional tender capability returned non-serializable server state');
     }
   }
-  if (tender.currency !== currency || tender.isNegative() || tender.gt(beforeTender)) {
+  if (tender.currency !== currency || tender.isNegative() || tender.gt(tenderEligible)) {
     throw new Error('Optional tender capability returned an invalid amount');
   }
   const total = beforeTender.subtract(tender);
@@ -702,7 +804,7 @@ export async function priceCheckout(
     tender: tender.toJSON(),
     total: total.toJSON(),
     discountCodes: discounts.appliedCodes,
-    shippingMethod: { id: input.shippingMethodId, label: method.label },
+    shippingMethod,
     taxSource,
     tenderState: tenderResolution.state,
   };

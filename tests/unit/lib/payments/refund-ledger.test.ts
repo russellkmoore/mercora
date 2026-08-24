@@ -112,6 +112,27 @@ describe('refund ledger decisions', () => {
     });
   });
 
+  it('accepts a completed zero-cash refund only after its gift restoration is recorded', async () => {
+    const key = await deriveRefundIdempotencyKey({
+      orderId: 'order-1', type: 'partial', refundAmount: 250,
+      settledSequence: 0, lineIds: ['line-1'],
+    });
+    const fingerprint = await deriveRefundRequestFingerprint({
+      orderId: 'order-1', type: 'partial', refundAmount: 250, lineIds: ['line-1'],
+    });
+    const entry = {
+      amount: 250, status: 'succeeded', type: 'partial' as const, items: ['line-1'],
+      settled_sequence: 0, idempotency_key: key, request_fingerprint: fingerprint,
+      cash_amount: 0, gift_amount: 250, provider_status: 'not_applicable',
+    };
+    await expect(decideRefundLedgerAction([entry], {
+      orderId: 'order-1', type: 'partial', amount: 250, lineIds: ['line-1'], totalAmount: 1_000,
+    })).resolves.toMatchObject({ action: 'reject', status: 409 });
+    await expect(decideRefundLedgerAction([{ ...entry, gift_restoration_status: 'succeeded' }], {
+      orderId: 'order-1', type: 'partial', amount: 250, lineIds: ['line-1'], totalAmount: 1_000,
+    })).resolves.toMatchObject({ action: 'completed', idempotencyKey: key });
+  });
+
   it('rejects a new reservation at the record bound and any provider-floor divergence', async () => {
     const full = Array.from({ length: 100 }, (_, index) => ({
       amount: 1,

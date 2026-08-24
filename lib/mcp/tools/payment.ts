@@ -13,6 +13,7 @@ export interface AgentPaymentIntentResponse {
   paymentIntentId: string;
   orderId: string;
   amount: MachMoney;
+  noCash?: boolean;
   quote: {
     items: Array<{
       productId: string;
@@ -57,10 +58,11 @@ export async function createAgentPaymentIntent(
     return {
       success: true,
       data: {
-        clientSecret: checkout.clientSecret,
-        paymentIntentId: checkout.paymentIntentId,
+        clientSecret: checkout.clientSecret ?? '',
+        paymentIntentId: checkout.paymentIntentId ?? '',
         orderId: checkout.orderId,
         amount: checkout.amount,
+        ...(checkout.noCash ? { noCash: true } : {}),
         quote: {
           items: checkout.quote.items.map((item) => ({
             productId: item.product_id,
@@ -78,7 +80,9 @@ export async function createAgentPaymentIntent(
       metadata: {
         can_fulfill_percentage: 100,
         estimated_satisfaction: 90,
-        next_actions: ['Complete the PaymentIntent', 'Call place_order with orderId and paymentIntentId'],
+        next_actions: checkout.noCash
+          ? ['Save the order confirmation']
+          : ['Complete the PaymentIntent', 'Call place_order with orderId and paymentIntentId'],
       },
     };
   } catch (error) {

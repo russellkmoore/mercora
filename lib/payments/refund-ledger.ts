@@ -30,7 +30,8 @@ export type RefundLedgerDecision =
       idempotencyKey: string;
       requestFingerprint: string;
       refundAmount: number;
-      stripeRefundId: string;
+      /** Present only when a cash-provider refund was required. */
+      stripeRefundId?: string;
       providerStatus: string;
     }
   | {
@@ -168,14 +169,21 @@ export async function decideRefundLedgerAction(
   if (matching.length === 1) {
     const match = matching[0];
     if (match.status === 'settled') {
-      if (!match.stripeRefundId) return reject('Settled refund is missing its Stripe id', 409);
+      const allocation = settledTenderAllocation(refunds[match.entryIndex]);
+      if (!allocation) return reject('Settled refund has an invalid tender allocation', 409);
+      if (allocation.cashAmount > 0 && !match.stripeRefundId) {
+        return reject('Settled cash refund is missing its Stripe id', 409);
+      }
+      if (allocation.giftAmount > 0 && refunds[match.entryIndex].gift_restoration_status !== 'succeeded') {
+        return reject('Settled gift refund is missing restoration confirmation', 409);
+      }
       return {
         action: 'completed',
         entryIndex: match.entryIndex,
         idempotencyKey: match.key,
         requestFingerprint: match.fingerprint,
         refundAmount: match.amount,
-        stripeRefundId: match.stripeRefundId,
+        ...(match.stripeRefundId ? { stripeRefundId: match.stripeRefundId } : {}),
         providerStatus: match.providerStatus ?? 'succeeded',
       };
     }
@@ -241,4 +249,23 @@ export async function decideRefundLedgerAction(
   } catch (error) {
     return reject(error instanceof Error ? error.message : 'Invalid refund request');
   }
+}
+
+/**
+ * Legacy refund records predate tender allocation and therefore imply cash.
+ * A zero-cash refund must write `cash_amount: 0` explicitly; that distinction
+ * prevents an absent provider id from being mistaken for a corrupt cash refund.
+ */
+function settledTenderAllocation(entry: RefundRecord): { cashAmount: number; giftAmount: number } | null {
+  if (!isPositiveSafeInteger(entry.amount)) return null;
+  if (entry.cash_amount === undefined && entry.gift_amount === undefined) {
+    return { cashAmount: entry.amount, giftAmount: 0 };
+  }
+  const cashAmount = typeof entry.cash_amount === 'number' && Number.isSafeInteger(entry.cash_amount)
+    && entry.cash_amount >= 0 ? entry.cash_amount : null;
+  const giftAmount = typeof entry.gift_amount === 'number' && Number.isSafeInteger(entry.gift_amount)
+    && entry.gift_amount >= 0 ? entry.gift_amount : null;
+  return cashAmount === null || giftAmount === null || cashAmount + giftAmount !== entry.amount
+    ? null
+    : { cashAmount, giftAmount };
 }

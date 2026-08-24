@@ -15,6 +15,9 @@ time.
 | Theme | `NEXT_PUBLIC_THEME_PRIMARY`, `NEXT_PUBLIC_STORE_LOGO_PATH` |
 | Contact and legal links | `STORE_SUPPORT_EMAIL`, `STORE_SENDER_EMAIL`, `STORE_REPLY_TO_EMAIL`, `STORE_MERCHANT_NOTIFICATION_EMAIL`, `STORE_POSTAL_ADDRESS`, `STORE_SUPPORT_HOURS`, `NEXT_PUBLIC_PRIVACY_URL`, `NEXT_PUBLIC_TERMS_URL`, `NEXT_PUBLIC_RETURNS_URL` |
 | Commerce formatting | `STORE_LOCALE` (canonical BCP 47 locale, defaults to `en-US`), `STORE_CURRENCY` (must match active catalog variant currency; Mercora checkout is single-currency per cart) |
+| Gift-card reconciliation | `STORE_FEATURE_GIFT_CARD_RECONCILIATION=true` (defaults off; keep enabled while reservations or balances exist) |
+| Optional gift-card acquisition | `STORE_FEATURE_GIFT_CARD_ACQUISITION=true` (defaults off and requires reconciliation enabled) |
+| Gift-card bearer lookup secrets | Server-only `GIFT_CARD_CODE_HMAC_CURRENT_VERSION` plus `GIFT_CARD_CODE_HMAC_KEYS_JSON` (at most four versioned keys; never `NEXT_PUBLIC_*`) |
 | Subscription reconciliation | `STORE_FEATURE_SUBSCRIPTION_RECONCILIATION=true` (defaults off; keep enabled after the first subscription is sold) |
 | Optional subscription acquisition | `STORE_FEATURE_SUBSCRIPTION_ACQUISITION=true` plus a bounded `STORE_SUBSCRIPTION_TERMS_VERSION` matching the published recurring terms (defaults off and requires reconciliation enabled) |
 | Outbound email | `EMAIL_PROVIDER=cloudflare\|resend`; Cloudflare `EMAIL` binding (recommended) or encrypted `RESEND_API_KEY` |
@@ -36,6 +39,23 @@ cancellation, payment recovery, or retryable notifications for existing
 subscriptions. Enabling acquisition without installed reconciliation is a
 configuration error. Deploy the additive schema first, install reconciliation,
 then enable the acquisition flag.
+
+Gift cards use the same acquisition/reconciliation rollback discipline. Leave
+both flags off before installing the additive schema and runtime factory; this
+path does not open D1 or parse bearer-code keys. Enable reconciliation first,
+then acquisition. After accepting a gift-card reservation or balance, disable
+acquisition to stop new bearer-code entry while leaving reconciliation enabled
+for verification, settlement, and release. The HMAC key ring is read from the
+request-scoped Workers environment only when a nonempty bearer token is being
+resolved. Reconciliation-only calls do not require those lookup keys.
+
+`GIFT_CARD_CODE_HMAC_KEYS_JSON` is a JSON object whose canonical positive
+integer property names are key versions, for example `{"1":"<32+ byte
+secret>","2":"<32+ byte secret>"}`. The current version must be present,
+and the ring is bounded to four keys. Store these values in local `.dev.vars`
+or encrypted Cloudflare secrets. They are intentionally absent from
+`StoreConfig`, browser configuration, committed deployment files, telemetry,
+and errors.
 
 Core one-time checkout never interprets catalog products as subscription
 acquisition. Products that also have subscription plans remain available for a

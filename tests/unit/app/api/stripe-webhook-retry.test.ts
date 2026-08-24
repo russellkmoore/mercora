@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   completeWebhookEvent: vi.fn(),
   failWebhookEvent: vi.fn(),
   recordTelemetry: vi.fn(),
+  capabilities: { giftCards: {}, subscriptions: {} },
 }));
 
 vi.mock('@/lib/stripe', () => ({
@@ -29,6 +30,9 @@ vi.mock('@/lib/webhooks/processed-events', () => ({
 }));
 vi.mock('@/lib/observability/telemetry', () => ({
   recordTelemetry: mocks.recordTelemetry,
+}));
+vi.mock('@/lib/commerce/runtime', () => ({
+  resolveRuntimeCommerceCapabilities: vi.fn(async () => mocks.capabilities),
 }));
 
 import { POST } from '@/app/api/webhooks/stripe/route';
