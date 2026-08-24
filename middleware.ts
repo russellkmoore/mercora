@@ -58,20 +58,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSettings } from "@/lib/utils/settings";
 import { getStoreConfig } from "@/lib/store-config";
 import { escapeHtmlText, safeMaintenanceMessage } from "@/lib/utils/maintenance-html";
+import { getDbAsync } from "@/lib/db";
+import { redirectMap } from "@/lib/db/schema/redirect-map";
+import { eq } from "drizzle-orm";
+import { resolveLegacyRedirect } from "@/lib/redirects/resolver";
+import { isLegacyRedirectLookupPath } from "@/lib/redirects/policy";
 
 /**
  * Custom middleware that combines Clerk authentication with maintenance mode checking
  */
 export default clerkMiddleware(async (auth, req: NextRequest) => {
   const { pathname } = req.nextUrl;
-  
+  const isLegacyRedirectPath = isLegacyRedirectLookupPath(pathname);
+
   // Skip maintenance check for static assets and Next.js internals
-  if (pathname.includes('/_next') || 
-      pathname.includes('/favicon') || 
-      pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf)$/)) {
+  if (!isLegacyRedirectPath && (pathname.includes('/_next') ||
+      pathname.includes('/favicon') ||
+      pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf)$/))) {
     return NextResponse.next();
   }
-  
+
   // Skip maintenance check for admin routes and MCP API - always accessible
   if (pathname.startsWith('/admin') || 
       pathname.startsWith('/api/admin') || 
@@ -169,6 +175,20 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     // If settings check fails, continue normally to avoid breaking the site
     console.error('Error checking maintenance mode:', error);
   }
+
+  const redirect = await resolveLegacyRedirect(req.url, async (sourcePath) => {
+    const db = await getDbAsync();
+    const row = await db
+      .select({ targetPath: redirectMap.targetPath, statusCode: redirectMap.statusCode })
+      .from(redirectMap)
+      .where(eq(redirectMap.sourcePath, sourcePath))
+      .limit(1)
+      .get();
+    return row ?? null;
+  });
+  if (redirect) {
+    return NextResponse.redirect(redirect.url, redirect.statusCode);
+  }
   
   // Continue with normal Clerk authentication
   return NextResponse.next();
@@ -184,6 +204,9 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
  */
 export const config = {
   matcher: [
+    // Legacy commerce paths must reach the exact redirect resolver even when a
+    // historical handle ends in a file-like extension such as `.html`.
+    "/(products|collections|pages|blogs|policies)/(.*)",
     // Match all routes except static assets and Next.js internals
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     // Include all API and tRPC routes for protection
