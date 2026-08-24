@@ -33,6 +33,8 @@ describe("canonical Wrangler migration targets", () => {
   it("never falls back from a selected environment to root bindings", () => {
     expect(resolveMediaTarget(config, { target: "production", environment: "staging" }).bucketName).toBe("stage-media");
     expect(() => resolveMediaTarget(config, { target: "production", environment: "missing" })).toThrow(/refusing root fallback/);
+    const arrayEnvironment = parseWranglerJsonc(`{ "env": { "staging": [] } }`);
+    expect(() => resolveMediaTarget(arrayEnvironment, { target: "production", environment: "staging" })).toThrow(/refusing root fallback/);
     const missingBinding = parseWranglerJsonc(`{ "r2_buckets": [{ "binding": "OTHER", "bucket_name": "other" }] }`);
     expect(() => resolveMediaTarget(missingBinding, { target: "production" })).toThrow(/exactly one.*MEDIA/);
   });
