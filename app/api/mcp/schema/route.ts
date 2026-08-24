@@ -160,7 +160,7 @@ export async function GET(request: NextRequest) {
       },
       {
         name: "create_payment_intent",
-        description: "Create a server-priced pending order and bound Stripe PaymentIntent",
+        description: "Create a server-priced order and a Stripe PaymentIntent only when cash remains after gift tender",
         inputSchema: {
           type: "object",
           properties: {
@@ -181,6 +181,7 @@ export async function GET(request: NextRequest) {
             shippingMethodId: { type: "string" },
             discountCodes: { type: "array", items: { type: "string" } },
             giftCardToken: { type: "string" },
+            giftCardRequestKey: { type: "string", description: "Stable opaque ID reused only when retrying this checkout request" },
             session_id: { type: "string" }
           },
           required: ["shippingAddress", "shippingMethodId", "session_id"]
@@ -196,7 +197,7 @@ export async function GET(request: NextRequest) {
             paymentIntentId: { type: "string" },
             session_id: { type: "string" }
           },
-          required: ["orderId", "paymentIntentId", "session_id"]
+          required: ["orderId", "session_id"]
         }
       },
       {

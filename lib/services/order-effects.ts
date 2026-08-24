@@ -18,6 +18,7 @@ import {
 import { runPaidOrderInventoryEffect } from '@/lib/services/inventory-adjustments';
 import { recordTelemetry } from '@/lib/observability/telemetry';
 import { subscriptionAcquisitionIdFromOrder } from '@/lib/commerce/capabilities';
+import { fulfillPaidGiftCards } from '@/lib/services/gift-card-fulfillment';
 
 const EFFECT_LEASE_MS = 5 * 60 * 1000;
 const MAX_EFFECT_ERROR = 2_000;
@@ -52,6 +53,8 @@ export interface OrderEffectRuntime {
   sendConfirmation?: typeof sendOrderConfirmation;
   sendMerchantNotification?: typeof sendMerchantOrderNotification;
   runInventory?: (order: Order, effect: ClaimedOrderEffect) => Promise<unknown>;
+  /** Full Worker environment for encrypted gift-card issuance/delivery. */
+  giftCardEnvironment?: Record<string, unknown> & { DB?: D1Database };
   now?: () => Date;
 }
 
@@ -268,6 +271,9 @@ async function executeEffect(
       await capabilities.giftCards.applyTender({
         order,
         state: extensions.checkout_tender_state,
+      });
+      await fulfillPaidGiftCards(order, {
+        environment: runtime.giftCardEnvironment ?? (runtime.database ? { DB: runtime.database } : undefined),
       });
       return { applied: true };
     case 'subscription':

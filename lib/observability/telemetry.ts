@@ -57,6 +57,7 @@ export const TELEMETRY_EVENTS = {
   'refund.request_rejected': { severity: 'warning', sampleRate: 0.05 },
   'refund.provider_unresolved': { severity: 'critical', sampleRate: 1 },
   'refund.provider_inconsistent': { severity: 'critical', sampleRate: 1 },
+  'refund.gift_restoration_unresolved': { severity: 'critical', sampleRate: 1 },
   'refund.settlement_failed': { severity: 'critical', sampleRate: 1 },
   'fulfillment.transition_failed': { severity: 'critical', sampleRate: 1 },
   'fulfillment.query_failed': { severity: 'error', sampleRate: 0.25 },
@@ -109,7 +110,7 @@ const ALLOWED_FIELD_ENUMS = {
     'rejected', 'retry_scheduled', 'unavailable', 'unresolved',
   ]),
   provider: new Set([
-    'analytics', 'carrier', 'cloudflare_email', 'd1', 'resend', 'stripe', 'workers_ai',
+    'analytics', 'carrier', 'cloudflare_email', 'd1', 'gift_card', 'resend', 'stripe', 'workers_ai',
   ]),
   trigger: new Set(['manual', 'recovery', 'request', 'scheduled', 'webhook']),
 } as const;

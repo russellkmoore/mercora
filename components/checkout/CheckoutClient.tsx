@@ -28,7 +28,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useCartStore } from '@/lib/stores/cart-store';
 import StripeProvider from './StripeProvider';
 import PaymentForm from './PaymentForm';
@@ -40,6 +40,7 @@ import OrderConfirmationModal from './OrderConfirmationModal';
 import type { Address, ShippingOption } from '@/lib/types';
 import { Money } from '@/lib/money';
 import { clearPendingCheckout, savePendingCheckout } from '@/lib/checkout/order-payload';
+import { projectCartLineForCheckout } from '@/lib/gift-cards/line-identity';
 
 interface CheckoutClientProps {
   userId: string | null;
@@ -79,6 +80,8 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
   const [authoritativeQuote, setAuthoritativeQuote] = useState<AuthoritativeCheckoutQuote>();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [giftCardToken, setGiftCardToken] = useState('');
+  const giftCardRequestKey = useRef<string | undefined>(undefined);
 
   // Handle address form changes
   const handleAddressChange = (
@@ -162,14 +165,14 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: items.map((item) => ({
-            productId: item.productId,
-            variantId: item.variantId,
-            quantity: item.quantity,
-          })),
+          items: items.map(projectCartLineForCheckout),
           shippingAddress,
           shippingMethodId: selectedShippingOption.id,
           discountCodes: appliedDiscounts.map((discount) => discount.code),
+          ...(giftCardToken.trim() ? {
+            giftCardToken: giftCardToken.trim(),
+            giftCardRequestKey: giftCardRequestKey.current ??= crypto.randomUUID(),
+          } : {}),
         }),
       });
 
@@ -179,6 +182,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
       }
 
       const data = await res.json() as {
+        noCash?: boolean;
         clientSecret: string;
         paymentIntentId: string;
         orderId: string;
@@ -187,12 +191,16 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
       setOrderId(data.orderId);
       setTaxAmount(Money.fromMajor(data.quote.tax.amount, data.quote.tax.currency).toJSON());
       setAuthoritativeQuote(data.quote);
-      savePendingCheckout({
-        orderId: data.orderId,
-        paymentIntentId: data.paymentIntentId,
-      });
-      setClientSecret(data.clientSecret);
-      setCurrentStep('payment');
+      if (data.noCash) {
+        clearCart();
+        setGiftCardToken('');
+        giftCardRequestKey.current = undefined;
+        setCurrentStep('confirmation');
+      } else {
+        savePendingCheckout({ orderId: data.orderId, paymentIntentId: data.paymentIntentId });
+        setClientSecret(data.clientSecret);
+        setCurrentStep('payment');
+      }
 
     } catch (err: unknown) {
       throw err;
@@ -362,6 +370,27 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
             }
             authoritativeQuote={authoritativeQuote}
           />
+
+          {currentStep === 'shipping' && (
+            <div className="bg-white p-4 rounded-xl text-black">
+              <label htmlFor="gift-card-code" className="block text-sm font-medium mb-1">
+                Gift card
+              </label>
+              <input
+                id="gift-card-code"
+                value={giftCardToken}
+                onChange={(event) => {
+                  setGiftCardToken(event.target.value);
+                  giftCardRequestKey.current = undefined;
+                }}
+                autoComplete="off"
+                maxLength={512}
+                className="w-full rounded border border-gray-300 px-3 py-2"
+                placeholder="Enter gift card code"
+              />
+              <p className="mt-1 text-xs text-gray-600">Applied securely when the checkout quote is created.</p>
+            </div>
+          )}
 
           {/* Payment Form */}
           {currentStep === 'payment' && clientSecret && (
