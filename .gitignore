@@ -60,3 +60,13 @@ linkedin-article.md
 !/migrations/**
 !/data/d1/**
 !/tests/fixtures/**
+
+# Operator migration inputs and generated artifacts may contain customer data.
+/scripts/shopify-migration/input/**
+/scripts/shopify-migration/data/**
+/scripts/shopify-migration/output/**
+/scripts/shopify-migration/**/*.log
+/scripts/shopify-migration/**/id-map*.json
+/scripts/shopify-migration/**/manifest*.json
+!/scripts/shopify-migration/input/.gitkeep
+!/scripts/shopify-migration/output/.gitkeep
