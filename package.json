@@ -81,9 +81,8 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "0.21.3",
     "@aws-sdk/client-s3": "3.984.0",
-    "@cloudflare/vitest-pool-workers": "0.20.3",
+    "@cloudflare/vitest-pool-workers": "0.21.3",
     "@cloudflare/workers-types": "^5.20260809.1",
     "@opennextjs/cloudflare": "^1.20.2",
     "@smithy/node-http-handler": "4.9.13",
