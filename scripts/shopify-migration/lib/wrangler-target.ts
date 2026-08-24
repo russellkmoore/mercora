@@ -101,7 +101,7 @@ export function parseWranglerJsonc(text: string): WranglerConfig {
 function section(config: WranglerConfig, environment: string | undefined): WranglerSection {
   if (!environment) return config;
   const selected = config.env?.[environment];
-  if (!selected || typeof selected !== "object") {
+  if (!selected || typeof selected !== "object" || Array.isArray(selected)) {
     throw new Error(`Wrangler environment "${environment}" is not configured; refusing root fallback`);
   }
   return selected;
