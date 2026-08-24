@@ -1,8 +1,28 @@
+import { SUBSCRIPTION_ACQUISITION_EXTENSION } from '@/lib/commerce/capabilities';
+
 /** Fields accepted by the generic order update endpoint. */
 export const ORDER_METADATA_FIELDS = [
   'notes',
   'external_references',
   'extensions',
+] as const;
+
+/** Immutable attribution copied from authoritative subscription invoice evidence. */
+export const SERVER_OWNED_SUBSCRIPTION_ORDER_EXTENSION_KEYS = [
+  SUBSCRIPTION_ACQUISITION_EXTENSION,
+  'subscription_shipping_required',
+  'subscription_id',
+  'subscription_plan_id',
+  'subscription_cadence',
+  'subscription_period',
+  'verified_paid_at',
+] as const;
+
+/** Provider invoice bindings used to make renewal fulfillment idempotent. */
+export const SERVER_OWNED_ORDER_EXTERNAL_REFERENCE_KEYS = [
+  'payment_intent_id',
+  'stripe_invoice_id',
+  'stripe_subscription_id',
 ] as const;
 
 /**
@@ -41,6 +61,8 @@ export const SERVER_OWNED_ORDER_EXTENSION_KEYS = [
   'discount_codes',
   'coupon_reconciliation_codes',
   'finalized_at',
+  ...SERVER_OWNED_SUBSCRIPTION_ORDER_EXTENSION_KEYS,
+  'customer_name',
 ] as const;
 
 const REJECTED_ORDER_FIELDS = new Set([
@@ -169,5 +191,5 @@ export function mergeOrderExternalReferences(
   incoming: unknown,
   current: unknown
 ): GuardResult<Record<string, unknown>> {
-  return mergeGuardedObject(incoming, current, ['payment_intent_id']);
+  return mergeGuardedObject(incoming, current, SERVER_OWNED_ORDER_EXTERNAL_REFERENCE_KEYS);
 }

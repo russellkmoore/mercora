@@ -77,6 +77,28 @@ describe('server-authoritative checkout pricing', () => {
     })]);
   });
 
+  it('keeps one-time checkout independent from subscription acquisition', async () => {
+    const orderPaid = vi.fn();
+    const quote = await priceCheckout({
+      items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],
+      shippingAddress: address,
+      shippingMethodId: 'standard',
+    }, {
+      dependencies: dependencies() as any,
+      capabilities: {
+        giftCards: {
+          resolveTender: vi.fn(async ({ currency }) => ({ amount: Money.zero(currency) })),
+          verifyReservedTender: vi.fn(),
+          applyTender: vi.fn(),
+        },
+        subscriptions: { orderPaid },
+      },
+    });
+
+    expect(quote.total).toEqual({ amount: 2700, currency: 'USD' });
+    expect(orderPaid).not.toHaveBeenCalled();
+  });
+
   it('uses the shared enabled shipping defaults on a fresh install', async () => {
     const quote = await priceCheckout({
       items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],

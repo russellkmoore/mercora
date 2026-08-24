@@ -39,6 +39,35 @@ describe("resolveStoreConfig", () => {
       .toBe(storeDefaults.commerce.currency);
   });
 
+  it("keeps optional money capabilities off unless explicitly enabled", () => {
+    expect(resolveStoreConfig({}).commerce.features).toEqual({
+      recommendations: true,
+      giftCards: false,
+      subscriptionAcquisition: false,
+      subscriptionReconciliation: false,
+    });
+    expect(resolveStoreConfig({
+      STORE_FEATURE_RECOMMENDATIONS: "false",
+      STORE_FEATURE_SUBSCRIPTION_ACQUISITION: "true",
+      STORE_FEATURE_SUBSCRIPTION_RECONCILIATION: "true",
+    }).commerce.features).toEqual({
+      recommendations: false,
+      giftCards: false,
+      subscriptionAcquisition: true,
+      subscriptionReconciliation: true,
+    });
+  });
+
+  it("accepts only a bounded operator-owned subscription terms version", () => {
+    expect(resolveStoreConfig({}).commerce.subscriptionTermsVersion).toBeUndefined();
+    expect(resolveStoreConfig({ STORE_SUBSCRIPTION_TERMS_VERSION: "2026-08:v1" })
+      .commerce.subscriptionTermsVersion).toBe("2026-08:v1");
+    expect(resolveStoreConfig({ STORE_SUBSCRIPTION_TERMS_VERSION: "terms version" })
+      .commerce.subscriptionTermsVersion).toBeUndefined();
+    expect(resolveStoreConfig({ STORE_SUBSCRIPTION_TERMS_VERSION: "x".repeat(101) })
+      .commerce.subscriptionTermsVersion).toBeUndefined();
+  });
+
   it("derives sender identity from a renamed store", () => {
     const config = resolveStoreConfig({
       NEXT_PUBLIC_STORE_NAME: "Acme Store",

@@ -66,6 +66,16 @@ describe('order confirmation provider boundary', () => {
       idempotencyKey: 'order-confirmation/WEB-EMAIL-1/v1',
     })).resolves.toEqual({ success: false, error: 'provider rejected' });
   });
+
+  it('renders an addressless digital receipt without inventing shipping details', async () => {
+    const digital = { ...orderData, shippingAddress: undefined };
+    await sendOrderConfirmationEmail(digital);
+    const message = mocks.send.mock.calls.at(-1)?.[0] as { html: string; text: string };
+    expect(message.html).toContain('no shippable items');
+    expect(message.html).not.toContain('Shipping Address');
+    expect(message.text).toContain('no shippable items');
+    expect(message.text).not.toContain('Ship to:');
+  });
 });
 
 describe('order status provider boundary', () => {

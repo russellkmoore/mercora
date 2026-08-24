@@ -49,6 +49,80 @@ import {
   handleRefundLifecycle,
 } from '@/app/api/webhooks/stripe/handlers/refund-handlers';
 import { recordTelemetry } from '@/lib/observability/telemetry';
+import { handleSubscriptionStripeEvent } from '@/app/api/webhooks/stripe/handlers/subscription-handlers';
+
+const MAX_STRIPE_SIGNATURE_BYTES = 4_096;
+const MAX_STRIPE_WEBHOOK_BODY_BYTES = 1_048_576;
+
+async function cancelBody(body: ReadableStream<Uint8Array> | null): Promise<void> {
+  try {
+    await body?.cancel();
+  } catch {
+    // Preserve the bounded public rejection if the upstream stream cannot cancel.
+  }
+}
+
+function validSignatureHeader(value: string | null): value is string {
+  return value !== null && value.length > 0
+    && new TextEncoder().encode(value).byteLength <= MAX_STRIPE_SIGNATURE_BYTES
+    && !/[\u0000-\u001f\u007f]/.test(value);
+}
+
+async function readBoundedRawBody(request: Request): Promise<
+  | { ok: true; body: Uint8Array }
+  | { ok: false; status: 400 | 413 }
+> {
+  const declaredHeader = request.headers.get('content-length');
+  if (declaredHeader !== null) {
+    if (!/^\d+$/.test(declaredHeader)) {
+      await cancelBody(request.body);
+      return { ok: false, status: 400 };
+    }
+    const declared = Number(declaredHeader);
+    if (!Number.isSafeInteger(declared) || declared > MAX_STRIPE_WEBHOOK_BODY_BYTES) {
+      await cancelBody(request.body);
+      return { ok: false, status: 413 };
+    }
+  }
+  if (!request.body) return { ok: true, body: new Uint8Array() };
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      received += chunk.value.byteLength;
+      if (received > MAX_STRIPE_WEBHOOK_BODY_BYTES) {
+        try {
+          await reader.cancel();
+        } catch {
+          // Preserve the bounded public rejection.
+        }
+        return { ok: false, status: 413 };
+      }
+      chunks.push(chunk.value.slice());
+    }
+  } catch {
+    try {
+      await reader.cancel();
+    } catch {
+      // Preserve the bounded public rejection.
+    }
+    return { ok: false, status: 400 };
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { ok: true, body };
+}
 
 function retryableResponse(message: string) {
   return NextResponse.json(
@@ -62,10 +136,10 @@ function retryableResponse(message: string) {
  * Verifies webhook signature and processes supported events
  */
 export async function POST(req: NextRequest) {
-  const body = await req.text();
   const signature = req.headers.get('stripe-signature');
 
-  if (!signature) {
+  if (!validSignatureHeader(signature)) {
+    await cancelBody(req.body);
     recordTelemetry('webhook.signature_rejected', {
       operation: 'validate', outcome: 'rejected', provider: 'stripe',
       http_status: 400, path: '/api/webhooks/stripe', trigger: 'webhook',
@@ -76,12 +150,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const rawBody = await readBoundedRawBody(req);
+  if (!rawBody.ok) {
+    recordTelemetry('webhook.signature_rejected', {
+      operation: 'validate', outcome: 'rejected', provider: 'stripe',
+      http_status: rawBody.status, path: '/api/webhooks/stripe', trigger: 'webhook',
+    });
+    return NextResponse.json(
+      { error: 'Webhook payload was rejected' },
+      { status: rawBody.status }
+    );
+  }
+
   let event: Stripe.Event;
 
   try {
     // Verify webhook signature for security
     event = await constructWebhookEvent(
-      body,
+      rawBody.body,
       signature
     );
   } catch (error) {
@@ -138,9 +224,18 @@ export async function POST(req: NextRequest) {
         outcome = 'ignored';
         break;
 
+      case 'invoice.paid':
       case 'invoice.payment_succeeded':
-        await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice);
-        outcome = 'ignored';
+      case 'invoice.payment_failed':
+      case 'invoice.payment_attempt_required':
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted':
+      case 'customer.subscription.paused':
+      case 'customer.subscription.resumed':
+      case 'customer.subscription.pending_update_applied':
+      case 'customer.subscription.pending_update_expired':
+        outcome = await handleSubscriptionStripeEvent(event);
         break;
 
       case 'charge.refunded':
@@ -280,26 +375,6 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     // - Final order confirmation
     // - Customer onboarding
     // - Thank you emails
-    
-  } catch (error) {
-    recordTelemetry('webhook.processing_failed', {
-      operation: 'process', outcome: 'failed', provider: 'd1', retryable: true,
-      path: '/api/webhooks/stripe', trigger: 'webhook',
-    }, error);
-  }
-}
-
-/**
- * Handle successful invoice payment
- * For subscription or recurring payment scenarios
- */
-async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
-  try {
-    // Handle subscription payment
-    // You can add additional logic here:
-    // - Update subscription status
-    // - Send invoice receipts
-    // - Handle plan upgrades/downgrades
     
   } catch (error) {
     recordTelemetry('webhook.processing_failed', {

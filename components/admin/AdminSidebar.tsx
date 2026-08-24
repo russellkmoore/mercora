@@ -41,7 +41,8 @@ import {
   ClipboardList,
   FileEdit,
   MessageSquare,
-  Newspaper
+  Newspaper,
+  Repeat2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStoreConfig } from "@/lib/store";
@@ -65,6 +66,12 @@ const navItems: NavItem[] = [
     href: "/admin/products",
     icon: Package,
     description: "Product catalog management"
+  },
+  {
+    label: "Subscriptions",
+    href: "/admin/subscription-plans",
+    icon: Repeat2,
+    description: "Recurring plan bindings"
   },
   {
     label: "Categories",

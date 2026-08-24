@@ -14,6 +14,11 @@ export const TELEMETRY_PATHS: ReadonlySet<string> = new Set([
   '/api/orders/:id',
   '/api/orders/refund',
   '/api/payment-intent',
+  '/api/setup-intent',
+  '/api/subscriptions',
+  '/api/subscriptions/:id/cancel',
+  '/api/subscriptions/:id/pause',
+  '/api/subscriptions/:id/resume',
   '/api/webhooks/stripe',
 ]);
 
@@ -28,6 +33,10 @@ export const TELEMETRY_EVENTS = {
   'payment.intent_invalid': { severity: 'critical', sampleRate: 1 },
   'payment.intent_cancel_failed': { severity: 'critical', sampleRate: 1 },
   'payment.order_persist_failed': { severity: 'critical', sampleRate: 1 },
+  'subscription.acquisition_failed': { severity: 'error', sampleRate: 0.25 },
+  'subscription.finalize_failed': { severity: 'error', sampleRate: 0.25 },
+  'subscription.list_failed': { severity: 'error', sampleRate: 0.25 },
+  'subscription.action_failed': { severity: 'error', sampleRate: 0.25 },
   'order.payment_verification_rejected': { severity: 'warning', sampleRate: 0.1 },
   'order.finalization_failed': { severity: 'critical', sampleRate: 1 },
   'order.query_failed': { severity: 'error', sampleRate: 0.25 },
@@ -92,7 +101,7 @@ const ALLOWED_FIELD_ENUMS = {
   ]),
   operation: new Set([
     'audit_write', 'claim', 'complete', 'create', 'finalize', 'persist',
-    'process', 'rebuild', 'record_failure', 'send', 'stage', 'transition',
+    'process', 'read', 'rebuild', 'record_failure', 'send', 'stage', 'transition',
     'validate',
   ]),
   outcome: new Set([
