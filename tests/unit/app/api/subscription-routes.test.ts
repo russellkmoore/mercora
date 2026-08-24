@@ -213,6 +213,16 @@ describe("subscription customer routes", () => {
     expect(mocks.begin).not.toHaveBeenCalled();
   });
 
+  it("rejects malformed terms versions before provider work", async () => {
+    const response = await setup(request("/api/setup-intent", {
+      planId: "plan_one",
+      quantity: 1,
+      consent: { termsVersion: "terms version", accepted: true },
+    }, { "idempotency-key": "checkout-key-001" }));
+    expect(response.status).toBe(400);
+    expect(mocks.begin).not.toHaveBeenCalled();
+  });
+
   it("owner-scopes finalization and requires same-origin", async () => {
     const denied = await finalize(request("/api/subscriptions", { setupIntentId: "seti_one" }, {
       origin: "https://attacker.example",

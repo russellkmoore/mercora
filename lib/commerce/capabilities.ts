@@ -115,8 +115,8 @@ export function resolveCommerceCapabilities(
     ? subscriptions
     : {
         async orderPaid(order) {
-          // Core currently stages this optional effect unconditionally. Ordinary
-          // orders must not wake the subscription database/provider boundary.
+          // Core stages this optional effect for protected acquisition markers.
+          // Ordinary orders must not wake the subscription database/provider boundary.
           if (!subscriptionAcquisitionIdFromOrder(order)) return;
           await subscriptions.orderPaid(order);
         },

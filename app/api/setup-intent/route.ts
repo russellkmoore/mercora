@@ -92,7 +92,8 @@ async function parseBody(request: Request): Promise<SetupIntentBody | null> {
     || !isPlainRecord(value.consent)
     || Object.keys(value.consent).some((key) => !["termsVersion", "accepted"].includes(key))
     || value.consent.accepted !== true
-    || !isBoundedString(value.consent.termsVersion, 200)) return null;
+    || !isBoundedString(value.consent.termsVersion, 100)
+    || !/^[A-Za-z0-9._:-]{1,100}$/.test(value.consent.termsVersion)) return null;
   const shippingAddress = parseAddress(value.shippingAddress);
   if (shippingAddress === null) return null;
   return {

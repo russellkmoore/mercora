@@ -58,9 +58,9 @@ not inferred from the cancellation request time.
 
 ## Paid-order effect applicability
 
-Core checkout currently stages an optional subscription effect for every paid
-order. The capability contract distinguishes an ordinary order (not
-applicable) from an order carrying a protected subscription acquisition marker.
+Core checkout currently stages an optional subscription effect for paid orders
+that carry a protected subscription acquisition marker. The capability contract
+distinguishes an ordinary order (not applicable) from a marked order.
 While disabled, ordinary orders converge successfully, but a genuine marker
 must fail and remain retryable rather than silently succeeding through a no-op.
 Verified subscription invoices do not use that recursive effect: their atomic
