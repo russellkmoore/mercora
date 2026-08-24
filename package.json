@@ -34,7 +34,8 @@
     "cf-typecheck": "wrangler types --env-interface CloudflareEnv --strict-vars false ./cloudflare-env.d.ts --check",
     "token:generate": "tsx scripts/manage-tokens.ts generate",
     "token:list": "tsx scripts/manage-tokens.ts list",
-    "token:revoke": "tsx scripts/manage-tokens.ts revoke"
+    "token:revoke": "tsx scripts/manage-tokens.ts revoke",
+    "migrate:shopify": "tsx scripts/shopify-migration/cli.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.7.4",
@@ -80,9 +81,11 @@
     "zustand": "^5.0.6"
   },
   "devDependencies": {
+    "@aws-sdk/client-s3": "3.984.0",
     "@cloudflare/vitest-pool-workers": "0.20.3",
     "@cloudflare/workers-types": "^5.20260809.1",
     "@opennextjs/cloudflare": "^1.20.2",
+    "@smithy/node-http-handler": "4.9.13",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/big.js": "^7.0.0",
     "@types/node": "^26.2.0",
@@ -90,6 +93,7 @@
     "@types/react-dom": "^19",
     "@types/sanitize-html": "2.16.1",
     "autoprefixer": "^10.5.4",
+    "csv-parse": "6.1.0",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.36.0",
     "eslint-config-next": "^16.3.0",
