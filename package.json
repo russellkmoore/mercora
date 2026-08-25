@@ -93,7 +93,7 @@
     "@types/react-dom": "^19",
     "@types/sanitize-html": "2.16.1",
     "autoprefixer": "^10.5.4",
-    "csv-parse": "6.1.0",
+    "csv-parse": "7.0.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.36.0",
     "eslint-config-next": "^16.3.1",
