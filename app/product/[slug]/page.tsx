@@ -51,15 +51,18 @@ import { getStoreConfig } from "@/lib/store-config";
 
 export const revalidate = 0;
 
+type Props = { params: Promise<{ slug: string }> };
+
 /**
  * Product page component that displays detailed information for a specific product
  * 
  * @param params - URL parameters object containing the product slug
  * @returns Server-rendered product page or 404 if product not found
  */
-export default async function ProductPage({ params }: any) {
+export default async function ProductPage({ params }: Props) {
+  const { slug } = await params;
   const { userId } = await auth();
-  const storedProduct = await getProductBySlug(params.slug);
+  const storedProduct = await getProductBySlug(slug);
   if (!storedProduct || storedProduct.status !== "active") return notFound();
   const product = toPublicProduct(storedProduct);
   const store = getStoreConfig();
