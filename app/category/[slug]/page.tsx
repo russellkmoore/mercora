@@ -43,17 +43,20 @@ import Image from "next/image";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { toPublicProduct } from "@/lib/models/mach/product-serializer";
 
+type Props = { params: Promise<{ slug: string }> };
+
 /**
  * Category page component that displays products for a specific category
  * 
  * @param params - URL parameters object containing the category slug
  * @returns Server-rendered category page with products
  */
-export default async function CategoryPage({ params }: any) {
-  const category = await getCategoryBySlug(params.slug);
+export default async function CategoryPage({ params }: Props) {
+  const { slug } = await params;
+  const category = await getCategoryBySlug(slug);
   
   if (!category) {
-    return <div>Category not found for slug: {params.slug}</div>;
+    return <div>Category not found for slug: {slug}</div>;
   }
   
   let products: any[] = [];
@@ -102,7 +105,7 @@ export default async function CategoryPage({ params }: any) {
   const breadcrumbItems = [
     { label: "Home", href: "/" },
     { label: "Categories", href: "/categories" },
-    { label: categoryName, href: `/category/${params.slug}`, current: true }
+    { label: categoryName, href: `/category/${slug}`, current: true }
   ];
 
   return (
