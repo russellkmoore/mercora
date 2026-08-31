@@ -83,6 +83,11 @@
 - `app/api/user-orders/` — no route.ts, no callers
 - `app/api/admin/generate-token/` — no route.ts, no callers
 - `app/api/mach/customers/` — no route.ts, no callers
+- `app/api/mach/orders/` — no route.ts, no callers
+- `app/api/mach/products/` — no route.ts, no callers
+- `app/api/debug/user-id/` — no route.ts, no callers
+
+Verified 2026-08-31 with `find app/api -type d -empty`: 12 empty directories, not 9.
 - `app/api/mach/products/` — no route.ts, no callers
 - `app/api/mach/orders/` — no route.ts, no callers
 - `app/api/debug/user-id/` — no route.ts, no callers
@@ -279,23 +284,33 @@
 
 ## Security Considerations
 
-### Admin Authentication Currently Disabled
+### Admin Authentication Development Bypasses (verified: production fails closed)
 
-**Issue:** Admin endpoints bypass authentication in development but must be re-enabled for production
-- `lib/auth/admin-middleware.ts` returns `{ success: true, userId: "dev-admin" }` without validation
-- `lib/auth/unified-auth.ts` bypasses all checks in development
-- Requires explicit re-enabling; easy to forget before production deploy
+**Issue:** Two development-only admin bypasses exist. Both are gated on
+`process.env.NODE_ENV === "development"`, so production is NOT exposed.
+Corrected 2026-08-31 after direct verification — an earlier draft of this
+document claimed production admin endpoints were public. That was wrong.
+
+- `lib/auth/admin-middleware.ts:22` — returns `{ success: true, userId: "dev-admin" }`,
+  but only when the `x-dev-admin` header equals the literal `mercora-dev-bypass`
+  AND `NODE_ENV === "development"`. Both conditions are required.
+- `lib/auth/unified-auth.ts:163` — treats any signed-in Clerk user as admin,
+  but only when `NODE_ENV === "development"`.
+
+`lib/auth/unified-auth.ts:85` states the intent explicitly: "Production fails closed."
 
 **Files:**
 - `lib/auth/admin-middleware.ts`
 - `lib/auth/unified-auth.ts`
-- Documented in `/docs/CLAUDE.md`
 
-**Risk:** If deployed to production as-is, all admin endpoints are public
+**Residual risk (low, but real):** the guard is only as good as `NODE_ENV` in the
+deployed Worker. Next.js bakes `NODE_ENV=production` into a production build, so
+this holds today. It would break if a development build were ever deployed, or if
+`NODE_ENV` were added to `wrangler.jsonc` vars with the wrong value — note that
+`nodejs_compat_populate_process_env` copies those vars into `process.env`.
 
-**Mitigation:**
-- Already has placeholder for token-based auth (ADMIN_VECTORIZE_TOKEN)
-- Documented in deployment guide
+**Suggested hardening:** assert `NODE_ENV !== "development"` at Worker startup,
+so a misbuilt deploy fails loudly instead of silently opening admin routes.
 
 ---
 
