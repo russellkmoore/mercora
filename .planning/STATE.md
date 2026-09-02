@@ -23,7 +23,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-02)
 
 **Core value:** A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** Phase 02 — Observability and Regression Guards
+**Current focus:** Phase 3 — Decision Lock-In and Operator Runbooks
 
 ## Current Position
 
@@ -121,4 +121,4 @@ Last session: 2026-09-02T19:57:43.913Z
 Stopped at: Phase 2 complete, ready to plan Phase 3
 Resume file: None
 
-Next: `/gsd-plan-phase 2` (or continue `/gsd-autonomous --from 2`)
+Next: `/gsd-plan-phase 3` (or continue `/gsd-autonomous --from 3`)
