@@ -45,7 +45,7 @@ graph TB
 
 ### 3. **Role-Based Access Control**
 - **Development**: Any authenticated user gets admin access
-- **Production**: Only users with admin role or whitelisted user IDs
+- **Production**: Only users with the Clerk admin role or an active `adminUsers` table row
 
 ## 📋 Implementation Details
 
@@ -78,7 +78,7 @@ if (!authResult.success) {
 - ✅ **Clerk Integration**: Uses `auth()` for user session validation
 - ✅ **Token Authentication**: Supports API tokens for server-to-server calls
 - ✅ **Dev Bypass**: Special development bypass for testing
-- ✅ **Role Checking**: Validates admin role or user ID whitelist
+- ✅ **Role Checking**: Validates Clerk admin role or an active `adminUsers` table row
 
 ## 🛡️ Security Features
 
@@ -95,11 +95,16 @@ if (process.env.NODE_ENV === "development") {
 
 #### Production Environment
 ```typescript
-// Check for admin role in Clerk metadata
-const userRole = (sessionClaims as any)?.metadata?.role;
-const adminUsers = process.env.ADMIN_USER_IDS?.split(",") || [];
+// lib/auth/admin-middleware.ts:64-77 — the real production check
+const isAdmin = await isUserAdmin(userId); // lib/models/admin.ts, adminUsers table
 
-if (userRole === "admin" || adminUsers.includes(userId)) {
+if (isAdmin) {
+  return { success: true, userId };
+}
+
+// Fallback: Clerk metadata role, for backward compatibility
+const userRole = (sessionClaims as any)?.metadata?.role;
+if (userRole === "admin") {
   return { success: true, userId };
 }
 ```
@@ -121,8 +126,9 @@ curl -H "Authorization: Bearer $ADMIN_VECTORIZE_TOKEN" \
 | Variable | Purpose | Required | Example |
 |----------|---------|----------|---------|
 | `NODE_ENV` | Environment mode | Yes | `development` or `production` |
-| `ADMIN_USER_IDS` | Production admin user IDs | Production | `user_123,user_456` |
 | `ADMIN_VECTORIZE_TOKEN` | API token for server calls | Optional | `secret-token-123` |
+
+The production admin list lives in the `adminUsers` D1 table, managed through `/admin/users`. It is not configured by an environment variable.
 
 ### Clerk Configuration
 
@@ -131,7 +137,7 @@ curl -H "Authorization: Bearer $ADMIN_VECTORIZE_TOKEN" \
 2. No additional configuration required
 
 #### Production Setup
-1. Set `ADMIN_USER_IDS` environment variable with comma-separated user IDs
+1. Add an active row to the `adminUsers` D1 table for the user (managed through `/admin/users`)
 2. Alternatively, use Clerk's public metadata to set user roles:
 
 ```javascript
@@ -196,12 +202,14 @@ curl -H "Authorization: Bearer $ADMIN_VECTORIZE_TOKEN" \
 
 ### Development Testing
 
-Use development bypass token for testing:
+Use the development bypass header for testing:
 
 ```bash
-# Add dev parameter to bypass auth in development
-curl "https://localhost:3000/api/admin/analytics?dev=mercora-dev-bypass"
+curl -H "x-dev-admin: <DEV_ADMIN_BYPASS_TOKEN>" \
+     "https://localhost:3000/api/admin/analytics"
 ```
+
+This header is honored only when `NODE_ENV` is `development`; it is inert in every deployed build.
 
 ## 🚨 Security Considerations
 
@@ -217,7 +225,7 @@ curl "https://localhost:3000/api/admin/analytics?dev=mercora-dev-bypass"
 ### Security Warnings
 
 ⚠️ **Development Mode**: Any authenticated user gets admin access for easier development
-⚠️ **Production Setup**: Ensure `ADMIN_USER_IDS` is properly configured before production deployment
+⚠️ **Production Setup**: Production admin access requires either an active `adminUsers` row or the Clerk metadata role; neither is granted by default
 ⚠️ **Token Management**: Keep API tokens secure and rotate regularly
 ⚠️ **Clerk Configuration**: Verify Clerk public metadata roles are properly set
 
@@ -235,11 +243,8 @@ curl "https://localhost:3000/api/admin/analytics?dev=mercora-dev-bypass"
 The system was upgraded from a development-only authentication to a production-ready solution:
 
 ### Before (Development Only)
-```typescript
-// Authentication completely disabled
-console.log("⚠️ WARNING: Admin authentication is DISABLED for development");
-return { success: true, userId: "dev-admin" };
-```
+
+The superseded implementation short-circuited the permission check entirely and returned a synthetic admin identity for every request.
 
 ### After (Production Ready - Current Implementation)
 ```typescript
