@@ -58,7 +58,19 @@ Plans:
   4. No `TODO` remains in `app/api/webhooks/stripe/route.ts`; `payment_intent.payment_failed` is either handled with a recorded outcome or no longer subscribed, and the choice is written down for the runbook update in Phase 3.
   5. A Lighthouse mobile baseline for the home, category, product, and checkout routes is recorded in `docs/` with scores compared against the PRD target of 85.
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 02-01-PLAN.md — Tracer: register the phase taxonomy in both parity files, emit `checkout.tax_fallback` at the flat-rate fallback site, export the two allocation functions (OBS-01, OBS-04)
+- [ ] 02-05-PLAN.md — Lighthouse mobile baseline for four live routes, median of three, recorded in `docs/mobile-lighthouse-baseline.md` (MOB-01)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 02-02-PLAN.md — Web-vitals sink: `WEB_VITALS` Analytics Engine binding, bounded route-template mapper, rewritten vitals route that writes five fields and always answers 200 (OBS-02)
+- [ ] 02-03-PLAN.md — Failed-payment telemetry: closed decline-reason mapper, telemetry-only `handlePaymentFailed`, RUN-02 hand-off note (OBS-05)
+- [ ] 02-04-PLAN.md — Slug pages typed with `Promise` params and real 404s, plus allocation sum-exactness tables at 1/2/10/100 lines (OBS-03, OBS-04)
 
 ### Phase 3: Decision Lock-In and Operator Runbooks
 
@@ -97,7 +109,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Security and Admin-Auth Truth | 4/4 | Complete    | 2026-09-02 |
-| 2. Observability and Regression Guards | 0/TBD | Not started | - |
+| 2. Observability and Regression Guards | 0/5 | Planned     | - |
 | 3. Decision Lock-In and Operator Runbooks | 0/TBD | Not started | - |
 | 4. Reference Documentation Refresh | 0/TBD | Not started | - |
 
