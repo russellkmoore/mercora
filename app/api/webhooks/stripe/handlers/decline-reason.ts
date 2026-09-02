@@ -55,7 +55,11 @@ export function mapDeclineReason(error: unknown): DeclineReason {
   const code = record.code;
   if (typeof code !== 'string') return 'other';
   if (code === 'card_declined') {
-    return record.decline_code === 'insufficient_funds' ? 'insufficient_funds' : 'card_declined';
+    const declineCode = record.decline_code;
+    if (declineCode === 'insufficient_funds') return 'insufficient_funds';
+    if (declineCode === 'expired_card') return 'expired_card';
+    if (declineCode === 'authentication_required') return 'authentication_required';
+    return 'card_declined';
   }
   return CODE_TO_REASON[code] ?? 'other';
 }

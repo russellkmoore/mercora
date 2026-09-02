@@ -123,6 +123,58 @@ describe('Stripe payment_intent.payment_failed webhook', () => {
     warnSpy.mockRestore();
   });
 
+  it('maps a generic card_declined with decline_code expired_card to the expired_card reason', async () => {
+    mocks.constructWebhookEvent.mockResolvedValue(eventFor(paymentIntentFixture({
+      last_payment_error: { code: 'card_declined', decline_code: 'expired_card' },
+    })));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await POST(request());
+
+    const envelope = JSON.parse(String(warnSpy.mock.calls[0][0]));
+    expect(envelope.fields.reason).toBe('expired_card');
+    warnSpy.mockRestore();
+  });
+
+  it('maps a generic card_declined with decline_code authentication_required to the authentication_required reason', async () => {
+    mocks.constructWebhookEvent.mockResolvedValue(eventFor(paymentIntentFixture({
+      last_payment_error: { code: 'card_declined', decline_code: 'authentication_required' },
+    })));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await POST(request());
+
+    const envelope = JSON.parse(String(warnSpy.mock.calls[0][0]));
+    expect(envelope.fields.reason).toBe('authentication_required');
+    warnSpy.mockRestore();
+  });
+
+  it('maps a generic card_declined with decline_code insufficient_funds to the insufficient_funds reason', async () => {
+    mocks.constructWebhookEvent.mockResolvedValue(eventFor(paymentIntentFixture({
+      last_payment_error: { code: 'card_declined', decline_code: 'insufficient_funds' },
+    })));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await POST(request());
+
+    const envelope = JSON.parse(String(warnSpy.mock.calls[0][0]));
+    expect(envelope.fields.reason).toBe('insufficient_funds');
+    warnSpy.mockRestore();
+  });
+
+  it('maps a generic card_declined with an unrecognized decline_code to the card_declined reason', async () => {
+    mocks.constructWebhookEvent.mockResolvedValue(eventFor(paymentIntentFixture({
+      last_payment_error: { code: 'card_declined', decline_code: 'generic_decline' },
+    })));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await POST(request());
+
+    const envelope = JSON.parse(String(warnSpy.mock.calls[0][0]));
+    expect(envelope.fields.reason).toBe('card_declined');
+    warnSpy.mockRestore();
+  });
+
   it('maps an unmapped Stripe decline code to other', async () => {
     mocks.constructWebhookEvent.mockResolvedValue(eventFor(paymentIntentFixture({
       last_payment_error: { code: 'processing_error' },
