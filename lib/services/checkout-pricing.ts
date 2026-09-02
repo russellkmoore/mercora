@@ -264,19 +264,24 @@ export function allocateDiscount(
   const applied = amount.lte(availableTotal) ? amount : availableTotal;
   if (applied.isZero() || availableTotal.isZero()) return;
 
-  let remaining = applied.toMinorUnits();
+  const appliedMinor = applied.toMinorUnits();
+  const availableTotalMinor = availableTotal.toMinorUnits();
+  const capacities = available.map((value) => value.toMinorUnits());
+  const shares = capacities.map((capacity) =>
+    Math.min(capacity, Math.floor((appliedMinor * capacity) / availableTotalMinor))
+  );
+  let remaining = appliedMinor - shares.reduce((sum, share) => sum + share, 0);
+  // Distribute any floor-rounding leftover across lines that still have spare
+  // capacity, in deterministic ascending-index order, never exceeding a
+  // line's own available amount.
+  for (let position = 0; remaining > 0 && position < shares.length; position += 1) {
+    const room = capacities[position] - shares[position];
+    const take = Math.min(room, remaining);
+    shares[position] += take;
+    remaining -= take;
+  }
   eligible.forEach((index, position) => {
-    const cents = position === eligible.length - 1
-      ? remaining
-      : Math.min(
-          available[position].toMinorUnits(),
-          Math.floor(
-            applied.toMinorUnits() * available[position].toMinorUnits() /
-            availableTotal.toMinorUnits()
-          )
-        );
-    existing[index] = existing[index].add(Money.fromMinor(cents, amount.currency));
-    remaining -= cents;
+    existing[index] = existing[index].add(Money.fromMinor(shares[position], amount.currency));
   });
 }
 
