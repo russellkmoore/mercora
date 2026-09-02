@@ -66,7 +66,7 @@ None yet.
 ### Blockers/Concerns
 
 - [Phase 1] SEC-02 needs Russell to confirm whether the token published in `docs/CLAUDE.md` matches the live `ADMIN_VECTORIZE_TOKEN` secret (the value cannot be read back from Cloudflare). Plan should include a probe against the live endpoint with the published value.
-- [Open question] `wrangler.jsonc` carries `pk_test_` Stripe and Clerk publishable keys and `scripts/build-with-public-env.mjs` injects them into the build. Confirm whether Voltique is meant to run in Stripe test mode. Out of v1 scope either way.
+- [Resolved 2026-09-01] `wrangler.jsonc` carries `pk_test_` Stripe and Clerk publishable keys by design. Production is a demo environment with no live Stripe account. Keys stay as-is; `wrangler.jsonc` stays tracked (Workers Builds and four scripts read it).
 - [Phase 2] OBS-02 needs a sink choice (Workers Analytics Engine dataset vs bounded D1 table). No Analytics Engine binding exists in `wrangler.jsonc` today; adding one requires `npm run cf-typegen` and a deploy-config update.
 - [Phase 4] DEP-01 may find that Next 16.3.1 still bundles a flagged PostCSS or Sharp; if so, record a new bounded exception rather than weakening the gate.
 
