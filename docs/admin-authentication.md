@@ -205,11 +205,13 @@ The production admin list lives in the `adminUsers` D1 table, managed through `/
 Use the development bypass header for testing:
 
 ```bash
-curl -H "x-dev-admin: <DEV_ADMIN_BYPASS_TOKEN>" \
+curl -H "x-dev-admin: <value defined in lib/auth/admin-middleware.ts>" \
      "https://localhost:3000/api/admin/analytics"
 ```
 
-This header is honored only when `NODE_ENV` is `development`; it is inert in every deployed build.
+The bypass value is a fixed literal in source, not an environment variable — there is no
+`DEV_ADMIN_BYPASS_TOKEN` to set. This header is honored only when `NODE_ENV` is `development`; it
+is inert in every deployed build.
 
 ## 🛡️ Deployment Safety
 
