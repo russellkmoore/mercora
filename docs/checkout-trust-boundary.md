@@ -1,5 +1,7 @@
 # Order and checkout trust boundary
 
+**Status:** Accepted (2026-08-05)
+
 Mercora treats checkout as one server-owned state transition rather than a
 client-created paid order.
 
@@ -98,9 +100,14 @@ test.
 
 ## Scope and schema
 
-This boundary does not expose trusted MCP payment operations or start
-fulfillment. MCP checkout remains outside the paid inventory boundary until it
-performs the same PaymentIntent verification.
+MCP `create_payment_intent` and `place_order` use the same shared checkout
+pricing service (`lib/services/checkout-pricing.ts`) and the same idempotent
+finalizer (`lib/services/order-finalization.ts`) as the storefront
+`POST /api/orders` route and the Stripe webhook path.
+MCP checkout is inside the paid inventory boundary.
+
+An earlier version of this document stated MCP checkout was outside the
+boundary; that was corrected on 2026-09-02 after verifying the code.
 
 The existing `orders` columns hold pending state, canonical line and Money
 snapshots, immutable provider bindings, and the versioned refund ledger. U09
