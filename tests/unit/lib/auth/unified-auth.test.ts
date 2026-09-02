@@ -223,7 +223,7 @@ describe('authenticateRequest fail-closed behavior', () => {
     );
 
     expect(result.response?.status).toBe(503);
-    const body = await result.response!.json();
+    const body = (await result.response!.json()) as { error: string };
     expect(body.error).toBe(DEPLOYMENT_GUARD_MESSAGE);
   });
 });
