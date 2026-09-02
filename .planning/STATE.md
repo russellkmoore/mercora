@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 current_phase: 3
 current_phase_name: Decision Lock-In and Operator Runbooks
 status: planning
-stopped_at: Phase 2 complete, ready to plan Phase 3
-last_updated: "2026-09-02T20:19:36.096Z"
+stopped_at: context exhaustion at 75% (2026-09-02)
+last_updated: "2026-09-02T20:24:40.374Z"
 last_activity: 2026-09-02
 last_activity_desc: Phase 2 complete, transitioned to Phase 3
-state_head: 496da253f1d956a0e148fcefd9b15209c417e07d
+state_head: 07150691dafc21a244a9351cbffc2e87fe133087
 progress:
   total_phases: 4
   completed_phases: 2
@@ -95,7 +95,7 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 1 follow-up, needs Russell] Code-review WR-04: client-side dev-mode admin shortcuts in `components/admin/AdminGuard.tsx` are not covered by the deployment guard. Deferred by the orchestrator; bounded to a visible nav link on a misbuilt deploy. Sign off or schedule the fix (see `01-SECURITY.md` "Unregistered Flags" and `deferred-items.md`).
+- [Resolved 2026-09-02] WR-04 (client-side dev-mode admin shortcuts in `components/admin/AdminGuard.tsx`) accepted as-is by Russell: no unintentional path deploys a development build to production, and the site is a demo. Recorded as AR-01-03 in `01-SECURITY.md`.
 - [Phase 1 follow-up, operator] On the next non-production deploy, confirm `/admin` returns 503 (the guard's live-bundle assumption was accepted on static evidence; step documented in `docs/admin-authentication.md`).
 - [Phase 1 side finding] A Worker secret named `ADMIN_USER_IDS` still exists in Cloudflare even though no code has read it since migration 0002. Candidate for deletion (`wrangler secret delete ADMIN_USER_IDS`) in a hygiene pass.
 - [Phase 1 side finding] Two Worker versions uploaded on 2026-08-31 (951a3547, 73dc8c9f) match no commit and were never promoted; superseded by the 2026-09-02 deploy of `main` (d60aa812). Likely local preview uploads.
@@ -117,8 +117,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-02T19:57:43.913Z
-Stopped at: Phase 2 complete, ready to plan Phase 3
+Last session: 2026-09-02T20:24:40.252Z
+Stopped at: context exhaustion at 75% (2026-09-02)
 Resume file: None
 
 Next: `/gsd-plan-phase 3` (or continue `/gsd-autonomous --from 3`)
