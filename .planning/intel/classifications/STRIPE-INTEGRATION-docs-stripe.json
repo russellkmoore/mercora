@@ -1,0 +1,13 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/STRIPE_INTEGRATION.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Stripe Integration Guide",
+  "summary": "Setup guide for Stripe payments, Stripe Tax, and webhook handling in Mercora, covering API keys, environment variables, file structure, and API endpoints.",
+  "scope": ["Stripe", "payment processing", "Payment Intents", "Stripe Tax", "webhooks", "checkout components", "/api/payment-intent", "/api/tax", "/api/webhooks/stripe", "environment variables"],
+  "cross_refs": ["API_STRUCTURE.md"],
+  "locked": false,
+  "precedence": null,
+  "notes": "Type set by manifest (DOC). Content also contains API endpoint request/response schemas (SPEC-like signals) and a pricing-authority statement for /api/payment-intent; manifest type honored. Output filename uses a path-derived suffix instead of a SHA-256 hash because no shell tool is available to this agent."
+}

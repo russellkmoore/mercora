@@ -1,0 +1,26 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/README.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Mercora Documentation Index",
+  "summary": "Navigation index for the Mercora docs directory, linking guides, architecture, admin, and MCP documents with a brief platform status and tech stack summary.",
+  "scope": ["documentation index", "Mercora platform", "Volt AI assistant", "admin dashboard", "MCP server", "Stripe integration", "deployment"],
+  "cross_refs": [
+    "../README.md",
+    "DEPLOYMENT_SETUP.md",
+    "ROADMAP.md",
+    "architecture.md",
+    "api-architecture.md",
+    "checkout-trust-boundary.md",
+    "ai-pipeline.md",
+    "CLAUDE.md",
+    "admin-dashboard-specification.md",
+    "admin-authentication.md",
+    "STRIPE_INTEGRATION.md",
+    "mcp-server-specification.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

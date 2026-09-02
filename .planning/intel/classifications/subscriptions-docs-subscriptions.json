@@ -1,0 +1,27 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/subscriptions.md",
+  "type": "ADR",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Subscriptions",
+  "summary": "Decisions governing Stripe subscription acquisition, webhook-driven lifecycle and invoice reconciliation, paid-order effect applicability, runtime feature flags, and rollback rules.",
+  "scope": [
+    "subscription acquisition",
+    "Stripe SetupIntent",
+    "subscription_acquisitions",
+    "customer_subscriptions",
+    "subscription_invoice_orders",
+    "processed_webhook_events",
+    "customer.subscription.* webhooks",
+    "invoice-driven renewal orders",
+    "paid-order subscription effect",
+    "migration 0021",
+    "STORE_FEATURE_SUBSCRIPTION_RECONCILIATION",
+    "STORE_FEATURE_SUBSCRIPTION_ACQUISITION",
+    "STORE_SUBSCRIPTION_TERMS_VERSION"
+  ],
+  "cross_refs": [],
+  "locked": false,
+  "precedence": null,
+  "notes": "Type set by manifest (ADR). Document has no frontmatter and no Status field, so locked is false per rule (only explicit Accepted locks). Content is prescriptive decision language (must/never/only) across multiple related decisions rather than a single Context/Decision/Consequences record. No markdown links or doc paths referenced; migration 0021 and env flags are mentioned by name only."
+}

@@ -1,0 +1,13 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/migration-reservations.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Migration reservations",
+  "summary": "Ledger of reserved D1 migration numbers 0018-0022 by owner, purpose, and state; next unreserved migration must start at 0023.",
+  "scope": ["D1 migrations", "migration numbering ledger", "email preferences", "blog content publishing", "legacy redirects", "subscriptions", "gift cards"],
+  "cross_refs": [],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

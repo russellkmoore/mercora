@@ -1,0 +1,24 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/ai-pipeline.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "AI Processing Pipeline Documentation",
+  "summary": "Mermaid diagrams describing the Volt AI assistant request flow, vector search, anti-hallucination prompting, and product recommendation engine.",
+  "scope": [
+    "Volt AI assistant",
+    "/api/agent-chat",
+    "Cloudflare Vectorize",
+    "BGE-base-en-v1.5 embeddings",
+    "Llama 3.1 8B",
+    "anti-hallucination system",
+    "product recommendation engine",
+    "D1 database",
+    "R2 storage",
+    "chat store"
+  ],
+  "cross_refs": [],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}
