@@ -250,7 +250,7 @@ function actionDiscount(promotion: Promotion, target: Money): Money {
   }
 }
 
-function allocateDiscount(
+export function allocateDiscount(
   amount: Money,
   eligible: number[],
   lineTotals: Money[],
@@ -449,7 +449,7 @@ export function mapProviderTaxAllocations(
   return { lineTaxById, shippingTax, totalTax };
 }
 
-function allocateLargestRemainder(total: number, weights: number[]): number[] {
+export function allocateLargestRemainder(total: number, weights: number[]): number[] {
   if (!Number.isSafeInteger(total) || total < 0 || weights.some((weight) =>
     !Number.isSafeInteger(weight) || weight < 0
   )) {
