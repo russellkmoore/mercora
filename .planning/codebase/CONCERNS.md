@@ -4,35 +4,23 @@
 
 ## Critical Production Issues
 
-### Test-Mode Publishable Keys in Production (accepted, not a defect)
-
-**Status:** Accepted by the owner on 2026-09-01. Not a fix target.
-
-- `wrangler.jsonc` lines 96-97 carry `pk_test_*` publishable keys for Stripe and Clerk.
-- The deployed site is a demo environment with no live Stripe account. Test mode is intentional.
-- Publishable keys are public by design (they ship to the browser), so keeping them in a tracked config file is not a secret leak. Secrets (`STRIPE_SECRET_KEY`, `CLERK_SECRET_KEY`, `ADMIN_VECTORIZE_TOKEN`) already live in Worker secrets and `.dev.vars`, which is gitignored.
-- `wrangler.jsonc` must stay tracked: Cloudflare Workers Builds clones the repo, and `scripts/build-with-public-env.mjs`, `d1-migrate.mjs`, `check-deploy-config.mjs`, and `db-local-ensure.mjs` all read it.
-
-**Revisit when:** a live Stripe account is attached. At that point swap the two `vars` values for `pk_live_*` keys and confirm `NEXT_PUBLIC_*` Workers Build variables match (see project memory on build-time vars).
-
 ### Flat Tax Rate Fallback for All Jurisdictions
 
 **Issue:** Tax calculation falls back to `configured_fallback` (flat 8.25%) when Stripe Tax fails
-- `lib/services/checkout-pricing.ts` lines 674-729: try/catch around `deps.calculateTax()` silently falls back to flat rate
+- `lib/services/checkout-pricing.ts` lines 674-729: try/catch around `deps.calculateTax()` silently falls back to flat rate; `taxSource = 'configured_fallback'` is set at line 712
 - `storeSettings['store.tax_rate']` is a single percentage applied uniformly
 - Only correct for a single jurisdiction; breaks multi-state/multi-country compliance
-- No warning when fallback is used; customers may overpay or underpay tax
+- No telemetry event fires when the fallback is used (verified 2026-09-01: no `recordTelemetry` or `console.warn` on that path), so customers may overpay or underpay tax with no operator signal
 
 **Files:**
 - `lib/services/checkout-pricing.ts` lines 674-729
-- `lib/store-config.ts` line 713 (fallback rate resolution)
 
 **Impact:** Tax compliance violations; customer overpayment/underpayment; audit risk
 
 **Fix approach:**
-1. Implement address-based tax lookup (Stripe Tax for primary, jurisdictional DB for secondary)
-2. Log when fallback is used with destination address for audit trail
-3. Add monitoring alert when fallback rate is applied
+1. Emit a `commerce.telemetry.v1` event on fallback with low-cardinality fields only (tracked as OBS-01)
+2. Add a monitoring alert on that event
+3. Implement address-based tax lookup (Stripe Tax for primary, jurisdictional DB for secondary) — larger scope, not in v1
 4. Consider requiring Stripe Tax for multi-jurisdiction stores
 
 ---
@@ -66,33 +54,17 @@
 
 ### Empty API Route Directories with No Callers
 
-**Issue:** Multiple empty directories exist with no `route.ts` files and no references in the codebase
+**Issue:** Twelve empty directories under `app/api/` have no `route.ts` and no references in the codebase (re-verified 2026-09-01 with `find app/api -type d -empty`):
 
-**Files (all empty):**
-- `app/api/submit-order/` — no route.ts, no callers anywhere
-- `app/api/update-order/` — no route.ts, no callers
-- `app/api/vectorize-products/` — no route.ts, no callers
-- `app/api/vectorize-knowledge/` — no route.ts, no callers
-- `app/api/test-email/` — no route.ts, no callers
-- `app/api/send-email/` — no route.ts, no callers
-- `app/api/user-orders/` — no route.ts, no callers
-- `app/api/admin/generate-token/` — no route.ts, no callers
-- `app/api/mach/customers/` — no route.ts, no callers
-- `app/api/mach/orders/` — no route.ts, no callers
-- `app/api/mach/products/` — no route.ts, no callers
-- `app/api/debug/user-id/` — no route.ts, no callers
+`submit-order`, `update-order`, `vectorize-products`, `vectorize-knowledge`, `test-email`, `send-email`, `user-orders`, `admin/generate-token`, `mach/customers`, `mach/orders`, `mach/products`, `debug/user-id`
 
-Verified 2026-08-31 with `find app/api -type d -empty`: 12 empty directories, not 9.
-- `app/api/mach/products/` — no route.ts, no callers
-- `app/api/mach/orders/` — no route.ts, no callers
-- `app/api/debug/user-id/` — no route.ts, no callers
+**Scope (corrected 2026-09-01):** git does not track empty directories, and `git ls-files` confirms none of these hold tracked files. They exist only in local working trees left over from deleted routes. A fresh clone does not have them. This is local clutter, not a repository defect.
 
-**Impact:** Clutters codebase; confuses developers about available endpoints; ghost routes that might get accidentally implemented
+**Impact:** Confuses developers reading the tree locally; risk of a ghost route being re-implemented
 
 **Fix approach:**
-1. Delete all 12 empty directories
-2. Add `.gitignore` rule to prevent empty dirs
-3. Document all active API endpoints in `STRUCTURE.md`
+1. Locally: `find app/api -type d -empty -delete`
+2. No repository change is possible or needed (a `.gitignore` rule cannot affect directories git already ignores)
 
 ---
 
@@ -110,12 +82,13 @@ Verified 2026-08-31 with `find app/api -type d -empty`: 12 empty directories, no
 - `lib/store-config.ts` lines 88-108 (defaults)
 - `lib/store-config.ts` lines 236, 380 (resolution logic with fallbacks)
 
+**Existing guard (added 2026-09-01):** `scripts/check-deploy-config.mjs` already runs as `predeploy` and `predeploy:ci`. It fails the deploy on any `REPLACE_WITH_` placeholder in `wrangler.jsonc`, and on a missing https `NEXT_PUBLIC_SITE_URL` when `NEXT_PUBLIC_ROBOTS_INDEX` is `"true"`. It does not check the email defaults, and it does not check `NEXT_PUBLIC_SITE_URL` for non-indexable deployments. Note that `NEXT_PUBLIC_SITE_URL` and `STORE_SUPPORT_EMAIL` are not in `wrangler.jsonc` `vars` at all; if they are set, it is as Workers Build or dashboard variables, which this script cannot see.
+
 **Impact:** Production site advertises placeholder domain; emails appear to come from non-existent address; brand damage; deliverability issues
 
 **Fix approach:**
-1. Add startup validation: throw error if `NEXT_PUBLIC_SITE_URL`, `STORE_SUPPORT_EMAIL`, or `STORE_SENDER_EMAIL` use example.com defaults
+1. Extend `check-deploy-config.mjs` to fail when the resolved `STORE_SUPPORT_EMAIL` / `STORE_SENDER_EMAIL` still match `@mercora.example.com`, and to require `NEXT_PUBLIC_SITE_URL` regardless of the robots flag
 2. Document required env vars clearly in deployment guide
-3. Add pre-flight check in `check-deploy-config.mjs` to validate config before build
 
 ---
 
@@ -123,23 +96,22 @@ Verified 2026-08-31 with `find app/api -type d -empty`: 12 empty directories, no
 
 ### Cloudflare Type Generation Not Synced With wrangler.jsonc
 
-**Issue:** Adding a variable to `wrangler.jsonc` requires running `npm run cf-typegen` to regenerate types
-- Script at line 33 in `package.json`: `cf-typegen`
-- Must regenerate `cloudflare-env.d.ts` after every wrangler.jsonc change
-- Easy step to miss in local development; CI catches it
-- Generates TypeScript errors that cannot be reproduced locally without setting up exact CI environment
+**Issue:** Adding a binding or var to `wrangler.jsonc` requires running `npm run cf-typegen` to regenerate `cloudflare-env.d.ts`
+- `package.json` line 33: `cf-typegen` regenerates the file; line 34: `cf-typecheck` runs the same `wrangler types` command with `--check` and fails if the committed file is stale
+- Easy step to miss locally; CI runs `cf-typecheck` and catches it
+
+**Correction (2026-09-01):** the earlier claim that the failure "cannot be reproduced locally" was wrong. `npm run cf-typecheck` is the exact CI command and reproduces it in seconds. The safety net already exists; the cost is one CI round-trip when someone forgets.
 
 **Files:**
 - `package.json` line 33-34
 - `cloudflare-env.d.ts` (generated, 543KB)
 - `docs/customer-communications.md` line 62 (documents the requirement)
 
-**Impact:** CI/local parity broken; developers can commit code that passes locally but fails in CI; requires CI re-run after fixes
+**Impact:** One wasted CI run per forgotten regen. Low.
 
 **Fix approach:**
-1. Add `precommit` hook to auto-run `cf-typegen` if `wrangler.jsonc` changes
-2. Or: add check in `npm run build` to verify types are current
-3. Document this as a common gotcha in onboarding guide
+1. Optional: a pre-commit hook that runs `cf-typegen` when `wrangler.jsonc` is staged
+2. Document this as a common gotcha in onboarding guide
 
 ### Test Env Isolation Issue in cf-typecheck
 
@@ -154,10 +126,12 @@ Verified 2026-08-31 with `find app/api -type d -empty`: 12 empty directories, no
 
 **Impact:** Local typecheck passes, CI typecheck fails; requires env cleanup to reproduce CI failure locally
 
+**Status:** unverified. This entry was written from inference, not from a reproduced failure. Confirm it before acting on it.
+
 **Fix approach:**
-1. Run `cf-typecheck` in CI with `--exclude-env-local` flag or equivalent
-2. Document that `.env.local` vars should not be referenced in types
-3. Add `.env.local` to `.gitignore` explicitly (should already be there)
+1. Reproduce first: with `.env.local` present, run `npm run cf-typecheck` and confirm it fails
+2. If confirmed, run `cf-typecheck` with an equivalent of `--exclude-env-local`, or document that `.env.local` vars must not be referenced in types
+3. `.env*.local` is already in `.gitignore` (line 30); nothing to do there
 
 ---
 
@@ -165,20 +139,20 @@ Verified 2026-08-31 with `find app/api -type d -empty`: 12 empty directories, no
 
 ### Generic Error Message Hides Distinct Failures
 
-**Issue:** Payment pricing endpoint collapses all errors into one generic string
+**Issue:** Payment pricing endpoint returns one generic string to the customer for every pricing failure
 - `app/api/payment-intent/route.ts` line 119: all pricing errors return `"Checkout details are invalid or unavailable"`
 - Could be tax failure, product unavailability, coupon validation failure, shipping config issue, etc.
-- Makes production outages hard to diagnose from user reports
-- Operators cannot distinguish between recoverable and permanent failures
+- The customer gets no hint about what to change
 
-**Files:** `app/api/payment-intent/route.ts` line 114-122
+**What already exists (corrected 2026-09-01):** the catch block at line 115 calls `recordTelemetry('payment.pricing_rejected', …, error)`, and the telemetry envelope records `error_class` from the thrown error's name (`lib/observability/telemetry.ts:206-254`). So operators do get a signal. The limit is that `error_class` is an allowlist and anything not on it collapses to `OtherError`, so distinct pricing failures may still look identical in telemetry.
 
-**Impact:** Slow incident diagnosis; hidden patterns in checkout failures; poor telemetry signal for operations
+**Files:** `app/api/payment-intent/route.ts` line 114-122; `lib/observability/telemetry.ts` `ALLOWED_ERROR_CLASSES`
+
+**Impact:** Customer cannot self-correct; operator diagnosis depends on whether the specific error class is on the allowlist
 
 **Fix approach:**
-1. Differentiate error responses: `"Tax calculation unavailable"`, `"Shipping method not available"`, `"Product out of stock"`, etc.
-2. Include error category in telemetry but not in user-facing message
-3. Add structured logging with specific failure reason for operators
+1. Give pricing failures distinct, named error classes and add them to `ALLOWED_ERROR_CLASSES` so telemetry separates them
+2. Then, where safe, map a few recoverable classes to specific customer messages (`"Coupon is not valid"`, `"Shipping method not available"`). Keep availability and tax internals generic.
 
 ---
 
@@ -186,7 +160,7 @@ Verified 2026-08-31 with `find app/api -type d -empty`: 12 empty directories, no
 
 ### Large, Complex Service Files
 
-**Issue:** Several key service files exceed 900 lines and handle multiple responsibilities
+**Issue:** Several key service files approach or exceed 900 lines and handle multiple responsibilities (sizes re-checked 2026-09-01). Splitting them is listed as out of scope in PROJECT.md until a feature touches them.
 
 **Files with complexity concerns:**
 - `lib/services/checkout-pricing.ts` (811 lines) — pricing, tax, discounts, shipping allocation all in one file
@@ -210,9 +184,9 @@ Verified 2026-08-31 with `find app/api -type d -empty`: 12 empty directories, no
 
 **Issue:** Incomplete implementations marked but not tracked
 
-**Files:**
-- `app/api/webhooks/stripe/route.ts` line comment: `// TODO: Implement order status update`
-- `lib/hooks/useEnhancedUserContext.ts` line comment: `// TODO: Implement with product category mapping`
+**Files (re-verified 2026-09-01; these are the only two TODO/FIXME markers in `app/`, `lib/`, and `components/`):**
+- `app/api/webhooks/stripe/route.ts:351`: `// TODO: Implement order status update` — the whole `handlePaymentFailed` body is this comment. Tracked as OBS-05 (implement or remove).
+- `lib/hooks/useEnhancedUserContext.ts:140`: `favoriteCategories` is always `[]` — `// TODO: Implement with product category mapping`. Personalization silently lacks category affinity. Not tracked; low impact.
 
 **Impact:** Features partially implemented; may be forgotten; inconsistent behavior if someone relies on partial implementation
 
@@ -309,14 +283,21 @@ so a misbuilt deploy fails loudly instead of silently opening admin routes.
 
 ---
 
-## Dependencies at Risk
+## Accepted Risks
 
-### Stripe Test Keys Active
+Known, decided, and not fix targets. Listed so nobody re-raises them.
 
-**Files:** `wrangler.jsonc` lines 96-97
+### Test-Mode Publishable Keys in Production
 
-**Risk:** None while the site is a demo. Accepted by the owner; see the first entry in this document.
+**Decided:** 2026-09-01 by the owner.
+
+- `wrangler.jsonc` lines 96-97 carry `pk_test_*` publishable keys for Stripe and Clerk.
+- The deployed site is a demo environment with no live Stripe account. Test mode is intentional.
+- Publishable keys are public by design (they ship to the browser), so keeping them in a tracked config file is not a secret leak. Secrets (`STRIPE_SECRET_KEY`, `CLERK_SECRET_KEY`, `ADMIN_VECTORIZE_TOKEN`) live in Worker secrets and `.dev.vars`, which is gitignored.
+- `wrangler.jsonc` stays tracked: Cloudflare Workers Builds clones the repo, and `scripts/build-with-public-env.mjs`, `d1-migrate.mjs`, `check-deploy-config.mjs`, and `db-local-ensure.mjs` all read it.
+
+**Revisit when:** a live Stripe account is attached. Swap the two `vars` values for `pk_live_*` keys and confirm the `NEXT_PUBLIC_*` Workers Build variables match (build-time vars are separate from runtime vars).
 
 ---
 
-*Concerns audit: 2026-08-31*
+*Concerns audit: 2026-08-31; corrected 2026-09-01 after code verification*
