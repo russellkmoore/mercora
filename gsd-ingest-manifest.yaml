@@ -1,0 +1,75 @@
+# Typed manifest for /gsd-ingest-docs.
+#
+# Directory-convention discovery does not work for this repo: the docs are flat
+# in docs/ with no ADR-*/PRD-*/SPEC-* naming, so every file falls through to the
+# lowest-precedence DOC bucket. A manifest is authoritative and also sidesteps
+# the 644-file node_modules match a repo-root scan produces.
+#
+# Precedence: ADR > SPEC > PRD > DOC.
+#   ADR  - binding decisions that constrain future work
+#   SPEC - contracts and interfaces others build against
+#   PRD  - scope, roadmap, and completion plans
+#   DOC  - guides, references, assessments
+
+docs:
+  # --- ADR: binding decisions ---
+  # All four ADRs locked 2026-09-02 (Phase 3, ADR-02); the binding status marker lives in each doc.
+  - path: docs/checkout-trust-boundary.md
+    type: ADR          # checkout is one server-owned state transition
+    locked: true
+  - path: docs/webhooks-refunds-inventory.md
+    type: ADR          # D1 ledgers + cron are the recovery mechanism, not HTTP
+  - path: docs/database-migrations.md
+    type: ADR          # migrations are an explicit operator action, never on deploy
+  - path: docs/subscriptions.md
+    type: ADR          # acquisition off by default; never down-migrate state
+
+  # --- SPEC: contracts and interfaces ---
+  - path: docs/mcp-server-specification.md
+    type: SPEC
+  - path: docs/admin-dashboard-specification.md
+    type: SPEC
+  - path: docs/observability.md
+    type: SPEC         # commerce.telemetry.v1 data contract
+  - path: docs/content-publishing.md
+    type: SPEC         # public CMS/Blog API
+  - path: docs/runtime-configuration.md
+    type: SPEC         # store-config override variable contract
+  - path: docs/api-architecture.md
+    type: SPEC
+
+  # --- PRD: scope and plans ---
+  - path: docs/ROADMAP.md
+    type: PRD
+  - path: docs/o07-gift-cards-plan.md
+    type: PRD
+  - path: docs/mobile-improvements-actionable.md
+    type: PRD
+
+  # --- DOC: guides, references, assessments ---
+  - path: docs/architecture.md
+    type: DOC          # system diagrams; descriptive, not decisional
+  - path: docs/customer-communications.md
+    type: DOC
+  - path: docs/ai-pipeline.md
+    type: DOC
+  - path: docs/admin-authentication.md
+    type: DOC
+  - path: docs/dependency-security.md
+    type: DOC
+  - path: docs/migration-reservations.md
+    type: DOC
+  - path: docs/shopify-migration.md
+    type: DOC
+  - path: docs/mobile-testing-automation.md
+    type: DOC
+  - path: docs/mobile-ux-assessment.md
+    type: DOC
+  - path: docs/DEPLOYMENT_SETUP.md
+    type: DOC
+  - path: docs/STRIPE_INTEGRATION.md
+    type: DOC
+  - path: docs/README.md
+    type: DOC          # docs index
+  - path: docs/CLAUDE.md
+    type: DOC          # AI-assistant reference, 23K
