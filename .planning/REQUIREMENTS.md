@@ -26,7 +26,7 @@ Each maps to exactly one roadmap phase.
 
 ### Mobile Measurement (MOB)
 
-- [ ] **MOB-01**: A Lighthouse mobile baseline (performance score, LCP, CLS, TBT) is recorded for the home, a category, a product, and the checkout route on the live storefront, compared against the PRD target (performance >= 85, target 90+), and stored in `docs/` so the unchecked measurement items in `docs/mobile-improvements-actionable.md` are closed.
+- [x] **MOB-01**: A Lighthouse mobile baseline (performance score, LCP, CLS, TBT) is recorded for the home, a category, a product, and the checkout route on the live storefront, compared against the PRD target (performance >= 85, target 90+), and stored in `docs/` so the unchecked measurement items in `docs/mobile-improvements-actionable.md` are closed.
 
 ### Decision Lock-In (ADR)
 
@@ -132,7 +132,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | OBS-03 | Phase 2 | Pending |
 | OBS-04 | Phase 2 | Pending |
 | OBS-05 | Phase 2 | Pending |
-| MOB-01 | Phase 2 | Pending |
+| MOB-01 | Phase 2 | Complete |
 | ADR-01 | Phase 3 | Pending |
 | ADR-02 | Phase 3 | Pending |
 | RUN-01 | Phase 3 | Pending |
