@@ -103,8 +103,8 @@ mercora/
 │   └── ui/                   # shadcn/ui components
 ├── lib/                      # Core logic
 │   ├── auth/                 # Authentication & authorization
-│   │   ├── admin-middleware.ts  # Admin auth (currently disabled for dev)
-│   │   └── unified-auth.ts   # Unified auth system (disabled for dev)
+│   │   ├── admin-middleware.ts  # Admin auth choke point (enforced)
+│   │   └── unified-auth.ts   # Service token + Clerk session auth (enforced)
 │   ├── db/                   # Database & schema
 │   │   └── schema/           # Database schemas
 │   │       └── mcp.ts        # MCP-specific tables (agents, sessions, rate limits)
@@ -157,9 +157,8 @@ The admin dashboard is **fully implemented and functional** with comprehensive f
 - `/api/admin/vectorize` - Consolidated AI content indexing (products + knowledge)
 
 #### **Authentication Status**
-- **Current State**: Authentication is **temporarily DISABLED** for development
-- **Implementation**: Unified admin authentication system exists but bypassed
-- **Production Ready**: Full authentication system ready to be re-enabled
+- **Current State**: Admin authentication is enforced in production
+- **Source of Truth**: See `docs/admin-authentication.md` for the full mechanism
 
 ### Admin Features Implemented
 
@@ -189,33 +188,18 @@ The admin dashboard is **fully implemented and functional** with comprehensive f
 
 ## Authentication System
 
-### Current Implementation
-The platform has a comprehensive authentication system that is currently disabled for development:
+Two entry points enforce admin authentication: `checkAdminPermissions` in
+`lib/auth/admin-middleware.ts` and `authenticateRequest` in
+`lib/auth/unified-auth.ts`. Server-to-server calls authenticate with an
+`Authorization: Bearer` or `X-API-Key` header carrying `<ADMIN_VECTORIZE_TOKEN>`.
+Interactive access requires a Clerk session where `sessionClaims.metadata.role`
+is `admin`, or an active row in the `adminUsers` table (`isUserAdmin` in
+`lib/models/admin.ts`). Mutating requests must also match the request's own
+origin. The only bypass is the `x-dev-admin` header, honored only when
+`NODE_ENV` is `development`.
 
-#### **Admin Authentication**
-- **File**: `lib/auth/admin-middleware.ts`
-- **Status**: Disabled - returns `{ success: true, userId: "dev-admin" }`
-- **Original**: Token-based auth using `ADMIN_VECTORIZE_TOKEN` environment variable
-- **Future**: Role-based access with Clerk integration
-
-#### **Unified Authentication** 
-- **File**: `lib/auth/unified-auth.ts`
-- **Status**: Disabled - bypasses all checks and returns admin permissions
-- **Original**: Comprehensive API token system with permissions and rate limiting
-- **Capabilities**: Multi-method authentication (Bearer token, API key, query parameter)
-
-#### **Re-enabling Authentication**
-To re-enable authentication in production:
-1. Uncomment the authentication logic in both middleware files
-2. Configure proper admin roles in Clerk
-3. Set up API tokens for admin endpoints
-4. Remove the bypass logic that returns success without validation
-
-### Important Notes for Developers
-- **Development Mode**: All admin endpoints work without authentication
-- **API Calls**: No tokens required for `/api/admin/*` endpoints during development
-- **Production Ready**: Full authentication system exists and can be enabled quickly
-- **Security**: Never deploy to production with authentication disabled
+See `docs/admin-authentication.md` for the full mechanism, including the
+deployment safety guard.
 
 ## Database Schema (MACH Alliance Compliant)
 
@@ -315,7 +299,14 @@ The MCP server enables multi-agent commerce scenarios where personal shopping ag
 - Coordinate with other agents for multi-site purchases
 
 ### Vectorization
-Use `GET /api/admin/vectorize?token=<ADMIN_VECTORIZE_TOKEN>` for complete atomic rebuild of both products and knowledge articles. The admin token is securely managed via Cloudflare secrets in production and environment variables in development.
+Trigger a complete atomic rebuild of both products and knowledge articles:
+
+```bash
+curl -X GET "https://voltique.russellkmoore.me/api/admin/vectorize" \
+  -H "Authorization: Bearer <ADMIN_VECTORIZE_TOKEN>"
+```
+
+The admin token is securely managed via Cloudflare secrets in production and environment variables in development.
 
 ### Authentication
 All user-specific endpoints use Clerk middleware. User context is available via `auth()` helper.
@@ -338,9 +329,10 @@ npx wrangler secret put ADMIN_VECTORIZE_TOKEN
 ```
 
 **Authentication Methods:**
-- Query parameter: `?token=<ADMIN_VECTORIZE_TOKEN>`  
 - Authorization header: `Authorization: Bearer <ADMIN_VECTORIZE_TOKEN>`
 - X-API-Key header: `X-API-Key: <ADMIN_VECTORIZE_TOKEN>`
+
+Credentials are read from headers only. A credential in a URL leaks through server logs, browser history, and the Referer header — see the comment at `lib/auth/admin-middleware.ts:27`.
 
 Admin UI components use Clerk authentication, while direct API access uses token authentication.
 
@@ -413,7 +405,7 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 ### Live Environment
 - **Test URL**: https://voltique.russellkmoore.me
 - **Production**: Deployed on Cloudflare Workers
-- **Admin Token**: `voltique-admin` (for vectorize endpoints)
+- **Admin Token**: `<ADMIN_VECTORIZE_TOKEN>` — set as a Cloudflare Worker secret, never stored in the repository
 
 ### Build & Deploy Steps
 ```bash
@@ -453,7 +445,7 @@ npx wrangler deploy               # Deploy to Cloudflare Workers
 
 ### Adding New Products
 1. Create markdown file in `data/products_md/`
-2. Run `GET /api/admin/vectorize?token=<ADMIN_VECTORIZE_TOKEN>` to index (or use the admin UI)
+2. Use the admin UI, or run the header-form `curl` from the Vectorization section above to index
 3. Products automatically appear in catalog and AI context
 
 ### Modifying AI Behavior
