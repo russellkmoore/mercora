@@ -20,10 +20,10 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-01)
+See: .planning/PROJECT.md (updated 2026-09-02)
 
 **Core value:** A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** Phase 01 — Security and Admin-Auth Truth
+**Current focus:** Phase 2 — Observability and Regression Guards
 
 ## Current Position
 
@@ -87,7 +87,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 1] SEC-02 needs Russell to confirm whether the token published in `docs/CLAUDE.md` matches the live `ADMIN_VECTORIZE_TOKEN` secret (the value cannot be read back from Cloudflare). Plan should include a probe against the live endpoint with the published value.
+- [Phase 1 follow-up, needs Russell] Code-review WR-04: client-side dev-mode admin shortcuts in `components/admin/AdminGuard.tsx` are not covered by the deployment guard. Deferred by the orchestrator; bounded to a visible nav link on a misbuilt deploy. Sign off or schedule the fix (see `01-SECURITY.md` "Unregistered Flags" and `deferred-items.md`).
+- [Phase 1 follow-up, operator] On the next non-production deploy, confirm `/admin` returns 503 (the guard's live-bundle assumption was accepted on static evidence; step documented in `docs/admin-authentication.md`).
+- [Phase 1 side finding] A Worker secret named `ADMIN_USER_IDS` still exists in Cloudflare even though no code has read it since migration 0002. Candidate for deletion (`wrangler secret delete ADMIN_USER_IDS`) in a hygiene pass.
+- [Phase 1 side finding] Two Worker versions uploaded on 2026-08-31 (951a3547, 73dc8c9f) match no commit and were never promoted; superseded by the 2026-09-02 deploy of `main` (d60aa812). Likely local preview uploads.
+- [Resolved 2026-09-02] SEC-02: Russell confirmed the published token was live; rotated and proven dead (401/401).
 - [Resolved 2026-09-01] `wrangler.jsonc` carries `pk_test_` Stripe and Clerk publishable keys by design. Production is a demo environment with no live Stripe account. Keys stay as-is; `wrangler.jsonc` stays tracked (Workers Builds and four scripts read it).
 - [Phase 2] OBS-02 needs a sink choice (Workers Analytics Engine dataset vs bounded D1 table). No Analytics Engine binding exists in `wrangler.jsonc` today; adding one requires `npm run cf-typegen` and a deploy-config update.
 - [Phase 4] DEP-01 may find that Next 16.3.1 still bundles a flagged PostCSS or Sharp; if so, record a new bounded exception rather than weakening the gate.
@@ -103,7 +107,7 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-09-02T07:24:54.883Z
-Stopped at: Phase 1 complete, ready to plan Phase 2
+Stopped at: Phase 1 complete (verified, secured, Nyquist-compliant), ready to plan Phase 2
 Resume file: None
 
-Next: `/gsd-plan-phase 1`
+Next: `/gsd-plan-phase 2` (or continue `/gsd-autonomous --from 2`)
