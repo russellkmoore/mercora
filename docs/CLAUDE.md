@@ -59,12 +59,17 @@ npm run lint                   # Run Next.js linter
 
 # Deployment
 npm run deploy                 # Clean, build, and deploy to Cloudflare
+npm run deploy:ci              # Workers Builds path: applies production migrations, then deploys
 npm run clean                  # Remove build artifacts
 npm run preview               # Build and preview locally
 
 # Cloudflare
 npm run cf-typegen            # Generate Cloudflare types
 ```
+
+**Deploy paths:** `npm run deploy` builds and uploads the Worker and never applies remote migrations.
+`npm run deploy:ci` (used by Cloudflare Workers Builds) applies production migrations before upload.
+Apply migrations yourself with the guarded `db:migrate:*` scripts; `docs/database-migrations.md` is the binding source.
 
 **Important**: Always run `npm run lint` after making changes to ensure code quality.
 
@@ -218,9 +223,18 @@ deployment safety guard.
 
 **Migration Commands:**
 ```bash
-npx wrangler d1 migrations apply mercora-db --local  # Local
-npx wrangler d1 migrations apply mercora-db          # Production
+# Local (development)
+npx wrangler d1 migrations apply mercora-db --local
+
+# Preview - check, then apply
+npm run db:migrate:status:preview
+npm run db:migrate:apply:preview
+
+# Production - check, then apply behind the gate
+npm run db:migrate:status:production
+MERCORA_ALLOW_PRODUCTION_MIGRATIONS=1 npm run db:migrate:apply:production
 ```
+See `docs/database-migrations.md` for the binding migration policy.
 
 ## API Architecture
 
@@ -456,7 +470,10 @@ npx wrangler deploy               # Deploy to Cloudflare Workers
 ### Database Changes
 1. Modify schema in `lib/db/schema/`
 2. Generate migration with Drizzle
-3. Apply with `wrangler d1 migrations apply`
+3. Apply through the guarded scripts: `npm run db:migrate:status:preview` then
+   `npm run db:migrate:apply:preview` for preview; `npm run db:migrate:status:production` then
+   `MERCORA_ALLOW_PRODUCTION_MIGRATIONS=1 npm run db:migrate:apply:production` for production.
+   See `docs/database-migrations.md` for the binding migration policy.
 
 ## Performance Notes
 
