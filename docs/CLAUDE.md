@@ -302,7 +302,7 @@ The MCP server enables multi-agent commerce scenarios where personal shopping ag
 Trigger a complete atomic rebuild of both products and knowledge articles:
 
 ```bash
-curl -X GET "https://voltique.russellkmoore.me/api/admin/vectorize" \
+curl -X POST "https://voltique.russellkmoore.me/api/admin/vectorize" \
   -H "Authorization: Bearer <ADMIN_VECTORIZE_TOKEN>"
 ```
 
