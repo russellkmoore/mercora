@@ -145,6 +145,49 @@ describe('checkAdminPermissions credential transport', () => {
 
     expect(result.success).toBe(false);
   });
+
+  it('follows the normal Clerk flow in production under a deployed Workers UA', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubGlobal('navigator', { userAgent: 'Cloudflare-Workers' });
+    vi.mocked(auth).mockResolvedValue({
+      userId: 'user_admin',
+      sessionClaims: null,
+    } as never);
+
+    const result = await checkAdminPermissions(
+      new NextRequest('https://store.example.test/api/products', {
+        method: 'GET',
+      })
+    );
+
+    expect(result).toMatchObject({ success: true, userId: 'user_admin' });
+    expect(isUserAdmin).toHaveBeenCalledWith('user_admin');
+  });
+
+  it('still honors the dev bypass under Node native UA in local development', async () => {
+    // navigator left as Node's native value, not stubbed
+    const result = await checkAdminPermissions(
+      new NextRequest('http://localhost/api/products', {
+        headers: { 'x-dev-admin': 'mercora-dev-bypass' },
+      })
+    );
+
+    expect(result).toMatchObject({ success: true, isDevMode: true });
+  });
+
+  it('denies the service-token path too under development + Workers UA', async () => {
+    vi.stubGlobal('navigator', { userAgent: 'Cloudflare-Workers' });
+
+    const result = await checkAdminPermissions(
+      new NextRequest('http://localhost/api/admin/vectorize', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer service-secret' },
+      })
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.isServiceToken).not.toBe(true);
+  });
 });
 
 describe('isSuperAdminActor', () => {
