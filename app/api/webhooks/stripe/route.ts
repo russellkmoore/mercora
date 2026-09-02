@@ -48,6 +48,7 @@ import {
   handleChargeRefunded,
   handleRefundLifecycle,
 } from '@/app/api/webhooks/stripe/handlers/refund-handlers';
+import { mapDeclineReason } from '@/app/api/webhooks/stripe/handlers/decline-reason';
 import { recordTelemetry } from '@/lib/observability/telemetry';
 import { handleSubscriptionStripeEvent } from '@/app/api/webhooks/stripe/handlers/subscription-handlers';
 import { resolveRuntimeCommerceCapabilities } from '@/lib/commerce/runtime';
@@ -217,7 +218,7 @@ export async function POST(req: NextRequest) {
 
       case 'payment_intent.payment_failed':
         await handlePaymentFailed(event.data.object as Stripe.PaymentIntent);
-        outcome = 'ignored';
+        outcome = 'handled';
         break;
 
       case 'checkout.session.completed':
@@ -339,21 +340,17 @@ async function handlePaymentSucceeded(
 
 /**
  * Handle failed payment intent
- * Updates order status and handles payment failure scenarios
+ * Records a telemetry-only signal for the operator: no order-state change,
+ * no email, no inventory adjustment, no ledger write. ADR-WRI forbids state
+ * changes outside the ledgers, and a failed payment is not a ledger event.
  */
 async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
-  const orderId = paymentIntent.metadata.orderId;
-  
-  if (!orderId) return;
-
   try {
-    // Update order status to failed
-    // TODO: Implement order status update
-    // You can add additional logic here:
-    // - Send failure notification emails
-    // - Restore inventory if needed
-    // - Log payment failure reasons
-    
+    recordTelemetry('payment.intent_failed', {
+      provider: 'stripe',
+      outcome: 'failed',
+      reason: mapDeclineReason(paymentIntent.last_payment_error),
+    });
   } catch (error) {
     recordTelemetry('webhook.processing_failed', {
       operation: 'process', outcome: 'failed', provider: 'd1', retryable: true,
