@@ -35,8 +35,8 @@ Each maps to exactly one roadmap phase.
 
 ### Operator Runbooks (RUN)
 
-- [ ] **RUN-01**: `docs/CLAUDE.md` (lines ~237–238, ~467) and `docs/DEPLOYMENT_SETUP.md` (lines ~29, ~248–251) show only the guarded migration commands (`db:migrate:status:*`, `db:migrate:apply:*`, production gated by `MERCORA_ALLOW_PRODUCTION_MIGRATIONS=1`), state that `npm run deploy` never applies remote migrations while `npm run deploy:ci` (Workers Builds) applies production migrations before upload, and require Node 24 (not 18). No unguarded `wrangler d1 migrations apply mercora-db` for production remains.
-- [ ] **RUN-02**: The Stripe webhook event lists in `docs/DEPLOYMENT_SETUP.md` (~lines 203–210) and `docs/STRIPE_INTEGRATION.md` (~lines 60–67) match ADR-WRI-02's required set (`payment_intent.succeeded`, `charge.refunded`, `refund.updated`, `refund.failed`, legacy `charge.refund.updated`) plus the subscription events ADR-SUB actually handles. Events with no handler after OBS-05 (`checkout.session.completed`, and `payment_intent.payment_failed` if removed) are gone.
+- [x] **RUN-01**: `docs/CLAUDE.md` (lines ~237–238, ~467) and `docs/DEPLOYMENT_SETUP.md` (lines ~29, ~248–251) show only the guarded migration commands (`db:migrate:status:*`, `db:migrate:apply:*`, production gated by `MERCORA_ALLOW_PRODUCTION_MIGRATIONS=1`), state that `npm run deploy` never applies remote migrations while `npm run deploy:ci` (Workers Builds) applies production migrations before upload, and require Node 24 (not 18). No unguarded `wrangler d1 migrations apply mercora-db` for production remains.
+- [x] **RUN-02**: The Stripe webhook event lists in `docs/DEPLOYMENT_SETUP.md` (~lines 203–210) and `docs/STRIPE_INTEGRATION.md` (~lines 60–67) match ADR-WRI-02's required set (`payment_intent.succeeded`, `charge.refunded`, `refund.updated`, `refund.failed`, legacy `charge.refund.updated`) plus the subscription events ADR-SUB actually handles. Events with no handler after OBS-05 (`checkout.session.completed`, and `payment_intent.payment_failed` if removed) are gone.
 
 ### Reference Documentation (REF)
 
@@ -135,8 +135,8 @@ Explicitly excluded. Documented to prevent scope creep.
 | MOB-01 | Phase 2 | Complete |
 | ADR-01 | Phase 3 | Complete |
 | ADR-02 | Phase 3 | Complete |
-| RUN-01 | Phase 3 | Pending |
-| RUN-02 | Phase 3 | Pending |
+| RUN-01 | Phase 3 | Complete |
+| RUN-02 | Phase 3 | Complete |
 | REF-01 | Phase 4 | Pending |
 | REF-02 | Phase 4 | Pending |
 | REF-03 | Phase 4 | Pending |
