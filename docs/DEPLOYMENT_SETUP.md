@@ -26,7 +26,7 @@ Mercora runs on Cloudflare's edge infrastructure with integrated services:
 4. **GitHub Account** - Repository hosting and optional CI/CD
 
 ### Local Development Environment
-- **Node.js 18+** and npm/yarn/pnpm
+- **Node.js 24.18.1** (pinned in `.nvmrc` and `engines` in `package.json`) and npm/yarn/pnpm
 - **Git** for version control
 - **Wrangler CLI**: `npm install -g wrangler`
 - **Terminal/Command Line** access
@@ -203,12 +203,28 @@ From Stripe Dashboard > **Developers > API Keys**:
 2. Click **+ Add endpoint**
 3. Set endpoint URL: `https://yourdomain.com/api/webhooks/stripe`
 4. Select events:
+   **Required** (core checkout and refunds):
    - `payment_intent.succeeded`
-   - `payment_intent.payment_failed`
-   - `checkout.session.completed`
+   - `payment_intent.payment_failed` (telemetry only; the subscription is deliberately retained)
    - `charge.refunded`
    - `refund.updated`
    - `refund.failed`
+
+   **Subscriptions** (required once acquisition is enabled):
+   - `invoice.paid`
+   - `invoice.payment_succeeded`
+   - `invoice.payment_failed`
+   - `invoice.payment_attempt_required`
+   - `customer.subscription.created`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+   - `customer.subscription.paused`
+   - `customer.subscription.resumed`
+   - `customer.subscription.pending_update_applied`
+   - `customer.subscription.pending_update_expired`
+
+   `charge.refund.updated` is accepted for compatibility with older Stripe event configurations but is not required; `refund.updated` is the preferred lifecycle event.
+   `docs/webhooks-refunds-inventory.md` is the binding source for the required set.
 5. Copy the **Signing secret** (starts with `whsec_`)
 
 ### **Step 5: Configure Environment Variables**
@@ -244,12 +260,18 @@ Update `wrangler.jsonc` vars:
 
 ### **Step 1: Run Migrations**
 ```bash
-# Apply migrations to local database (for development)
+# Local (development)
 npx wrangler d1 migrations apply mercora-db --local
 
-# Apply migrations to production database
-npx wrangler d1 migrations apply mercora-db
+# Preview - check, then apply
+npm run db:migrate:status:preview
+npm run db:migrate:apply:preview
+
+# Production - check, then apply behind the gate
+npm run db:migrate:status:production
+MERCORA_ALLOW_PRODUCTION_MIGRATIONS=1 npm run db:migrate:apply:production
 ```
+See `docs/database-migrations.md` for the binding migration policy.
 
 ### **Step 2: Seed Data (Optional)**
 ```bash
@@ -277,6 +299,10 @@ Ensure your content is properly organized:
 - Content should be uploaded to R2 bucket before indexing
 
 ### **Step 2: Deploy and Index Content**
+
+**Deploy paths:** `npm run deploy` builds and uploads the Worker and never applies remote migrations.
+`npm run deploy:ci` (used by Cloudflare Workers Builds) applies production migrations before upload.
+Apply migrations yourself with the guarded `db:migrate:*` scripts; `docs/database-migrations.md` is the binding source.
 ```bash
 # Deploy the application first
 npm run deploy
