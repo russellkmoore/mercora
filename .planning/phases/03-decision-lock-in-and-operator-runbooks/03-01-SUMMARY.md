@@ -149,6 +149,10 @@ Why this is not automated: the in-phase gates are structural (marker text, manif
 
 Plans 03-02 and 03-03 (operator runbooks, RUN-01/RUN-02) do not depend on this plan (`depends_on: []` in all three) and can proceed independently. Ready for `03-02`.
 
+## Self-Check: PASSED
+
+All key files confirmed present on disk (`docs/checkout-trust-boundary.md`, `docs/webhooks-refunds-inventory.md`, `docs/database-migrations.md`, `docs/subscriptions.md`, `gsd-ingest-manifest.yaml`, this SUMMARY). All three commits (`083e2dd`, `f0f4027`, `b3de45a`) confirmed present in `git log`. All task acceptance criteria and the plan-level `<verification>` block (including `npm run lint`) were re-run and passed.
+
 ---
 *Phase: 03-decision-lock-in-and-operator-runbooks*
 *Completed: 2026-09-02*
