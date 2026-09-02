@@ -28,11 +28,17 @@ export type DeploymentPosture =
  * `navigator.userAgent` there is not exactly `Cloudflare-Workers`.
  */
 export function isDeployedDevelopmentBuild(): boolean {
-  return (
-    typeof navigator !== 'undefined' &&
-    navigator.userAgent === 'Cloudflare-Workers' &&
-    process.env.NODE_ENV === 'development'
-  );
+  try {
+    return (
+      typeof navigator === 'object' &&
+      navigator !== null &&
+      typeof navigator.userAgent === 'string' &&
+      navigator.userAgent === 'Cloudflare-Workers' &&
+      process.env.NODE_ENV === 'development'
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
