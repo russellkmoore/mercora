@@ -13,7 +13,7 @@ Mercora's commerce core is shipped and live as Voltique. This first GSD mileston
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Security and Admin-Auth Truth** - Scrub published secrets, rotate the admin token, assert `NODE_ENV` at startup, and make every doc describe admin auth as it actually works
+- [x] **Phase 1: Security and Admin-Auth Truth** - Scrub published secrets, rotate the admin token, assert `NODE_ENV` at startup, and make every doc describe admin auth as it actually works (completed 2026-09-02)
 - [ ] **Phase 2: Observability and Regression Guards** - Give tax fallback and web vitals a real signal, type the slug routes with 404 tests, widen allocation tests, resolve the webhook TODO, and record a Lighthouse baseline
 - [ ] **Phase 3: Decision Lock-In and Operator Runbooks** - Supersede ADR-CTB-15, mark all four ADRs Accepted and locked, and correct the migration, deploy, Node, and webhook runbooks
 - [ ] **Phase 4: Reference Documentation Refresh** - Right model and tool count everywhere, real test/CI description, complete README index, historical banners, and a refreshed dependency baseline with a higher audit gate
@@ -96,7 +96,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Security and Admin-Auth Truth | 4/4 | In Progress|  |
+| 1. Security and Admin-Auth Truth | 4/4 | Complete    | 2026-09-02 |
 | 2. Observability and Regression Guards | 0/TBD | Not started | - |
 | 3. Decision Lock-In and Operator Runbooks | 0/TBD | Not started | - |
 | 4. Reference Documentation Refresh | 0/TBD | Not started | - |
