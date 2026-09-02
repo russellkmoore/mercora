@@ -1,7 +1,10 @@
 ---
 phase: 03-decision-lock-in-and-operator-runbooks
 verified: 2026-09-02T23:10:00Z
-status: human_needed
+status: passed
+previous_status: human_needed
+human_verified: 2026-09-02T23:55:00Z
+human_verification_result: "passed — ingest re-run on throwaway branch tmp/ingest-check classified all four ADRs as LOCKED; prior W1 and I17 reported closed (I2-resolved, I4-resolved); see 03-UAT.md"
 score: 12/12 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0
@@ -15,7 +18,7 @@ human_verification:
 
 **Phase Goal:** The binding decisions state what the code does and are marked binding, and the runbooks an operator follows for migrations, deploys, and Stripe webhooks are correct.
 **Verified:** 2026-09-02T23:10:00Z
-**Status:** human_needed
+**Status:** passed (human verification item completed 2026-09-02; see 03-UAT.md)
 **Re-verification:** No — initial verification
 
 ## Goal Achievement
