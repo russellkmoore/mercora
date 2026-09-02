@@ -1,0 +1,29 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/customer-communications.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Customer accounts and communications",
+  "summary": "Describes customer account navigation, the provider-neutral email delivery policy (Cloudflare Email Sending or Resend), unsubscribe tokens, merchant notifications, and deferred privacy operations.",
+  "scope": [
+    "customer accounts",
+    "/account/orders redirect",
+    "email delivery",
+    "EMAIL_PROVIDER (cloudflare | resend)",
+    "EMAIL send_email binding",
+    "D1 delivery keys and needs_review quarantine",
+    "transactional emails",
+    "review reminders",
+    "unsubscribe HMAC tokens",
+    "merchant fulfillment notification",
+    "migration 0018_add_email_preferences.sql",
+    "cf-typegen / cf-typecheck",
+    "account deletion and data export (deferred)"
+  ],
+  "cross_refs": [
+    "0018_add_email_preferences.sql"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": "Type set by manifest (DOC). Content is operator-facing prose; no ADR/PRD/SPEC structure, though it states several behavioral constraints (no provider fallthrough, needs_review quarantine, fail-closed reminders) the synthesizer may want as context. Filename suffix is a fixed unique token, not a SHA-256, because this agent has no shell; matches sibling convention."
+}

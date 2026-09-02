@@ -1,0 +1,29 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/mobile-testing-automation.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Mobile Testing Automation Setup",
+  "summary": "Setup guide for automated mobile testing and performance monitoring: Lighthouse CI config, Core Web Vitals tracking, Playwright mobile tests, device matrix script, and metrics dashboard.",
+  "scope": [
+    "Lighthouse CI",
+    ".lighthouserc.json",
+    "Core Web Vitals",
+    "web-vitals",
+    "lib/hooks/useWebVitals.ts",
+    "app/api/analytics/vitals/route.ts",
+    "Playwright",
+    "tests/mobile/mobile-navigation.spec.js",
+    "tests/mobile/mobile-performance.spec.js",
+    "scripts/mobile-test-matrix.js",
+    "components/admin/MobileDashboard.tsx",
+    "npm scripts",
+    "mobile navigation",
+    "cart",
+    "checkout"
+  ],
+  "cross_refs": [],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

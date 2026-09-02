@@ -1,0 +1,35 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/checkout-trust-boundary.md",
+  "type": "ADR",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Order and checkout trust boundary",
+  "summary": "Defines checkout as a server-owned state transition: authoritative pricing, PaymentIntent verification, guarded paid CAS, order authorization, inventory and refund authority.",
+  "scope": [
+    "checkout",
+    "POST /api/payment-intent",
+    "Stripe PaymentIntent",
+    "orders",
+    "paid order effects",
+    "Stripe webhook finalizer",
+    "PUT /api/orders",
+    "order authorization",
+    "shipping.allowed_countries",
+    "gift cards",
+    "subscriptions",
+    "lib/commerce/capabilities.ts",
+    "coupon_reconciliation_codes",
+    "product_variants.inventory",
+    "inventory_adjustments",
+    "refunds",
+    "fulfillment / shipment transition",
+    "MCP checkout",
+    "D1 migrations 0008-0011"
+  ],
+  "cross_refs": [
+    "./webhooks-refunds-inventory.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": "Type set by manifest (ADR). Source has no Status field and no Decision/Consequences sections, so locked stays false per the Accepted-only rule; synthesizer may treat as locked if the manifest intends it. Filename suffix is a fallback: no shell available to compute SHA-256 of the path."
+}

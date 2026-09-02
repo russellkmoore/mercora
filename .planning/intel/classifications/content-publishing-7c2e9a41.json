@@ -1,0 +1,13 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/content-publishing.md",
+  "type": "SPEC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Content publishing",
+  "summary": "Store-neutral CMS pages and Blog publishing: public CMS API response contract, Blog image upload and CDN handling, migration 0019 deployment and rollback rules.",
+  "scope": ["CMS pages", "Blog publishing", "migration 0019", "GET /api/pages", "PublicPageSummary", "R2 upload route", "NEXT_PUBLIC_IMAGE_CDN", "deployment and rollback"],
+  "cross_refs": [],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

@@ -1,0 +1,13 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/database-migrations.md",
+  "type": "ADR",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Database migrations",
+  "summary": "Remote D1 migrations are an explicit operator action, not part of deploy; preview requires preview_database_id, production requires an env guard, migrations stay additive.",
+  "scope": ["D1 migrations", "npm run deploy", "npm run db:prepare:local", "db:migrate:status", "db:migrate:apply", "preview_database_id", "MERCORA_ALLOW_PRODUCTION_MIGRATIONS", "expand/contract migrations", "production backups"],
+  "cross_refs": [],
+  "locked": true,
+  "precedence": null,
+  "notes": "Type set by manifest (ADR). Content has no Status/Decision/Consequences sections; reads as a runbook with embedded policy decisions (no auto-apply on deploy, preview abort without preview_database_id, production env guard, additive-only). No explicit Accepted status in source; locked=true follows manifest ADR declaration. Output filename hash suffix could not be computed (no shell available) and is a stand-in, not a real SHA-256 prefix."
+}

@@ -1,0 +1,35 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/webhooks-refunds-inventory.md",
+  "type": "ADR",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Webhooks, refunds, and inventory operations",
+  "summary": "Durable, retryable processing model for Stripe webhooks, refunds, and variant inventory using D1 ledgers and a scheduled worker.",
+  "scope": [
+    "Stripe webhooks",
+    "processed_webhook_events",
+    "order_effects",
+    "inventory_adjustments",
+    "product_variants.inventory",
+    "refunds",
+    "POST /api/orders/refund",
+    "refund.external_full_restock_enabled",
+    "fulfillment hold",
+    "SHIPMENT_NO_UNSETTLED_REFUNDS_SQL",
+    "D1 migrations 0008-0011",
+    "worker.ts cron"
+  ],
+  "cross_refs": [
+    "lib/utils/refund-validation.ts",
+    "worker.ts",
+    ".env.example",
+    "wrangler.jsonc",
+    "0008_add_processed_webhook_events.sql",
+    "0009_add_order_effects.sql",
+    "0010_add_inventory_adjustments.sql",
+    "0011_add_external_refund_restock_setting.sql"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": "Type set by manifest (ADR). Source has no frontmatter and no Status field, so locked is false per the Accepted-only rule. Content reads as an operational spec/runbook (config, migration order, ledger contracts, SQL inspection queries) rather than a Context/Decision/Consequences record; heuristic classification alone would have yielded SPEC. Filename hash suffix is a deterministic placeholder because no shell was available to compute SHA-256."
+}

@@ -1,0 +1,28 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/admin-dashboard-specification.md",
+  "type": "SPEC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Voltique Admin Dashboard - Technical Specification",
+  "summary": "Technical specification for the Voltique admin dashboard covering architecture, module interfaces, security model, UI layout, roadmap, and success metrics.",
+  "scope": [
+    "admin dashboard",
+    "product management",
+    "inventory management",
+    "order management",
+    "customer management",
+    "AI management",
+    "analytics and reporting",
+    "system configuration",
+    "authentication and authorization",
+    "audit logging",
+    "Next.js 15",
+    "Cloudflare D1",
+    "Cloudflare R2",
+    "Clerk"
+  ],
+  "cross_refs": [],
+  "locked": false,
+  "precedence": null,
+  "notes": "Type set by manifest (SPEC). Content agrees: TypeScript interface contracts per module, security model, architecture stack. Also contains PRD-style sections (user personas, vision statement, success metrics, roadmap) that the synthesizer may want to mine for requirements. Output filename omits the SHA-256 suffix because this agent has no execution tool to compute it."
+}

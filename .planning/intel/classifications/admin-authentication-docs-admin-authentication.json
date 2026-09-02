@@ -1,0 +1,27 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/admin-authentication.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Admin Authentication System",
+  "summary": "Explains Mercora's admin authentication: AdminGuard client protection, checkAdminPermissions server middleware, Clerk role checks, dev bypass, API token auth, and environment configuration.",
+  "scope": [
+    "admin authentication",
+    "AdminGuard",
+    "checkAdminPermissions",
+    "lib/auth/admin-middleware.ts",
+    "app/admin/layout.tsx",
+    "Clerk",
+    "role-based access control",
+    "ADMIN_USER_IDS",
+    "ADMIN_VECTORIZE_TOKEN",
+    "dev bypass",
+    "admin API routes"
+  ],
+  "cross_refs": [
+    "CLAUDE.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": "Type set by manifest (DOC). Content signals agree: prose guide with architecture overview, config tables, testing steps, and future enhancements; no ADR decision/consequences structure, no user stories or acceptance criteria. Note: this doc says production auth is enabled, while docs/CLAUDE.md says admin auth is disabled for development; synthesizer should treat the security claims as unverified context. Filename suffix is path-derived (docs-admin-authentication) rather than a SHA-256 prefix because no shell was available to hash the path."
+}

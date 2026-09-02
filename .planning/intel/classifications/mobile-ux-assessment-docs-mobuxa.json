@@ -1,0 +1,27 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/mobile-ux-assessment.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Mobile UX Assessment - Mercora Platform",
+  "summary": "Mobile UX evaluation of the Mercora storefront: component-level findings, device testing checklist, performance monitoring setup, prioritized improvements, and target metrics.",
+  "scope": [
+    "HeaderClient.tsx",
+    "ProductCard.tsx",
+    "CartDrawer.tsx",
+    "CheckoutClient.tsx",
+    "button.tsx",
+    "mobile navigation",
+    "checkout flow",
+    "touch targets",
+    "Core Web Vitals",
+    "Lighthouse CI",
+    "PWA",
+    "mobile accessibility",
+    "Volt chat interface"
+  ],
+  "cross_refs": [],
+  "locked": false,
+  "precedence": null,
+  "notes": "MANIFEST_TYPE=DOC applied as authoritative. Content agrees: assessment prose, testing checklists, and recommendations; no decision record, user stories, or API contracts. Note the doc contains performance targets (FCP < 1.5s, LCP < 2.5s, CLS < 0.1, touch targets 48px) and a prioritized recommendation list that a synthesizer may want to surface as candidate non-functional requirements despite DOC precedence. Output filename uses a path-derived suffix (docs-mobuxa) instead of a SHA-256 hash because no hashing tool is available in this agent; consistent with sibling classification files."
+}

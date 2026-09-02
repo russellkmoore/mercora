@@ -1,0 +1,27 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/observability.md",
+  "type": "SPEC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Privacy-safe commerce observability",
+  "summary": "Defines the commerce.telemetry.v1 telemetry envelope contract, the observability Tail Worker design, its deployment order, and validation gates.",
+  "scope": [
+    "commerce.telemetry.v1 telemetry envelope",
+    "workers/observability-tail Tail Worker",
+    "AlertCooldown Durable Object",
+    "Analytics Engine (COMMERCE_ANALYTICS)",
+    "alert email provider adapter (Cloudflare Email Sending, Resend)",
+    "EMAIL_PROVIDER configuration",
+    "producer tail_consumers bindings",
+    "recordTelemetry",
+    "validation gates and non-production canary"
+  ],
+  "cross_refs": [
+    "workers/observability-tail/wrangler.jsonc",
+    "workers/observability-tail/worker-configuration.d.ts",
+    "producer-bindings.example.jsonc"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": "Type set by manifest (SPEC). Content agrees: closed data contract, worker behavior rules, config contract, and test gates. No Bash tool available in this session, so the SHA-256 path hash could not be computed; filename uses a fixed 'docs-obs' suffix instead of the 8-hex hash."
+}

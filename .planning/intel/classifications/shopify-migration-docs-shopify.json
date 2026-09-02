@@ -1,0 +1,30 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/shopify-migration.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Shopify migration toolkit",
+  "summary": "Operator runbook for the Shopify-to-Mercora migration toolkit: prerequisites, input layout, configuration, dry run, sensitive data, apply targets, deployment order, and rollback.",
+  "scope": [
+    "Shopify migration toolkit",
+    "npm run migrate:shopify",
+    "Cloudflare D1",
+    "Cloudflare R2 MEDIA bucket",
+    "Clerk identities",
+    "Judge.me reviews",
+    "Shopify Admin API",
+    "wrangler.jsonc bindings",
+    "historical orders",
+    "customers",
+    "catalog and content import",
+    "legacy redirects (redirect_map)",
+    "/media/* object serving",
+    "media validation",
+    "D1 backup and rollback",
+    "migration 0020"
+  ],
+  "cross_refs": [],
+  "locked": false,
+  "precedence": null,
+  "notes": "Type set by manifest (DOC). Content agrees: prose runbook with procedural sections, no Decision/Consequences, no user stories, no endpoint or schema tables. Contains operational constraints (env vars, flags, ordering rules) that read as SPEC-like technical constraints; synthesizer may want to surface them as context. No markdown links or doc paths referenced, so cross_refs is empty. Output filename suffix is path-derived, not a SHA-256 (no shell available to compute a hash)."
+}
