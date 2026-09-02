@@ -46,12 +46,13 @@ A customer or an external AI agent can find the right outdoor gear through Volt,
 - ✓ `payment_intent.payment_failed` handled as telemetry only (`payment.intent_failed` with an allowlisted `reason`), no order-state change — Phase 2 (OBS-05)
 - ✓ Mobile Lighthouse baseline recorded in `docs/mobile-lighthouse-baseline.md`: all four routes score 72–80 against the 85 target — Phase 2 (MOB-01)
 
+- ✓ `docs/checkout-trust-boundary.md` states MCP checkout is inside the paid inventory boundary and names the shared pricing service and finalizer; all four ADR docs carry a dated `**Status:** Accepted` marker and `gsd-ingest-manifest.yaml` (now tracked) marks them `locked: true`; a throwaway-branch ingest re-run classified all four as locked with the prior W1 and I17 closed — Phase 3 (ADR-01, ADR-02)
+- ✓ Runbooks match the repo: `docs/CLAUDE.md` and `docs/DEPLOYMENT_SETUP.md` show only the guarded `db:migrate:*` scripts, the `deploy` versus `deploy:ci` distinction, and Node 24.18.1; both Stripe webhook event lists are identical 16-event Required/Subscriptions groups matching the route's dispatch switch, and the dead `checkout.session.completed` branch is gone from the route with a regression test pinning the unhandled-event contract — Phase 3 (RUN-01, RUN-02)
+
 ### Active
 
 <!-- v1 = hardening milestone. Verified gaps only. Full definitions in REQUIREMENTS.md. -->
 
-- [ ] `docs/checkout-trust-boundary.md` says MCP is inside the paid boundary; all four ADRs carry an explicit Accepted status and are marked locked in the ingest manifest (ADR-01, ADR-02)
-- [ ] Migration, deploy, Node, and Stripe-webhook runbooks are correct (RUN-01, RUN-02)
 - [ ] Reference docs name the right LLM and tool count, describe the real test/CI setup, index all 26 docs, and label historical material (REF-01..04)
 - [ ] Dependency audit gate raised to `high` now that Next 16 has landed, and `docs/dependency-security.md` refreshed (DEP-01)
 
@@ -148,6 +149,9 @@ A customer or an external AI agent can find the right outdoor gear through Volt,
 | `handlePaymentFailed` is telemetry-only and the `payment_intent.payment_failed` subscription stays (Phase 2) | ADR-WRI forbids order-state changes outside the ledgers; the event is still useful ops signal | ✓ Good — runbook update is RUN-02 in Phase 3 |
 | `allocateDiscount` caps every line at its own capacity and redistributes remainder cents ascending by index (Phase 2, code-review CR-01) | The old algorithm could give the last line more discount than its value, producing a negative net line and a crash in the fallback tax path | ✓ Good — invariants pinned by tests |
 | Live sitemap advertises `mercora.example.com` because `NEXT_PUBLIC_SITE_URL` is only a runtime var, not a Workers Build var (Phase 2 finding) | `app/sitemap.ts` resolves the host at build time | — Pending Russell: add the Build variable and redeploy |
+| ADR status markers are one `**Status:** Accepted (YYYY-MM-DD)` line under each H1, dated to each doc's first commit, not to the day they were labeled (Phase 3) | The classifier keys on the literal `Status: Accepted`; the first-commit date is when the decision actually took effect. The manifest `locked: true` keys are a human-readable record only; the classifier does not read them | ✓ Good — ingest re-run classified all four ADRs LOCKED |
+| `payment_intent.payment_failed` stays subscribed and is listed under Required in both runbooks; `checkout.session.completed` removed from docs and from the route's dispatch switch (Phase 3) | Phase 2 made the failed-payment handler telemetry-only but kept the event; the checkout-session case was a comment-only no-op returning `ignored`, identical to `default`, so deleting it is behavior-neutral and makes "docs match the route" literally true | ✓ Good — 29 deletions, 0 insertions; regression test pins the fall-through |
+| Remote migration commands in runbooks are the four `db:migrate:*` npm scripts only; local keeps `wrangler d1 migrations apply --local`; `npm run deploy` never applies remote migrations, `npm run deploy:ci` does (Phase 3) | The scripts wrap `scripts/d1-migrate.mjs`, which gates production on `--confirm-production` plus `MERCORA_ALLOW_PRODUCTION_MIGRATIONS=1`; the docs must not offer an unguarded path | ✓ Good |
 
 ---
-*Last updated: 2026-09-02 after Phase 2*
+*Last updated: 2026-09-02 after Phase 3*
