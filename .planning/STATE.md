@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 01
 current_phase_name: Security and Admin-Auth Truth
 status: executing
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-09-02T06:37:00.225Z"
+stopped_at: Completed 01-03-PLAN.md
+last_updated: "2026-09-02T06:46:01.444Z"
 last_activity: 2026-09-01
 last_activity_desc: Phase 01 execution started
-state_head: 35cc4beb2760bca96572c1e471d7c6f2f2683b39
+state_head: ec7b25b8823c5fe95dcf585dda6c9eb92ad05758
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 01 (Security and Admin-Auth Truth) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-09-01 — Phase 01 execution started
 
@@ -59,6 +59,7 @@ Progress: [░░░░░░░░░░] 0%
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 01 P01 | 20min | 3 tasks | 6 files |
+| Phase 01 P03 | 24min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,7 @@ Recent decisions affecting current work:
 - [Init]: ADR-DBM-01..05 locked by manifest; the other three ADR sources are treated as locked per user direction and will be marked so in ADR-02
 - [Phase 01]: Guard's recordTelemetry call kept exclusively in new lib/auth/deployment-guard.ts to avoid tripping the observability AST contract test against admin-middleware.ts's existing console.error(label, error) catch block
 - [Phase 01]: assertDeploymentPosture() returns a discriminated union rather than throwing, matching the codebase's denial-as-return-value convention
+- [Phase 01]: docs/CLAUDE.md and docs/admin-authentication.md corrected to describe the real isUserAdmin/adminUsers mechanism; phantom ADMIN_USER_IDS env var removed from all tracked docs/components/lib/app — SEC-04 requires docs to match code exactly; the file designated as source of truth had to be right, including bullets not explicitly itemized in the plan
 
 ### Pending Todos
 
@@ -96,8 +98,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-02T06:37:00.216Z
-Stopped at: Completed 01-01-PLAN.md
+Last session: 2026-09-02T06:46:01.434Z
+Stopped at: Completed 01-03-PLAN.md
 Resume file: None
 
 Next: `/gsd-plan-phase 1`
