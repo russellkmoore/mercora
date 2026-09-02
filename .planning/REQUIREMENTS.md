@@ -30,8 +30,8 @@ Each maps to exactly one roadmap phase.
 
 ### Decision Lock-In (ADR)
 
-- [ ] **ADR-01**: `docs/checkout-trust-boundary.md` no longer states that MCP checkout is outside the paid inventory boundary (lines ~101–103). It states that MCP `create_payment_intent` and `place_order` use the shared checkout pricing service and the same idempotent finalizer (`lib/services/order-finalization.ts`) as the storefront and webhook paths, and that MCP is inside the boundary.
-- [ ] **ADR-02**: The four ADR docs (`checkout-trust-boundary.md`, `database-migrations.md`, `subscriptions.md`, `webhooks-refunds-inventory.md`) each carry an explicit `Status: Accepted` marker with a date, and `gsd-ingest-manifest.yaml` marks all four `locked: true`. Re-running `/gsd-ingest-docs` classifies all four as locked and produces neither the I17 lock-status note nor the W1 warning.
+- [x] **ADR-01**: `docs/checkout-trust-boundary.md` no longer states that MCP checkout is outside the paid inventory boundary (lines ~101–103). It states that MCP `create_payment_intent` and `place_order` use the shared checkout pricing service and the same idempotent finalizer (`lib/services/order-finalization.ts`) as the storefront and webhook paths, and that MCP is inside the boundary.
+- [x] **ADR-02**: The four ADR docs (`checkout-trust-boundary.md`, `database-migrations.md`, `subscriptions.md`, `webhooks-refunds-inventory.md`) each carry an explicit `Status: Accepted` marker with a date, and `gsd-ingest-manifest.yaml` marks all four `locked: true`. Re-running `/gsd-ingest-docs` classifies all four as locked and produces neither the I17 lock-status note nor the W1 warning.
 
 ### Operator Runbooks (RUN)
 
@@ -133,8 +133,8 @@ Explicitly excluded. Documented to prevent scope creep.
 | OBS-04 | Phase 2 | Complete |
 | OBS-05 | Phase 2 | Complete |
 | MOB-01 | Phase 2 | Complete |
-| ADR-01 | Phase 3 | Pending |
-| ADR-02 | Phase 3 | Pending |
+| ADR-01 | Phase 3 | Complete |
+| ADR-02 | Phase 3 | Complete |
 | RUN-01 | Phase 3 | Pending |
 | RUN-02 | Phase 3 | Pending |
 | REF-01 | Phase 4 | Pending |
