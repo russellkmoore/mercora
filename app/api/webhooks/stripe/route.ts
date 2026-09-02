@@ -345,18 +345,14 @@ async function handlePaymentSucceeded(
  * changes outside the ledgers, and a failed payment is not a ledger event.
  */
 async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
-  try {
-    recordTelemetry('payment.intent_failed', {
-      provider: 'stripe',
-      outcome: 'failed',
-      reason: mapDeclineReason(paymentIntent.last_payment_error),
-    });
-  } catch (error) {
-    recordTelemetry('webhook.processing_failed', {
-      operation: 'process', outcome: 'failed', provider: 'd1', retryable: true,
-      path: '/api/webhooks/stripe', trigger: 'webhook',
-    }, error);
-  }
+  // recordTelemetry fails open by contract (see lib/observability/telemetry.ts)
+  // and mapDeclineReason is total over all inputs, so neither can throw here;
+  // no try/catch needed.
+  recordTelemetry('payment.intent_failed', {
+    provider: 'stripe',
+    outcome: 'failed',
+    reason: mapDeclineReason(paymentIntent.last_payment_error),
+  });
 }
 
 /**
