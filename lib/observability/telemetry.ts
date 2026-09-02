@@ -69,6 +69,9 @@ export const TELEMETRY_EVENTS = {
   'cron.recovery_failed': { severity: 'critical', sampleRate: 1 },
   'cron.analytics_failed': { severity: 'critical', sampleRate: 1 },
   'auth.deployment_guard_tripped': { severity: 'critical', sampleRate: 1 },
+  'checkout.tax_fallback': { severity: 'warning', sampleRate: 1 },
+  'payment.intent_failed': { severity: 'warning', sampleRate: 1 },
+  'analytics.vitals_sink_unavailable': { severity: 'warning', sampleRate: 0.01 },
 } as const;
 
 export type TelemetryEvent = keyof typeof TELEMETRY_EVENTS;
@@ -105,16 +108,19 @@ export const ALLOWED_FIELD_ENUMS = {
     'subscription', 'paid_decrement', 'refund_restock',
   ]),
   operation: new Set([
-    'audit_write', 'claim', 'complete', 'create', 'finalize', 'persist',
+    'audit_write', 'claim', 'complete', 'create', 'finalize', 'persist', 'price',
     'process', 'read', 'rebuild', 'record_failure', 'send', 'stage', 'transition',
     'validate',
   ]),
   outcome: new Set([
-    'conflict', 'failed', 'invalid', 'needs_review', 'partial_failure',
+    'conflict', 'degraded', 'failed', 'invalid', 'needs_review', 'partial_failure',
     'rejected', 'retry_scheduled', 'unavailable', 'unresolved',
   ]),
   provider: new Set([
     'analytics', 'carrier', 'cloudflare_email', 'd1', 'gift_card', 'resend', 'stripe', 'workers_ai',
+  ]),
+  reason: new Set([
+    'authentication_required', 'card_declined', 'expired_card', 'insufficient_funds', 'other',
   ]),
   trigger: new Set(['manual', 'recovery', 'request', 'scheduled', 'webhook']),
 } as const;

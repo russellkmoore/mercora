@@ -364,6 +364,28 @@ describe('server-authoritative checkout pricing', () => {
     }, { dependencies: invalid as any })).rejects.toThrow('store.tax_rate');
   });
 
+  it('emits a checkout.tax_fallback telemetry envelope when the tax provider fails', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fallbackDeps = dependencies({ calculateTax: vi.fn(async () => { throw new Error('offline'); }) });
+    const quote = await priceCheckout({
+      items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],
+      shippingAddress: address,
+      shippingMethodId: 'standard',
+    }, { dependencies: fallbackDeps as any });
+
+    expect(quote.taxSource).toBe('configured_fallback');
+    expect(warnSpy).toHaveBeenCalledOnce();
+    const envelope = JSON.parse(String(warnSpy.mock.calls[0][0]));
+    expect(envelope).toMatchObject({
+      marker: 'commerce.telemetry.v1',
+      event: 'checkout.tax_fallback',
+      severity: 'warning',
+      fields: { operation: 'price', outcome: 'degraded', provider: 'stripe' },
+    });
+    expect(Object.keys(envelope.fields)).toEqual(['operation', 'outcome', 'provider']);
+    warnSpy.mockRestore();
+  });
+
   it('does not persist a coupon code whose promotion contributes no discount', async () => {
     const deps = dependencies({
       validateCouponCode: vi.fn(async () => ({
