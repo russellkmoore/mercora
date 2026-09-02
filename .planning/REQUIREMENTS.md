@@ -22,7 +22,7 @@ Each maps to exactly one roadmap phase.
 - [x] **OBS-02**: Web-vitals beacons posted to `/api/analytics/vitals` in production are written to a queryable sink (a Workers Analytics Engine dataset or a bounded D1 table) carrying only metric name, value, rating, route template, and `isMobile`. An operator can query mobile LCP, INP, and CLS from real traffic. The route no longer returns `{ status: "ok" }` while discarding the payload.
 - [ ] **OBS-03**: `app/product/[slug]/page.tsx` and `app/category/[slug]/page.tsx` type `params` as `Promise<{ slug: string }>` and `await` it (no `: any`). An unknown category slug returns HTTP 404 via `notFound()` instead of a 200 "Category not found" div. Tests cover the unknown-slug path for both routes.
 - [ ] **OBS-04**: Discount allocation (`allocateDiscount`) and tax allocation (`allocateLargestRemainder`) in `lib/services/checkout-pricing.ts` have tests asserting that allocated parts sum exactly to the total across 1, 2, 10, and 100 lines, including penny-rounding edge cases. (One largest-remainder sum test exists at `tests/unit/lib/services/checkout-pricing.test.ts:525`; this requirement is about breadth.)
-- [ ] **OBS-05**: The empty `handlePaymentFailed` handler in `app/api/webhooks/stripe/route.ts` (TODO at line ~351) is resolved. Either `payment_intent.payment_failed` is handled with a recorded telemetry/audit outcome that does not violate ADR-WRI rules (no order-state change outside the ledgers), or the handler and its event subscription are removed and the removal is noted for RUN-02. No `TODO` remains in the webhook route.
+- [x] **OBS-05**: The empty `handlePaymentFailed` handler in `app/api/webhooks/stripe/route.ts` (TODO at line ~351) is resolved. Either `payment_intent.payment_failed` is handled with a recorded telemetry/audit outcome that does not violate ADR-WRI rules (no order-state change outside the ledgers), or the handler and its event subscription are removed and the removal is noted for RUN-02. No `TODO` remains in the webhook route.
 
 ### Mobile Measurement (MOB)
 
@@ -131,7 +131,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | OBS-02 | Phase 2 | Complete |
 | OBS-03 | Phase 2 | Pending |
 | OBS-04 | Phase 2 | Pending |
-| OBS-05 | Phase 2 | Pending |
+| OBS-05 | Phase 2 | Complete |
 | MOB-01 | Phase 2 | Complete |
 | ADR-01 | Phase 3 | Pending |
 | ADR-02 | Phase 3 | Pending |

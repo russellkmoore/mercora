@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 02
 current_phase_name: Observability and Regression Guards
 status: executing
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-09-02T19:41:03.150Z"
+stopped_at: Completed 02-03-PLAN.md
+last_updated: "2026-09-02T19:50:31.047Z"
 last_activity: 2026-09-02
 last_activity_desc: Phase 02 execution started
-state_head: 2b177aee2f143c07ee67fcf56d39b27a6bd8e38f
+state_head: ece5a27535d954a30ad2240432475a9196b11b69
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 9
-  completed_plans: 7
+  completed_plans: 8
   percent: 25
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-02)
 ## Current Position
 
 Phase: 02 (Observability and Regression Guards) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-09-02 — Phase 02 execution started
 
@@ -65,6 +65,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 02 P01 | 25min | 3 tasks | 4 files |
 | Phase 02 P05 | 22min | 2 tasks | 1 files |
 | Phase 02 P02 | 30min | 3 tasks | 6 files |
+| Phase 02 P03 | 9min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -84,6 +85,7 @@ Recent decisions affecting current work:
 - [Phase 01]: Task 2 initially failed on a deploy precondition (unpromoted Worker version); resolved by pushing main to origin and letting Cloudflare Workers Builds deploy/promote version d60aa812, after which wrangler secret put succeeded
 - [Phase 01]: authenticateRequest and middleware.ts both wired to assertDeploymentPosture(); admin routes now return real HTTP 503 at the edge on deployed dev builds; docs/admin-authentication.md documents the guard and the residual 401-vs-503 gap for six non-/api/admin callers
 - [Phase 02]: WEB_VITALS Analytics Engine binding (dataset mercora_web_vitals) added, separate from unconfigured COMMERCE_ANALYTICS; route-template mapper uses literal Next.js bracket-form strings so dataset rows map back to routes at a glance
+- [Phase 02]: Phase 2: handlePaymentFailed telemetry-only; dispatch outcome for payment_intent.payment_failed changed 'ignored'->'handled' to match must_haves; orderId guard dropped since it protected a now-removed state update
 
 ### Pending Todos
 
@@ -112,8 +114,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-02T19:41:03.079Z
-Stopped at: Completed 02-02-PLAN.md
+Last session: 2026-09-02T19:50:30.963Z
+Stopped at: Completed 02-03-PLAN.md
 Resume file: None
 
 Next: `/gsd-plan-phase 2` (or continue `/gsd-autonomous --from 2`)
