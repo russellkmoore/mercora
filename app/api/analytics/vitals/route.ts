@@ -30,15 +30,64 @@ interface AnalyticsBinding {
   writeDataPoint: (event: { blobs?: string[]; doubles?: number[]; indexes?: string[] }) => void;
 }
 
+/** A five-field vitals beacon fits comfortably in well under 1 KB; 4 KB leaves headroom. */
+const MAX_VITALS_BODY_BYTES = 4096;
+
+/**
+ * Reads the request body up to `MAX_VITALS_BODY_BYTES`, checking `content-length`
+ * up front and also bounding the actual bytes read (in case the header is absent
+ * or understates the real size). Returns `null` on any oversized or malformed
+ * length so the caller can fall through to the uniform 200-with-no-write response.
+ */
+async function readBoundedBody(request: NextRequest): Promise<Uint8Array | null> {
+  const declaredHeader = request.headers.get("content-length");
+  if (declaredHeader !== null) {
+    if (!/^\d+$/.test(declaredHeader)) return null;
+    const declared = Number(declaredHeader);
+    if (!Number.isSafeInteger(declared) || declared > MAX_VITALS_BODY_BYTES) {
+      return null;
+    }
+  }
+  if (!request.body) return new Uint8Array();
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  while (true) {
+    const chunk = await reader.read();
+    if (chunk.done) break;
+    received += chunk.value.byteLength;
+    if (received > MAX_VITALS_BODY_BYTES) {
+      try {
+        await reader.cancel();
+      } catch {
+        // Best-effort cancel; the oversized-body rejection below still applies.
+      }
+      return null;
+    }
+    chunks.push(chunk.value);
+  }
+  const combined = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    combined.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return combined;
+}
+
 export async function POST(request: NextRequest) {
   let metric: AnalyticsPayload | undefined;
   try {
-    const parsed = await request.json();
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      metric = parsed as AnalyticsPayload;
+    const raw = await readBoundedBody(request);
+    if (raw) {
+      const parsed = JSON.parse(new TextDecoder().decode(raw));
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        metric = parsed as AnalyticsPayload;
+      }
     }
   } catch {
-    // Malformed body: fall through to the uniform 200 response with no write.
+    // Malformed or oversized body: fall through to the uniform 200 response with no write.
   }
 
   if (!metric) {
