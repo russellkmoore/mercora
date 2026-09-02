@@ -1,19 +1,19 @@
 ---
 gsd_state_version: 1.0
-current_phase: 02
-current_phase_name: Observability and Regression Guards
-status: verifying
-stopped_at: Completed 02-04-PLAN.md
-last_updated: "2026-09-02T19:57:43.962Z"
+current_phase: 3
+current_phase_name: Decision Lock-In and Operator Runbooks
+status: planning
+stopped_at: Phase 2 complete, ready to plan Phase 3
+last_updated: "2026-09-02T20:19:36.096Z"
 last_activity: 2026-09-02
-last_activity_desc: Phase 02 execution started
-state_head: 894cfadb339df00726218a449a02e811bcb24c83
+last_activity_desc: Phase 2 complete, transitioned to Phase 3
+state_head: 496da253f1d956a0e148fcefd9b15209c417e07d
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 9
   completed_plans: 9
-  percent: 25
+  percent: 50
 ---
 
 # Project State
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-09-02)
 
 ## Current Position
 
-Phase: 02 (Observability and Regression Guards) — EXECUTING
-Plan: 5 of 5
-Status: Phase complete — ready for verification
-Last activity: 2026-09-02 — Phase 02 execution started
+Phase: 3 — Decision Lock-In and Operator Runbooks
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-09-02 — Phase 2 complete, transitioned to Phase 3
 
 Progress: [███░░░░░░░] 25%
 
@@ -38,7 +38,7 @@ Progress: [███░░░░░░░] 25%
 
 **Velocity:**
 
-- Total plans completed: 4
+- Total plans completed: 9
 - Average duration: -
 - Total execution time: 0.0 hours
 
@@ -47,6 +47,7 @@ Progress: [███░░░░░░░] 25%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 | 4 | - | - |
+| 2 | 5 | - | - |
 
 **Recent Trend:**
 
@@ -102,7 +103,8 @@ None yet.
 - [Resolved 2026-09-01] `wrangler.jsonc` carries `pk_test_` Stripe and Clerk publishable keys by design. Production is a demo environment with no live Stripe account. Keys stay as-is; `wrangler.jsonc` stays tracked (Workers Builds and four scripts read it).
 - [Phase 2 finding, needs Russell] The LIVE sitemap (`/sitemap.xml`) renders every `<loc>` under `https://mercora.example.com` (the demo default in `lib/store-config.ts`). `app/sitemap.ts` reads the site URL via `getStoreConfig()` at build time, and `NEXT_PUBLIC_SITE_URL` exists only as a Worker runtime var. Fix: add `NEXT_PUBLIC_SITE_URL=https://voltique.russellkmoore.me` as a Cloudflare Workers **Build** variable and redeploy (same build-vs-runtime distinction as the Clerk/Stripe publishable keys). Search engines currently receive wrong URLs. Found by plan 02-05 on 2026-09-02.
 - [Phase 2 finding] Mobile Lighthouse baseline: all four routes score 72–80, below the PRD target of 85 (`docs/mobile-lighthouse-baseline.md`). Performance work is backlog, not v1.
-- [Phase 2] OBS-02 needs a sink choice (Workers Analytics Engine dataset vs bounded D1 table). No Analytics Engine binding exists in `wrangler.jsonc` today; adding one requires `npm run cf-typegen` and a deploy-config update.
+- [Phase 2 follow-up, operator] After the next production deploy, query the `mercora_web_vitals` Analytics Engine dataset (Cloudflare dashboard or SQL API) and confirm rows carry metric, value, rating, route template, isMobile. Accepted on code evidence 2026-09-02.
+- [Resolved 2026-09-02] OBS-02 sink choice: Workers Analytics Engine dataset `mercora_web_vitals` via binding `WEB_VITALS`; no D1 table.
 - [Phase 4] DEP-01 may find that Next 16.3.1 still bundles a flagged PostCSS or Sharp; if so, record a new bounded exception rather than weakening the gate.
 
 ## Deferred Items
@@ -116,7 +118,7 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-09-02T19:57:43.913Z
-Stopped at: Completed 02-04-PLAN.md
+Stopped at: Phase 2 complete, ready to plan Phase 3
 Resume file: None
 
 Next: `/gsd-plan-phase 2` (or continue `/gsd-autonomous --from 2`)
