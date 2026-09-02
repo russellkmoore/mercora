@@ -147,6 +147,13 @@ None - no external service configuration required.
 
 RUN-02's code half is complete: the dispatch switch matches the event lists Plan 02 already wrote into `docs/DEPLOYMENT_SETUP.md` and `docs/STRIPE_INTEGRATION.md` (no `checkout.session.completed`), and the regression test guards against the case being re-added silently. This was the last plan in Phase 3 — phase verification (`/gsd-verify-work`) can now run against all three plans (ADR locks, runbook corrections, and this dead-code removal).
 
+## Self-Check: PASSED
+
+- FOUND: tests/unit/app/api/stripe-webhook-unhandled-events.test.ts
+- FOUND: app/api/webhooks/stripe/route.ts
+- FOUND: commit 0852c93 (Task 1)
+- FOUND: commit 7b84825 (Task 2)
+
 ---
 *Phase: 03-decision-lock-in-and-operator-runbooks*
 *Completed: 2026-09-02*
