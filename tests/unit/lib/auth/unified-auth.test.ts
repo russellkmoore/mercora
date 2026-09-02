@@ -15,6 +15,7 @@ import { NextRequest } from 'next/server';
 import { authenticateRequest } from '@/lib/auth/unified-auth';
 import { getApiTokenByHash, updateApiTokenLastUsed } from '@/lib/models/auth';
 import { isUserAdmin } from '@/lib/models/admin';
+import { DEPLOYMENT_GUARD_MESSAGE } from '@/lib/auth/deployment-guard';
 
 describe('authenticateRequest fail-closed behavior', () => {
   beforeEach(() => {
@@ -26,6 +27,7 @@ describe('authenticateRequest fail-closed behavior', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 
   it('rejects an admin secret supplied in the query string', async () => {
@@ -141,5 +143,87 @@ describe('authenticateRequest fail-closed behavior', () => {
     expect(result.success).toBe(false);
     expect(result.response?.status).toBe(401);
     expect(vi.mocked(updateApiTokenLastUsed)).not.toHaveBeenCalled();
+  });
+
+  it('trips the deployment guard for a request with no credentials under a deployed development build', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubGlobal('navigator', { userAgent: 'Cloudflare-Workers' });
+
+    const result = await authenticateRequest(
+      new NextRequest('http://localhost/api/orders'),
+      ['orders:read']
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.response?.status).toBe(503);
+  });
+
+  it('trips the deployment guard before token extraction, denying a valid Bearer service token', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubGlobal('navigator', { userAgent: 'Cloudflare-Workers' });
+
+    const result = await authenticateRequest(
+      new NextRequest('http://localhost/api/orders', {
+        method: 'POST',
+        headers: { authorization: 'Bearer expected-service-secret' },
+      }),
+      ['orders:read']
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.response?.status).toBe(503);
+  });
+
+  it('trips the deployment guard for a signed-in Clerk user, making the development admin shortcut unreachable', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubGlobal('navigator', { userAgent: 'Cloudflare-Workers' });
+    vi.mocked(auth).mockResolvedValue({ userId: 'user_123', sessionClaims: null } as never);
+
+    const result = await authenticateRequest(
+      new NextRequest('http://localhost/api/orders'),
+      ['orders:read']
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.response?.status).toBe(503);
+  });
+
+  it('does not trip in production under a deployed Workers build', async () => {
+    vi.stubGlobal('navigator', { userAgent: 'Cloudflare-Workers' });
+    vi.mocked(auth).mockResolvedValue({ userId: 'user_123', sessionClaims: null } as never);
+    vi.mocked(isUserAdmin).mockResolvedValue(true);
+
+    const result = await authenticateRequest(
+      new NextRequest('http://localhost/api/orders'),
+      ['orders:read']
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  it('does not trip under development with Node native user-agent, preserving local development', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.mocked(auth).mockResolvedValue({ userId: 'user_123', sessionClaims: null } as never);
+
+    const result = await authenticateRequest(
+      new NextRequest('http://localhost/api/orders'),
+      ['orders:read']
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  it('returns the shared deployment guard message in the 503 body', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubGlobal('navigator', { userAgent: 'Cloudflare-Workers' });
+
+    const result = await authenticateRequest(
+      new NextRequest('http://localhost/api/orders'),
+      ['orders:read']
+    );
+
+    expect(result.response?.status).toBe(503);
+    const body = await result.response!.json();
+    expect(body.error).toBe(DEPLOYMENT_GUARD_MESSAGE);
   });
 });
