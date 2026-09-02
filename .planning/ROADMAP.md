@@ -27,7 +27,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   1. A repository-wide search for the previously published admin token and dev-bypass values returns nothing; `docs/CLAUDE.md` and `docs/admin-authentication.md` show placeholders where the values were.
   2. Presenting the previously published token to `/api/admin/vectorize` and `/api/admin/knowledge` on the live site is rejected with 401/403 (or the finding records that the value was never live).
   3. A test shows the Worker fails at startup, or every admin request fails closed, when `NODE_ENV` is `development`, and a production build is unaffected; all CI gates still pass.
-  4. `docs/CLAUDE.md`, `docs/DEPLOYMENT_SETUP.md`, and `docs/admin-authentication.md` agree that production admin auth is enforced through Clerk role, `ADMIN_USER_IDS`, or the bearer token, that the only bypass is the `x-dev-admin` header under `NODE_ENV=development`, and no query-string bypass is described anywhere.
+  4. `docs/CLAUDE.md`, `docs/DEPLOYMENT_SETUP.md`, and `docs/admin-authentication.md` agree that production admin auth is enforced through Clerk role, an active `adminUsers` table row, or the bearer token, that the only bypass is the `x-dev-admin` header under `NODE_ENV=development`, and no query-string bypass is described anywhere.
 **Plans**: TBD
 
 ### Phase 2: Observability and Regression Guards
