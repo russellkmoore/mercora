@@ -283,7 +283,7 @@ npm run deploy
 
 # Index both products and knowledge articles (consolidated endpoint)
 # The admin token is a Cloudflare Worker secret (ADMIN_VECTORIZE_TOKEN)
-curl -X GET "https://yourdomain.com/api/admin/vectorize" \
+curl -X POST "https://yourdomain.com/api/admin/vectorize" \
   -H "Authorization: Bearer <ADMIN_VECTORIZE_TOKEN>"
 ```
 
