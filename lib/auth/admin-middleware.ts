@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { isUserAdmin, isUserSuperAdmin, updateAdminLastLogin } from "../models/admin";
 import { timingSafeEqual } from "./crypto";
 import { hasSameOrigin } from "./same-origin";
+import { assertDeploymentPosture } from "./deployment-guard";
 
 const ORIGIN_REQUIRED_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -16,6 +17,11 @@ export interface AdminAuthResult {
 
 export async function checkAdminPermissions(request: NextRequest): Promise<AdminAuthResult> {
   try {
+    const posture = assertDeploymentPosture();
+    if (posture.tripped) {
+      return { success: false, error: posture.message };
+    }
+
     // Check for development mode bypass token first
     const devToken = request.headers.get("x-dev-admin");
     

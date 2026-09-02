@@ -68,6 +68,7 @@ export const TELEMETRY_EVENTS = {
   'recommendation.stale_rows': { severity: 'warning', sampleRate: 0.25 },
   'cron.recovery_failed': { severity: 'critical', sampleRate: 1 },
   'cron.analytics_failed': { severity: 'critical', sampleRate: 1 },
+  'auth.deployment_guard_tripped': { severity: 'critical', sampleRate: 1 },
 } as const;
 
 export type TelemetryEvent = keyof typeof TELEMETRY_EVENTS;

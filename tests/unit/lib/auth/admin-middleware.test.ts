@@ -23,7 +23,24 @@ describe('checkAdminPermissions credential transport', () => {
     vi.mocked(updateAdminLastLogin).mockResolvedValue(undefined);
   });
 
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it('trips the deployment guard under development + Workers UA, bypass unreachable', async () => {
+    vi.stubGlobal('navigator', { userAgent: 'Cloudflare-Workers' });
+
+    const result = await checkAdminPermissions(
+      new NextRequest('http://localhost/api/products', {
+        method: 'POST',
+        headers: { 'x-dev-admin': 'mercora-dev-bypass' },
+      })
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.isDevMode).not.toBe(true);
+  });
 
   it('does not accept development or service credentials from query parameters', async () => {
     const result = await checkAdminPermissions(

@@ -31,6 +31,7 @@ export const TAIL_CRITICAL_EVENTS = [
   'recommendation.rebuild_failed',
   'cron.recovery_failed',
   'cron.analytics_failed',
+  'auth.deployment_guard_tripped',
 ] as const;
 
 export type CriticalEvent = (typeof TAIL_CRITICAL_EVENTS)[number];
