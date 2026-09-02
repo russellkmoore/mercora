@@ -84,7 +84,14 @@ Plans:
   3. An operator following `docs/CLAUDE.md` or `docs/DEPLOYMENT_SETUP.md` finds only the guarded `db:migrate:*` commands, the `deploy` versus `deploy:ci` distinction, and Node 24; no unguarded production `wrangler d1 migrations apply` remains in either doc.
   4. The Stripe webhook event lists in `docs/DEPLOYMENT_SETUP.md` and `docs/STRIPE_INTEGRATION.md` match the events the route handles and ADR-WRI-02's required set; `checkout.session.completed` is gone.
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+**Wave 1** *(all three run in parallel — no shared files)*
+
+- [ ] 03-01-PLAN.md — ADR truth and lock-in: trust-boundary correction, four dated status markers, manifest lock flags (ADR-01, ADR-02)
+- [ ] 03-02-PLAN.md — Operator runbooks: guarded migration commands, deploy vs deploy:ci, Node 24, and the synced Stripe event lists (RUN-01, RUN-02)
+- [ ] 03-03-PLAN.md — Dead webhook branch removed from the Stripe route, plus a regression test pinning the unhandled-event contract (RUN-02)
 
 ### Phase 4: Reference Documentation Refresh
 
@@ -110,7 +117,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Security and Admin-Auth Truth | 4/4 | Complete    | 2026-09-02 |
 | 2. Observability and Regression Guards | 5/5 | Complete    | 2026-09-02 |
-| 3. Decision Lock-In and Operator Runbooks | 0/TBD | Not started | - |
+| 3. Decision Lock-In and Operator Runbooks | 0/3 | Planned | - |
 | 4. Reference Documentation Refresh | 0/TBD | Not started | - |
 
 ---
