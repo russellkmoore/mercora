@@ -46,6 +46,12 @@
       "index_name": "voltique-index"
     }
   ],
+  "analytics_engine_datasets": [
+    {
+      "binding": "WEB_VITALS",
+      "dataset": "mercora_web_vitals"
+    }
+  ],
   "ai": {
     "binding": "AI"
   },
