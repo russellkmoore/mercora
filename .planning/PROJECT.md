@@ -41,14 +41,15 @@ A customer or an external AI agent can find the right outdoor gear through Volt,
 - ✓ Deployment-posture guard (`lib/auth/deployment-guard.ts`): a development build running in the Cloudflare Workers runtime fails closed with 503 in `checkAdminPermissions`, `authenticateRequest`, and `middleware.ts` for `/admin` and `/api/admin`, and emits `auth.deployment_guard_tripped` (escalated as critical by the tail worker) — Phase 1 (SEC-03)
 - ✓ Admin-auth docs describe the real mechanism: Clerk role or active `adminUsers` row, header-only bearer token, `x-dev-admin` header only under development, no query-string auth, no phantom `ADMIN_USER_IDS` — Phase 1 (SEC-04)
 
+- ✓ Tax fallback emits `checkout.tax_fallback`; production web-vitals beacons are written to the `mercora_web_vitals` Analytics Engine dataset with five low-cardinality fields, always answering 200 — Phase 2 (OBS-01, OBS-02)
+- ✓ Slug pages take `Promise`-typed `params` and return real 404s; allocation-sum tests at 1, 2, 10, 100 lines. These tests exposed and fixed a pre-existing bug where `allocateDiscount` could over-allocate the last line beyond its capacity — Phase 2 (OBS-03, OBS-04)
+- ✓ `payment_intent.payment_failed` handled as telemetry only (`payment.intent_failed` with an allowlisted `reason`), no order-state change — Phase 2 (OBS-05)
+- ✓ Mobile Lighthouse baseline recorded in `docs/mobile-lighthouse-baseline.md`: all four routes score 72–80 against the 85 target — Phase 2 (MOB-01)
+
 ### Active
 
 <!-- v1 = hardening milestone. Verified gaps only. Full definitions in REQUIREMENTS.md. -->
 
-- [ ] Tax fallback is observable through telemetry; production web-vitals beacons land in a queryable sink instead of being discarded (OBS-01, OBS-02)
-- [ ] Regressions the codebase map found have tests: typed `params` with 404 on unknown slugs; allocation-sum invariants across line counts (OBS-03, OBS-04)
-- [ ] The empty `payment_intent.payment_failed` webhook handler is resolved (OBS-05)
-- [ ] A Lighthouse mobile baseline is recorded against the PRD target (MOB-01)
 - [ ] `docs/checkout-trust-boundary.md` says MCP is inside the paid boundary; all four ADRs carry an explicit Accepted status and are marked locked in the ingest manifest (ADR-01, ADR-02)
 - [ ] Migration, deploy, Node, and Stripe-webhook runbooks are correct (RUN-01, RUN-02)
 - [ ] Reference docs name the right LLM and tool count, describe the real test/CI setup, index all 26 docs, and label historical material (REF-01..04)
@@ -143,5 +144,10 @@ A customer or an external AI agent can find the right outdoor gear through Volt,
 | `workflow.use_worktrees=false` for this project | Fresh git worktrees have no `node_modules` or `.dev.vars`, so parallel executors would fail vitest and wrangler or spend minutes on `npm ci`; sequential execution on the main tree is the safer trade | ✓ Good |
 | Client-side dev-mode admin shortcuts in `components/admin/AdminGuard.tsx` left unchanged (code-review WR-04) | Orchestrator deferral under Phase 1's locked scope; server-side middleware and API guards hold, so the residual is a visible nav link on a misbuilt deploy | — Pending Russell's sign-off |
 
+| Web-vitals sink is a Workers Analytics Engine dataset (`WEB_VITALS` → `mercora_web_vitals`), not D1 (Phase 2) | Purpose-built for metrics, no schema migration or retention job; five fields only, route template derived server-side | ✓ Good — post-deploy row check tracked in STATE.md |
+| `handlePaymentFailed` is telemetry-only and the `payment_intent.payment_failed` subscription stays (Phase 2) | ADR-WRI forbids order-state changes outside the ledgers; the event is still useful ops signal | ✓ Good — runbook update is RUN-02 in Phase 3 |
+| `allocateDiscount` caps every line at its own capacity and redistributes remainder cents ascending by index (Phase 2, code-review CR-01) | The old algorithm could give the last line more discount than its value, producing a negative net line and a crash in the fallback tax path | ✓ Good — invariants pinned by tests |
+| Live sitemap advertises `mercora.example.com` because `NEXT_PUBLIC_SITE_URL` is only a runtime var, not a Workers Build var (Phase 2 finding) | `app/sitemap.ts` resolves the host at build time | — Pending Russell: add the Build variable and redeploy |
+
 ---
-*Last updated: 2026-09-02 after Phase 1*
+*Last updated: 2026-09-02 after Phase 2*
