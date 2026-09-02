@@ -287,6 +287,10 @@ curl -X GET "https://yourdomain.com/api/admin/vectorize" \
   -H "Authorization: Bearer <ADMIN_VECTORIZE_TOKEN>"
 ```
 
+A build deployed with a development `NODE_ENV` locks every admin route with HTTP 503 instead of
+opening the development bypasses. See `docs/admin-authentication.md` for what trips this guard
+and how to recover.
+
 ### **Step 3: Verify AI System**
 1. Test the AI assistant via the chat interface
 2. Verify semantic search is working with product queries

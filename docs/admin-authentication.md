@@ -211,6 +211,31 @@ curl -H "x-dev-admin: <DEV_ADMIN_BYPASS_TOKEN>" \
 
 This header is honored only when `NODE_ENV` is `development`; it is inert in every deployed build.
 
+## 🛡️ Deployment Safety
+
+A deployed Worker running a development build must never open the dev-only admin bypasses.
+`assertDeploymentPosture()` in `lib/auth/deployment-guard.ts` guards against exactly this: it
+runs before every credential check in both `checkAdminPermissions` (`lib/auth/admin-middleware.ts`)
+and `authenticateRequest` (`lib/auth/unified-auth.ts`), and before the admin short-circuit in
+`middleware.ts`.
+
+- **What trips it:** the Worker is running the Cloudflare Workers runtime (`navigator.userAgent === "Cloudflare-Workers"`) and the build's `NODE_ENV` resolves to `development`. This can only happen when a development build is deployed by mistake — local development (`next dev`, vitest) never matches.
+- **What the operator sees:** HTTP 503 with the fixed message `Service temporarily unavailable.` on `/admin` and `/api/admin` routes, and one `auth.deployment_guard_tripped` event in the `commerce.telemetry.v1` stream at critical severity, escalated by the observability tail worker. The public storefront keeps serving normally — the guard is scoped to admin paths only.
+- **How to recover:** build and deploy with a production `NODE_ENV` and redeploy. No secret, setting, or database change is involved.
+
+On the first deploy after this guard ships, confirm it is live rather than silently inert: a
+correct production deploy should serve admin routes normally, while a deliberately-misbuilt
+development deploy should return 503 on `/admin` and `/api/admin`. This check exists because the
+interaction between the Workers `navigator` global and the `nodejs_compat` flag inside the
+OpenNext bundle could not be verified from documentation alone.
+
+**Residual status-code difference:** the guard's 503 reaches the wire for the 31 routes under
+`app/api/admin/` (via the `middleware.ts` branch above). Six callers of `checkAdminPermissions`
+outside that prefix — `app/api/agent-chat`, `app/api/categories`, `app/api/categories/[id]`,
+`app/api/products`, `app/api/products/[id]`, `app/api/promotions` — hardcode `{ status: 401 }`
+and will surface 401 instead. They still fail closed, which is the security property; only the
+status code differs.
+
 ## 🚨 Security Considerations
 
 ### Best Practices Implemented
