@@ -66,6 +66,7 @@ created: "2026-09-02"
 |---------|------------|-----------|-------------|------|
 | AR-01-01 | T-01-16 | Consumers read the secret at request time, so rotation cannot break in-repo callers; any external holder of the old value is meant to lose access | Plan 01-04 threat model (planner), passed plan-checker; rotation itself decided by Russell 2026-09-01 | 2026-09-02 |
 | AR-01-02 | T-01-SC | No dependency changes in this phase; no supply-chain surface | Plans 01-01..04 threat models (planner), passed plan-checker | 2026-09-02 |
+| AR-01-03 | WR-04 (code review; client-side dev-mode admin shortcuts in `components/admin/AdminGuard.tsx`) | Only reachable if a development build is deployed to production, which has no unintentional path in this project's deploy flow; production is a demo site; server-side middleware and API guards independently block admin access, so the residual is a visible nav link | Russell, 2026-09-02 ("accept as-is") | 2026-09-02 |
 
 *Accepted risks do not resurface in future audit runs.*
 
@@ -75,7 +76,7 @@ created: "2026-09-02"
 
 | Flag | Source | Component | Bounded Impact | Status |
 |------|--------|-----------|----------------|--------|
-| WR-04 | `01-REVIEW.md` (code review) | `components/admin/AdminGuard.tsx:69-74, 206-211` client-side dev-mode admin shortcuts (`checkAdminAccess`, `useAdminAccess`) not covered by the deployment guard (a browser `navigator` never reads `Cloudflare-Workers`) | Cosmetic: a misbuilt development deploy would show the "Admin Dashboard" link to any signed-in user; clicking through hits the middleware 503 and every admin API call is server-guarded | Deferred by the orchestrator on 2026-09-02 under the phase's locked scope; **not yet reviewed by Russell**. Not counted in `threats_open`. Fix suggestion recorded in `deferred-items.md` |
+| WR-04 | `01-REVIEW.md` (code review) | `components/admin/AdminGuard.tsx:69-74, 206-211` client-side dev-mode admin shortcuts (`checkAdminAccess`, `useAdminAccess`) not covered by the deployment guard (a browser `navigator` never reads `Cloudflare-Workers`) | Cosmetic: a misbuilt development deploy would show the "Admin Dashboard" link to any signed-in user; clicking through hits the middleware 503 and every admin API call is server-guarded | **Accepted by Russell 2026-09-02** — moved to Accepted Risks Log as AR-01-03. Fix suggestion remains in `deferred-items.md` if ever wanted |
 
 ---
 
@@ -94,4 +95,4 @@ created: "2026-09-02"
 - [x] `threats_open: 0` confirmed
 - [x] `status: verified` set in frontmatter
 
-**Approval:** verified 2026-09-02 (automated audit); WR-04 deferral awaits owner review
+**Approval:** verified 2026-09-02 (automated audit); WR-04 accepted by Russell 2026-09-02 (AR-01-03)
