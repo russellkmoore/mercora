@@ -19,10 +19,13 @@ docs:
     locked: true
   - path: docs/webhooks-refunds-inventory.md
     type: ADR          # D1 ledgers + cron are the recovery mechanism, not HTTP
+    locked: true
   - path: docs/database-migrations.md
     type: ADR          # migrations are an explicit operator action, never on deploy
+    locked: true
   - path: docs/subscriptions.md
     type: ADR          # acquisition off by default; never down-migrate state
+    locked: true
 
   # --- SPEC: contracts and interfaces ---
   - path: docs/mcp-server-specification.md
