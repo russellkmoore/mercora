@@ -89,6 +89,14 @@ describe('deployment guard boundaries', () => {
     expect(isDeployedDevelopmentBuild()).toBe(false);
   });
 
+  it('does not trip and does not throw when navigator is null', () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubGlobal('navigator', null);
+
+    expect(() => isDeployedDevelopmentBuild()).not.toThrow();
+    expect(isDeployedDevelopmentBuild()).toBe(false);
+  });
+
   it('leaks no environment detail in the tripped message', () => {
     vi.stubEnv('NODE_ENV', 'development');
     vi.stubGlobal('navigator', { userAgent: 'Cloudflare-Workers' });
