@@ -1,297 +1,86 @@
 ---
 phase: 02-observability-and-regression-guards
-reviewed: 2026-09-02T13:10:00Z
+reviewed: 2026-09-02T20:13:19Z
 depth: standard
-files_reviewed: 19
+files_reviewed: 8
 files_reviewed_list:
-  - app/api/analytics/vitals/route.ts
-  - app/api/webhooks/stripe/handlers/decline-reason.ts
-  - app/api/webhooks/stripe/route.ts
-  - app/category/[slug]/page.tsx
-  - app/product/[slug]/page.tsx
-  - cloudflare-env.d.ts
-  - docs/mobile-lighthouse-baseline.md
-  - lib/observability/route-template.ts
-  - lib/observability/telemetry.ts
   - lib/services/checkout-pricing.ts
-  - tests/unit/app/api/stripe-webhook-payment-failed.test.ts
-  - tests/unit/app/api/vitals-route.test.ts
-  - tests/unit/app/category-slug-page.test.ts
-  - tests/unit/app/product-slug-page.test.ts
-  - tests/unit/lib/observability/route-template.test.ts
   - tests/unit/lib/services/checkout-allocation.test.ts
   - tests/unit/lib/services/checkout-pricing.test.ts
-  - workers/observability-tail/src/core.ts
-  - wrangler.jsonc
+  - app/api/analytics/vitals/route.ts
+  - tests/unit/app/api/vitals-route.test.ts
+  - app/api/webhooks/stripe/handlers/decline-reason.ts
+  - app/api/webhooks/stripe/route.ts
+  - tests/unit/app/api/stripe-webhook-payment-failed.test.ts
 findings:
-  critical: 1
-  warning: 3
-  info: 1
-  total: 5
-status: issues_found
+  critical: 0
+  warning: 0
+  info: 2
+  total: 2
+status: clean
 ---
 
-# Phase 02: Code Review Report
+# Phase 02: Code Review Report (Iteration 2 — Fix Re-Review)
 
-**Reviewed:** 2026-09-02T13:10:00Z
+**Reviewed:** 2026-09-02T20:13:19Z
 **Depth:** standard
-**Files Reviewed:** 19
-**Status:** issues_found
+**Files Reviewed:** 8 (iteration 2 re-read only the fixer's touched files, listed above — not the full 19-file iteration-1 scope)
+**Status:** clean
 
 ## Summary
 
-Reviewed the diff since `a55e976` against full file context for the web-vitals
-Analytics Engine sink, the `checkout.tax_fallback` / `payment.intent_failed`
-telemetry additions, the telemetry-only `handlePaymentFailed`, the
-Promise-typed slug params, the newly-exported checkout allocation functions
-(with their new table tests), and the Lighthouse baseline doc.
+This is a re-review of iteration 1's fix pass (`.planning/phases/02-observability-and-regression-guards/02-REVIEW.iter2.md`), verifying commits `2f4baa1` (CR-01), `fdf9a0f` (WR-01), `b82b1c4` (WR-02), and `c970578` (WR-03) against the current tree.
 
-The unauthenticated vitals endpoint is well-bounded: metric name, rating,
-route-template bucket, and boolean-mobile flag are all drawn from small,
-fixed enumerations before being written to Analytics Engine, and the beacon's
-raw `url`/`userAgent`/`id`/`timestamp` fields are never persisted — confirmed
-by the new test suite and by inspection. The `reason` enum addition is
-byte-parallel between `lib/observability/telemetry.ts` and
-`workers/observability-tail/src/core.ts` (both diffs are identical, and the
-existing `observability-tail-core.test.ts` parity test still passes).
-`handlePaymentFailed` performs no order/inventory/email writes and is
-replay-safe (verified against the new webhook test, including a
-replay-three-times assertion). The category/product page Promise-param
-change is a pure typing/notFound cleanup and does not alter behavior for
-valid slugs.
+**CR-01 (`allocateDiscount` per-line overrun):** Re-derived the fix mathematically and verified all four required invariants hold for *every* input, not just the tested cases:
 
-However, tracing the newly-*exported* `allocateDiscount` function (exported
-in this phase specifically so it could be table-tested) turned up a real,
-reproducible per-line over-allocation bug that the new tests do not catch
-because they only assert sum-exactness, not per-line capacity. See CR-01.
+- `parts[i] <= available[i]` for all `i` — proven: initial `shares[i] = min(capacity_i, floor(...))` is `<= capacity_i` by construction (and the `min` is provably a no-op here since `appliedMinor <= availableTotalMinor` always), and the redistribution loop only ever adds `take = min(room, remaining)` where `room = capacity_i - shares_i >= 0`, so the cap is never crossed.
+- All parts are nonnegative integers — `floor()` of nonnegative operands, and `take` is bounded below by 0 in the loop.
+- `sum(parts) === min(discount, sum(available))` — proven algebraically: total spare room across all lines after the initial floor pass is `(availableTotalMinor - appliedMinor) + remaining_initial`, which is always `>= remaining_initial` since `appliedMinor <= availableTotalMinor`. The single ascending pass therefore always fully exhausts `remaining` by the time it reaches the last line, so the sum invariant holds exactly, not just in the tested weight tables.
+- Deterministic ascending-index redistribution — the loop iterates `position = 0..shares.length-1` in a fixed order with no randomness or object-key iteration; confirmed deterministic.
 
-All 146 tests across the files reviewed here pass (`mise exec -- npx vitest
-run` against the listed test files), and the pre-existing
-`observability-tail-core.test.ts` enum-parity test also passes.
+Ran an independent adversarial script (not part of the committed suite) directly against the exported `allocateDiscount`, covering: all-zero capacities, discount far exceeding total capacity, a single eligible line (both under- and over-capacity), 100 lines with an uneven, non-uniform weight pattern, partial pre-existing discounts on some lines, a mix of zero- and nonzero-capacity eligible lines, and the exact CR-01 repro from iteration 1. Every case satisfied the cap, nonnegativity, and sum invariants. Also re-ran the full `tests/unit/lib/services` and `tests/unit/app/api` suites (`mise exec -- npx vitest run tests/unit/lib/services tests/unit/app/api`): 48 files, 511 tests, all pass.
 
-## Critical Issues
+Also checked golden-value stability in `checkout-pricing.test.ts`: no test there exercises a multi-line percentage/fixed discount that produces a nonzero floor-rounding remainder across more than one eligible line, so none of the pre-existing expected quote values could have moved as a side effect of the CR-01 fix. Confirmed by inspection and by the full suite passing unchanged. See IN-02 below for one behavioral nuance worth being aware of even though it caused no test regression.
 
-### CR-01: `allocateDiscount` can assign a line more discount than the line is worth
+**WR-01 (vitals body size cap):** `readBoundedBody()` checks `content-length` up front (rejecting non-numeric, unsafe, or over-cap declared lengths) and separately bounds actual bytes read via a streaming reader that cancels once `MAX_VITALS_BODY_BYTES` (4096) is exceeded, before any `JSON.parse`. Oversized/malformed bodies fall through to the existing always-200/no-write path. Verified against `tests/unit/app/api/vitals-route.test.ts`, including the new oversized-body test; 200 and no `writeDataPoint` call are correctly asserted.
 
-**File:** `lib/services/checkout-pricing.ts:253-281`
+**WR-02 (`mapDeclineReason` decline_code refinement):** The `card_declined` branch now checks `decline_code` against `insufficient_funds`, `expired_card`, and `authentication_required` before falling back to the generic `card_declined` value, matching Stripe's real error shape. New tests cover all three specific `decline_code` values plus an unrecognized-`decline_code` fallback case. Verified against `tests/unit/app/api/stripe-webhook-payment-failed.test.ts`.
 
-**Issue:** In `allocateDiscount`, every eligible line except the *last* one
-in iteration order is capped against its own remaining capacity:
+**WR-03 (dead catch in `handlePaymentFailed`):** The unreachable `try/catch` was removed and replaced with a comment documenting why (`recordTelemetry` fails open by contract, `mapDeclineReason` is total). Confirmed `webhook.processing_failed` telemetry remains correctly wired at the two other call sites in `route.ts` (the top-level POST catch and `handleCheckoutCompleted`), so removing this particular wrapper does not reduce observability coverage elsewhere in the file.
 
-```ts
-const cents = position === eligible.length - 1
-  ? remaining
-  : Math.min(
-      available[position].toMinorUnits(),
-      Math.floor(
-        applied.toMinorUnits() * available[position].toMinorUnits() /
-        availableTotal.toMinorUnits()
-      )
-    );
-```
+No regressions were introduced by any of the four fixes. All findings from iteration 1's Critical and Warning sections are resolved.
 
-The last position instead receives the entire floor-rounding leftover
-(`remaining`) with **no cap against `available[position]`**. When the
-per-line floor shares for the non-last lines lose more than a few cents to
-rounding (which grows with the number of eligible lines, up to
-`eligible.length - 1` cents in the worst case), that lost value is dumped
-onto the last line even if the last line's own price/available capacity is
-smaller than the leftover. The result is `existing[lastIndex]` exceeding
-`lineTotals[lastIndex]` — a per-line discount larger than the line's own
-price.
+## Structural Findings (fallow)
 
-Reproduced directly against the exported function (verified interactively,
-not committed as a test):
+None provided for this iteration.
 
-```ts
-const lineTotals = [Money.fromMinor(1,'USD'), Money.fromMinor(1,'USD'), Money.fromMinor(1,'USD')];
-const existing   = [Money.zero('USD'), Money.zero('USD'), Money.zero('USD')];
-allocateDiscount(Money.fromMinor(2, 'USD'), [0, 1, 2], lineTotals, existing);
-// existing => [0, 0, 2]  — line index 2 received a 2-cent discount on a 1-cent line.
-```
+## Narrative Findings (AI reviewer)
 
-The total (`2`) still matches `applied`, which is exactly what the new
-`checkout-allocation.test.ts` suite asserts ("sums exactly to the applied
-amount") — so the new table tests pass while this per-line invariant is
-silently broken. In `priceCheckout`, this flows into
-`netMerchandise: pricedCatalog[index].lineTotal.subtract(discounts.perLine[index])`,
-which `Money.subtract` allows to go negative (no floor-at-zero guard). A
-negative net-merchandise line then either:
-- is sent to Stripe Tax as a negative line `amount` (likely provider-rejected,
-  routing into the `catch` fallback), or
-- if it reaches the `configured_fallback` tax path, is passed as a negative
-  weight into `allocateLargestRemainder`, which explicitly throws
-  (`"Tax fallback allocation requires nonnegative integer minor units"`),
-  crashing checkout pricing entirely for that customer.
-
-This is realistically reachable with a normal-sized cart: any checkout with
-several eligible lines (accessories, small add-ons) under a percentage or
-fixed promotion whose amount doesn't divide evenly across all eligible line
-prices can dump the accumulated rounding loss onto whichever line happens to
-be last in catalog order — worse the more eligible lines there are (up to
-`MAX_CHECKOUT_LINES = 100`), and worst when the last eligible line is
-cheap.
-
-**Fix:** Cap the last line the same way the others are capped, and
-redistribute any leftover that the last line can't absorb to lines with
-remaining spare capacity (or switch this function to the same
-largest-remainder technique already implemented correctly in
-`allocateLargestRemainder` in this same file, using each line's `available`
-value as its weight and iterating spare capacity for the actual cent-by-cent
-remainder assignment). Minimal patch shape:
-
-```ts
-let remaining = applied.toMinorUnits();
-const shareOf = (position: number) => Math.min(
-  available[position].toMinorUnits(),
-  Math.floor(
-    applied.toMinorUnits() * available[position].toMinorUnits() /
-    availableTotal.toMinorUnits()
-  )
-);
-const shares = eligible.map((_, position) => shareOf(position));
-remaining -= shares.reduce((a, b) => a + b, 0);
-// Distribute the leftover only into lines with spare capacity, never past it.
-for (let i = 0; remaining > 0 && i < eligible.length; i += 1) {
-  const room = available[i].toMinorUnits() - shares[i];
-  const take = Math.min(room, remaining);
-  shares[i] += take;
-  remaining -= take;
-}
-eligible.forEach((index, position) => {
-  existing[index] = existing[index].add(Money.fromMinor(shares[position], amount.currency));
-});
-```
-(Any equivalent fix is acceptable as long as no `shares[i]` can exceed
-`available[i]`.) Add a regression test asserting
-`existing[i].toMinorUnits() <= lineTotals[i].toMinorUnits()` (or
-`<= available[i]` pre-mutation) for every line across the existing weight
-tables — the current suite never checks this invariant.
-
-## Warnings
-
-### WR-01: Vitals endpoint has no request body size cap
-
-**File:** `app/api/analytics/vitals/route.ts:35-42`
-
-**Issue:** `POST` calls `await request.json()` directly with no
-`content-length` check and no bounded-reader pattern, even though this route
-is unauthenticated by design (a public `sendBeacon`/`fetch` target) and the
-same PR adds exactly this kind of guard to
-`app/api/webhooks/stripe/route.ts` (`readBoundedRawBody`,
-`MAX_STRIPE_WEBHOOK_BODY_BYTES = 1_048_576`). Field-level validation (metric
-name/value/rating enums) happens only *after* the full body has been
-buffered and JSON-parsed, so an attacker can send arbitrarily large POST
-bodies to this public endpoint at no authentication cost, forcing the worker
-to buffer/parse the whole payload before anything is rejected.
-
-**Fix:** Reuse the same bounded-body pattern already established in the
-Stripe webhook route (check `content-length` up front, cap total bytes read,
-e.g. a few KB is plenty for a five-field vitals beacon) before calling
-`.json()`.
-
-### WR-02: `mapDeclineReason` likely under-detects `expired_card` / `authentication_required` in real Stripe data
-
-**File:** `app/api/webhooks/stripe/handlers/decline-reason.ts:52-61`
-
-**Issue:** `CODE_TO_REASON` maps `code === 'expired_card'` and
-`code === 'authentication_required'` directly, but the refinement step for
-the generic `code === 'card_declined'` case only special-cases
-`decline_code === 'insufficient_funds'`:
-
-```ts
-if (code === 'card_declined') {
-  return record.decline_code === 'insufficient_funds' ? 'insufficient_funds' : 'card_declined';
-}
-```
-
-In Stripe's actual error shape, when an issuer declines a card the `code` is
-almost always the generic `card_declined`, and the *specific* reason
-(`expired_card`, `authentication_required`, `stolen_card`, etc.) is carried
-in `decline_code`, not `code`. As written, most real expired-card and
-3DS-required declines will fall through to the generic `'card_declined'`
-bucket instead of their more specific reason, even though
-`ALLOWED_FIELD_ENUMS.reason` and `CODE_TO_REASON` both already define
-`expired_card` and `authentication_required` as first-class values. The
-`expired_card`/`authentication_required` branches of `CODE_TO_REASON`
-mostly only fire for the (rarer) case where Stripe rejects the card before
-even reaching the issuer.
-
-**Fix:** Extend the `card_declined` refinement to check `decline_code`
-against `expired_card` and `authentication_required` the same way it
-already does for `insufficient_funds`, e.g.:
-
-```ts
-if (code === 'card_declined') {
-  const declineCode = record.decline_code;
-  if (declineCode === 'insufficient_funds') return 'insufficient_funds';
-  if (declineCode === 'expired_card') return 'expired_card';
-  if (declineCode === 'authentication_required') return 'authentication_required';
-  return 'card_declined';
-}
-```
-
-### WR-03: Dead catch branch in `handlePaymentFailed`
-
-**File:** `app/api/webhooks/stripe/route.ts:347-360`
-
-**Issue:**
-
-```ts
-async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
-  try {
-    recordTelemetry('payment.intent_failed', { ... });
-  } catch (error) {
-    recordTelemetry('webhook.processing_failed', { ... }, error);
-  }
-}
-```
-
-`recordTelemetry` (`lib/observability/telemetry.ts:312-341`) wraps its
-entire body in a top-level `try { ... } catch { /* fail open */ }` and
-documents itself as always failing open; it cannot throw. `mapDeclineReason`
-is likewise documented as "Total over all inputs — never throws." This means
-the `catch` branch here is unreachable in the current codebase, and the
-function has no test coverage of that branch (understandably, since nothing
-can trigger it).
-
-**Fix:** Either remove the try/catch (relying on `recordTelemetry`'s
-documented fail-open contract, matching how `mapDeclineReason` is called
-elsewhere without a wrapper), or add a code comment noting this is
-deliberate defense-in-depth against a future change to `recordTelemetry`'s
-contract. Not a functional bug today, but the dead branch adds
-untestable/unreachable code.
+No Critical or Warning findings remain. Two Info-level notes below (one carried forward, one newly observed during CR-01 verification).
 
 ## Info
 
-### IN-01: Inconsistent `notFound()` call style between the two updated pages
+### IN-01: Inconsistent `notFound()` call style between the two updated pages (carried forward, out of scope this iteration)
 
 **File:** `app/category/[slug]/page.tsx:62-64`
 
-**Issue:** The category page calls `notFound();` without `return`:
+**Issue:** Carried forward unchanged from iteration 1 — this file is outside iteration 2's fix scope (`fix_scope: critical_warning`) and was not part of this iteration's file list, so it was not re-read. The category page still calls `notFound();` without `return`, while the product page changed in the same original diff uses `return notFound();`. Functionally equivalent today since `notFound()` throws, but fragile if code is ever added beneath the `if` block, or against a test double that doesn't throw.
 
-```ts
-if (!category) {
-  notFound();
-}
-```
+**Fix:** `if (!category) { return notFound(); }` for consistency with the sibling file. Non-blocking; can be picked up in a future pass.
 
-while the product page updated in the same diff uses the safer explicit
-form:
+### IN-02: `allocateDiscount`'s floor-rounding remainder now lands on the first line(s) with room, not the last line
 
-```ts
-if (!storedProduct || storedProduct.status !== "active") return notFound();
-```
+**File:** `lib/services/checkout-pricing.ts:270-282`
 
-Functionally equivalent today (`notFound()` throws), but relying on that
-implicitly is fragile if code is ever added beneath the `if` block later, or
-in a test double that doesn't throw.
+**Issue:** The CR-01 fix is correct and necessary, but it also changes *which* eligible line absorbs a nonzero floor-rounding remainder compared to the pre-fix algorithm, even in cases where the old algorithm never overflowed a line's capacity. Example verified directly against the function: three eligible lines each with 10 minor units of available capacity, discount of 10 minor units. Old algorithm (pre-CR-01): `[3, 3, 4]` (all rounding loss dumped on the last line). Current algorithm: `[4, 3, 3]` (loss distributed starting at the first line with spare room, ascending). Both are valid allocations — the sum, per-line-cap, and nonnegativity invariants hold either way, and no line's price is exceeded — so this is not a correctness bug. It is a genuine behavior change in which specific product line receives an extra cent (or a few cents, bounded by `eligible.length - 1`) of discount when a promotion doesn't divide evenly across eligible lines.
 
-**Fix:** `if (!category) { return notFound(); }` for consistency with the
-sibling file changed in this same PR.
+No test in `checkout-pricing.test.ts` or `checkout-allocation.test.ts` currently pins down *which* line receives the redistributed remainder (the new per-line-capacity test only asserts `<=`, and the sum-exactness tests only assert the total). This means a future refactor could silently change the redistribution order again (e.g., back to largest-remainder-first like `allocateLargestRemainder` uses) without any test catching the shift. Not blocking — no currently-shipped test value moved because none of the existing `checkout-pricing.test.ts` scenarios produce a multi-line remainder — but worth a small follow-up test to lock in the intended policy if the specific per-line cent assignment is ever product-relevant (e.g., for customer-facing discount receipts).
+
+**Fix:** Optional. Add a test such as `allocateDiscount(Money.fromMinor(10), [0,1,2], [10,10,10 minor], zero)` asserting the exact `[4,3,3]` distribution, documenting that ascending-index-first is the intended (not incidental) redistribution policy.
 
 ---
 
-_Reviewed: 2026-09-02T13:10:00Z_
+_Reviewed: 2026-09-02T20:13:19Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+_Iteration: 2 (fix re-review)_
