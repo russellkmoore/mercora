@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mapProviderTaxAllocations, priceCheckout } from '@/lib/services/checkout-pricing';
 import { Money } from '@/lib/money';
 
@@ -54,6 +54,10 @@ function dependencies(overrides: Record<string, unknown> = {}) {
 }
 
 describe('server-authoritative checkout pricing', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('uses catalog identity, name, SKU and price rather than client display or totals', async () => {
     const quote = await priceCheckout({
       items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 2 }],
@@ -383,6 +387,130 @@ describe('server-authoritative checkout pricing', () => {
       fields: { operation: 'price', outcome: 'degraded', provider: 'stripe' },
     });
     expect(Object.keys(envelope.fields)).toEqual(['operation', 'outcome', 'provider']);
+    warnSpy.mockRestore();
+  });
+
+  it('does not fire checkout.tax_fallback when the tax provider succeeds', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const quote = await priceCheckout({
+      items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],
+      shippingAddress: address,
+      shippingMethodId: 'standard',
+    }, { dependencies: dependencies() as any });
+
+    expect(quote.taxSource).toBe('provider');
+    const fallbackWarnings = warnSpy.mock.calls.filter((call) => {
+      try {
+        return JSON.parse(String(call[0])).event === 'checkout.tax_fallback';
+      } catch {
+        return false;
+      }
+    });
+    expect(fallbackWarnings).toHaveLength(0);
+    warnSpy.mockRestore();
+  });
+
+  it('fires checkout.tax_fallback exactly once per fallback priceCheckout call', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fallbackDeps = dependencies({ calculateTax: vi.fn(async () => { throw new Error('offline'); }) });
+    await priceCheckout({
+      items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],
+      shippingAddress: address,
+      shippingMethodId: 'standard',
+    }, { dependencies: fallbackDeps as any });
+
+    const fallbackWarnings = warnSpy.mock.calls.filter((call) => {
+      try {
+        return JSON.parse(String(call[0])).event === 'checkout.tax_fallback';
+      } catch {
+        return false;
+      }
+    });
+    expect(fallbackWarnings).toHaveLength(1);
+    warnSpy.mockRestore();
+  });
+
+  it('fires checkout.tax_fallback exactly once for a multi-line fallback cart', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fallbackDeps = dependencies({ calculateTax: vi.fn(async () => { throw new Error('offline'); }) });
+    await priceCheckout({
+      items: [
+        { productId: 'prod_1', variantId: 'var_1', quantity: 1 },
+        { productId: 'prod_1', variantId: 'var_1', quantity: 2 },
+      ],
+      shippingAddress: address,
+      shippingMethodId: 'standard',
+    }, { dependencies: fallbackDeps as any });
+
+    const fallbackWarnings = warnSpy.mock.calls.filter((call) => {
+      try {
+        return JSON.parse(String(call[0])).event === 'checkout.tax_fallback';
+      } catch {
+        return false;
+      }
+    });
+    expect(fallbackWarnings).toHaveLength(1);
+    warnSpy.mockRestore();
+  });
+
+  it('carries no identifier from the pricing input in the checkout.tax_fallback envelope', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fallbackDeps = dependencies({ calculateTax: vi.fn(async () => { throw new Error('offline'); }) });
+    await priceCheckout({
+      items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],
+      shippingAddress: address,
+      shippingMethodId: 'standard',
+    }, { dependencies: fallbackDeps as any });
+
+    const serialized = String(warnSpy.mock.calls[0][0]);
+    for (const value of Object.values(address)) {
+      expect(serialized).not.toContain(String(value));
+    }
+    expect(serialized).not.toContain('prod_1');
+    expect(serialized).not.toContain('var_1');
+    expect(serialized).not.toContain('SKU-1');
+    warnSpy.mockRestore();
+  });
+
+  it('carries no numeric field or error_class in the checkout.tax_fallback envelope', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fallbackDeps = dependencies({ calculateTax: vi.fn(async () => { throw new Error('offline'); }) });
+    await priceCheckout({
+      items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],
+      shippingAddress: address,
+      shippingMethodId: 'standard',
+    }, { dependencies: fallbackDeps as any });
+
+    const envelope = JSON.parse(String(warnSpy.mock.calls[0][0]));
+    expect(envelope.fields.attempt).toBeUndefined();
+    expect(envelope.fields.count).toBeUndefined();
+    expect(envelope.fields.duration_ms).toBeUndefined();
+    expect(envelope.fields.http_status).toBeUndefined();
+    expect(envelope.error_class).toBeUndefined();
+    warnSpy.mockRestore();
+  });
+
+  it('leaves the fallback quote unchanged even when console.warn itself throws', async () => {
+    const fallbackDeps = dependencies({ calculateTax: vi.fn(async () => { throw new Error('offline'); }) });
+    const baseline = await priceCheckout({
+      items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],
+      shippingAddress: address,
+      shippingMethodId: 'standard',
+    }, { dependencies: fallbackDeps as any });
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+      throw new Error('hostile console');
+    });
+    const hostileDeps = dependencies({ calculateTax: vi.fn(async () => { throw new Error('offline'); }) });
+    const withHostileConsole = await priceCheckout({
+      items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],
+      shippingAddress: address,
+      shippingMethodId: 'standard',
+    }, { dependencies: hostileDeps as any });
+
+    expect(withHostileConsole.tax).toEqual(baseline.tax);
+    expect(withHostileConsole.total).toEqual(baseline.total);
+    expect(withHostileConsole.taxSource).toEqual(baseline.taxSource);
     warnSpy.mockRestore();
   });
 
