@@ -126,11 +126,11 @@
 
 **Impact:** Local typecheck passes, CI typecheck fails; requires env cleanup to reproduce CI failure locally
 
-**Status:** unverified. This entry was written from inference, not from a reproduced failure. Confirm it before acting on it.
+**Status:** VERIFIED 2026-09-02. With `.env.local` present, `npm run cf-typecheck` fails locally ("Types at ./cloudflare-env.d.ts are out of date") while the same commit passes `cf-typecheck` in CI (run 33601930824). A local regeneration adds the `.env.local` variable names to `CloudflareEnv` and rewrites the `mainModule` import as an absolute path. Never commit a local regeneration; it would leak secret names into tracked types.
 
 **Fix approach:**
-1. Reproduce first: with `.env.local` present, run `npm run cf-typecheck` and confirm it fails
-2. If confirmed, run `cf-typecheck` with an equivalent of `--exclude-env-local`, or document that `.env.local` vars must not be referenced in types
+1. Run `cf-typecheck` locally with `.env.local` temporarily moved aside, or treat CI as the authority for this gate
+2. Optionally add an npm script that does the move-aside automatically, or document the gotcha in the onboarding guide
 3. `.env*.local` is already in `.gitignore` (line 30); nothing to do there
 
 ---
