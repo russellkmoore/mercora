@@ -66,7 +66,10 @@ export const TAIL_ROUTE_PATHS: ReadonlySet<string> = new Set([
   '/api/webhooks/stripe',
 ]);
 
-const ENUM_FIELDS: Record<string, ReadonlySet<string>> = {
+// Kept in parity with `ALLOWED_FIELD_ENUMS` in lib/observability/telemetry.ts (the source of
+// truth for this closed taxonomy). Exported so tests/unit/workers/observability-tail-core.test.ts
+// can assert byte-equal parity and fail loudly on future drift.
+export const ENUM_FIELDS: Record<string, ReadonlySet<string>> = {
   effect_type: new Set([
     'confirmation_email', 'coupon', 'gift_card', 'inventory', 'merchant_notification',
     'subscription', 'paid_decrement', 'refund_restock',
@@ -81,7 +84,7 @@ const ENUM_FIELDS: Record<string, ReadonlySet<string>> = {
     'rejected', 'retry_scheduled', 'unavailable', 'unresolved',
   ]),
   provider: new Set([
-    'analytics', 'carrier', 'cloudflare_email', 'd1', 'resend', 'stripe', 'workers_ai',
+    'analytics', 'carrier', 'cloudflare_email', 'd1', 'gift_card', 'resend', 'stripe', 'workers_ai',
   ]),
   trigger: new Set(['manual', 'recovery', 'request', 'scheduled', 'webhook']),
 };

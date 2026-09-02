@@ -2,12 +2,14 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  ALLOWED_FIELD_ENUMS,
   TELEMETRY_EVENTS,
   TELEMETRY_MARKER,
   TELEMETRY_PATHS,
 } from '@/lib/observability/telemetry';
 import {
   buildEmailMessage,
+  ENUM_FIELDS,
   escapeHtml,
   extractCriticalAlerts,
   MAX_CANDIDATE_ALERTS,
@@ -218,5 +220,19 @@ describe('observability Tail Worker parser and renderer', () => {
     expect(() => validateAlertConfiguration(Object.create(null, {
       ALERT_EMAIL_TO: { get: () => { throw new Error('secret getter'); } },
     }))).not.toThrow();
+  });
+});
+
+describe('ENUM_FIELDS parity with lib/observability/telemetry.ts', () => {
+  it('mirrors ALLOWED_FIELD_ENUMS field-for-field and value-for-value', () => {
+    // lib/observability/telemetry.ts is the source of truth for this closed taxonomy.
+    // core.ts's sanitizeFields() silently drops any field/value not in its own enum, so
+    // drift here means a critical alert email silently loses a diagnostic field with no
+    // test failure to catch it (see 01-REVIEW.md WR-05). Assert byte-equal parity so
+    // future drift fails loudly instead of silently.
+    expect(Object.keys(ENUM_FIELDS).sort()).toEqual(Object.keys(ALLOWED_FIELD_ENUMS).sort());
+    for (const key of Object.keys(ALLOWED_FIELD_ENUMS) as (keyof typeof ALLOWED_FIELD_ENUMS)[]) {
+      expect([...ENUM_FIELDS[key]].sort()).toEqual([...ALLOWED_FIELD_ENUMS[key]].sort());
+    }
   });
 });

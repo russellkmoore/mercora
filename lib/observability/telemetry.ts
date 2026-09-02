@@ -96,7 +96,10 @@ const ALLOWED_ERROR_CLASSES = new Set([
   'TypeError',
 ]);
 
-const ALLOWED_FIELD_ENUMS = {
+// Source of truth for this closed taxonomy. Mirrored by `ENUM_FIELDS` in
+// workers/observability-tail/src/core.ts — exported so
+// tests/unit/workers/observability-tail-core.test.ts can assert byte-equal parity.
+export const ALLOWED_FIELD_ENUMS = {
   effect_type: new Set([
     'confirmation_email', 'coupon', 'gift_card', 'inventory', 'merchant_notification',
     'subscription', 'paid_decrement', 'refund_restock',
