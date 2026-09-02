@@ -63,6 +63,7 @@ import { redirectMap } from "@/lib/db/schema/redirect-map";
 import { eq } from "drizzle-orm";
 import { resolveLegacyRedirect } from "@/lib/redirects/resolver";
 import { isLegacyRedirectLookupPath } from "@/lib/redirects/policy";
+import { assertDeploymentPosture, DEPLOYMENT_GUARD_MESSAGE } from "@/lib/auth/deployment-guard";
 
 /**
  * Custom middleware that combines Clerk authentication with maintenance mode checking
@@ -70,6 +71,19 @@ import { isLegacyRedirectLookupPath } from "@/lib/redirects/policy";
 export default clerkMiddleware(async (auth, req: NextRequest) => {
   const { pathname } = req.nextUrl;
   const isLegacyRedirectPath = isLegacyRedirectLookupPath(pathname);
+
+  // Deployment posture guard: a deployed development build must lock admin
+  // routes at the edge, before the admin short-circuit below skips every
+  // other check for these two prefixes.
+  if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) {
+    const posture = assertDeploymentPosture();
+    if (posture.tripped) {
+      return new NextResponse(DEPLOYMENT_GUARD_MESSAGE, {
+        status: posture.status,
+        headers: { 'Content-Type': 'text/plain', 'Retry-After': '3600' },
+      });
+    }
+  }
 
   // Skip maintenance check for static assets and Next.js internals
   if (!isLegacyRedirectPath && (pathname.includes('/_next') ||
