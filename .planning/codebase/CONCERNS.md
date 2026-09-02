@@ -4,22 +4,16 @@
 
 ## Critical Production Issues
 
-### Test API Keys in Production Configuration
+### Test-Mode Publishable Keys in Production (accepted, not a defect)
 
-**Issue:** Production deployment uses Stripe and Clerk test mode publishable keys
-- `wrangler.jsonc` lines 96-97 contain `pk_test_*` keys for both Stripe and Clerk
-- Test keys cannot process real transactions or authenticate real users
-- Orders cannot be taken as currently configured
+**Status:** Accepted by the owner on 2026-09-01. Not a fix target.
 
-**Files:** `wrangler.jsonc`
+- `wrangler.jsonc` lines 96-97 carry `pk_test_*` publishable keys for Stripe and Clerk.
+- The deployed site is a demo environment with no live Stripe account. Test mode is intentional.
+- Publishable keys are public by design (they ship to the browser), so keeping them in a tracked config file is not a secret leak. Secrets (`STRIPE_SECRET_KEY`, `CLERK_SECRET_KEY`, `ADMIN_VECTORIZE_TOKEN`) already live in Worker secrets and `.dev.vars`, which is gitignored.
+- `wrangler.jsonc` must stay tracked: Cloudflare Workers Builds clones the repo, and `scripts/build-with-public-env.mjs`, `d1-migrate.mjs`, `check-deploy-config.mjs`, and `db-local-ensure.mjs` all read it.
 
-**Impact:** Complete payment processing failure in production; no real transactions possible
-
-**Fix approach:**
-1. Use environment secrets in Cloudflare (not vars) for production publishable keys
-2. Keep test keys only in local `.env.local`
-3. Verify CI/production builds fetch keys from secrets, not wrangler.jsonc
-4. Add deployment validation to reject test keys at build time
+**Revisit when:** a live Stripe account is attached. At that point swap the two `vars` values for `pk_live_*` keys and confirm `NEXT_PUBLIC_*` Workers Build variables match (see project memory on build-time vars).
 
 ### Flat Tax Rate Fallback for All Jurisdictions
 
@@ -61,9 +55,10 @@
 **Impact:** Type safety disabled; runtime failures undetected by TypeScript; regressions on Next.js version upgrades
 
 **Fix approach:**
-1. Use proper `Awaitable<{ slug: string }>` type for all `[slug]` pages
-2. Run tsc in strict mode in CI to catch all type escapes
-3. Audit all `any` casts in admin pages (`ProductManagement.tsx`, `AdminPage.tsx`, etc.) and replace with proper types
+1. Type `params` as `Promise<{ slug: string }>` and `await` it in both `[slug]` pages (tracked as OBS-03)
+2. Audit all `any` casts in admin pages (`ProductManagement.tsx`, `AdminPage.tsx`, etc.) and replace with proper types
+
+**Note (corrected 2026-09-01):** `tsconfig.json` already sets `"strict": true` and CI already runs `npm run typecheck` and `npm run cf-typecheck`. Strict mode does not reject an explicit `: any` annotation, so "run tsc in strict mode in CI" was never the missing gate. The gap is the explicit escape hatches themselves.
 
 ---
 
@@ -245,8 +240,8 @@ Verified 2026-08-31 with `find app/api -type d -empty`: 12 empty directories, no
 **Priority:** High
 
 **Safe modification approach:**
-1. Add TypeScript strict mode check to CI that fails on `any` in route handlers
-2. Add E2E test that verifies `/product/invalid-slug` returns 404 (not error 500)
+1. Replace the explicit `: any` with `Promise<{ slug: string }>` (strict mode is already on and typecheck already runs in CI; see the correction under Type Safety above). Tracked as OBS-03.
+2. Add a test that verifies `/product/invalid-slug` and `/category/invalid-slug` return 404 (not error 500, and not a 200 "not found" div)
 
 ---
 
@@ -273,12 +268,12 @@ Verified 2026-08-31 with `find app/api -type d -empty`: 12 empty directories, no
 **Why fragile:**
 - Allocates tax remainder using "largest remainder method"
 - Off-by-one errors here cause customer refunds or lost tax
-- No unit tests currently verify correctness for all line counts
+
+**Test coverage (corrected 2026-09-01):** an earlier draft said no unit tests covered this. That was wrong. `tests/unit/lib/services/checkout-pricing.test.ts:525` ("uses largest remainders so fallback line taxes remain integer and sum exactly") already asserts integer allocation and an exact sum. The remaining gap is breadth, not existence: the existing test covers one line-count shape.
 
 **Safe modification approach:**
-1. Add deterministic tests with mock tax amounts: `[100, 200, 50]` items with `1234` tax cents
-2. Verify: sum of allocated tax === total tax
-3. Test with 0, 1, 10, 100+ line items
+1. Extend the existing test with 1, 2, 10, and 100 line items and penny-rounding edge cases (tracked as OBS-04)
+2. Keep the invariant: sum of allocated tax === total tax
 
 ---
 
@@ -320,7 +315,7 @@ so a misbuilt deploy fails loudly instead of silently opening admin routes.
 
 **Files:** `wrangler.jsonc` lines 96-97
 
-**Risk:** Already listed in Production Issues section above
+**Risk:** None while the site is a demo. Accepted by the owner; see the first entry in this document.
 
 ---
 

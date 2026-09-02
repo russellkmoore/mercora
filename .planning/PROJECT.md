@@ -61,7 +61,7 @@ A customer or an external AI agent can find the right outdoor gear through Volt,
 - Unbuilt modules in `docs/admin-dashboard-specification.md` (MFA, WebSocket/SSE, custom report builder, fulfillment automation, GDPR/CCPA tools, VIP tiers, personalization admin) — that document is a historical design doc, not a backlog (W2 resolved); admin is treated as shipped
 - The U13 shipment command and `SHIPMENT_NO_UNSETTLED_REFUNDS_SQL` end-to-end CAS test — future ADR-scoped work with its own migration; not a hardening gap
 - Account deletion and personal-data export — explicitly deferred by `docs/customer-communications.md`; needs a separate design
-- Switching the `pk_test_` Stripe/Clerk publishable keys in `wrangler.jsonc` to live keys — a business decision about whether Voltique runs in Stripe test mode, not a hardening task; flagged in STATE.md for Russell to confirm
+- Switching the `pk_test_` Stripe/Clerk publishable keys in `wrangler.jsonc` to live keys — production is intentionally a demo environment with no live Stripe account (confirmed 2026-09-01)
 - Splitting large service files (`checkout-pricing.ts`, `reviews.ts`, `products.ts`, `inventory.ts`, `agent-chat/route.ts`) — refactor with no user-observable outcome; revisit only when a feature touches them
 - Deleting the 12 empty `app/api/*` directories — git does not track empty directories, so they exist only in the local working tree; one local `find app/api -type d -empty -delete` clears them
 - Playwright mobile suite and Lighthouse CI workflow from `docs/mobile-testing-automation.md` — v1 records a one-time baseline (MOB-01); ongoing automation is backlog
@@ -87,7 +87,7 @@ A customer or an external AI agent can find the right outdoor gear through Volt,
 - `app/product/[slug]/page.tsx:60` and `app/category/[slug]/page.tsx:52` take `{ params }: any` and read `params.slug` synchronously; the category route renders a 200 "not found" div instead of `notFound()`.
 - `app/api/webhooks/stripe/route.ts:351` is an empty `handlePaymentFailed` with a TODO. `lib/hooks/useEnhancedUserContext.ts:140` has a `favoriteCategories` TODO (minor; not a requirement).
 - `worker.ts` has no `NODE_ENV` assertion; the admin bypass guard is only as good as the baked-in build value.
-- `wrangler.jsonc` carries two `pk_test_` publishable keys and `scripts/build-with-public-env.mjs` injects `NEXT_PUBLIC_*` from it. Whether production is meant to run in Stripe test mode is unconfirmed.
+- `wrangler.jsonc` carries two `pk_test_` publishable keys and `scripts/build-with-public-env.mjs` injects `NEXT_PUBLIC_*` from it. Production is a demo environment in Stripe test mode by design; the file stays tracked.
 - `docs/dependency-security.md` next review date was 2026-08-25. Its two exceptions (Next-bundled PostCSS and Sharp) have exit condition "Next 16 upgrade"; the repo is on Next 16.3.1.
 - `docs/README.md` links 1 of the 12 2026-era docs and says "MCP Server: Under development".
 
@@ -135,7 +135,7 @@ A customer or an external AI agent can find the right outdoor gear through Volt,
 | The production text model is `@cf/openai/gpt-oss-20b` (I8) | `lib/ai/config.ts:29` is the single source of truth | ✓ Good — docs in REF-01 |
 | Migrations nuance: `deploy` never migrates; `deploy:ci` migrates production first | Both true; not a conflict. Recorded so nobody "fixes" one to match the other | ✓ Good — runbook in RUN-01 |
 | v1 is a hardening milestone; the 12 `docs/ROADMAP.md` items are backlog | User decision 2026-09-01; docs and code must agree before feature work resumes | — Pending |
-| Publishable `pk_test_` keys in `wrangler.jsonc` are out of v1 scope | Whether Voltique runs in Stripe test mode is a business decision; needs Russell's answer, not a plan | — Pending |
+| Publishable `pk_test_` keys stay in tracked `wrangler.jsonc` | Production is a demo with no live Stripe account; publishable keys are public by design; Workers Builds and deploy scripts read the file | ✓ Good |
 
 ---
 *Last updated: 2026-09-01 after project initialization from doc ingest and codebase map*
