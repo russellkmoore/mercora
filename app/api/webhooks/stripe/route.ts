@@ -10,7 +10,6 @@
  * - **payment_intent.payment_failed**: Payment failed
  * - **invoice.payment_succeeded**: Subscription/recurring payment succeeded
  * - **customer.subscription.updated**: Subscription changes
- * - **checkout.session.completed**: Checkout session completed
  * - **charge.refunded**: Authoritative cumulative refund reconciliation
  * - **refund.updated/refund.failed**: Delayed refund lifecycle reconciliation
  * - **charge.refund.updated**: Legacy delayed-refund compatibility event
@@ -221,11 +220,6 @@ export async function POST(req: NextRequest) {
         outcome = 'handled';
         break;
 
-      case 'checkout.session.completed':
-        await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
-        outcome = 'ignored';
-        break;
-
       case 'invoice.paid':
       case 'invoice.payment_succeeded':
       case 'invoice.payment_failed':
@@ -355,26 +349,3 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
   });
 }
 
-/**
- * Handle completed checkout session
- * Processes successful checkout completion
- */
-async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-  const orderId = session.metadata?.orderId;
-  
-  if (!orderId) return;
-
-  try {
-    // Handle checkout completion
-    // You can add additional logic here:
-    // - Final order confirmation
-    // - Customer onboarding
-    // - Thank you emails
-    
-  } catch (error) {
-    recordTelemetry('webhook.processing_failed', {
-      operation: 'process', outcome: 'failed', provider: 'd1', retryable: true,
-      path: '/api/webhooks/stripe', trigger: 'webhook',
-    }, error);
-  }
-}
