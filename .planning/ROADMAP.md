@@ -28,7 +28,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Presenting the previously published token to `/api/admin/vectorize` and `/api/admin/knowledge` on the live site is rejected with 401/403 (or the finding records that the value was never live).
   3. A test shows the Worker fails at startup, or every admin request fails closed, when `NODE_ENV` is `development`, and a production build is unaffected; all CI gates still pass.
   4. `docs/CLAUDE.md`, `docs/DEPLOYMENT_SETUP.md`, and `docs/admin-authentication.md` agree that production admin auth is enforced through Clerk role, an active `adminUsers` table row, or the bearer token, that the only bypass is the `x-dev-admin` header under `NODE_ENV=development`, and no query-string bypass is described anywhere.
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Deployment guard tracer: taxonomy event, `lib/auth/deployment-guard.ts`, wired into `checkAdminPermissions` with tests (SEC-03)
+- [ ] 01-02-PLAN.md — Guard completion: `authenticateRequest`, `middleware.ts` 503 at the edge, and the operator documentation (SEC-03, SEC-04)
+- [ ] 01-03-PLAN.md — Credential scrub and doc truth across the three admin-auth documents (SEC-01, SEC-04)
+- [ ] 01-04-PLAN.md — Rotate `ADMIN_VECTORIZE_TOKEN` and prove the published value is dead on the live site (SEC-02)
 
 ### Phase 2: Observability and Regression Guards
 **Goal**: The silent failure modes the codebase map found become visible to an operator, and the regressions it found have tests that would catch them if they came back.
@@ -72,7 +78,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Security and Admin-Auth Truth | 0/TBD | Not started | - |
+| 1. Security and Admin-Auth Truth | 0/4 | Planned | - |
 | 2. Observability and Regression Guards | 0/TBD | Not started | - |
 | 3. Decision Lock-In and Operator Runbooks | 0/TBD | Not started | - |
 | 4. Reference Documentation Refresh | 0/TBD | Not started | - |

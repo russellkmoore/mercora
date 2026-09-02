@@ -42,14 +42,36 @@ Project commands run under Node 24 via mise (`mise exec -- <command>`).
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| (filled by planner) | | | SEC-01 | — | No credential literal in `docs/` | scripted grep | `git grep -n "voltique-admin"` returns nothing; `git grep -n "mercora-dev-bypass" docs/` returns nothing | ✅ shell | ⬜ pending |
-| (filled by planner) | | | SEC-02 | — | Old token rejected on live site | scripted HTTP probe | `curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer voltique-admin" https://voltique.russellkmoore.me/api/admin/vectorize` prints 401 or 403; same for `/api/admin/knowledge` | ✅ shell | ⬜ pending |
-| (filled by planner) | | | SEC-03 | — | Guard trips under dev + Workers UA; bypass unreachable; silent in prod; silent in dev without Workers UA | unit | `npx vitest run tests/unit/lib/auth/admin-middleware.test.ts tests/unit/lib/auth/unified-auth.test.ts` | ❌ W0 (new `it()` cases) | ⬜ pending |
-| (filled by planner) | | | SEC-03 | — | New telemetry event fits the closed taxonomy | unit (AST contract) | `npx vitest run tests/unit/observability/instrumentation-source.test.ts tests/unit/lib/observability/telemetry.test.ts` | ✅ exists | ⬜ pending |
-| (filled by planner) | | | SEC-03 | — | middleware.ts returns 503 on `/api/admin/*` when tripped | unit | `npx vitest run tests/unit/lib/auth/deployment-guard.test.ts` (or the test file the planner names) | ❌ W0 | ⬜ pending |
-| (filled by planner) | | | SEC-04 | — | No query-string bypass documented; no "disabled" claim | scripted grep | `git grep -n -e "?dev=" -e "?token=" -e "temporarily disabled" -e "disabled for dev" docs/` returns nothing | ✅ shell | ⬜ pending |
+| 01-01 T1 | 01-01 | 1 | SEC-03 | T-01-01, T-01-02, T-01-03 | Deployed dev build denies the `x-dev-admin` bypass through `checkAdminPermissions`; event registered and escalated | unit + AST contract | `npx vitest run tests/unit/lib/auth/admin-middleware.test.ts tests/unit/observability/instrumentation-source.test.ts tests/unit/workers/observability-tail-core.test.ts` | ❌ W0 (new `it()` case) | ⬜ pending |
+| 01-01 T2 | 01-01 | 1 | SEC-03 | T-01-02, T-01-04 | Guard predicate boundaries: exact equality, absent/empty `navigator`, near-miss `NODE_ENV`, no leaked detail in the message | unit | `npx vitest run tests/unit/lib/auth/deployment-guard.test.ts tests/unit/lib/auth/admin-middleware.test.ts` | ❌ W0 (new file) | ⬜ pending |
+| 01-01 T3 | 01-01 | 1 | SEC-03 | T-01-04, T-01-18 | Production and local development unchanged; service-token path also closed when tripped | unit + full gate | `npx vitest run tests/unit/lib/auth/admin-middleware.test.ts` then `npm test && npm run lint && npm run typecheck` | ❌ W0 (new `it()` cases) | ⬜ pending |
+| 01-02 T1 | 01-02 | 2 | SEC-03 | T-01-05 | `authenticateRequest` returns a real HTTP 503; Clerk dev-admin path unreachable | unit | `npx vitest run tests/unit/lib/auth/unified-auth.test.ts tests/unit/observability/instrumentation-source.test.ts` | ❌ W0 (new `it()` cases) | ⬜ pending |
+| 01-02 T2 | 01-02 | 2 | SEC-03 | T-01-06, T-01-07, T-01-08 | `middleware.ts` returns 503 on `/admin` and `/api/admin` when tripped; storefront unaffected | unit + source contract | `npx vitest run tests/unit/app/admin-guard-middleware.test.ts tests/unit/app/redirect-middleware-source.test.ts` | ❌ W0 (new file) | ⬜ pending |
+| 01-02 T3 | 01-02 | 2 | SEC-04 | T-01-19 | Guard documented: what trips it, what the operator sees, how to recover, and the residual 401-vs-503 difference | scripted grep | `grep -q 'Deployment Safety' docs/admin-authentication.md && grep -q 'auth.deployment_guard_tripped' docs/admin-authentication.md` | ✅ shell | ⬜ pending |
+| 01-03 T1 | 01-03 | 1 | SEC-01, SEC-04 | T-01-09, T-01-10, T-01-20 | `docs/CLAUDE.md` publishes no credential, shows no URL-credential example, makes no switched-off claim | scripted grep | `git grep -q "ADMIN_VECTORIZE_TOKEN" -- docs/CLAUDE.md && ! git grep -q "voltique-admin" -- docs/` | ✅ shell | ⬜ pending |
+| 01-03 T2 | 01-03 | 1 | SEC-04 | T-01-11, T-01-12 | `docs/admin-authentication.md` matches `lib/auth` and `lib/models/admin.ts`; names no phantom allowlist variable | scripted grep | `git grep -q "isUserAdmin" -- docs/admin-authentication.md && ! git grep -q "ADMIN_USER_IDS" -- docs/` | ✅ shell | ⬜ pending |
+| 01-03 T3 | 01-03 | 1 | SEC-01, SEC-04 | T-01-09, T-01-10, T-01-20 | Deploy runbook uses one authenticated header example; no tracked file outside `.planning/` holds the published value | scripted grep + lint | `git grep -q "checkAdminPermissions" -- docs/ && ! git grep -qi -e "temporarily disabled" -e "currently disabled" -e "disabled for dev" -- docs/` then `npm run lint && npm run typecheck` | ✅ shell | ⬜ pending |
+| 01-04 T1 | 01-04 | 1 | SEC-02 | T-01-17 | Wrangler authenticated, secret binding present, pre-rotation baseline captured | scripted CLI + HTTP | `npx wrangler whoami` then `npx wrangler secret list 2>&1 \| grep -q ADMIN_VECTORIZE_TOKEN` | ✅ shell | ⬜ pending |
+| 01-04 T2 | 01-04 | 1 | SEC-02 | T-01-14, T-01-15 | Secret rotated; the new value exists in no file, transcript, or commit | scripted CLI + grep | `npx wrangler secret list 2>&1 \| grep -q ADMIN_VECTORIZE_TOKEN` and `! git grep -qEI '[0-9a-f]{64}' -- ':!.planning'` | ✅ shell | ⬜ pending |
+| 01-04 T3 | 01-04 | 1 | SEC-02 | T-01-14, T-01-21 | Old value rejected on both live endpoints (read-only probe first); storefront still 200 | scripted HTTP probe | `curl -s -o /dev/null -w "%{http_code}" --max-time 20 -H "Authorization: Bearer voltique-admin" https://voltique.russellkmoore.me/api/admin/knowledge` prints 401 or 403, then the same for `-X POST .../api/admin/vectorize` | ✅ shell | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+
+### Probe-endpoint correction (found during planning)
+
+`GET /api/admin/vectorize` returns HTTP 405 unconditionally with **no** authentication check
+(`app/api/admin/vectorize/route.ts:356-361`). The `GET` probe named in `01-CONTEXT.md` would have
+proven nothing. The authenticated method there is `POST`, and a successful `POST` clears and
+rebuilds the entire vector index. Plan `01-04` therefore probes the read-only
+`GET /api/admin/knowledge` first and only issues the `POST` probe after the old value has already
+been rejected, which makes the destructive outcome unreachable.
+
+### Grep-scope note (SEC-01)
+
+The credential search excludes `.planning/`. This phase's own CONTEXT, RESEARCH, VALIDATION, and
+plan files quote the old value because it is the probe payload and the specification of the work.
+Every negative gate is paired with a positive control match so a broken pathspec cannot produce a
+vacuous pass.
 
 ---
 
@@ -57,8 +79,10 @@ Project commands run under Node 24 via mise (`mise exec -- <command>`).
 
 - [ ] `tests/unit/lib/auth/admin-middleware.test.ts` — add cases: guard-tripped (dev + Workers UA → denial, `x-dev-admin` bypass does not succeed), guard-silent-in-prod, guard-silent-in-dev-without-Workers-UA
 - [ ] `tests/unit/lib/auth/unified-auth.test.ts` — same three cases for `authenticateRequest`
-- [ ] `tests/unit/lib/auth/deployment-guard.test.ts` — guard predicate in isolation plus the middleware 503 path (uses `vi.stubEnv('NODE_ENV', …)` and `vi.stubGlobal('navigator', { userAgent: 'Cloudflare-Workers' })`)
+- [ ] `tests/unit/lib/auth/deployment-guard.test.ts` — guard predicate in isolation (uses `vi.stubEnv('NODE_ENV', …)` and `vi.stubGlobal('navigator', { userAgent: 'Cloudflare-Workers' })`); owned by plan `01-01` task 2
+- [ ] `tests/unit/app/admin-guard-middleware.test.ts` — the `middleware.ts` 503 path plus a source-ordering contract; owned by plan `01-02` task 2. Mock exactly `@clerk/nextjs/server` (clerkMiddleware as an identity passthrough), `@/lib/utils/settings`, and `@/lib/db` — this mock set was executed against the repository during planning and reaches the admin branch without touching D1
 - [ ] `lib/observability/telemetry.ts` — new event key in `TELEMETRY_EVENTS` before any test references it (AST contract test enforces the closed taxonomy)
+- [ ] `workers/observability-tail/src/core.ts` — the same key appended to `TAIL_CRITICAL_EVENTS`, so a tripped guard escalates to an operator like every other critical event
 
 ---
 
