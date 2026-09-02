@@ -218,6 +218,24 @@ describe("POST /api/analytics/vitals", () => {
     expect(writeDataPoint).not.toHaveBeenCalled();
   });
 
+  it("produces no write and a 200 response for a body over the size cap", async () => {
+    const writeDataPoint = vi.fn();
+    mocks.getCloudflareContext.mockResolvedValue(envWithWrite(writeDataPoint));
+
+    const oversized = JSON.stringify({
+      name: "LCP",
+      value: 100,
+      rating: "good",
+      url: "/",
+      padding: "x".repeat(5000),
+    });
+    const res = await POST(request(oversized));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "ok" });
+    expect(writeDataPoint).not.toHaveBeenCalled();
+  });
+
   it("produces no write and a 200 response for a JSON array body", async () => {
     const writeDataPoint = vi.fn();
     mocks.getCloudflareContext.mockResolvedValue(envWithWrite(writeDataPoint));
