@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 02
 current_phase_name: Observability and Regression Guards
 status: executing
-stopped_at: Completed 02-05-PLAN.md
-last_updated: "2026-09-02T19:29:04.620Z"
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-09-02T19:41:03.150Z"
 last_activity: 2026-09-02
 last_activity_desc: Phase 02 execution started
-state_head: daceb9dbf07a3adb38c70b5d434a997d9fcc86c2
+state_head: 2b177aee2f143c07ee67fcf56d39b27a6bd8e38f
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 9
-  completed_plans: 6
+  completed_plans: 7
   percent: 25
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-02)
 ## Current Position
 
 Phase: 02 (Observability and Regression Guards) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-09-02 — Phase 02 execution started
 
@@ -64,6 +64,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 01 P02 | 35min | 3 tasks | 6 files |
 | Phase 02 P01 | 25min | 3 tasks | 4 files |
 | Phase 02 P05 | 22min | 2 tasks | 1 files |
+| Phase 02 P02 | 30min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,7 @@ Recent decisions affecting current work:
 - [Phase 01]: docs/CLAUDE.md and docs/admin-authentication.md corrected to describe the real isUserAdmin/adminUsers mechanism; phantom ADMIN_USER_IDS env var removed from all tracked docs/components/lib/app — SEC-04 requires docs to match code exactly; the file designated as source of truth had to be right, including bullets not explicitly itemized in the plan
 - [Phase 01]: Task 2 initially failed on a deploy precondition (unpromoted Worker version); resolved by pushing main to origin and letting Cloudflare Workers Builds deploy/promote version d60aa812, after which wrangler secret put succeeded
 - [Phase 01]: authenticateRequest and middleware.ts both wired to assertDeploymentPosture(); admin routes now return real HTTP 503 at the edge on deployed dev builds; docs/admin-authentication.md documents the guard and the residual 401-vs-503 gap for six non-/api/admin callers
+- [Phase 02]: WEB_VITALS Analytics Engine binding (dataset mercora_web_vitals) added, separate from unconfigured COMMERCE_ANALYTICS; route-template mapper uses literal Next.js bracket-form strings so dataset rows map back to routes at a glance
 
 ### Pending Todos
 
@@ -95,6 +97,8 @@ None yet.
 - [Phase 1 side finding] Two Worker versions uploaded on 2026-08-31 (951a3547, 73dc8c9f) match no commit and were never promoted; superseded by the 2026-09-02 deploy of `main` (d60aa812). Likely local preview uploads.
 - [Resolved 2026-09-02] SEC-02: Russell confirmed the published token was live; rotated and proven dead (401/401).
 - [Resolved 2026-09-01] `wrangler.jsonc` carries `pk_test_` Stripe and Clerk publishable keys by design. Production is a demo environment with no live Stripe account. Keys stay as-is; `wrangler.jsonc` stays tracked (Workers Builds and four scripts read it).
+- [Phase 2 finding, needs Russell] The LIVE sitemap (`/sitemap.xml`) renders every `<loc>` under `https://mercora.example.com` (the demo default in `lib/store-config.ts`). `app/sitemap.ts` reads the site URL via `getStoreConfig()` at build time, and `NEXT_PUBLIC_SITE_URL` exists only as a Worker runtime var. Fix: add `NEXT_PUBLIC_SITE_URL=https://voltique.russellkmoore.me` as a Cloudflare Workers **Build** variable and redeploy (same build-vs-runtime distinction as the Clerk/Stripe publishable keys). Search engines currently receive wrong URLs. Found by plan 02-05 on 2026-09-02.
+- [Phase 2 finding] Mobile Lighthouse baseline: all four routes score 72–80, below the PRD target of 85 (`docs/mobile-lighthouse-baseline.md`). Performance work is backlog, not v1.
 - [Phase 2] OBS-02 needs a sink choice (Workers Analytics Engine dataset vs bounded D1 table). No Analytics Engine binding exists in `wrangler.jsonc` today; adding one requires `npm run cf-typegen` and a deploy-config update.
 - [Phase 4] DEP-01 may find that Next 16.3.1 still bundles a flagged PostCSS or Sharp; if so, record a new bounded exception rather than weakening the gate.
 
@@ -108,8 +112,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-02T19:29:04.571Z
-Stopped at: Completed 02-05-PLAN.md
+Last session: 2026-09-02T19:41:03.079Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None
 
 Next: `/gsd-plan-phase 2` (or continue `/gsd-autonomous --from 2`)
