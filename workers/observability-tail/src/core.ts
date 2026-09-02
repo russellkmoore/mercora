@@ -75,16 +75,19 @@ export const ENUM_FIELDS: Record<string, ReadonlySet<string>> = {
     'subscription', 'paid_decrement', 'refund_restock',
   ]),
   operation: new Set([
-    'audit_write', 'claim', 'complete', 'create', 'finalize', 'persist',
+    'audit_write', 'claim', 'complete', 'create', 'finalize', 'persist', 'price',
     'process', 'read', 'rebuild', 'record_failure', 'send', 'stage', 'transition',
     'validate',
   ]),
   outcome: new Set([
-    'conflict', 'failed', 'invalid', 'needs_review', 'partial_failure',
+    'conflict', 'degraded', 'failed', 'invalid', 'needs_review', 'partial_failure',
     'rejected', 'retry_scheduled', 'unavailable', 'unresolved',
   ]),
   provider: new Set([
     'analytics', 'carrier', 'cloudflare_email', 'd1', 'gift_card', 'resend', 'stripe', 'workers_ai',
+  ]),
+  reason: new Set([
+    'authentication_required', 'card_declined', 'expired_card', 'insufficient_funds', 'other',
   ]),
   trigger: new Set(['manual', 'recovery', 'request', 'scheduled', 'webhook']),
 };

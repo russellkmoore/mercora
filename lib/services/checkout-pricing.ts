@@ -4,6 +4,7 @@ import { validateCouponCode } from '@/lib/models/mach/couponInstance';
 import { checkTimeValidity, getPromotionById } from '@/lib/models/mach/promotions';
 import { getSettings } from '@/lib/utils/settings';
 import { calculateTax } from '@/lib/stripe';
+import { recordTelemetry } from '@/lib/observability/telemetry';
 import {
   noOpCommerceCapabilities,
   type CommerceCapabilities,
@@ -710,6 +711,9 @@ export async function priceCheckout(
     tax = Money.fromMinor(allocation.totalTax, currency);
   } catch {
     taxSource = 'configured_fallback';
+    recordTelemetry('checkout.tax_fallback', {
+      operation: 'price', outcome: 'degraded', provider: 'stripe',
+    });
     const fallbackRate = configuredRate(storeSettings['store.tax_rate']);
     if (fallbackRate === null) {
       throw new Error('Tax provider failed and store.tax_rate is not a valid configured fallback');
