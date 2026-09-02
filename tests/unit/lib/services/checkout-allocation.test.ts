@@ -190,4 +190,39 @@ describe('allocateDiscount', () => {
     expect(lineTotals.map((m) => m.toMinorUnits())).toEqual(lineTotalsSnapshot);
     expect(eligible).toEqual(eligibleSnapshot);
   });
+
+  // CR-01 regression: the last eligible line used to receive the entire
+  // floor-rounding leftover with no cap against its own capacity, letting a
+  // line's discount exceed its own price. Redistribution must stay within
+  // each line's available capacity, in ascending-index order.
+  it('never assigns a line more discount than its own price (CR-01 reproduction)', () => {
+    const lineTotals = [
+      Money.fromMinor(1, 'USD'),
+      Money.fromMinor(1, 'USD'),
+      Money.fromMinor(1, 'USD'),
+    ];
+    const existing = zeroExisting(3);
+    allocateDiscount(Money.fromMinor(2, 'USD'), [0, 1, 2], lineTotals, existing);
+    expect(existing.map((m) => m.toMinorUnits())).toEqual([1, 1, 0]);
+  });
+
+  describe('per-line capacity invariant across fixed weight tables at 1, 2, 10, and 100 lines', () => {
+    it.each([1, 2, 10, 100])(
+      'never exceeds a line\'s own available capacity across %i lines',
+      (n) => {
+        const lineTotals = Array.from({ length: n }, (_, i) => Money.fromMinor(100 + i, 'USD'));
+        const existing = zeroExisting(n);
+        const eligible = Array.from({ length: n }, (_, i) => i);
+        const amount = Money.fromMinor(50, 'USD');
+
+        allocateDiscount(amount, eligible, lineTotals, existing);
+
+        eligible.forEach((index, position) => {
+          expect(existing[index].toMinorUnits()).toBeLessThanOrEqual(
+            lineTotals[eligible[position]].toMinorUnits()
+          );
+        });
+      }
+    );
+  });
 });
