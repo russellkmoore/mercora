@@ -37,13 +37,14 @@ A customer or an external AI agent can find the right outdoor gear through Volt,
 - ✓ Observability: `commerce.telemetry.v1` closed-taxonomy producer, Tail Worker with SQLite cooldown Durable Object, three vitest suites (unit 233 files, Workers, observability) plus lint, typecheck, cf-typecheck, migration-safety, and `npm audit --audit-level=critical` in `.github/workflows/ci.yml` — pre-GSD (SPEC OBS)
 - ✓ Shopify migration toolkit (dry-run by default, migration `0020` redirects, `/media/*` object serving) and runtime store configuration (`lib/store-config.ts`, `NEXT_PUBLIC_*` overrides, feature flags) — pre-GSD
 
+- ✓ No literal credential values in `docs/`; the published admin token was rotated on 2026-09-02 and the old value returns 401 on both admin endpoints — Phase 1 (SEC-01, SEC-02)
+- ✓ Deployment-posture guard (`lib/auth/deployment-guard.ts`): a development build running in the Cloudflare Workers runtime fails closed with 503 in `checkAdminPermissions`, `authenticateRequest`, and `middleware.ts` for `/admin` and `/api/admin`, and emits `auth.deployment_guard_tripped` (escalated as critical by the tail worker) — Phase 1 (SEC-03)
+- ✓ Admin-auth docs describe the real mechanism: Clerk role or active `adminUsers` row, header-only bearer token, `x-dev-admin` header only under development, no query-string auth, no phantom `ADMIN_USER_IDS` — Phase 1 (SEC-04)
+
 ### Active
 
 <!-- v1 = hardening milestone. Verified gaps only. Full definitions in REQUIREMENTS.md. -->
 
-- [ ] No literal credential values in `docs/`; the published admin token is rotated and dead (SEC-01, SEC-02)
-- [ ] A deployed Worker fails loudly if `NODE_ENV` resolves to `development`, so the dev-only admin bypasses can never open in production (SEC-03)
-- [ ] Admin-auth docs describe the real mechanism: enforced in production, header-based bypass in development only, no query-string bypass (SEC-04)
 - [ ] Tax fallback is observable through telemetry; production web-vitals beacons land in a queryable sink instead of being discarded (OBS-01, OBS-02)
 - [ ] Regressions the codebase map found have tests: typed `params` with 404 on unknown slugs; allocation-sum invariants across line counts (OBS-03, OBS-04)
 - [ ] The empty `payment_intent.payment_failed` webhook handler is resolved (OBS-05)
@@ -136,6 +137,11 @@ A customer or an external AI agent can find the right outdoor gear through Volt,
 | Migrations nuance: `deploy` never migrates; `deploy:ci` migrates production first | Both true; not a conflict. Recorded so nobody "fixes" one to match the other | ✓ Good — runbook in RUN-01 |
 | v1 is a hardening milestone; the 12 `docs/ROADMAP.md` items are backlog | User decision 2026-09-01; docs and code must agree before feature work resumes | — Pending |
 | Publishable `pk_test_` keys stay in tracked `wrangler.jsonc` | Production is a demo with no live Stripe account; publishable keys are public by design; Workers Builds and deploy scripts read the file | ✓ Good |
+| Deployment guard detects "deployed" via `navigator.userAgent === "Cloudflare-Workers"` and trips only when combined with `NODE_ENV === "development"`; fails closed per request (503), never at boot (Phase 1) | No new config; local `next dev` and vitest are unaffected; storefront keeps serving while admin locks. Live-bundle assumption accepted on static evidence 2026-09-02 (guard present in the OpenNext bundle, nothing shadows `navigator`, compat date guarantees the global) | ✓ Good — first-deploy confirmation step documented in `docs/admin-authentication.md` |
+| The dev-bypass value stays a source literal in `lib/auth/admin-middleware.ts`; docs use prose placeholders, never the value (Phase 1) | Russell's choice 2026-09-01; the guard closes the deployed-development case, so the literal is harmless in production | ✓ Good |
+| `ADMIN_VECTORIZE_TOKEN` rotated by the executor with a single `openssl rand -hex 32 \| wrangler secret put` pipeline; verified only with the old value (Phase 1) | Value never printed or stored; proof is two live 401s. Required pushing `main` first because Cloudflare refuses secret edits when the latest uploaded version is not deployed | ✓ Good |
+| `workflow.use_worktrees=false` for this project | Fresh git worktrees have no `node_modules` or `.dev.vars`, so parallel executors would fail vitest and wrangler or spend minutes on `npm ci`; sequential execution on the main tree is the safer trade | ✓ Good |
+| Client-side dev-mode admin shortcuts in `components/admin/AdminGuard.tsx` left unchanged (code-review WR-04) | Orchestrator deferral under Phase 1's locked scope; server-side middleware and API guards hold, so the residual is a visible nav link on a misbuilt deploy | — Pending Russell's sign-off |
 
 ---
-*Last updated: 2026-09-01 after project initialization from doc ingest and codebase map*
+*Last updated: 2026-09-02 after Phase 1*
