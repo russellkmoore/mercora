@@ -60,12 +60,28 @@ STRIPE_SECRET_KEY=sk_test_your_actual_key_here
 2. Click **+ Add endpoint**
 3. Set endpoint URL: `https://yourdomain.com/api/webhooks/stripe`
 4. Select events to listen for:
+   **Required** (core checkout and refunds):
    - `payment_intent.succeeded`
-   - `payment_intent.payment_failed`
-   - `checkout.session.completed`
+   - `payment_intent.payment_failed` (telemetry only; the subscription is deliberately retained)
    - `charge.refunded`
    - `refund.updated`
    - `refund.failed`
+
+   **Subscriptions** (required once acquisition is enabled):
+   - `invoice.paid`
+   - `invoice.payment_succeeded`
+   - `invoice.payment_failed`
+   - `invoice.payment_attempt_required`
+   - `customer.subscription.created`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+   - `customer.subscription.paused`
+   - `customer.subscription.resumed`
+   - `customer.subscription.pending_update_applied`
+   - `customer.subscription.pending_update_expired`
+
+   `charge.refund.updated` is accepted for compatibility with older Stripe event configurations but is not required; `refund.updated` is the preferred lifecycle event.
+   `docs/webhooks-refunds-inventory.md` is the binding source for the required set.
 5. Copy the **Signing secret** and add to `.env.local`:
 ```env
 STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
