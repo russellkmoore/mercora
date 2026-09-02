@@ -32,7 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A test shows the Worker fails at startup, or every admin request fails closed, when `NODE_ENV` is `development`, and a production build is unaffected; all CI gates still pass.
   4. `docs/CLAUDE.md`, `docs/DEPLOYMENT_SETUP.md`, and `docs/admin-authentication.md` agree that production admin auth is enforced through Clerk role, an active `adminUsers` table row, or the bearer token, that the only bypass is the `x-dev-admin` header under `NODE_ENV=development`, and no query-string bypass is described anywhere.
 
-**Plans**: 3/4 plans executed
+**Plans**: 4/4 plans executed
 
 Plans:
 **Wave 1**
@@ -43,7 +43,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02-PLAN.md — Guard completion: `authenticateRequest`, `middleware.ts` 503 at the edge, and the operator documentation (SEC-03, SEC-04)
+- [x] 01-02-PLAN.md — Guard completion: `authenticateRequest`, `middleware.ts` 503 at the edge, and the operator documentation (SEC-03, SEC-04)
 
 ### Phase 2: Observability and Regression Guards
 
@@ -96,7 +96,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Security and Admin-Auth Truth | 3/4 | In Progress|  |
+| 1. Security and Admin-Auth Truth | 4/4 | In Progress|  |
 | 2. Observability and Regression Guards | 0/TBD | Not started | - |
 | 3. Decision Lock-In and Operator Runbooks | 0/TBD | Not started | - |
 | 4. Reference Documentation Refresh | 0/TBD | Not started | - |
