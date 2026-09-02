@@ -282,11 +282,9 @@ Ensure your content is properly organized:
 npm run deploy
 
 # Index both products and knowledge articles (consolidated endpoint)
-# Note: Authentication temporarily disabled for development
-curl -X GET "https://yourdomain.com/api/admin/vectorize"
-
-# For production with admin token:
-curl -X GET "https://yourdomain.com/api/admin/vectorize?token=your-admin-token"
+# The admin token is a Cloudflare Worker secret (ADMIN_VECTORIZE_TOKEN)
+curl -X GET "https://yourdomain.com/api/admin/vectorize" \
+  -H "Authorization: Bearer <ADMIN_VECTORIZE_TOKEN>"
 ```
 
 ### **Step 3: Verify AI System**

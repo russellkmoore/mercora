@@ -27,7 +27,7 @@
  * - This is client-side protection only
  * - Server-side API protection is still required
  * - In development, any authenticated user gets admin access
- * - In production, only users with admin role or in ADMIN_USER_IDS
+ * - In production, only users with the Clerk admin role or an active adminUsers table row
  */
 
 "use client";
