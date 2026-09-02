@@ -42,29 +42,36 @@ import CategoryDisplay from "./CategoryDisplay";
 import Image from "next/image";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { toPublicProduct } from "@/lib/models/mach/product-serializer";
+import { notFound } from "next/navigation";
+import type { Product } from "@/lib/types";
 
 /**
  * Category page component that displays products for a specific category
- * 
+ *
  * @param params - URL parameters object containing the category slug
  * @returns Server-rendered category page with products
  */
-export default async function CategoryPage({ params }: any) {
-  const category = await getCategoryBySlug(params.slug);
-  
+export default async function CategoryPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const category = await getCategoryBySlug(slug);
+
   if (!category) {
-    return <div>Category not found for slug: {params.slug}</div>;
+    notFound();
   }
-  
-  let products: any[] = [];
+
+  let products: Product[] = [];
   let error: string | null = null;
-  
+
   try {
     products = (await getProductsByCategory(category.id as string))
       .filter((product) => product.status === "active")
       .map(toPublicProduct);
-  } catch (e: any) {
-    error = e?.message || 'Unknown error';
+  } catch (e) {
+    error = e instanceof Error ? e.message : 'Unknown error';
   }
   
   /**
@@ -102,7 +109,7 @@ export default async function CategoryPage({ params }: any) {
   const breadcrumbItems = [
     { label: "Home", href: "/" },
     { label: "Categories", href: "/categories" },
-    { label: categoryName, href: `/category/${params.slug}`, current: true }
+    { label: categoryName, href: `/category/${slug}`, current: true }
   ];
 
   return (
