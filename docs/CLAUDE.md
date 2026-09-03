@@ -30,7 +30,7 @@ Mercora is an AI-powered outdoor gear eCommerce platform featuring **Volt**, an 
 - **Runtime**: Cloudflare Workers with OpenNext
 - **Database**: Cloudflare D1 (SQLite) with Drizzle ORM
 - **Storage**: Cloudflare R2 for images
-- **AI**: Cloudflare AI (Llama 3.1 8B + BGE embeddings)
+- **AI**: Cloudflare AI (`@cf/openai/gpt-oss-20b` + BGE embeddings)
 - **Vector DB**: Cloudflare Vectorize
 - **Authentication**: Clerk
 
@@ -155,7 +155,7 @@ The admin dashboard is **fully implemented and functional** with comprehensive f
 #### **Key Components**
 - **AdminSidebar.tsx**: Navigation with collapsible design and active states
 - **AdminLayoutProvider.tsx**: Layout context for responsive admin interface
-- **AI Analytics**: Real-time business intelligence using Llama 3.1 8B
+- **AI Analytics**: Real-time business intelligence using gpt-oss-20b (`@cf/openai/gpt-oss-20b`)
 
 #### **Admin API Endpoints**
 - `/api/admin/analytics` - AI-powered business insights and analytics
@@ -169,7 +169,7 @@ The admin dashboard is **fully implemented and functional** with comprehensive f
 
 #### **Dashboard Analytics**
 - Real-time AI-powered business intelligence
-- Natural language insights using Llama 3.1 8B
+- Natural language insights using gpt-oss-20b (`@cf/openai/gpt-oss-20b`)
 - Order status distribution and product performance metrics
 - Actionable business recommendations
 
@@ -255,7 +255,9 @@ See `docs/database-migrations.md` for the binding migration policy.
 - `POST /api/mcp` - Tool execution endpoint
 - `GET /api/mcp/schema` - Complete API documentation
 
-#### **MCP Tools (17 total)**
+#### **MCP Tools (19 total)**
+The authoritative tool list lives in `app/api/mcp/route.ts`.
+
 **Commerce Tools:**
 - `search_products` - Product search with agent context
 - `assess_request` - Multi-site fulfillment assessment
@@ -270,6 +272,7 @@ See `docs/database-migrations.md` for the binding migration policy.
 - `get_cart` - View cart with totals
 
 **Order Processing:**
+- `create_payment_intent` - Create a Stripe payment intent for an agent's order
 - `get_shipping_options` - Calculate shipping costs and methods
 - `validate_payment` - Payment method validation and fees
 - `place_order` - Complete order placement
@@ -280,6 +283,7 @@ See `docs/database-migrations.md` for the binding migration policy.
 - `list_agents` - View all agents with stats
 - `get_agent_details` - Agent analytics and performance
 - `update_agent_status` - Enable/disable agents
+- `rotate_agent_key` - Rotate an agent's API key credential
 
 #### **Individual Tool Endpoints** (also accessible via REST)
 - `POST /api/mcp/tools/cart/bulk-add` - Bulk cart operations
@@ -354,7 +358,7 @@ Admin UI components use Clerk authentication, while direct API access uses token
 
 ### Architecture
 ```
-User Query → BGE Embeddings → Vector Search → Context → Llama 3.1 → Response + Products
+User Query → BGE Embeddings → Vector Search → Context → @cf/openai/gpt-oss-20b → Response + Products
 ```
 
 ### Key Components
@@ -542,7 +546,7 @@ npx wrangler deploy               # Deploy to Cloudflare Workers
 ## MCP Server Implementation Details
 
 ### **Production-Ready Features**
-✅ **Complete Tool Set**: 17 MCP tools covering all commerce operations  
+✅ **Complete Tool Set**: 19 MCP tools covering all commerce operations  
 ✅ **Agent Management**: Create, list, monitor, and manage MCP agents  
 ✅ **Session Persistence**: Cart state maintained across agent sessions  
 ✅ **Rate Limiting**: Configurable per-agent limits with monitoring  
