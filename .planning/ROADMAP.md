@@ -106,7 +106,7 @@ Plans:
   4. `docs/admin-dashboard-specification.md`, the ER diagram in `docs/architecture.md`, `docs/mobile-ux-assessment.md`, and `docs/mobile-testing-automation.md` carry historical or proposal banners, and the checklist in `docs/mobile-improvements-actionable.md` shows the code items complete.
   5. CI's `npm audit` gate runs at `--audit-level=high` (or `docs/dependency-security.md` records a bounded exception with owner and exit condition), and the document's next-review date is in the future.
 
-**Plans**: 3/5 plans executed
+**Plans**: 4/5 plans executed
 
 Plans:
 **Wave 1** *(all five run in one wave — `files_modified` are disjoint across 14 files)*
@@ -114,7 +114,7 @@ Plans:
 - [x] 04-01-PLAN.md — Model name and tool count in the three docs no other plan touches: `DEPLOYMENT_SETUP.md`, `ai-pipeline.md` (mermaid node id rename), `ROADMAP.md` (REF-01)
 - [x] 04-02-PLAN.md — `CLAUDE.md` test/CI section, unpinned dependencies, tool count and the two missing tool names, plus the `api-architecture.md` payment note and both stale doc references (REF-01, REF-02)
 - [x] 04-03-PLAN.md — `README.md` index: four new groups linking all 15 unlinked docs, current status lines, 2026 date (REF-01, REF-03)
-- [ ] 04-04-PLAN.md — Four `Status: Historical` banners, the `architecture.md` ER-diagram label and model names, and 12 ticked checklist items with evidence (REF-01, REF-04)
+- [x] 04-04-PLAN.md — Four `Status: Historical` banners, the `architecture.md` ER-diagram label and model names, and 12 ticked checklist items with evidence (REF-01, REF-04)
 - [ ] 04-05-PLAN.md — CI audit gate raised to `high` (proven locally first) and the refreshed dependency baseline with both exceptions closed (DEP-01)
 
 ## Progress
@@ -127,7 +127,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Security and Admin-Auth Truth | 4/4 | Complete    | 2026-09-02 |
 | 2. Observability and Regression Guards | 5/5 | Complete    | 2026-09-02 |
 | 3. Decision Lock-In and Operator Runbooks | 3/3 | Complete    | 2026-09-02 |
-| 4. Reference Documentation Refresh | 3/5 | In Progress|  |
+| 4. Reference Documentation Refresh | 4/5 | In Progress|  |
 
 ---
 *Roadmap created: 2026-09-01 from doc ingest (26 docs) and codebase map (2026-08-31)*
