@@ -86,7 +86,7 @@ graph TB
     classDef data fill:#fff3e0
 
     class WebApp,Mobile,Admin client
-    class AgentChat,Orders,PaymentIntent,Tax,Products,Categories,ShippingOptions,StripeWebhooks api
+    class AgentChat,Orders,PaymentIntent,Tax,Products,Categories,ShippingOptions,Vectorize,StripeWebhooks api
     class AIService,VectorService,OrderService,PaymentService,TaxService,ShippingService service
     class D1Database,VectorDatabase,R2Storage,StripeAPI,ExternalAPIs data
 ```
