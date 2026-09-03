@@ -1,5 +1,7 @@
 # Mobile UX Assessment - Mercora Platform
 
+> **Status: Historical (September 2025).** This is a September 2025 snapshot; its measurements are superseded by `docs/mobile-lighthouse-baseline.md`, which recorded all four measured routes falling short of the PRD target.
+
 > **Assessment Date**: September 2, 2025  
 > **Platform**: Mercora AI-Powered eCommerce  
 > **Scope**: Complete mobile user experience evaluation

@@ -1,5 +1,7 @@
 # Mobile Testing Automation Setup
 
+> **Status: Historical (September 2025).** This is a proposal; the Lighthouse CI and Playwright suites it describes are not implemented.
+
 > **Setup Guide**: Automated mobile testing and performance monitoring for Mercora  
 > **Updated**: September 2, 2025
 

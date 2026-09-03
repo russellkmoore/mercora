@@ -25,7 +25,7 @@ graph TB
 
     %% AI Services Layer
     subgraph "Cloudflare AI Platform"
-        LLM[Llama 3.1 8B Instruct]
+        LLM["@cf/openai/gpt-oss-20b"]
         Embeddings[BGE Base EN v1.5]
         Vectorize[Vector Database]
     end
@@ -100,7 +100,7 @@ graph LR
     KnowledgeContext --> Prompt
     AgentAPI --> Prompt
     
-    Prompt --> LLM[🧠 Llama 3.1 8B]
+    Prompt --> LLM["🧠 @cf/openai/gpt-oss-20b"]
     LLM --> Response[💭 AI Response]
     
     %% Product Recommendations
@@ -212,6 +212,8 @@ flowchart TD
 ```
 
 ## Database Schema Overview
+
+> **Status: Historical (September 2025).** This diagram predates the variant model (`product_variants`) and the order ledger tables (`order_effects`, `order_events`, `order_webhooks`); the current schema also includes gift cards, subscriptions, CMS/blog, promotions, and admin-user tables not shown here, and the diagrammed `CHAT_SESSIONS` entity has no corresponding table in the current schema. See `lib/db/schema/` and `migrations/` for the current schema.
 
 ```mermaid
 erDiagram
