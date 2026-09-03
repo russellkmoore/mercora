@@ -2,9 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2
 milestone_name: Themeable Storefront
+current_phase: 5
+current_phase_name: Token Contract & Component Sweep
 status: planning
-last_updated: "2026-09-02T00:00:00.000Z"
+stopped_at: Phase 5 context gathered
+last_updated: "2026-09-03T20:21:50.216Z"
 last_activity: 2026-09-02
+last_activity_desc: "ROADMAP.md created for v2: 4 phases (5-8), 16/16 requirements mapped"
+state_head: 5a2ce46722820a30bcb6d50af4f078c9f0342177
 progress:
   total_phases: 4
   completed_phases: 0
@@ -101,8 +106,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-02 (v2 ROADMAP.md and STATE.md created; REQUIREMENTS.md traceability filled)
-Stopped at: Roadmap created, awaiting approval
-Resume file: None
+Last session: 2026-09-03T20:21:50.207Z
+Stopped at: Phase 5 context gathered
+Resume file: .planning/phases/05-token-contract-component-sweep/05-CONTEXT.md
 
 Next: `/gsd-discuss-phase 5` (or `/gsd-plan-phase 5` directly) to start Token Contract & Component Sweep
