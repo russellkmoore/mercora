@@ -37,14 +37,29 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 - Cloudflare hygiene: delete the unused `ADMIN_USER_IDS` Worker secret; two unpromoted Worker versions from 2026-08-31 can be ignored.
 - Dependency review due 2026-12-01 (five moderate dev-only findings).
 
-## Next Milestone Goals
+## Current Milestone: v2 Themeable Storefront
 
-Not yet defined. Run `/gsd-new-milestone`. Candidates, in rough priority order:
+**Goal:** The storefront is skinnable without touching component code — a theme is a CSS file in `themes/`, selectable from admin with swatch previews, and page templates expose enumerated layout switches configurable from admin. Tokens + enumerated variants, never free composition, never per-theme markup.
 
-1. **Mobile performance**: all four routes score 72–80 against the PRD target of 85 (`docs/mobile-lighthouse-baseline.md`). Image strategy and caching (REQ-performance-image-caching) is the obvious lever; the web-vitals sink from v1 makes progress measurable.
-2. **Backlog features** from the v1 requirements archive: wishlist, PWA, multi-language, advanced security, email marketing, advanced analytics, visual search, predictive analytics, social features, touch interactions.
-3. **Deferred engineering**: U13 shipment command (REQ-u13-shipment-command), MCP legacy credential column removal, account deletion and data export, Lighthouse CI and Playwright mobile automation.
-4. **Docs pass**: the stale "Recent Fixes" and "Current Git Status" sections of `docs/CLAUDE.md`; unverified "AI analytics" feature claims.
+**Target features:**
+- Token contract (~18 tokens: colors, radius, fonts) and a full storefront component/template sweep to token classes; admin explicitly excluded (keeps its hardcoded palette)
+- Theme file mechanism: prebuild script scans `themes/*.css`, generates a CSS import barrel + typed manifest, fails the build on invalid themes; `getActiveTheme()` resolves server-side from `admin_settings` → env default → manifest default; admin "Appearance" section with swatch cards; 2–3 preset themes, one light
+- Layout switches: `appearance.category_layout` (grid-3/grid-2/list), `appearance.home_hero` (full-bleed/split/minimal), `appearance.product_gallery` (left/top) as enumerated variant components chosen server-side
+- Close-out: `docs/theming.md`, `docs/CLAUDE.md` update, visual QA of presets × layout variants, targeted refresh of `.planning/codebase/` structure/architecture docs
+
+**Decisions taken during milestone discussion (2026-09-02):**
+
+| Decision | Call |
+|----------|------|
+| Theme registry | Build-time generated from `themes/*.css` only — never a wrangler var or hand-maintained list |
+| New theme requires deploy | Accepted; switching between shipped themes is instant via D1 |
+| `getActiveTheme()` D1 read per request | Accept; revisit only if traces show it |
+| Per-category layout overrides | Not now; per-template only |
+| `theme.mode` (dark/light) | Fold into the theme file — a theme IS a mode |
+| Admin theming | Never in this milestone |
+| Per-theme component/markup overrides | Rejected on principle — tokens + enumerated variants is the line |
+
+**Deferred candidates not in this milestone** (from the v1 close): mobile performance / image caching, wishlist, PWA, multi-language, advanced security, email marketing, advanced analytics, visual search, predictive analytics, social features, touch interactions, U13 shipment command, MCP legacy credential column removal, account deletion and data export, Lighthouse CI / Playwright mobile automation.
 
 ## Requirements
 
@@ -85,9 +100,16 @@ Not yet defined. Run `/gsd-new-milestone`. Candidates, in rough priority order:
 
 ### Active
 
-<!-- v1 shipped 2026-09-02. Next milestone requirements are defined by /gsd-new-milestone; candidates are listed under Next Milestone Goals above. -->
+<!-- v2 Themeable Storefront — defined by /gsd-new-milestone 2026-09-02. REQ-IDs assigned in .planning/REQUIREMENTS.md. -->
 
-*(none — v1 is complete; the next milestone has not been defined yet)*
+- [ ] Token contract defined (~18 tokens) and the current volt-dark look moved verbatim to `themes/volt-dark.css` under `[data-theme="volt-dark"]`
+- [ ] All storefront components and page templates use token classes; no hardcoded palette values remain in storefront code (admin excluded)
+- [ ] Prebuild theme scan generates the import barrel + manifest and fails the build on an invalid theme file
+- [ ] `getActiveTheme()` resolves `admin_settings` → env default → manifest default server-side, with telemetry on unknown theme names
+- [ ] Admin "Appearance" section: theme selection with swatch previews plus the three layout switches
+- [ ] 2–3 preset themes ship, at least one light
+- [ ] Category, home hero, and product gallery render as enumerated server-chosen variants with one render test each
+- [ ] `docs/theming.md` documents the token contract, theme duplication, and build validation
 
 ### Out of Scope
 
@@ -190,5 +212,22 @@ Not yet defined. Run `/gsd-new-milestone`. Candidates, in rough priority order:
 | `commerce-observability-tail` wired as a `tail_consumers` entry in `wrangler.jsonc` at milestone close (post-Phase 4) | The audit found the tail Worker deployed but not attached, so critical-severity alerts never reached the consumer | ✓ Good — email delivery check pending the next deploy |
 | Milestone v1 closed with tech debt accepted, not with open gaps | The audit satisfied all 19 requirements; the remaining items are operator follow-ups outside the repo, Cloudflare hygiene, or backlog | ✓ Good |
 
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd-transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd-complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
 ---
-*Last updated: 2026-09-02 after v1 milestone*
+*Last updated: 2026-09-02 after v2 milestone start (Themeable Storefront)*
