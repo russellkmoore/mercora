@@ -11,7 +11,7 @@ Mercora runs on Cloudflare's edge infrastructure with integrated services:
 - **Hosting**: Cloudflare Workers + Next.js 15 with App Router
 - **Database**: Cloudflare D1 (distributed SQLite with Drizzle ORM)
 - **Storage**: Cloudflare R2 Object Storage for images and content
-- **AI Platform**: Cloudflare AI (Llama 3.1 8B + BGE embeddings)
+- **AI Platform**: Cloudflare AI (`@cf/openai/gpt-oss-20b` + BGE embeddings)
 - **Vector Database**: Cloudflare Vectorize (38-item index)
 - **Authentication**: Clerk Authentication (with admin role support)
 - **Payments**: Stripe with Stripe Tax for global tax calculation
