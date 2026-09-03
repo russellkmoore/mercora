@@ -28,9 +28,15 @@ Out-of-scope discoveries logged during execution, not fixed by the introducing t
   cosmetic: `useAdminAccess()` is consumed by `components/login/ClerkLogin.tsx` on every page, so a
   misbuilt deployed-dev-build would show the "Admin Dashboard" nav link to any signed-in non-admin
   user, even though clicking through leads to a 503. Not a data exposure.
+- **Status:** resolved
+- **Resolution (2026-09-03, milestone close):** Closed as accepted risk at Russell's direction. Russell
+  accepted WR-04 as-is on 2026-09-02; it is recorded as AR-01-03 in `01-SECURITY.md`'s Accepted Risks
+  Log with the rationale (no unintentional path deploys a development build to production, the site is
+  a demo, and server-side middleware and API guards block admin access independently). The fix
+  suggestion below stays on record for a future pass if the risk posture changes.
 - **Action:** Not fixed in this pass. Orchestrator decision on 2026-09-02 during the autonomous
   REVIEW-FIX pass, made under the phase's locked scope (no component behavior changes were in scope);
-  Russell has NOT reviewed this deferral yet. Rationale: server-side middleware already blocks
+  Russell accepted this deferral on 2026-09-02 (AR-01-03). Rationale: server-side middleware already blocks
   `/admin` and `/api/admin`, so client-side visibility is cosmetic. Deferred — fix suggestion if
   picked up later: gate the
   dev-mode shortcut in both functions behind a server round-trip (production already makes one via
