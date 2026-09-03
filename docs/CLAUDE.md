@@ -35,18 +35,16 @@ Mercora is an AI-powered outdoor gear eCommerce platform featuring **Volt**, an 
 - **Authentication**: Clerk
 
 ### Key Dependencies
-```json
-{
-  "next": "15.3.5",
-  "react": "^19.0.0",
-  "drizzle-orm": "^0.35.2",
-  "@clerk/nextjs": "^6.25.5",
-  "@opennextjs/cloudflare": "^1.5.1",
-  "zustand": "^5.0.6",
-  "@stripe/stripe-js": "^7.8.0",
-  "stripe": "^18.4.0"
-}
-```
+- `next`
+- `react`
+- `drizzle-orm`
+- `@clerk/nextjs`
+- `@opennextjs/cloudflare`
+- `zustand`
+- `@stripe/stripe-js`
+- `stripe`
+
+Versions live in `package.json`.
 
 ## Build Commands
 
@@ -415,8 +413,20 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 
 ## Testing
 
-**Status**: No formal testing framework currently configured.
-**Recommendation**: Consider adding Vitest or Jest for unit tests, Playwright for E2E.
+- **Unit tests**: `vitest.config.mts`, run with `npm test`. The bare `npm test` script resolves `vitest.config.mts` by Vitest's default discovery.
+- **Workers integration tests**: `vitest.workers.config.mts`, run with `npm run test:workers`.
+- **Observability Durable Object tests**: `vitest.observability.config.mts`, run with `npm run test:observability-worker`.
+
+CI (`.github/workflows/ci.yml`) runs these gates in order:
+
+1. Audit production dependencies
+2. Check migration safety
+3. Lint
+4. Typecheck
+5. Check Cloudflare binding types
+6. Build
+
+The three test steps run between the Cloudflare binding-types step and the build step in the real pipeline, so the suites above run inside CI, not outside it.
 
 ## Deployment
 
@@ -590,7 +600,7 @@ const response = await fetch('/api/mcp', {
 - `docs/architecture.md` - System architecture diagrams
 - `docs/ai-pipeline.md` - AI implementation details
 - `docs/STRIPE_INTEGRATION.md` - Stripe payment setup guide
-- `docs/API_STRUCTURE.md` - **NEW**: Clean API architecture (eliminates redundancy)
+- `docs/api-architecture.md` - RESTful API specifications and flows
 - `docs/mcp-server-specification.md` - **MCP Server documentation and planning**
 - `lib/types/mach/` - MACH Alliance type definitions
 - `lib/mcp/` - **Complete MCP server implementation**

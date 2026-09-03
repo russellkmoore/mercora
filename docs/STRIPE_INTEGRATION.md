@@ -112,7 +112,7 @@ STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
 │   └── ... other checkout components
 └── docs/
     ├── STRIPE_INTEGRATION.md     # This documentation
-    └── API_STRUCTURE.md          # Clean API architecture
+    └── api-architecture.md       # Clean API architecture
 ```
 
 ## API Endpoints
