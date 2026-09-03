@@ -1,6 +1,6 @@
 ---
 phase: 04-reference-documentation-refresh
-reviewed: 2026-09-03T01:07:18Z
+reviewed: 2026-09-02T18:15:00Z
 depth: standard
 files_reviewed: 14
 files_reviewed_list:
@@ -28,113 +28,84 @@ status: issues_found
 
 # Phase 4: Code Review Report
 
-**Reviewed:** 2026-09-03T01:07:18Z
+**Reviewed:** 2026-09-02T18:15:00Z
 **Depth:** standard
 **Files Reviewed:** 14
 **Status:** issues_found
 
 ## Summary
 
-This phase is a documentation-correctness refresh plus a one-line CI severity-gate
-change. Every factual claim in the diff was independently re-derived from the
-codebase rather than taken on trust:
+This is the iteration-2 `--auto` re-review after the fix for iteration 1's
+WR-01 (dangling mermaid node ids `VectorizeProducts` / `VectorizeKnowledge`
+in `docs/api-architecture.md`, commit `590181f`).
 
-- **Model id** — `@cf/openai/gpt-oss-20b` in `docs/CLAUDE.md`, `docs/ROADMAP.md`,
-  `docs/DEPLOYMENT_SETUP.md`, `docs/README.md`, `docs/architecture.md`, and
-  `docs/ai-pipeline.md` matches `lib/ai/config.ts:29` exactly. Grepped the whole
-  `docs/` tree for leftover `Llama` references — none remain.
-- **MCP tool count/names** — counted the `switch (tool)` cases in
-  `app/api/mcp/route.ts`: exactly 19, and every name (`search_products` …
-  `rotate_agent_key`) matches the lists in `docs/CLAUDE.md`. Grepped for
-  leftover "17 tool(s)" references — none remain.
-- **Testing/CI section** — `docs/CLAUDE.md`'s Testing section (three vitest
-  configs, gate order) was checked against `package.json` scripts and the
-  parsed step list of `.github/workflows/ci.yml`; both match exactly, including
-  the claim that the three test steps run between "Check Cloudflare binding
-  types" and "Build".
-- **README index (27 files)** — `find docs -maxdepth 1 -name '*.md'` returns
-  exactly 27 files, and every one of the 26 non-README files is linked from
-  `docs/README.md`'s navigation map with no dead or missing links.
-- **Dependency baseline** — ran a fresh `npm audit --omit=dev --json`: 0
-  vulnerabilities at every severity, matching the doc's claim. Ran the
-  full-tree `npm audit --json`: exactly 5 moderate findings across
-  `esbuild`, `@esbuild-kit/core-utils`, `@esbuild-kit/esm-loader`,
-  `drizzle-kit`, and `qs` — matching the doc's dev-only findings list
-  package-for-package. Verified `node_modules` directly: `next@16.3.1`,
-  top-level `postcss@8.5.26`, nested `next/node_modules/postcss@8.5.23`,
-  `sharp@0.35.3` hoisted to top-level `node_modules/sharp` (confirmed via
-  `require.resolve('sharp')`), Node `24.18.1`, npm `11.16.0` — all match the
-  doc's stated evidence for closing both prior exceptions.
-- **CI YAML** — the diff is a single line (`--audit-level=critical` →
-  `--audit-level=high`); parsed the workflow with a YAML loader to confirm it
-  is still valid, and `--omit=dev` is preserved.
-- **Historical banners / ADR claims** — spot-checked `docs/README.md`'s new
-  claim that "All four [ADRs] carry a dated Accepted status and are locked in
-  `gsd-ingest-manifest.yaml`" against that manifest: four `type: ADR` entries,
-  all `locked: true`. Historical banners on `mobile-ux-assessment.md`,
-  `mobile-testing-automation.md`, and `admin-dashboard-specification.md` read
-  accurately against their content.
-- **Mermaid diagrams (rename)** — traced the `LlamaModel` → `TextModel` and
-  `LLM[...]` label rename through `docs/ai-pipeline.md` and
-  `docs/architecture.md` node-by-node (declaration, arrows, `class` assignment
-  lines). Both are fully consistent — no dangling node ids were introduced by
-  the rename in either file.
-
-One pre-existing defect was found while doing the file-scoped mermaid check
-described above, in a file that is in this review's scope even though this
-specific diagram section wasn't touched by this phase's diff (see below).
+- **Scope confirmation** — `git diff --stat 19846fd..HEAD -- docs .github`
+  shows exactly one file changed since iteration 1: `docs/api-architecture.md`
+  (3 insertions, 5 deletions). The other 13 files in scope are byte-identical
+  to iteration 1 and are carried forward unchanged; their prior findings
+  (zero) stand without re-derivation.
+- **WR-01 verification** — re-read the full "Unified API Structure Overview"
+  diagram block (`docs/api-architecture.md:7-92`) node-by-node. The fix
+  correctly repoints `Admin --> VectorizeProducts` / `Admin -->
+  VectorizeKnowledge` and `VectorizeProducts --> VectorService` /
+  `VectorizeKnowledge --> VectorService` at the already-declared `Vectorize`
+  node, and removes the two dangling ids from the `class` assignment line.
+  `grep -n "VectorizeProducts\|VectorizeKnowledge"` returns no matches
+  anywhere in the file. Every node id referenced in an arrow (`WebApp`,
+  `Mobile`, `Admin`, `AgentChat`, `Orders`, `PaymentIntent`, `Tax`,
+  `Products`, `Categories`, `ShippingOptions`, `Vectorize`, `StripeWebhooks`,
+  `AIService`, `VectorService`, `OrderService`, `PaymentService`,
+  `TaxService`, `ShippingService`, `D1Database`, `VectorDatabase`,
+  `R2Storage`, `StripeAPI`, `ExternalAPIs`) is declared in a subgraph block
+  above it. WR-01 is resolved — no phantom/auto-created nodes remain.
+- **New defect found while re-verifying the same block** — the fix's edit to
+  the `class` line (line 89) dropped `VectorizeProducts` and
+  `VectorizeKnowledge` but never added the replacement id `Vectorize` in
+  their place, so the `Vectorize` node is now declared and wired but
+  excluded from the `api` styling class that every one of its seven sibling
+  API-layer nodes receives. See WR-01 below (renumbered; this is a new
+  finding, distinct from iteration 1's now-resolved WR-01).
 
 ## Warnings
 
-### WR-01: Dangling mermaid node references in the "Unified API Structure Overview" diagram
+### WR-01: `Vectorize` node excluded from the `api` style class it should share with its siblings
 
-**File:** `docs/api-architecture.md:59-60,67-68,91`
-**Issue:** The graph subgraph "Unified API Layer" declares a single
-consolidated node for the vectorize endpoint:
-
-```
-Vectorize[🔍 /api/admin/vectorize]
-```
-
-but the flow and class-assignment lines still reference two node ids that are
-never declared anywhere in this diagram block:
+**File:** `docs/api-architecture.md:89`
+**Issue:** The "Unified API Layer" subgraph declares eight endpoint nodes:
+`AgentChat`, `Orders`, `PaymentIntent`, `Tax`, `Products`, `Categories`,
+`ShippingOptions`, `Vectorize`, `StripeWebhooks` (line 18-26). The `class`
+assignment line that applies the `api` style (`classDef api fill:#f3e5f5`,
+line 84) lists only seven of the eight:
 
 ```
-Admin --> VectorizeProducts
-Admin --> VectorizeKnowledge
-...
-VectorizeProducts --> VectorService
-VectorizeKnowledge --> VectorService
-...
-class AgentChat,Orders,PaymentIntent,Tax,Products,Categories,ShippingOptions,VectorizeProducts,VectorizeKnowledge,StripeWebhooks api
-```
-
-Mermaid will silently auto-create two extra, unstyled boxes literally labeled
-`VectorizeProducts` and `VectorizeKnowledge` instead of connecting to the
-already-declared, correctly-labeled `Vectorize` node. This is a leftover from
-before the products/knowledge vectorize endpoints were consolidated into the
-single `/api/admin/vectorize` endpoint (confirmed current: `docs/CLAUDE.md`
-and `docs/api-architecture.md`'s own endpoint list both describe only the
-consolidated endpoint). This diagram is not part of this phase's diff, but the
-file is in this review's scope, `docs/api-architecture.md` is typed `SPEC`
-(binding contract) in `gsd-ingest-manifest.yaml`, and this phase's stated
-charter explicitly includes checking these diagrams for dangling node ids
-after the rename — this is exactly that class of defect, just found in the
-sibling diagram file rather than the two named in the task brief.
-
-**Fix:** Replace the two dangling references with the already-declared
-`Vectorize` node, and drop the two ids from the `class` line:
-
-```
-Admin --> Vectorize
-...
-Vectorize --> VectorService
-...
 class AgentChat,Orders,PaymentIntent,Tax,Products,Categories,ShippingOptions,StripeWebhooks api
+```
+
+`Vectorize` is missing. It is fully declared (line 25) and correctly wired
+into the graph (`Admin --> Vectorize` at line 59, `Vectorize -->
+VectorService` at line 66), so this isn't a dangling-reference bug like the
+one already fixed — it renders as a real box, just with mermaid's default
+(unstyled) fill instead of the intended purple `#f3e5f5` that every other
+API-layer node gets. In the rendered diagram this reads as visually
+inconsistent: seven identically-purple endpoint boxes and one that stands
+out for no documented reason, inside a diagram this project treats as a
+binding `SPEC` artifact (`gsd-ingest-manifest.yaml`).
+
+This id was already missing from the `class` line before the WR-01 fix too
+(the pre-fix version only listed the phantom `VectorizeProducts` /
+`VectorizeKnowledge` ids, never a bare `Vectorize`), so this is a
+longer-standing gap that the fix carried forward rather than something the
+fix commit itself introduced — but it was not caught by the iteration-1
+review's fix suggestion, and it is present in the file today.
+
+**Fix:** Add `Vectorize` to the `api` class list:
+
+```
+class AgentChat,Orders,PaymentIntent,Tax,Products,Categories,ShippingOptions,Vectorize,StripeWebhooks api
 ```
 
 ---
 
-_Reviewed: 2026-09-03T01:07:18Z_
+_Reviewed: 2026-09-02T18:15:00Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
