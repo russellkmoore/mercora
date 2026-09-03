@@ -26,6 +26,31 @@ This directory contains comprehensive documentation for all aspects of the Merco
 ### 🚀 **Innovation & Future**
 - **[MCP Server Integration](mcp-server-specification.md)** - Revolutionary agentic commerce through developer tools
 
+### 📜 **Binding decisions (ADRs)**
+All four carry a dated Accepted status and are locked in `gsd-ingest-manifest.yaml`.
+- **[Order and Checkout Trust Boundary](checkout-trust-boundary.md)** - Server-owned pricing, pending orders, and verified finalization (see Technical Architecture above)
+- **[Webhooks, Refunds, and Inventory Operations](webhooks-refunds-inventory.md)** - Stripe, order state, and variant inventory as durable, retryable transitions
+- **[Database Migrations](database-migrations.md)** - Remote D1 migrations are an explicit operator action, never part of `npm run deploy`
+- **[Subscriptions](subscriptions.md)** - Optional, disabled-by-default subscription acquisition on an additive migration
+
+### 🛠️ **Operations and runbooks**
+- **[Dependency Security Baseline](dependency-security.md)** - Production dependency audit baseline, owned exceptions, and the CI audit gate
+- **[Migration Reservations](migration-reservations.md)** - Assigns migration numbers from the current ledger so parallel branches don't reuse one
+- **[Shopify Migration Toolkit](shopify-migration.md)** - Operator-only import of catalog, content, media, customers, and historical orders, defaulting to a dry run
+- **[Runtime Configuration](runtime-configuration.md)** - Override public, non-secret storefront defaults from `lib/store-config.ts` without editing components
+
+### 📐 **Specs and contracts**
+- **[Commerce Observability](observability.md)** - A versioned, bounded, best-effort telemetry envelope for actionable commerce failures
+- **[Content Publishing](content-publishing.md)** - Store-neutral CMS pages and Blog publishing, added without seeding merchant content
+- **[Customer Accounts and Communications](customer-communications.md)** - Authenticated account navigation, order history, saved addresses, and profile settings
+- **[Gift Cards](o07-gift-cards-plan.md)** - Generic stored-value gift cards with a security and ledger foundation, shipped and stacked on subscriptions
+
+### 📈 **Assessments, baselines, and proposals**
+- **[Mobile UX Assessment](mobile-ux-assessment.md)** - A September 2025 snapshot of the platform's mobile user experience
+- **[Mobile Testing Automation Setup](mobile-testing-automation.md)** - A September 2025 proposal for automated mobile testing and performance monitoring
+- **[Mobile UX Improvements - Actionable Guide](mobile-improvements-actionable.md)** - Implementation guide for touch targets, performance, and user flow
+- **[Mobile Lighthouse Baseline](mobile-lighthouse-baseline.md)** - Lighthouse scores recorded for four routes against the PRD performance target
+
 ## 📋 **Quick Reference**
 
 ### **Current Platform Status**
