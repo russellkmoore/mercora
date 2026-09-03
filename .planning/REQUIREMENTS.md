@@ -41,7 +41,7 @@ Each maps to exactly one roadmap phase.
 ### Reference Documentation (REF)
 
 - [ ] **REF-01**: Every doc names the production text model as `@cf/openai/gpt-oss-20b` (source: `lib/ai/config.ts:29`). `grep -r "Llama 3.1" docs/` returns nothing across `CLAUDE.md`, `README.md`, `ROADMAP.md`, `architecture.md`, `ai-pipeline.md`, `api-architecture.md`, `DEPLOYMENT_SETUP.md`. The MCP tool count reads 19 in `docs/CLAUDE.md:536` and `docs/ROADMAP.md:107`.
-- [ ] **REF-02**: `docs/CLAUDE.md` describes the real test and CI setup (vitest unit, Workers, and observability suites; CI gates: audit, migration safety, lint, typecheck, cf-typecheck, build) instead of "No formal testing framework" (line ~408), points to `package.json` instead of pinning dependency versions, and drops the reference to the nonexistent `docs/API_STRUCTURE.md` (also in `docs/STRIPE_INTEGRATION.md:99`). `docs/api-architecture.md:435` no longer says "Stripe integration (mock implementation)".
+- [x] **REF-02**: `docs/CLAUDE.md` describes the real test and CI setup (vitest unit, Workers, and observability suites; CI gates: audit, migration safety, lint, typecheck, cf-typecheck, build) instead of "No formal testing framework" (line ~408), points to `package.json` instead of pinning dependency versions, and drops the reference to the nonexistent `docs/API_STRUCTURE.md` (also in `docs/STRIPE_INTEGRATION.md:99`). `docs/api-architecture.md:435` no longer says "Stripe integration (mock implementation)".
 - [ ] **REF-03**: `docs/README.md` links all 26 docs in `docs/` (11 of the 12 2026-era docs are currently missing), says the MCP server is live at `/api/mcp` (line ~37), and carries a 2026 "Last Updated" date (line ~79).
 - [ ] **REF-04**: Historical and proposal documents are labeled at the top: `docs/admin-dashboard-specification.md` (historical design; unbuilt modules are not planned), the ER diagram in `docs/architecture.md` (~lines 240–320; predates the variant/ledger model), `docs/mobile-ux-assessment.md` (September 2025 snapshot), and `docs/mobile-testing-automation.md` (proposal; Lighthouse CI and Playwright suites are not implemented). The implementation checklist in `docs/mobile-improvements-actionable.md` (~lines 422–444) shows the code items as complete.
 
@@ -138,7 +138,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | RUN-01 | Phase 3 | Complete |
 | RUN-02 | Phase 3 | Complete |
 | REF-01 | Phase 4 | Pending |
-| REF-02 | Phase 4 | Pending |
+| REF-02 | Phase 4 | Complete |
 | REF-03 | Phase 4 | Pending |
 | REF-04 | Phase 4 | Pending |
 | DEP-01 | Phase 4 | Pending |
