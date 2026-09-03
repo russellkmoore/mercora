@@ -52,7 +52,7 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 - ✅ **Admin User Management**: Database-based admin user CRUD operations
 - ✅ **CMS Pages Management**: Create and manage static content pages
 - ✅ **Multi-layered Authentication**: Production-ready authentication with role-based access
-- ✅ **AI-Powered Analytics**: Real-time business insights using Llama 3.1 8B
+- ✅ **AI-Powered Analytics**: Real-time business insights using `@cf/openai/gpt-oss-20b`
 - ✅ **Content Generation**: AI-powered article and product description generation
 
 ### 🏗️ **Technical Infrastructure (✅ Production-Ready)**
@@ -104,7 +104,7 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 
 ### 🤖 **Agentic Commerce via MCP Server (✅ Complete - Revolutionary Achievement)**
 
-- ✅ **MCP Server Implementation**: Production-ready Model Context Protocol server with 17 tools
+- ✅ **MCP Server Implementation**: Production-ready Model Context Protocol server with 19 tools
   - ✅ **Product Discovery**: Search catalog, get recommendations, assess fulfillment capability
   - ✅ **Cart Management**: Full CRUD operations with bulk additions and updates
   - ✅ **Order Management**: Complete order placement, tracking, and status monitoring
