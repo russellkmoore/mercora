@@ -35,6 +35,14 @@ Out-of-scope discoveries logged during execution, not fixed by the introducing t
      `customer.subscription.pending_update_applied`,
      `customer.subscription.pending_update_expired`, `charge.refunded`, `refund.updated`,
      `refund.failed`, `charge.refund.updated` (legacy compatibility alias for `refund.updated`).
+- **Status:** resolved
+- **Resolution (2026-09-03, milestone close):** Consumed by Phase 3 (RUN-02). Plan 03-02 rewrote the
+  event lists in `docs/DEPLOYMENT_SETUP.md` and `docs/STRIPE_INTEGRATION.md` from these four facts
+  (`payment_intent.payment_failed` retained and listed under Required; sixteen events in two groups;
+  `charge.refund.updated` noted as legacy compatibility in prose), and plan 03-03 removed the dead
+  `checkout.session.completed` case, handler, and header bullet from `app/api/webhooks/stripe/route.ts`
+  with a regression test for the unhandled-event fall-through. Verified in `03-VERIFICATION.md`
+  (truths 8 and 10) and by the milestone integration check.
 
 ## `tail_consumers` not wired — telemetry never reaches the tail worker today
 
