@@ -20,6 +20,15 @@
     "binding": "ASSETS",
     "directory": ".open-next/assets"
   },
+  /**
+   * Tail Worker consumer: commerce.telemetry.v1 events flow to the deployed
+   * commerce-observability-tail Worker (alert cooldown DO + email alerting).
+   * The consumer must exist on the account before this is deployed; it was
+   * deployed 2026-09-03 (version 5ba50573). See workers/observability-tail/.
+   */
+  "tail_consumers": [
+    { "service": "commerce-observability-tail" }
+  ],
   "observability": {
     "enabled": true
   },
