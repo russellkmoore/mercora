@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-02)
 
 **Core value:** A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** Phase 4 — Reference Documentation Refresh
+**Current focus:** Milestone v1 hardening complete (4/4 phases) — audit, complete, and cleanup
 
 ## Current Position
 
@@ -31,7 +31,7 @@ Plan: Not started
 Status: All phases complete
 Last activity: 2026-09-02 — Phase 4 complete
 
-Progress: [████████░░] 75%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -121,9 +121,11 @@ None yet.
 - [Phase 2 finding] Mobile Lighthouse baseline: all four routes score 72–80, below the PRD target of 85 (`docs/mobile-lighthouse-baseline.md`). Performance work is backlog, not v1.
 - [Phase 2 follow-up, operator] After the next production deploy, query the `mercora_web_vitals` Analytics Engine dataset (Cloudflare dashboard or SQL API) and confirm rows carry metric, value, rating, route template, isMobile. Accepted on code evidence 2026-09-02.
 - [Resolved 2026-09-02] OBS-02 sink choice: Workers Analytics Engine dataset `mercora_web_vitals` via binding `WEB_VITALS`; no D1 table.
-- [Phase 4] DEP-01 may find that Next 16.3.1 still bundles a flagged PostCSS or Sharp; if so, record a new bounded exception rather than weakening the gate.
-- [Phase 3 code review, carry to Phase 4] Two Info-level pre-existing items: `docs/CLAUDE.md` still says "No formal testing framework currently configured" (that is REF-02), and `docs/webhooks-refunds-inventory.md`'s own required-event list omits `payment_intent.payment_failed` while the runbooks list it under Required (by design: the ADR set is the refund/payment core and the runbooks add the retained telemetry event; a one-line note in the ADR would remove the apparent mismatch and is a Phase 4 candidate alongside REF-01..04).
-- [Phase 3 ingest re-check] The only open ingest warning is W2: `docs/admin-dashboard-specification.md` carries no historical/proposal label. That is REF-04 in Phase 4.
+- [Resolved 2026-09-03, Phase 4] DEP-01: Next 16.3.1 no longer bundles a flagged PostCSS or Sharp; `npm audit --omit=dev --audit-level=high` exits 0; both exceptions closed and CI gates at `high`.
+- [Resolved 2026-09-03, Phase 4] The Phase 3 code-review Info item on `docs/CLAUDE.md`'s "No formal testing framework" line is closed by REF-02. The optional one-line note in `docs/webhooks-refunds-inventory.md` about the retained `payment_intent.payment_failed` telemetry event was not added (still a candidate for a later docs pass, not a defect).
+- [Resolved 2026-09-03, Phase 4] Ingest warning W2 closed: `docs/admin-dashboard-specification.md` now carries the historical banner (REF-04).
+- [Phase 4 follow-up, operator] `docs/dependency-security.md` next review is 2026-12-01. The full-tree `npm audit` shows 5 moderate dev-only findings (`esbuild` via drizzle-kit, `qs` via `@opennextjs/cloudflare`); they do not affect the production gate but should be re-checked at that review.
+- [Phase 4 deferred] The dated "Recent Fixes & Issues Resolved (Aug 23, 2025)" and "Current Git Status" sections of `docs/CLAUDE.md` are stale and were left out of REF-02's scope; candidate for a later docs pass or deletion. Feature claims around the model name ("AI analytics") were not verified.
 - [Resolved 2026-09-02] Phase 3 human verification: the throwaway-branch `/gsd-ingest-docs` re-run classified all four ADRs as LOCKED; prior W1 and I17 reported closed. Record in `03-UAT.md`.
 
 ## Deferred Items
@@ -140,4 +142,4 @@ Last session: 2026-09-03T01:00:41.992Z
 Stopped at: Phase 4 complete — all phases complete
 Resume file: None
 
-Next: `/gsd-plan-phase 4` (or continue `/gsd-autonomous --from 4`)
+Next: milestone lifecycle — `/gsd-audit-milestone`, then `/gsd-complete-milestone`, then `/gsd-cleanup` (autonomous run handles these in order)

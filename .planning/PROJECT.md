@@ -49,12 +49,14 @@ A customer or an external AI agent can find the right outdoor gear through Volt,
 - ✓ `docs/checkout-trust-boundary.md` states MCP checkout is inside the paid inventory boundary and names the shared pricing service and finalizer; all four ADR docs carry a dated `**Status:** Accepted` marker and `gsd-ingest-manifest.yaml` (now tracked) marks them `locked: true`; a throwaway-branch ingest re-run classified all four as locked with the prior W1 and I17 closed — Phase 3 (ADR-01, ADR-02)
 - ✓ Runbooks match the repo: `docs/CLAUDE.md` and `docs/DEPLOYMENT_SETUP.md` show only the guarded `db:migrate:*` scripts, the `deploy` versus `deploy:ci` distinction, and Node 24.18.1; both Stripe webhook event lists are identical 16-event Required/Subscriptions groups matching the route's dispatch switch, and the dead `checkout.session.completed` branch is gone from the route with a regression test pinning the unhandled-event contract — Phase 3 (RUN-01, RUN-02)
 
+- ✓ Reference docs are current: every model mention names `@cf/openai/gpt-oss-20b` (no "Llama" anywhere in `docs/`), the MCP tool count reads 19 with the full list in `docs/CLAUDE.md`, the Testing section describes the three vitest suites and six CI gates, dependency versions point at `package.json`, no doc references the dead `API_STRUCTURE.md`, `docs/README.md` links all 27 files with the MCP server shown live at `/api/mcp`, and the four historical or proposal documents carry `Status: Historical` banners with the mobile checklist's 12 shipped items ticked — Phase 4 (REF-01, REF-02, REF-03, REF-04)
+- ✓ Dependency baseline current: `npm audit --omit=dev --audit-level=high` exits 0 under Next 16.3.1 and Node 24.18.1, CI gates at `high`, both Next-bundled exceptions closed on observed evidence (Sharp 0.35.3, PostCSS 8.5.23/8.5.26), next review 2026-12-01 — Phase 4 (DEP-01)
+
 ### Active
 
 <!-- v1 = hardening milestone. Verified gaps only. Full definitions in REQUIREMENTS.md. -->
 
-- [ ] Reference docs name the right LLM and tool count, describe the real test/CI setup, index all 26 docs, and label historical material (REF-01..04)
-- [ ] Dependency audit gate raised to `high` now that Next 16 has landed, and `docs/dependency-security.md` refreshed (DEP-01)
+*(none — every v1 hardening requirement has shipped; see Validated)*
 
 ### Out of Scope
 
@@ -152,6 +154,10 @@ A customer or an external AI agent can find the right outdoor gear through Volt,
 | ADR status markers are one `**Status:** Accepted (YYYY-MM-DD)` line under each H1, dated to each doc's first commit, not to the day they were labeled (Phase 3) | The classifier keys on the literal `Status: Accepted`; the first-commit date is when the decision actually took effect. The manifest `locked: true` keys are a human-readable record only; the classifier does not read them | ✓ Good — ingest re-run classified all four ADRs LOCKED |
 | `payment_intent.payment_failed` stays subscribed and is listed under Required in both runbooks; `checkout.session.completed` removed from docs and from the route's dispatch switch (Phase 3) | Phase 2 made the failed-payment handler telemetry-only but kept the event; the checkout-session case was a comment-only no-op returning `ignored`, identical to `default`, so deleting it is behavior-neutral and makes "docs match the route" literally true | ✓ Good — 29 deletions, 0 insertions; regression test pins the fall-through |
 | Remote migration commands in runbooks are the four `db:migrate:*` npm scripts only; local keeps `wrangler d1 migrations apply --local`; `npm run deploy` never applies remote migrations, `npm run deploy:ci` does (Phase 3) | The scripts wrap `scripts/d1-migrate.mjs`, which gates production on `--confirm-production` plus `MERCORA_ALLOW_PRODUCTION_MIGRATIONS=1`; the docs must not offer an unguarded path | ✓ Good |
+| Docs name the exact model id `@cf/openai/gpt-oss-20b` and cite `app/api/mcp/route.ts` for the 19-tool count; mermaid node ids renamed with the labels (Phase 4) | One source of truth each (`lib/ai/config.ts`, the route's "Available tools" string); a label-only rename leaves misleading ids in diagrams | ✓ Good — repo-wide `grep -ri llama docs/` is empty |
+| Historical material is labelled with a `> **Status: Historical (September 2025).**` blockquote under the heading, not deleted or moved (Phase 4) | Same position as the ADR status markers; keeps the design history readable while stopping a reader from mistaking a proposal for the shipped system | ✓ Good |
+| CI dependency audit gate raised from `critical` to `high`; both Next-bundled exceptions closed on observed evidence rather than deleted (Phase 4) | `npm audit --omit=dev` is clean under Next 16.3.1 (Sharp 0.35.3 hoisted, PostCSS patched), which is the exit condition the doc's own rule set; closed entries keep the history | ✓ Good — next review 2026-12-01 |
+| Phase 4 planned with `--skip-ui`: the UI plan gate matched the word "dashboard" inside the filename `admin-dashboard-specification.md` (Phase 4) | Markdown edits and one CI line; no UI code. Recorded as a flagged assumption in plan 04-04 | ✓ Good |
 
 ---
-*Last updated: 2026-09-02 after Phase 3*
+*Last updated: 2026-09-03 after Phase 4 (milestone v1 complete)*
