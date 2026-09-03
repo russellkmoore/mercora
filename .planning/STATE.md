@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v2
 milestone_name: Themeable Storefront
 status: planning
-last_updated: "2026-09-03T05:47:54.858Z"
+last_updated: "2026-09-02T00:00:00.000Z"
 last_activity: 2026-09-02
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,76 +17,60 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-02 after v1 milestone)
+See: .planning/PROJECT.md (updated 2026-09-02 after v2 milestone start)
 
 **Core value:** A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** Planning next milestone (v1 Hardening shipped 2026-09-02; candidates listed under "Next Milestone Goals" in PROJECT.md)
+**Current focus:** v2 Themeable Storefront — Phase 5 (Token Contract & Component Sweep), first of 4 phases
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-09-02 — Milestone v2 started
+Phase: 5 of 8 total (1 of 4 in v2) — Token Contract & Component Sweep
+Plan: — (not yet planned)
+Status: Roadmap complete, ready to plan Phase 5
+Last activity: 2026-09-02 — ROADMAP.md created for v2: 4 phases (5-8), 16/16 requirements mapped
+
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 17
-- Average duration: -
-- Total execution time: 0.0 hours
+- Total plans completed: 17 (all v1)
+- Average duration: - (v2 not started)
+- Total execution time: 0.0 hours (v2)
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1 | 4 | - | - |
-| 2 | 5 | - | - |
-| 3 | 3 | - | - |
-| 4 | 5 | - | - |
+| 1 (v1) | 4 | - | - |
+| 2 (v1) | 5 | - | - |
+| 3 (v1) | 3 | - | - |
+| 4 (v1) | 5 | - | - |
+| 5 (v2) | - | - | - |
+| 6 (v2) | - | - | - |
+| 7 (v2) | - | - | - |
+| 8 (v2) | - | - | - |
 
 **Recent Trend:**
 
-- Last 5 plans: -
+- Last 5 plans: - (v2 not started)
 - Trend: -
 
 *Updated after each plan completion*
-**Per-Plan Metrics:**
-
-| Plan | Duration | Tasks | Files |
-|------|----------|-------|-------|
-| Phase 01 P01 | 20min | 3 tasks | 6 files |
-| Phase 01 P03 | 24min | 3 tasks | 4 files |
-| Phase 01 P04 | 22min | 3 tasks | 0 files |
-| Phase 01 P02 | 35min | 3 tasks | 6 files |
-| Phase 02 P01 | 25min | 3 tasks | 4 files |
-| Phase 02 P05 | 22min | 2 tasks | 1 files |
-| Phase 02 P02 | 30min | 3 tasks | 6 files |
-| Phase 02 P03 | 9min | 3 tasks | 4 files |
-| Phase 02 P04 | 25min | 3 tasks | 5 files |
-| Phase 3 P1 | 20min | 2 tasks | 5 files |
-| Phase 03 P02 | 15min | 3 tasks | 3 files |
-| Phase 3 P03 | 20min | 2 tasks | 2 files |
-| Phase 04 P01 | 12min | 3 tasks | 3 files |
-| Phase 04 P02 | 15min | 3 tasks | 3 files |
-| Phase 04 P03 | 12min | 2 tasks | 1 files |
-| Phase 04 P04 | 4min | 3 tasks | 5 files |
-| Phase 04-reference-documentation-refresh P05 | 8min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table. The v1 per-phase decision log is archived in `milestones/v1-phases/*/` SUMMARY files and `milestones/v1-MILESTONE-AUDIT.md`.
+Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 
-Decisions that constrain the next milestone:
-
-- v1 was hardening only; the 12 `docs/ROADMAP.md` feature items and 4 deferred engineering items are backlog in `milestones/v1-REQUIREMENTS.md`, ready for `/gsd-new-milestone`
-- All four ADR docs are `Status: Accepted` and locked in `gsd-ingest-manifest.yaml`; new work must not contradict them without a superseding ADR
-- `workflow.use_worktrees=false` stays (fresh worktrees lack `node_modules` and `.dev.vars`)
-- Telemetry stays in the closed `commerce.telemetry.v1` taxonomy; any new event needs both parity files updated
-- The codebase map (2026-08-31) and ingest intel (2026-09-01) predate v1's code changes; refresh with `/gsd-map-codebase` before a code-heavy milestone
+- Theme registry is build-time generated from `themes/*.css` only — never a wrangler var or hand-maintained list
+- A new theme requires a deploy; switching between shipped themes is instant via D1
+- `getActiveTheme()` accepts the per-request D1 read; no caching layer unless traces show it's needed
+- `theme.mode` (dark/light) folds into the theme file — a theme IS a mode; no separate mode switch
+- Per-theme component/markup overrides and per-category layout overrides are rejected — tokens + enumerated variants is the line
+- Admin theming is out of scope for this milestone; admin keeps its hardcoded palette
 
 ### Pending Todos
 
@@ -94,14 +78,18 @@ None.
 
 ### Blockers/Concerns
 
-Open items carried out of v1 (none blocks feature work; full list in `milestones/v1-MILESTONE-AUDIT.md`):
+Open items carried from v1 close (none blocks v2 feature work; full list in `milestones/v1-MILESTONE-AUDIT.md`):
 
-- [Needs Russell] Live sitemap advertises `https://mercora.example.com`. Fix: add `NEXT_PUBLIC_SITE_URL=https://voltique.russellkmoore.me` as a Cloudflare Workers **Build** variable and redeploy.
-- [Operator, next deploy] Confirm `/admin` returns 503 on a non-production build (`docs/admin-authentication.md`); confirm `mercora_web_vitals` Analytics Engine rows carry metric, value, rating, route template, isMobile; trip one warning-severity telemetry event and confirm the alert email arrives via the `commerce-observability-tail` consumer.
-- [Cloudflare hygiene] Delete the unused `ADMIN_USER_IDS` Worker secret. Two unpromoted Worker versions from 2026-08-31 (951a3547, 73dc8c9f) can be ignored.
-- [Backlog] Mobile Lighthouse scores 72–80 on all four routes against a target of 85 (`docs/mobile-lighthouse-baseline.md`).
-- [Review 2026-12-01] Five moderate dev-only `npm audit` findings (`esbuild` via drizzle-kit, `qs` via `@opennextjs/cloudflare`); production gate unaffected.
-- [Docs pass] Stale "Recent Fixes" and "Current Git Status" sections in `docs/CLAUDE.md`; optional note in `docs/webhooks-refunds-inventory.md` about the retained `payment_intent.payment_failed` telemetry event.
+- [Needs Russell] Add `NEXT_PUBLIC_SITE_URL` as a Cloudflare Workers Build variable and redeploy (sitemap still advertises `mercora.example.com`)
+- [Cloudflare hygiene] Delete the unused `ADMIN_USER_IDS` Worker secret
+- [Backlog] Mobile Lighthouse scores 72-80 vs. target 85 on all four measured routes
+- [Review 2026-12-01] Five moderate dev-only `npm audit` findings
+
+Research flags for v2 execution (from `.planning/research/SUMMARY.md`):
+
+- Phase 5: the sweep grep must cover the whole tree (Tailwind config, inline `style={}`, SVG fill/stroke, dead shadcn classes) — a className-only pass will look complete and won't be
+- Phase 6: any new telemetry event needs both `commerce.telemetry.v1` parity files updated (`lib/observability/telemetry.ts` + `workers/observability-tail/src/core.ts`) — locked v1 rule
+- Phase 6: `scripts/build-themes.mjs` must be wired into `build:worker` and `predev` explicitly — a `prebuild` script name never fires on the real deploy path
 
 ## Deferred Items
 
@@ -113,14 +101,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-02 (milestone v1 closed and archived; tag `v1`)
-Stopped at: milestone v1 complete
+Last session: 2026-09-02 (v2 ROADMAP.md and STATE.md created; REQUIREMENTS.md traceability filled)
+Stopped at: Roadmap created, awaiting approval
 Resume file: None
 
-Next: `/gsd-new-milestone` from a fresh session. Phase numbering continues at 5. `.planning/REQUIREMENTS.md` was removed at close; the new milestone defines a fresh one. The v1 phase directories are already archived under `milestones/v1-phases/`, so `/gsd-cleanup` has nothing to do.
-
-## Operator Next Steps
-
-- Push the `v1` tag if wanted: `git push origin v1`
-- Add the `NEXT_PUBLIC_SITE_URL` Workers Build variable and redeploy (sitemap fix)
-- Start the next milestone with `/gsd-new-milestone`
+Next: `/gsd-discuss-phase 5` (or `/gsd-plan-phase 5` directly) to start Token Contract & Component Sweep

@@ -66,13 +66,28 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (filled by roadmap) | | |
+| TOKEN-01 | Phase 5 | Pending |
+| TOKEN-02 | Phase 5 | Pending |
+| TOKEN-03 | Phase 5 | Pending |
+| TOKEN-04 | Phase 5 | Pending |
+| TOKEN-05 | Phase 5 | Pending |
+| THEME-01 | Phase 6 | Pending |
+| THEME-02 | Phase 6 | Pending |
+| THEME-03 | Phase 6 | Pending |
+| THEME-04 | Phase 6 | Pending |
+| LAYOUT-01 | Phase 7 | Pending |
+| LAYOUT-02 | Phase 7 | Pending |
+| LAYOUT-03 | Phase 7 | Pending |
+| LAYOUT-04 | Phase 7 | Pending |
+| DOCS-01 | Phase 8 | Pending |
+| DOCS-02 | Phase 8 | Pending |
+| DOCS-03 | Phase 8 | Pending |
 
 **Coverage:**
 - v2 requirements: 16 total
-- Mapped to phases: 0
-- Unmapped: 16 ⚠️
+- Mapped to phases: 16
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-02*
-*Last updated: 2026-09-02 after initial definition*
+*Last updated: 2026-09-02 after ROADMAP.md creation (4 phases, 16/16 requirements mapped)*
