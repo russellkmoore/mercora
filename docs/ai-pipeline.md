@@ -38,7 +38,7 @@ sequenceDiagram
     alt Special Response (Easter Egg)
         API->>API: Return canned response
     else Normal AI Processing
-        API->>AI: Generate response with Llama 3.1 8B
+        API->>AI: Generate response with @cf/openai/gpt-oss-20b
         AI-->>API: Return AI response text
         
         Note over API: Phase 3: Personality Enhancement
@@ -167,7 +167,7 @@ flowchart TD
 
     %% AI Generation
     subgraph "AI Generation"
-        LlamaModel[🧠 Llama 3.1 8B]
+        TextModel["🧠 @cf/openai/gpt-oss-20b"]
         LowTemp[🌡️ Temperature: 0.3]
         Response[💭 AI Response]
     end
@@ -197,8 +197,8 @@ flowchart TD
     StrictRules --> ContextInjection
     ContextInjection --> FinalPrompt
 
-    FinalPrompt --> LlamaModel
-    LlamaModel --> LowTemp
+    FinalPrompt --> TextModel
+    TextModel --> LowTemp
     LowTemp --> Response
 
     Response --> ProductMentions
@@ -232,7 +232,7 @@ flowchart TD
     class UserQuery,QueryType,ContextCheck input
     class VectorResults,ProductAvailable,KnowledgeAvailable analysis
     class BasePrompt,StrictRules,ContextInjection,FinalPrompt prompt
-    class LlamaModel,LowTemp,Response ai
+    class TextModel,LowTemp,Response ai
     class ProductMentions,ContextCompliance,FallbackTrigger,SafeResponse validation
     class NoInvention,ExactMatch,GeneralAdvice,RefuseSpecific rules
 ```
