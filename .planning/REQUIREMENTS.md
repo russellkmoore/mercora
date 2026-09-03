@@ -47,7 +47,7 @@ Each maps to exactly one roadmap phase.
 
 ### Dependency Hygiene (DEP)
 
-- [ ] **DEP-01**: `docs/dependency-security.md` is refreshed under Node 24: `npm audit --omit=dev` is re-run, the two Next-bundled exceptions (PostCSS, Sharp) are closed now that Next 16.3.1 has landed or re-recorded with a new owner and review date if still present, CI's gate is raised to `--audit-level=high` per the document's own rule (or the blocking finding is recorded as a bounded exception), and the next-review date (currently 2026-08-25, passed) is in the future.
+- [x] **DEP-01**: `docs/dependency-security.md` is refreshed under Node 24: `npm audit --omit=dev` is re-run, the two Next-bundled exceptions (PostCSS, Sharp) are closed now that Next 16.3.1 has landed or re-recorded with a new owner and review date if still present, CI's gate is raised to `--audit-level=high` per the document's own rule (or the blocking finding is recorded as a bounded exception), and the next-review date (currently 2026-08-25, passed) is in the future.
 
 ## Already Shipped (validated, no phase)
 
@@ -141,7 +141,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | REF-02 | Phase 4 | Complete |
 | REF-03 | Phase 4 | Complete |
 | REF-04 | Phase 4 | Complete |
-| DEP-01 | Phase 4 | Pending |
+| DEP-01 | Phase 4 | Complete |
 
 **Coverage:**
 

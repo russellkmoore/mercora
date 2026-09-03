@@ -115,7 +115,7 @@ Plans:
 - [x] 04-02-PLAN.md — `CLAUDE.md` test/CI section, unpinned dependencies, tool count and the two missing tool names, plus the `api-architecture.md` payment note and both stale doc references (REF-01, REF-02)
 - [x] 04-03-PLAN.md — `README.md` index: four new groups linking all 15 unlinked docs, current status lines, 2026 date (REF-01, REF-03)
 - [x] 04-04-PLAN.md — Four `Status: Historical` banners, the `architecture.md` ER-diagram label and model names, and 12 ticked checklist items with evidence (REF-01, REF-04)
-- [ ] 04-05-PLAN.md — CI audit gate raised to `high` (proven locally first) and the refreshed dependency baseline with both exceptions closed (DEP-01)
+- [x] 04-05-PLAN.md — CI audit gate raised to `high` (proven locally first) and the refreshed dependency baseline with both exceptions closed (DEP-01)
 
 ## Progress
 
