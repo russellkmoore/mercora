@@ -43,8 +43,25 @@ Full phase details, success criteria, and plan lists: `milestones/v1-ROADMAP.md`
   2. `tailwind.config.ts` maps all ~18 tokens through `runtimeColor()`, with the hardcoded `border`/`ring` hex values deleted
   3. A whole-tree scan (Tailwind config, inline `style={}`, SVG fill/stroke, dead shadcn-pattern classes like `bg-popover` — not just `.tsx` classNames) finds zero hardcoded palette values in storefront code
   4. `NEXT_PUBLIC_THEME_PRIMARY` no longer exists in the codebase; `logoPath` still resolves via store-config unchanged
-**Plans**: TBD
+**Plans**: 12 plans
+
+Plans:
+
+- [ ] 05-01-PLAN.md — Palette scan gate: whole-tree scanner, `scan:tokens` script, fail-first fixture proof
+- [ ] 05-02-PLAN.md — Screenshot harness: Playwright install (human legitimacy gate), capture script, D-21 pre-sweep baseline
+- [ ] 05-03-PLAN.md — TRACER: 23-token contract wired theme-file → Tailwind → `data-theme` → pixel, plus `getThemeTokens()` and the env-var retirement
+- [ ] 05-04-PLAN.md — Sweep chunk 2a: the 19 shadcn primitives, dead colour vocabulary rewritten in place
+- [ ] 05-05-PLAN.md — Sweep chunk 2b: shared shell — header, footer, breadcrumbs, banner, Sonner toaster
+- [ ] 05-06-PLAN.md — Sweep chunk 3a: home, category, product routes and the catalogue cards
+- [ ] 05-07-PLAN.md — Sweep chunk 3b: reviews and subscription acquisition (the densest palette cluster outside email)
+- [ ] 05-08-PLAN.md — Sweep chunk 3c: CMS page blocks and blog surfaces
+- [ ] 05-09-PLAN.md — Sweep chunk 4a: cart and agent drawers on the inverse token set
+- [ ] 05-10-PLAN.md — Sweep chunk 4b: checkout UI plus the server-to-client token bridge for Stripe Elements
+- [ ] 05-11-PLAN.md — Sweep chunk 5a: account, order-status, both error boundaries, Clerk appearance
+- [ ] 05-12-PLAN.md — Sweep chunk 5b: the six transactional email builders, then the phase-close whole-tree scan
+
 **UI hint**: yes
+**Execution note**: waves are serial by construction — D-18 locks one branch and one PR per sweep chunk in a fixed order, and every plan appends to the shared `05-SCREENSHOTS.md` manifest.
 
 ### Phase 6: Theme File Mechanism & Presets
 **Goal**: A theme is a self-contained CSS file that can be added or swapped without touching component code; admins choose among shipped presets with swatch previews, and an invalid theme file cannot reach production.
@@ -91,7 +108,7 @@ Full phase details, success criteria, and plan lists: `milestones/v1-ROADMAP.md`
 | 2. Observability and Regression Guards | v1 | 5/5 | Complete | 2026-09-02 |
 | 3. Decision Lock-In and Operator Runbooks | v1 | 3/3 | Complete | 2026-09-02 |
 | 4. Reference Documentation Refresh | v1 | 5/5 | Complete | 2026-09-02 |
-| 5. Token Contract & Component Sweep | v2 | 0/TBD | Not started | - |
+| 5. Token Contract & Component Sweep | v2 | 0/12 | Planned | - |
 | 6. Theme File Mechanism & Presets | v2 | 0/TBD | Not started | - |
 | 7. Layout Switches | v2 | 0/TBD | Not started | - |
 | 8. Documentation & Visual QA Close-out | v2 | 0/TBD | Not started | - |
