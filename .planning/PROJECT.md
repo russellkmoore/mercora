@@ -13,7 +13,38 @@ A customer or an external AI agent can find the right outdoor gear through Volt,
 - **Customer**: Outdoor-gear shoppers on the Voltique storefront, plus AI shopping agents (Claude Desktop, Cursor, VS Code, custom agents) using the MCP server
 - **Revenue model**: Direct product sales through Stripe; stored-value gift cards; subscriptions (new acquisition is off by default per ADR-SUB-01)
 - **Success metric**: TBD
-- **Strategy notes**: `docs/ROADMAP.md` (2025 strategic priorities; its 12 planned items are backlogged in REQUIREMENTS.md, not in v1)
+- **Strategy notes**: `docs/ROADMAP.md` (2025 strategic priorities; its 12 planned items are backlogged in `.planning/milestones/v1-REQUIREMENTS.md`, not in v1)
+
+## Current State
+
+**Shipped: v1 Hardening (2026-09-02).** Four phases, 17 plans, 46 tasks over 2026-08-31 to 2026-09-02. Archive: `.planning/milestones/v1-ROADMAP.md`, `v1-REQUIREMENTS.md`, `v1-MILESTONE-AUDIT.md`, `v1-phases/`.
+
+What v1 changed:
+
+- The published admin token is dead and no credential value lives in `docs/`.
+- A development build deployed to Workers fails closed (503) on every admin path.
+- Tax fallback, failed payments, and production web vitals all emit real signals.
+- Slug routes 404 correctly; allocation math is pinned by sum-exactness tests (and one real over-allocation bug was fixed).
+- All four ADRs are marked Accepted and locked; the runbooks and reference docs match the code.
+- CI's dependency audit gate is at `high` with a clean production tree.
+
+Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase: roughly 108k lines of TypeScript outside tests, 233 unit test files plus the Workers and observability suites.
+
+**Operator follow-ups carried out of v1** (none blocks feature work; see `.planning/milestones/v1-MILESTONE-AUDIT.md` tech debt):
+
+- Add `NEXT_PUBLIC_SITE_URL=https://voltique.russellkmoore.me` as a Cloudflare Workers Build variable and redeploy. The live sitemap advertises `mercora.example.com` until then.
+- After the next deploy: confirm `/admin` returns 503 on a non-production build, confirm `mercora_web_vitals` rows arrive, and trip one warning-severity event to confirm the `commerce-observability-tail` alert email arrives.
+- Cloudflare hygiene: delete the unused `ADMIN_USER_IDS` Worker secret; two unpromoted Worker versions from 2026-08-31 can be ignored.
+- Dependency review due 2026-12-01 (five moderate dev-only findings).
+
+## Next Milestone Goals
+
+Not yet defined. Run `/gsd-new-milestone`. Candidates, in rough priority order:
+
+1. **Mobile performance**: all four routes score 72–80 against the PRD target of 85 (`docs/mobile-lighthouse-baseline.md`). Image strategy and caching (REQ-performance-image-caching) is the obvious lever; the web-vitals sink from v1 makes progress measurable.
+2. **Backlog features** from the v1 requirements archive: wishlist, PWA, multi-language, advanced security, email marketing, advanced analytics, visual search, predictive analytics, social features, touch interactions.
+3. **Deferred engineering**: U13 shipment command (REQ-u13-shipment-command), MCP legacy credential column removal, account deletion and data export, Lighthouse CI and Playwright mobile automation.
+4. **Docs pass**: the stale "Recent Fixes" and "Current Git Status" sections of `docs/CLAUDE.md`; unverified "AI analytics" feature claims.
 
 ## Requirements
 
@@ -54,15 +85,15 @@ A customer or an external AI agent can find the right outdoor gear through Volt,
 
 ### Active
 
-<!-- v1 = hardening milestone. Verified gaps only. Full definitions in REQUIREMENTS.md. -->
+<!-- v1 shipped 2026-09-02. Next milestone requirements are defined by /gsd-new-milestone; candidates are listed under Next Milestone Goals above. -->
 
-*(none — every v1 hardening requirement has shipped; see Validated)*
+*(none — v1 is complete; the next milestone has not been defined yet)*
 
 ### Out of Scope
 
 <!-- Explicit boundaries. Includes reasoning to prevent re-adding. -->
 
-- The 12 planned items in `docs/ROADMAP.md` (PWA, touch interactions, wishlist, social, visual search, predictive analytics, multi-language, advanced security, email marketing, advanced analytics, image caching, reviews header) — backlogged in REQUIREMENTS.md by user decision; v1 is hardening only
+- The 12 planned items in `docs/ROADMAP.md` (PWA, touch interactions, wishlist, social, visual search, predictive analytics, multi-language, advanced security, email marketing, advanced analytics, image caching, reviews header) — backlogged in `.planning/milestones/v1-REQUIREMENTS.md` by user decision; v1 was hardening only. Candidates for the next milestone, not out of scope forever
 - Unbuilt modules in `docs/admin-dashboard-specification.md` (MFA, WebSocket/SSE, custom report builder, fulfillment automation, GDPR/CCPA tools, VIP tiers, personalization admin) — that document is a historical design doc, not a backlog (W2 resolved); admin is treated as shipped
 - The U13 shipment command and `SHIPMENT_NO_UNSETTLED_REFUNDS_SQL` end-to-end CAS test — future ADR-scoped work with its own migration; not a hardening gap
 - Account deletion and personal-data export — explicitly deferred by `docs/customer-communications.md`; needs a separate design
@@ -74,27 +105,26 @@ A customer or an external AI agent can find the right outdoor gear through Volt,
 
 ## Context
 
-**Brownfield.** The codebase was mapped on 2026-08-31 (`.planning/codebase/ARCHITECTURE.md`, `CONCERNS.md`, `CONVENTIONS.md`, `INTEGRATIONS.md`, `STACK.md`, `STRUCTURE.md`, `TESTING.md`) and 26 docs were ingested on 2026-09-01 (`.planning/intel/`, `.planning/INGEST-CONFLICTS.md`). This milestone exists because the docs and the code disagree in specific, verified places.
+**Brownfield.** The codebase was mapped on 2026-08-31 (`.planning/codebase/ARCHITECTURE.md`, `CONCERNS.md`, `CONVENTIONS.md`, `INTEGRATIONS.md`, `STACK.md`, `STRUCTURE.md`, `TESTING.md`) and 26 docs were ingested on 2026-09-01 (`.planning/intel/`, `.planning/INGEST-CONFLICTS.md`). Milestone v1 existed because the docs and the code disagreed in specific, verified places. As of 2026-09-02 they agree; the codebase map and ingest intel predate v1's changes and should be refreshed (`/gsd-map-codebase`) before planning code-heavy work.
 
 **Two generations of docs.** The 2025-dated docs (`CLAUDE.md`, `README.md`, `ROADMAP.md`, `architecture.md`, `ai-pipeline.md`, `api-architecture.md`, `DEPLOYMENT_SETUP.md`, `STRIPE_INTEGRATION.md`, `admin-*.md`, `mobile-*.md`) describe an earlier system. The 2026-dated operational docs (the four ADRs, `observability.md`, `runtime-configuration.md`, `content-publishing.md`, `customer-communications.md`, `dependency-security.md`, `shopify-migration.md`, `migration-reservations.md`, `o07-gift-cards-plan.md`) are newer and match the code. Where they disagree, the 2026 set wins.
 
-**Verified facts that override the 2025 docs:**
-- MCP `place_order` (`lib/mcp/tools/order.ts:148`) calls the same `finalizeOrderPayment` as `app/api/orders/route.ts:193` and `app/api/webhooks/stripe/route.ts:318`. ADR-CTB-15's "MCP remains outside the boundary" is superseded.
-- Admin auth is enforced in production. The `x-dev-admin` header bypass (`lib/auth/admin-middleware.ts:22`) and the signed-in-user-is-admin shortcut (`lib/auth/unified-auth.ts:163`) both require `NODE_ENV === "development"`. There is no query-string bypass in code; `docs/admin-authentication.md:203` documents one anyway.
-- The text model is `@cf/openai/gpt-oss-20b` (`lib/ai/config.ts:29`). Seven docs still say Llama 3.1 8B.
-- `npm run deploy` never applies remote migrations (ADR-DBM-01). `npm run deploy:ci`, used by Cloudflare Workers Builds, runs `scripts/d1-migrate.mjs --target production --apply --confirm-production` before uploading. Both are true. Expand-only migrations (ADR-DBM-05) is a hard rule precisely because the schema lands before the new Worker.
+**Facts a planner should not re-derive** (all now reflected in `docs/` after v1):
+- MCP `place_order` (`lib/mcp/tools/order.ts`) calls the same `finalizeOrderPayment` as `app/api/orders/route.ts` and the Stripe webhook route. MCP checkout is inside the paid inventory boundary; ADR-CTB-15 is superseded and `docs/checkout-trust-boundary.md` says so.
+- Admin auth is enforced in production through Clerk role or an active `adminUsers` row, or a header-only bearer token. The `x-dev-admin` bypass and the signed-in-user shortcut require `NODE_ENV === "development"`, and `lib/auth/deployment-guard.ts` returns 503 if such a build ever reaches the Workers runtime.
+- The text model is `@cf/openai/gpt-oss-20b` (`lib/ai/config.ts`). The MCP server exposes 19 tools (`app/api/mcp/route.ts`).
+- `npm run deploy` never applies remote migrations (ADR-DBM-01). `npm run deploy:ci`, used by Cloudflare Workers Builds, applies production migrations before uploading. Expand-only migrations (ADR-DBM-05) is a hard rule because the schema lands before the new Worker.
 - Migrations live in `migrations/`; the highest tracked file is `0022_add_gift_cards.sql`; the next free schema-bearing number is `0023`.
+- Telemetry taxonomy now includes `auth.deployment_guard_tripped`, `checkout.tax_fallback`, and `payment.intent_failed`; web vitals go to the `mercora_web_vitals` Analytics Engine dataset via the `WEB_VITALS` binding. The `commerce-observability-tail` Worker is wired as a tail consumer in `wrangler.jsonc`.
+- `wrangler.jsonc` carries two `pk_test_` publishable keys by design (demo environment); the file stays tracked.
 
-**Known issues carried into this milestone:**
-- `docs/CLAUDE.md` (section "Admin Token Config", ~line 323) publishes a literal admin token value; `docs/admin-authentication.md:203` publishes the dev-bypass literal (I15).
-- `app/api/analytics/vitals/route.ts` returns `{ status: "ok" }` and discards every beacon when `NODE_ENV === "production"`. The PRD's success metrics (touch response < 100 ms, Mobile PageSpeed > 85) are therefore unmeasured.
-- `lib/services/checkout-pricing.ts:712` sets `taxSource = 'configured_fallback'` with no telemetry event; `lib/observability/telemetry.ts` has no tax event in its taxonomy.
-- `app/product/[slug]/page.tsx:60` and `app/category/[slug]/page.tsx:52` take `{ params }: any` and read `params.slug` synchronously; the category route renders a 200 "not found" div instead of `notFound()`.
-- `app/api/webhooks/stripe/route.ts:351` is an empty `handlePaymentFailed` with a TODO. `lib/hooks/useEnhancedUserContext.ts:140` has a `favoriteCategories` TODO (minor; not a requirement).
-- `worker.ts` has no `NODE_ENV` assertion; the admin bypass guard is only as good as the baked-in build value.
-- `wrangler.jsonc` carries two `pk_test_` publishable keys and `scripts/build-with-public-env.mjs` injects `NEXT_PUBLIC_*` from it. Production is a demo environment in Stripe test mode by design; the file stays tracked.
-- `docs/dependency-security.md` next review date was 2026-08-25. Its two exceptions (Next-bundled PostCSS and Sharp) have exit condition "Next 16 upgrade"; the repo is on Next 16.3.1.
-- `docs/README.md` links 1 of the 12 2026-era docs and says "MCP Server: Under development".
+**Known debt after v1** (nothing here blocks feature work):
+- Mobile Lighthouse scores are 72–80 on all four measured routes against a target of 85.
+- `NEXT_PUBLIC_SITE_URL` is a runtime var only, so the live sitemap advertises `mercora.example.com` until a Workers Build variable is added.
+- `lib/hooks/useEnhancedUserContext.ts` still has the cosmetic `favoriteCategories` TODO.
+- Six non-`/api/admin` callers of `authenticateRequest` get 401 rather than 503 when the deployment guard trips (documented residual, `docs/admin-authentication.md`).
+- Client-side dev-mode admin shortcuts in `components/admin/AdminGuard.tsx` remain (accepted risk AR-01-03).
+- The dated "Recent Fixes" and "Current Git Status" sections of `docs/CLAUDE.md` are stale.
 
 ## Constraints
 
@@ -139,18 +169,17 @@ A customer or an external AI agent can find the right outdoor gear through Volt,
 | `docs/admin-dashboard-specification.md` is a historical design document, not a backlog (W2) | Live admin routes cover the shipped scope; its unbuilt modules are not planned | ✓ Good — label in REF-04 |
 | The production text model is `@cf/openai/gpt-oss-20b` (I8) | `lib/ai/config.ts:29` is the single source of truth | ✓ Good — docs in REF-01 |
 | Migrations nuance: `deploy` never migrates; `deploy:ci` migrates production first | Both true; not a conflict. Recorded so nobody "fixes" one to match the other | ✓ Good — runbook in RUN-01 |
-| v1 is a hardening milestone; the 12 `docs/ROADMAP.md` items are backlog | User decision 2026-09-01; docs and code must agree before feature work resumes | — Pending |
+| v1 is a hardening milestone; the 12 `docs/ROADMAP.md` items are backlog | User decision 2026-09-01; docs and code must agree before feature work resumes | ✓ Good — shipped 2026-09-02 in 3 days; the audit found no gaps and the backlog is intact for the next milestone |
 | Publishable `pk_test_` keys stay in tracked `wrangler.jsonc` | Production is a demo with no live Stripe account; publishable keys are public by design; Workers Builds and deploy scripts read the file | ✓ Good |
 | Deployment guard detects "deployed" via `navigator.userAgent === "Cloudflare-Workers"` and trips only when combined with `NODE_ENV === "development"`; fails closed per request (503), never at boot (Phase 1) | No new config; local `next dev` and vitest are unaffected; storefront keeps serving while admin locks. Live-bundle assumption accepted on static evidence 2026-09-02 (guard present in the OpenNext bundle, nothing shadows `navigator`, compat date guarantees the global) | ✓ Good — first-deploy confirmation step documented in `docs/admin-authentication.md` |
 | The dev-bypass value stays a source literal in `lib/auth/admin-middleware.ts`; docs use prose placeholders, never the value (Phase 1) | Russell's choice 2026-09-01; the guard closes the deployed-development case, so the literal is harmless in production | ✓ Good |
 | `ADMIN_VECTORIZE_TOKEN` rotated by the executor with a single `openssl rand -hex 32 \| wrangler secret put` pipeline; verified only with the old value (Phase 1) | Value never printed or stored; proof is two live 401s. Required pushing `main` first because Cloudflare refuses secret edits when the latest uploaded version is not deployed | ✓ Good |
 | `workflow.use_worktrees=false` for this project | Fresh git worktrees have no `node_modules` or `.dev.vars`, so parallel executors would fail vitest and wrangler or spend minutes on `npm ci`; sequential execution on the main tree is the safer trade | ✓ Good |
 | Client-side dev-mode admin shortcuts in `components/admin/AdminGuard.tsx` left unchanged (code-review WR-04) | Accepted by Russell 2026-09-02: no unintentional path puts a development build in production, the site is a demo, and server-side guards hold; residual is a visible nav link | ✓ Good — accepted risk AR-01-03 |
-
 | Web-vitals sink is a Workers Analytics Engine dataset (`WEB_VITALS` → `mercora_web_vitals`), not D1 (Phase 2) | Purpose-built for metrics, no schema migration or retention job; five fields only, route template derived server-side | ✓ Good — post-deploy row check tracked in STATE.md |
 | `handlePaymentFailed` is telemetry-only and the `payment_intent.payment_failed` subscription stays (Phase 2) | ADR-WRI forbids order-state changes outside the ledgers; the event is still useful ops signal | ✓ Good — runbook update is RUN-02 in Phase 3 |
 | `allocateDiscount` caps every line at its own capacity and redistributes remainder cents ascending by index (Phase 2, code-review CR-01) | The old algorithm could give the last line more discount than its value, producing a negative net line and a crash in the fallback tax path | ✓ Good — invariants pinned by tests |
-| Live sitemap advertises `mercora.example.com` because `NEXT_PUBLIC_SITE_URL` is only a runtime var, not a Workers Build var (Phase 2 finding) | `app/sitemap.ts` resolves the host at build time | — Pending Russell: add the Build variable and redeploy |
+| Live sitemap advertises `mercora.example.com` because `NEXT_PUBLIC_SITE_URL` is only a runtime var, not a Workers Build var (Phase 2 finding) | `app/sitemap.ts` resolves the host at build time | — Pending Russell: add the Build variable and redeploy (carried out of v1 as an operator follow-up) |
 | ADR status markers are one `**Status:** Accepted (YYYY-MM-DD)` line under each H1, dated to each doc's first commit, not to the day they were labeled (Phase 3) | The classifier keys on the literal `Status: Accepted`; the first-commit date is when the decision actually took effect. The manifest `locked: true` keys are a human-readable record only; the classifier does not read them | ✓ Good — ingest re-run classified all four ADRs LOCKED |
 | `payment_intent.payment_failed` stays subscribed and is listed under Required in both runbooks; `checkout.session.completed` removed from docs and from the route's dispatch switch (Phase 3) | Phase 2 made the failed-payment handler telemetry-only but kept the event; the checkout-session case was a comment-only no-op returning `ignored`, identical to `default`, so deleting it is behavior-neutral and makes "docs match the route" literally true | ✓ Good — 29 deletions, 0 insertions; regression test pins the fall-through |
 | Remote migration commands in runbooks are the four `db:migrate:*` npm scripts only; local keeps `wrangler d1 migrations apply --local`; `npm run deploy` never applies remote migrations, `npm run deploy:ci` does (Phase 3) | The scripts wrap `scripts/d1-migrate.mjs`, which gates production on `--confirm-production` plus `MERCORA_ALLOW_PRODUCTION_MIGRATIONS=1`; the docs must not offer an unguarded path | ✓ Good |
@@ -158,6 +187,8 @@ A customer or an external AI agent can find the right outdoor gear through Volt,
 | Historical material is labelled with a `> **Status: Historical (September 2025).**` blockquote under the heading, not deleted or moved (Phase 4) | Same position as the ADR status markers; keeps the design history readable while stopping a reader from mistaking a proposal for the shipped system | ✓ Good |
 | CI dependency audit gate raised from `critical` to `high`; both Next-bundled exceptions closed on observed evidence rather than deleted (Phase 4) | `npm audit --omit=dev` is clean under Next 16.3.1 (Sharp 0.35.3 hoisted, PostCSS patched), which is the exit condition the doc's own rule set; closed entries keep the history | ✓ Good — next review 2026-12-01 |
 | Phase 4 planned with `--skip-ui`: the UI plan gate matched the word "dashboard" inside the filename `admin-dashboard-specification.md` (Phase 4) | Markdown edits and one CI line; no UI code. Recorded as a flagged assumption in plan 04-04 | ✓ Good |
+| `commerce-observability-tail` wired as a `tail_consumers` entry in `wrangler.jsonc` at milestone close (post-Phase 4) | The audit found the tail Worker deployed but not attached, so critical-severity alerts never reached the consumer | ✓ Good — email delivery check pending the next deploy |
+| Milestone v1 closed with tech debt accepted, not with open gaps | The audit satisfied all 19 requirements; the remaining items are operator follow-ups outside the repo, Cloudflare hygiene, or backlog | ✓ Good |
 
 ---
-*Last updated: 2026-09-03 after Phase 4 (milestone v1 complete)*
+*Last updated: 2026-09-02 after v1 milestone*
