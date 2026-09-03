@@ -1,5 +1,7 @@
 # Voltique Admin Dashboard - Technical Specification
 
+> **Status: Historical (September 2025).** This is a design document; the modules it describes that were never built are not planned, and the admin routes that actually ship are listed in `.planning/PROJECT.md` and `docs/CLAUDE.md`.
+
 > **Comprehensive Administrative Interface for Voltique Platform Management**
 > 
 > Empowering operators with complete control over products, orders, customers, and AI systems
