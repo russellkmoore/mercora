@@ -127,3 +127,7 @@ Ready for plans 04-02, 04-03, 04-04 (own disjoint file sets within this phase) a
 ---
 *Phase: 04-reference-documentation-refresh*
 *Completed: 2026-09-03*
+
+## Self-Check: PASSED
+
+All three modified files and all three task commits (07d092b, c78f48a, f9ff3eb) verified present on disk / in git log.
