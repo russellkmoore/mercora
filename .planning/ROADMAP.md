@@ -106,7 +106,7 @@ Plans:
   4. `docs/admin-dashboard-specification.md`, the ER diagram in `docs/architecture.md`, `docs/mobile-ux-assessment.md`, and `docs/mobile-testing-automation.md` carry historical or proposal banners, and the checklist in `docs/mobile-improvements-actionable.md` shows the code items complete.
   5. CI's `npm audit` gate runs at `--audit-level=high` (or `docs/dependency-security.md` records a bounded exception with owner and exit condition), and the document's next-review date is in the future.
 
-**Plans**: 4/5 plans executed
+**Plans**: 5/5 plans executed
 
 Plans:
 **Wave 1** *(all five run in one wave — `files_modified` are disjoint across 14 files)*
