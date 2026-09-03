@@ -19,20 +19,20 @@
   ],
   "send_email": [
     {
-      "name": "ALERT_EMAIL",
-      "destination_address": "configure@example.invalid",
-      "allowed_sender_addresses": ["configure@example.invalid"]
+      // Unrestricted, matching the producer's EMAIL binding in the root wrangler.jsonc;
+      // recipient and sender come from the vars below. Configured 2026-09-03.
+      "name": "ALERT_EMAIL"
     }
   ],
   "vars": {
     // Cloudflare is recommended. Use "resend" with RESEND_API_KEY set as a
     // Wrangler secret for compatibility. No cross-provider fallback occurs.
     "EMAIL_PROVIDER": "cloudflare",
-    "ALERT_EMAIL_TO": "configure@example.invalid",
-    "ALERT_EMAIL_FROM": "configure@example.invalid",
-    "ALERT_SUBJECT_PREFIX": "configure-me",
-    "OPERATOR_IDENTITY": "configure-me",
-    "ENVIRONMENT": "configure-me",
+    "ALERT_EMAIL_TO": "russell@russellkmoore.me",
+    "ALERT_EMAIL_FROM": "russell@russellkmoore.me",
+    "ALERT_SUBJECT_PREFIX": "[voltique]",
+    "OPERATOR_IDENTITY": "Russell K. Moore",
+    "ENVIRONMENT": "production",
     "ALERT_COOLDOWN_SECONDS": "900",
     "ALERT_FAILURE_BACKOFF_SECONDS": "30"
   }

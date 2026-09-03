@@ -60,3 +60,16 @@ Out-of-scope discoveries logged during execution, not fixed by the introducing t
   rediscovered as a surprise bug later — anyone expecting `payment.intent_failed` (or any other
   critical/warning event) to page via the tail worker's alerting today will be wrong until this is
   wired.
+- **Status:** resolved
+- **Resolution (2026-09-03, milestone close, at Russell's direction):** Wired. The
+  `commerce-observability-tail` Worker was configured (unrestricted `ALERT_EMAIL` Send Email binding
+  matching the producer's `EMAIL` binding; `ALERT_EMAIL_TO`/`ALERT_EMAIL_FROM` =
+  `russell@russellkmoore.me`; `ALERT_SUBJECT_PREFIX` `[voltique]`; `OPERATOR_IDENTITY` "Russell K.
+  Moore"; `ENVIRONMENT` production) and deployed with `npx wrangler deploy` from
+  `workers/observability-tail/` (version `5ba50573`, 2026-09-03T03:21:33Z, SQLite `AlertCooldown`
+  Durable Object migration `v1` applied). The root `wrangler.jsonc` now carries
+  `"tail_consumers": [{ "service": "commerce-observability-tail" }]`; `scripts/check-deploy-config.mjs`
+  passes. The producer binding takes effect on the next `mercora` deploy (push `main` for Workers
+  Builds, or `npm run deploy`). Follow-up after that deploy: trip one warning-severity event and
+  confirm an alert email arrives; the tail worker also got a default `workers.dev` route it does not
+  need, which can be disabled with `"workers_dev": false` in its config.
