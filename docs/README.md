@@ -34,12 +34,12 @@ This directory contains comprehensive documentation for all aspects of the Merco
 - ✅ **Admin Dashboard**: Full management interface with AI analytics
 - ✅ **CMS System**: Content management for pages and articles  
 - ✅ **Authentication**: Multi-layered security with role-based access
-- 🚧 **MCP Server**: Under development for agentic commerce
+- ✅ **MCP Server**: Live at `/api/mcp` with 19 tools for agentic commerce
 
 ### **Key Technologies**
 - **Frontend**: Next.js 15, TypeScript, Tailwind CSS, shadcn/ui
 - **Backend**: Cloudflare Workers, D1 Database, R2 Storage
-- **AI**: Cloudflare AI (Llama 3.1 8B + BGE embeddings)
+- **AI**: Cloudflare AI (`@cf/openai/gpt-oss-20b` + BGE embeddings)
 - **Auth**: Clerk with role-based admin access
 - **Payments**: Stripe with Stripe Tax integration
 
@@ -63,7 +63,7 @@ This directory contains comprehensive documentation for all aspects of the Merco
 
 ### For AI Integration
 - Study [ai-pipeline.md](ai-pipeline.md) for AI implementation details
-- Review [mcp-server-specification.md](mcp-server-specification.md) for future AI features
+- Review [mcp-server-specification.md](mcp-server-specification.md) for the live MCP server's tools and architecture
 
 ## 📊 **Documentation Quality**
 
@@ -76,7 +76,7 @@ All documentation has been recently audited and updated to ensure:
 
 ## 🔄 **Documentation Updates**
 
-**Last Updated**: September 1, 2025
+**Last Updated**: September 2, 2026
 
 **Recent Changes**:
 - Updated all docs to reflect current production state
