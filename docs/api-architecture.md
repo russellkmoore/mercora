@@ -56,16 +56,14 @@ graph TB
     Mobile --> Orders
     Mobile --> Products
     
-    Admin --> VectorizeProducts
-    Admin --> VectorizeKnowledge
+    Admin --> Vectorize
     Admin --> Orders
     Admin --> Products
     Admin --> Categories
 
     AgentChat --> AIService
     AgentChat --> VectorService
-    VectorizeProducts --> VectorService
-    VectorizeKnowledge --> VectorService
+    Vectorize --> VectorService
     
     Orders --> OrderService
     PaymentIntent --> PaymentService
@@ -88,7 +86,7 @@ graph TB
     classDef data fill:#fff3e0
 
     class WebApp,Mobile,Admin client
-    class AgentChat,Orders,PaymentIntent,Tax,Products,Categories,ShippingOptions,VectorizeProducts,VectorizeKnowledge,StripeWebhooks api
+    class AgentChat,Orders,PaymentIntent,Tax,Products,Categories,ShippingOptions,StripeWebhooks api
     class AIService,VectorService,OrderService,PaymentService,TaxService,ShippingService service
     class D1Database,VectorDatabase,R2Storage,StripeAPI,ExternalAPIs data
 ```
