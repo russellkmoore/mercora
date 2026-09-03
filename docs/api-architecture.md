@@ -260,7 +260,7 @@ sequenceDiagram
     alt Easter Egg Detected
         API->>API: Return special response
     else Normal Processing
-        API->>AI: Generate response (Llama 3.1)
+        API->>AI: Generate response (@cf/openai/gpt-oss-20b)
         AI-->>API: Return AI text
         API->>API: Apply personality flair (30%)
     end
@@ -431,8 +431,9 @@ stateDiagram-v2
     end note
 
     note right of PaymentProcessing
-        Stripe integration
-        (mock implementation)
+        Mercora creates the PaymentIntent and
+        the finalizer retrieves it server-side
+        before finalizing (checkout-trust-boundary.md)
     end note
 ```
 
