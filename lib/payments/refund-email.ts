@@ -3,6 +3,7 @@ import { getStoreConfig } from '@/lib/store-config';
 import { sendEmail, type EmailResult } from '@/lib/email/sender';
 import { escapeHtmlText } from '@/lib/utils/maintenance-html';
 import { postalFooterHtml, postalFooterText } from '@/lib/email/footer';
+import { getThemeTokens } from '@/lib/themes/tokens';
 
 export interface RefundSettledEmailInput {
   orderId: string;
@@ -19,10 +20,11 @@ export async function sendRefundSettledEmail(
 ): Promise<EmailResult> {
   if (!input.customerEmail) return { success: true };
   const store = getStoreConfig();
+  const tokens = getThemeTokens();
   const amount = Money.fromMinor(input.amount, input.currencyCode).format();
   const customerName = input.customerName || 'Customer';
   const html = `<!doctype html>
-<html><body style="font-family:Arial,sans-serif;color:#1e293b">
+<html><body style="font-family:Arial,sans-serif;color:${tokens.onInverse}">
   <h1>${escapeHtmlText(store.identity.name)}</h1>
   <p>Hi ${escapeHtmlText(customerName)},</p>
   <p>We processed a refund of <strong>${escapeHtmlText(amount)}</strong> for order

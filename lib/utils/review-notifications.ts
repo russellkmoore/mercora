@@ -8,6 +8,7 @@ import {
   unsubscribeFooterHtml,
 } from '@/lib/email/footer';
 import { createUnsubscribeToken } from '@/lib/email/unsubscribe-token';
+import { getThemeTokens } from '@/lib/themes/tokens';
 
 interface ReviewStatusNotificationInput {
   email: string;
@@ -54,16 +55,17 @@ function throwOnFailure(result: Awaited<ReturnType<typeof sendEmail>>): void {
 
 export async function sendReviewStatusNotification(input: ReviewStatusNotificationInput): Promise<void> {
   const store = getStoreConfig();
+  const tokens = getThemeTokens();
   const statusLabel = formatStatus(input.status);
   const subjectPrefix = input.event === 'response'
     ? 'We replied to your review'
     : `Your review was ${statusLabel}`;
   const subject = `${subjectPrefix} - ${plain(input.productName)}`;
   const responseSection = input.adminResponse
-    ? `<div style="margin-top:16px;padding:16px;background:#f8fafc;border-radius:8px"><h3>Store response</h3><p style="white-space:pre-line">${escapeHtmlText(input.adminResponse)}</p></div>`
+    ? `<div style="margin-top:16px;padding:16px;background:${tokens.surfaceInverseElevated};border-radius:8px"><h3>Store response</h3><p style="white-space:pre-line">${escapeHtmlText(input.adminResponse)}</p></div>`
     : '';
   const reviewDetails = input.reviewBody
-    ? `<div style="margin-top:16px;padding:16px;background:#f8fafc;border-radius:8px"><h3>Your review</h3>${typeof input.rating === 'number' ? `<p>${'★'.repeat(Math.round(input.rating))}${'☆'.repeat(5 - Math.round(input.rating))}</p>` : ''}<p style="white-space:pre-line">${escapeHtmlText(input.reviewBody)}</p></div>`
+    ? `<div style="margin-top:16px;padding:16px;background:${tokens.surfaceInverseElevated};border-radius:8px"><h3>Your review</h3>${typeof input.rating === 'number' ? `<p>${'★'.repeat(Math.round(input.rating))}${'☆'.repeat(5 - Math.round(input.rating))}</p>` : ''}<p style="white-space:pre-line">${escapeHtmlText(input.reviewBody)}</p></div>`
     : '';
   const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto"><h2>${escapeHtmlText(store.identity.name)} Reviews</h2><p>Hi ${escapeHtmlText(firstName(input.name))},</p><p>${input.event === 'response' ? 'Our team replied to your feedback.' : `The status of your review for <strong>${escapeHtmlText(input.productName)}</strong> has changed.`}</p><p><strong>Current status:</strong> ${escapeHtmlText(statusLabel)}</p>${reviewDetails}${responseSection}<p>Thank you for sharing your experience.</p>${postalFooterHtml()}</div>`;
   const text = [

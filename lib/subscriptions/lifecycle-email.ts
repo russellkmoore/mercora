@@ -5,6 +5,7 @@ import {
 } from '@/lib/email/sender';
 import { getStoreConfig } from '@/lib/store-config';
 import { escapeHtmlText } from '@/lib/utils/maintenance-html';
+import { getThemeTokens } from '@/lib/themes/tokens';
 
 export const SUBSCRIPTION_LIFECYCLE_EMAIL_TEMPLATE_VERSION = 1;
 
@@ -215,6 +216,7 @@ function prepareEmail(
   kind: SubscriptionLifecycleNotificationKind,
 ): OutboundEmail {
   const store = getStoreConfig();
+  const tokens = getThemeTokens();
   const copy = notificationCopy(kind, formatEffectiveDate(row, store.commerce.locale));
   const accountUrl = safeAccountUrl(store.urls.site);
   const greeting = identity.name ? `Hi ${identity.name},` : 'Hello,';
@@ -222,13 +224,13 @@ function prepareEmail(
     ? `<p><a href="${escapeHtmlText(accountUrl)}">View your subscription</a></p>`
     : '';
   const accountText = accountUrl ? `View your subscription: ${accountUrl}` : undefined;
-  const html = `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#1e293b">
+  const html = `<!doctype html><html><body style="font-family:Arial,sans-serif;color:${tokens.onInverse}">
   <h1>${escapeHtmlText(copy.heading)}</h1>
   <p>${escapeHtmlText(greeting)}</p>
   ${copy.paragraphs.map((paragraph) => `<p>${escapeHtmlText(paragraph)}</p>`).join('\n  ')}
   ${accountHtml}
   <p>Questions? Contact ${escapeHtmlText(store.contact.supportEmail)}.</p>
-  <p style="color:#94a3b8;font-size:12px;line-height:16px">${escapeHtmlText(store.identity.name)} · ${escapeHtmlText(store.contact.postalAddress)}</p>
+  <p style="color:${tokens.mutedOnInverse};font-size:12px;line-height:16px">${escapeHtmlText(store.identity.name)} · ${escapeHtmlText(store.contact.postalAddress)}</p>
 </body></html>`;
   const text = [
     `${store.identity.name}: ${copy.heading}`,
