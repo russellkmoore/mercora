@@ -10,11 +10,11 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Token Contract & Sweep
 
-- [ ] **TOKEN-01**: A ~18-token contract (colors `primary`, `on-primary`, `surface`, `surface-elevated`, `foreground`, `muted-foreground`, `border`, `ring`, `success`, `warning`, `danger`; shape `radius-sm/md/lg`; type `font-sans`, `font-display`) is defined and mapped through `runtimeColor()` in `tailwind.config.ts`, with the hardcoded `border`/`ring` hex values deleted
-- [ ] **TOKEN-02**: The current look lives verbatim in `themes/volt-dark.css` as a `[data-theme="volt-dark"]` block; `app/layout.tsx` stamps `data-theme` on `<html>` server-side — a visual no-op relocation of the inline body vars
-- [ ] **TOKEN-03**: All storefront components and page templates use token classes; a whole-tree scan (tailwind config, inline `style={}`, SVG fill/stroke, dead shadcn-pattern classes like `bg-popover` — not just `.tsx` classNames) finds no hardcoded palette values; admin is explicitly excluded and keeps its hardcoded palette
-- [ ] **TOKEN-04**: `NEXT_PUBLIC_THEME_PRIMARY` is deprecated; `logoPath` stays in store-config
-- [ ] **TOKEN-05**: Before/after screenshots per route (home, category, product, cart, checkout, account, order-status) accompany each sweep PR
+- [x] **TOKEN-01**: A ~18-token contract (colors `primary`, `on-primary`, `surface`, `surface-elevated`, `foreground`, `muted-foreground`, `border`, `ring`, `success`, `warning`, `danger`; shape `radius-sm/md/lg`; type `font-sans`, `font-display`) is defined and mapped through `runtimeColor()` in `tailwind.config.ts`, with the hardcoded `border`/`ring` hex values deleted
+- [x] **TOKEN-02**: The current look lives verbatim in `themes/volt-dark.css` as a `[data-theme="volt-dark"]` block; `app/layout.tsx` stamps `data-theme` on `<html>` server-side — a visual no-op relocation of the inline body vars
+- [x] **TOKEN-03**: All storefront components and page templates use token classes; a whole-tree scan (tailwind config, inline `style={}`, SVG fill/stroke, dead shadcn-pattern classes like `bg-popover` — not just `.tsx` classNames) finds no hardcoded palette values; admin is explicitly excluded and keeps its hardcoded palette
+- [x] **TOKEN-04**: `NEXT_PUBLIC_THEME_PRIMARY` is deprecated; `logoPath` stays in store-config
+- [x] **TOKEN-05**: Before/after screenshots per route (home, category, product, cart, checkout, account, order-status) accompany each sweep PR
 
 ### Theme Mechanism
 
@@ -66,11 +66,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TOKEN-01 | Phase 5 | Pending |
-| TOKEN-02 | Phase 5 | Pending |
-| TOKEN-03 | Phase 5 | Pending |
-| TOKEN-04 | Phase 5 | Pending |
-| TOKEN-05 | Phase 5 | Pending |
+| TOKEN-01 | Phase 5 | Complete |
+| TOKEN-02 | Phase 5 | Complete |
+| TOKEN-03 | Phase 5 | Complete |
+| TOKEN-04 | Phase 5 | Complete |
+| TOKEN-05 | Phase 5 | Complete |
 | THEME-01 | Phase 6 | Pending |
 | THEME-02 | Phase 6 | Pending |
 | THEME-03 | Phase 6 | Pending |
