@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 05
 current_phase_name: Token Contract & Component Sweep
 status: executing
-stopped_at: Completed 05-04-PLAN.md
-last_updated: "2026-09-04T15:11:04.936Z"
+stopped_at: Completed 05-05-PLAN.md
+last_updated: "2026-09-04T15:26:20.252Z"
 last_activity: 2026-09-03
 last_activity_desc: Phase 05 execution started
-state_head: 2b11dd9ce64342e07e968538be1c5354c7c21500
+state_head: 0d34ce52c1e508807b955f7953d482a24541a9ed
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 12
-  completed_plans: 4
+  completed_plans: 5
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-02 after v2 milestone start)
 ## Current Position
 
 Phase: 05 (Token Contract & Component Sweep) — EXECUTING
-Plan: 5 of 12
+Plan: 6 of 12
 Status: Ready to execute
 Last activity: 2026-09-03 — Phase 05 execution started
 
@@ -71,6 +71,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P02 | 55min | 2 tasks | 5 files |
 | Phase 05 P03 | 130min | 3 tasks | 11 files |
 | Phase 05 P04 | 55min | 3 tasks | 18 files |
+| Phase 05 P05 | 50min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 05]: [Phase 05-03] StoreConfig.theme reduced to { logoPath: string } only; mode/primary/surface/surfaceElevated/foreground/mutedForeground deleted from both the type and defaults, not kept as a Phase 6 compatibility shim. — app/layout.tsx was the only reader of the colour fields anywhere in the tree (confirmed by whole-repo grep) and Task 1 already removed those reads, so a shim would just be a second, unused source of the same values.
 - [Phase 05]: [Phase 05-03] Added app/not-found.tsx to fix a regression Next's built-in notFound() fallback exposed once the body's inline style was removed. — Next's built-in 404 boundary injects an unlayered body{background:#fff} style that outranks Tailwind's @layer utilities regardless of specificity; the prior inline style always won by CSS origin priority, masking this. Reproduced in dev and production next start; reachable from real notFound() call sites (category, product, blog, account, order-status), not just the screenshot tooling.
 - [Phase 05]: [Phase 05-04] Fixed CSS-specificity regression on CategoryDisplay.tsx's sort-toggle active indicator (Rule 1) — data-[state=on]:bg-surface-elevated now legitimately outranks the page's unconditional bg-orange-500 override; marked the override !important to restore the exact prior pixel.
+- [Phase 05]: Categories dropdown panel uses bg-foreground/text-surface (main-set tokens) instead of the inverse token set, since it's not one of the four scoped inverse surfaces and both frozen values equal white/black — Satisfies both D-16 pixel-preservation and the plan's own automated no-inverse-tokens check
+- [Phase 05]: Registered two new shade-consolidation snaps S13 (Footer bg-neutral-950 to bg-surface) and S14 (mobile category-card gray/orange convergence) rather than reverting them — Both are directed by the frozen token substitution table and D-15's close-enough-snap allowance; verified via PIL pixel diff before annotating
 
 ### Pending Todos
 
@@ -121,8 +124,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T15:11:04.924Z
-Stopped at: Completed 05-04-PLAN.md
+Last session: 2026-09-04T15:26:20.237Z
+Stopped at: Completed 05-05-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 5` (or `/gsd-plan-phase 5` directly) to start Token Contract & Component Sweep
