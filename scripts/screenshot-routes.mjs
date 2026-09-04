@@ -71,10 +71,16 @@ async function resolveSitemapSlugs(baseUrl) {
   const res = await fetch(new URL("/sitemap.xml", baseUrl).href);
   if (!res.ok) throw new Error(`sitemap fetch failed: ${res.status}`);
   const xml = await res.text();
-  const urls = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
-  const product = urls.find((u) => /\/product\/[^/]+\/?$/.test(u));
-  const category = urls.find((u) => /\/category\/[^/]+\/?$/.test(u));
-  return { product, category };
+  // The sitemap emits absolute URLs built from the store's configured site URL (which may be
+  // an unconfigured placeholder in local dev), not necessarily --base-url. Only the path is
+  // meaningful here; re-resolve it against baseUrl so captures always hit the target host.
+  const paths = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => new URL(m[1]).pathname);
+  const productPath = paths.find((p) => /^\/product\/[^/]+\/?$/.test(p));
+  const categoryPath = paths.find((p) => /^\/category\/[^/]+\/?$/.test(p));
+  return {
+    product: productPath ? new URL(productPath, baseUrl).href : undefined,
+    category: categoryPath ? new URL(categoryPath, baseUrl).href : undefined,
+  };
 }
 
 function buildCoverageGrid({ productUrl, categoryUrl, baseUrl, orderId }) {
