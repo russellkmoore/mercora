@@ -5,11 +5,11 @@ milestone_name: Themeable Storefront
 current_phase: 6
 current_phase_name: Theme File Mechanism & Presets
 status: planning
-stopped_at: Phase 05 complete, ready to plan Phase 6
-last_updated: "2026-09-04T18:34:14.855Z"
+stopped_at: Phase 6 UI-SPEC approved
+last_updated: "2026-09-04T18:51:08.979Z"
 last_activity: 2026-09-04
 last_activity_desc: Phase 05 complete, transitioned to Phase 6
-state_head: d04ebbdd057a5d70e409dfd8dabfc9fcf81bba69
+state_head: 25a1508c9d36ec498ae6ef1cadcd7fdfbdf9dc4a
 progress:
   total_phases: 4
   completed_phases: 1
@@ -156,8 +156,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T18:40:00Z
-Stopped at: Phase 05 complete, ready to plan Phase 6
-Resume file: None
+Last session: 2026-09-04T18:51:08.693Z
+Stopped at: Phase 6 UI-SPEC approved
+Resume file: .planning/phases/06-theme-file-mechanism-presets/06-UI-SPEC.md
 
 Next: `/gsd-discuss-phase 6` (or `/gsd-plan-phase 6` directly) to start Theme File Mechanism & Presets
