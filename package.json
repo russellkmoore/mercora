@@ -22,6 +22,7 @@
     "predeploy:ci": "node scripts/check-deploy-config.mjs",
     "deploy:ci": "node scripts/d1-migrate.mjs --target production --apply --confirm-production && opennextjs-cloudflare deploy",
     "check:migrations": "node scripts/check-migration-safety.mjs",
+    "scan:tokens": "node scripts/scan-hardcoded-colors.mjs",
     "build:worker": "node scripts/build-with-public-env.mjs ./node_modules/.bin/opennextjs-cloudflare build",
     "clean": "rm -rf .open-next .next .wrangler/state .wrangler/public",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
