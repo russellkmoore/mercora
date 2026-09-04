@@ -102,33 +102,33 @@ export default function SubscriptionSetupReturnHandler() {
 
   if (redirect?.kind === "success" && !isLoaded) {
     return (
-      <aside className="border-b border-orange-800 bg-neutral-950 px-4 py-3 text-center text-sm text-gray-200" role="status">
+      <aside className="border-b border-info bg-surface px-4 py-3 text-center text-sm text-foreground" role="status">
         Checking your account to finish the subscription request…
       </aside>
     );
   }
   if (redirect?.kind === "success" && !currentOwner) {
     return (
-      <aside className="border-b border-orange-800 bg-neutral-950 px-4 py-3 text-center text-sm text-white" role="status">
+      <aside className="border-b border-info bg-surface px-4 py-3 text-center text-sm text-foreground" role="status">
         <span>Sign in to finish your subscription request. </span>
         <SignInButton mode="modal">
-          <button type="button" className="font-semibold text-orange-400 underline">Sign in</button>
+          <button type="button" className="font-semibold text-primary underline">Sign in</button>
         </SignInButton>
       </aside>
     );
   }
   if (workingOwner === currentOwner && currentOwner) {
     return (
-      <aside className="border-b border-orange-800 bg-neutral-950 px-4 py-3 text-center text-sm text-gray-200" role="status">
+      <aside className="border-b border-warning bg-surface px-4 py-3 text-center text-sm text-foreground" role="status">
         Finalizing your subscription request…
       </aside>
     );
   }
   if (completedOwner === currentOwner && currentOwner) {
     return (
-      <aside className="border-b border-green-800 bg-green-950 px-4 py-3 text-center text-sm text-green-100" role="status">
+      <aside className="border-b border-success bg-success/10 px-4 py-3 text-center text-sm text-success" role="status">
         Subscription request received and pending secure reconciliation.{" "}
-        <Link href="/account/subscriptions" className="font-semibold text-orange-300 underline">
+        <Link href="/account/subscriptions" className="font-semibold text-primary underline">
           View subscriptions
         </Link>
       </aside>
@@ -136,12 +136,12 @@ export default function SubscriptionSetupReturnHandler() {
   }
   if (error && (error.ownerId === null || error.ownerId === currentOwner)) {
     return (
-      <aside className="border-b border-red-800 bg-red-950 px-4 py-3 text-center text-sm text-red-100" role="alert">
+      <aside className="border-b border-danger bg-danger/10 px-4 py-3 text-center text-sm text-danger" role="alert">
         <span>{error.message}. </span>
         {error.retryable ? (
           <button
             type="button"
-            className="font-semibold text-orange-300 underline"
+            className="font-semibold text-primary underline"
             onClick={() => {
               setError(null);
               setRetry((value) => value + 1);
@@ -150,7 +150,7 @@ export default function SubscriptionSetupReturnHandler() {
             Retry finalization
           </button>
         ) : (
-          <button type="button" className="font-semibold text-orange-300 underline" onClick={() => setError(null)}>
+          <button type="button" className="font-semibold text-primary underline" onClick={() => setError(null)}>
             Dismiss
           </button>
         )}
