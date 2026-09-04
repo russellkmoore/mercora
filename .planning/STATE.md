@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 05
 current_phase_name: Token Contract & Component Sweep
 status: executing
-stopped_at: Completed 05-10-PLAN.md
-last_updated: "2026-09-04T17:27:22.811Z"
+stopped_at: Completed 05-11-PLAN.md
+last_updated: "2026-09-04T17:49:18.560Z"
 last_activity: 2026-09-03
 last_activity_desc: Phase 05 execution started
-state_head: aed5a7538ba534946a72ce4251a75f26b438e5a6
+state_head: decfb41e46cac306039702c7f5f2000030323e7d
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 12
-  completed_plans: 10
+  completed_plans: 11
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-02 after v2 milestone start)
 ## Current Position
 
 Phase: 05 (Token Contract & Component Sweep) — EXECUTING
-Plan: 11 of 12
+Plan: 12 of 12
 Status: Ready to execute
 Last activity: 2026-09-03 — Phase 05 execution started
 
@@ -77,6 +77,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P08 | 25min | 3 tasks | 13 files |
 | Phase 05 P09 | 45min | 3 tasks | 5 files |
 | Phase 05 P10 | 90min | 3 tasks | 16 files |
+| Phase 05 P11 | 20min | 3 tasks | 19 files |
 
 ## Accumulated Context
 
@@ -111,6 +112,10 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 05]: [Phase 05] [05-09] The agent chat's user bubble maps to bg-info/text-foreground per D-03, matching the existing PromotionalBanner.tsx on-colour precedent for status tokens. — D-03 names the chat bubble as one of exactly three surfaces that justify the info token's place in the contract; bg-info pairs with text-foreground everywhere else it's used.
 - [Phase 05]: [Phase 05-10] Checkout's legacy light (bg-white/text-black) panel design is normalized to the dark main-set token surface, not preserved as a fifth inverse-surface exception -- a deliberate polarity change scoped to exactly the checkout UI files, directed by Task 2's own action text.
 - [Phase 05]: [Phase 05-10] Completed-step summary boxes in CheckoutClient.tsx map to the success token, not primary, per the plan's own 'a completed step is success' instruction; confirmed by the acceptance criterion requiring danger and success as distinct tokens in that file.
+- [Phase 05]: [Phase 05-11] AccountNav.tsx's active-item requirement is satisfied by the existing hover-state token mapping (hover:border-primary), not new usePathname() active-route logic -- the component never had active/inactive differentiation, and adding one would break a test that mocks next/navigation.
+- [Phase 05]: [Phase 05-11] SubscriptionManager.tsx and GiftCardDashboard.tsx status badges are newly colour-coded onto the success/warning/danger/info quartet by meaning, directed explicitly by the plan's own action text -- both previously rendered as flat neutral chips with no status colour.
+- [Phase 05]: [Phase 05-11] app/order-status/[id]/page.tsx's dead shadcn classes and bg-white legacy panels normalize onto the dark main-set token surface (not the inverse set), following the same precedent 05-10 set for checkout -- it's not one of TOKEN-MAP section 3's four scoped inverse consumers.
+- [Phase 05]: [Phase 05-11] app/global-error.tsx maps its seven inline colours to MAIN-set getThemeTokens() fields only, avoiding RESEARCH Pitfall 4's predicted trap of pattern-matching the inverse-mapped drawers/Stripe/email consumers it sits near in CONTEXT.md.
 
 ### Pending Todos
 
@@ -141,8 +146,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T17:27:22.782Z
-Stopped at: Completed 05-10-PLAN.md
+Last session: 2026-09-04T17:49:09.621Z
+Stopped at: Completed 05-11-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 5` (or `/gsd-plan-phase 5` directly) to start Token Contract & Component Sweep
