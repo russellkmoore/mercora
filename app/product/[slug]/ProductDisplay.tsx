@@ -151,7 +151,7 @@ export default function ProductDisplay({
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12">
         {/* Image Gallery Section */}
         <div>
-          <div className="relative aspect-3/4 w-full overflow-hidden rounded bg-neutral-800">
+          <div className="relative aspect-3/4 w-full overflow-hidden rounded bg-surface-elevated">
             <Image
               src={getMediaUrl(selectedImage)}
               alt={typeof product.name === "string" ? product.name : ""}
@@ -169,7 +169,7 @@ export default function ProductDisplay({
                 key={`thumb-${index}`}
                 onClick={() => setSelectedImage(imageUrl)}
                 className={`relative h-16 w-16 shrink-0 overflow-hidden rounded border sm:h-20 sm:w-20 ${
-                  selectedImage === imageUrl ? "border-orange-500" : "border-gray-700"
+                  selectedImage === imageUrl ? "border-primary" : "border-border"
                 }`}
               >
                 <Image
@@ -190,7 +190,7 @@ export default function ProductDisplay({
           </h1>
 
           {ratingSummary ? (
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-400">
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <StarRating value={ratingSummary.average} size="sm" />
               <span>
                 {ratingSummary.average.toFixed(1)} · {ratingSummary.count} review{ratingSummary.count === 1 ? "" : "s"}
@@ -198,25 +198,25 @@ export default function ProductDisplay({
               <button
                 type="button"
                 onClick={() => setActiveTab("reviews")}
-                className="rounded-full border border-transparent px-3 py-1 text-xs font-semibold text-orange-300 transition hover:border-orange-500 hover:text-orange-200"
+                className="rounded-full border border-transparent px-3 py-1 text-xs font-semibold text-primary transition hover:border-primary hover:text-primary/90"
               >
                 Read reviews
               </button>
             </div>
           ) : (
-            <p className="mt-3 text-sm text-amber-300">Be the first to share feedback once your order is delivered.</p>
+            <p className="mt-3 text-sm text-warning">Be the first to share feedback once your order is delivered.</p>
           )}
 
           <div className="mt-6">
-            <div className="rounded-lg border border-neutral-800 bg-neutral-900">
-              <div className="flex flex-wrap border-b border-neutral-800">
+            <div className="rounded-lg border border-border bg-surface-elevated">
+              <div className="flex flex-wrap border-b border-border">
                 <button
                   type="button"
                   onClick={() => setActiveTab("details")}
                   className={`flex-1 px-4 py-3 text-sm font-semibold sm:flex-none sm:px-6 ${
                     activeTab === "details"
-                      ? "border-b-2 border-orange-500 text-white"
-                      : "text-gray-400 hover:text-white"
+                      ? "border-b-2 border-primary text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   Details
@@ -226,8 +226,8 @@ export default function ProductDisplay({
                   onClick={() => setActiveTab("reviews")}
                   className={`flex-1 px-4 py-3 text-sm font-semibold sm:flex-none sm:px-6 ${
                     activeTab === "reviews"
-                      ? "border-b-2 border-orange-500 text-white"
-                      : "text-gray-400 hover:text-white"
+                      ? "border-b-2 border-primary text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {reviewsTabLabel}
@@ -235,11 +235,11 @@ export default function ProductDisplay({
               </div>
               <div className="p-6">
                 {activeTab === "details" ? (
-                  <div className="space-y-4 text-sm text-gray-300">
+                  <div className="space-y-4 text-sm text-muted-foreground">
                     {productDescription ? (
-                      <p className="whitespace-pre-line leading-relaxed text-gray-300">{productDescription}</p>
+                      <p className="whitespace-pre-line leading-relaxed text-muted-foreground">{productDescription}</p>
                     ) : (
-                      <p className="text-sm text-gray-500">Product description coming soon.</p>
+                      <p className="text-sm text-muted-foreground">Product description coming soon.</p>
                     )}
                   </div>
                 ) : (
@@ -256,12 +256,12 @@ export default function ProductDisplay({
           <div className="mt-6 space-y-6">
             {variants.length > 1 && (
               <div>
-                <label className="mb-2 block text-sm font-medium text-white">Choose an option:</label>
+                <label className="mb-2 block text-sm font-medium text-foreground">Choose an option:</label>
                 <Select value={selectedVariantId} onValueChange={setSelectedVariantId}>
-                  <SelectTrigger className="w-full border border-neutral-700 bg-neutral-900 text-white hover:bg-neutral-800 sm:w-auto">
+                  <SelectTrigger className="w-full border border-border bg-surface-elevated text-foreground hover:bg-surface-elevated sm:w-auto">
                     <SelectValue placeholder="Select a variant" />
                   </SelectTrigger>
-                  <SelectContent className="bg-neutral-900 border border-neutral-700 text-white">
+                  <SelectContent className="bg-surface-elevated border border-border text-foreground">
                     {variants.map((variant) => {
                       const optionDisplay = variant.option_values?.map((value) => `${value.value}`).join(", ") || `Variant ${variant.id}`;
                       const priceDisplay = variant.price ? Money.fromStored(variant.price).format() : "";
@@ -270,12 +270,12 @@ export default function ProductDisplay({
                         <SelectItem
                           key={variant.id}
                           value={variant.id}
-                          className="text-white hover:bg-neutral-800 focus:bg-neutral-800"
+                          className="text-foreground hover:bg-surface-elevated focus:bg-surface-elevated"
                         >
                           <div className="flex w-full items-center justify-between">
                             <span>{optionDisplay}</span>
                             {priceDisplay && (
-                              <span className="ml-2 text-orange-400 font-semibold">{priceDisplay}</span>
+                              <span className="ml-2 text-primary font-semibold">{priceDisplay}</span>
                             )}
                           </div>
                         </SelectItem>
@@ -288,23 +288,23 @@ export default function ProductDisplay({
 
             {onSale ? (
               <div>
-                <p className="text-base text-gray-500 line-through sm:text-lg">{Money.fromMinor(compareAt!).format()}</p>
-                <p className="text-lg font-bold text-green-400 sm:text-xl">{Money.fromMinor(price).format()}</p>
-                <p className="text-xs italic text-orange-400 sm:text-sm">Limited-time offer</p>
+                <p className="text-base text-muted-foreground line-through sm:text-lg">{Money.fromMinor(compareAt!).format()}</p>
+                <p className="text-lg font-bold text-primary sm:text-xl">{Money.fromMinor(price).format()}</p>
+                <p className="text-xs italic text-primary sm:text-sm">Limited-time offer</p>
               </div>
             ) : (
-              <p className="text-lg font-semibold text-white sm:text-xl">{Money.fromMinor(price).format()}</p>
+              <p className="text-lg font-semibold text-foreground sm:text-xl">{Money.fromMinor(price).format()}</p>
             )}
 
             {selectedVariant && (
-              <p className="text-xs text-gray-500">
+              <p className={`text-xs ${available ? "text-success" : "text-warning"}`}>
                 {available ? "In stock" : "Currently unavailable"}
               </p>
             )}
 
             {available ? (
               <button
-                className="w-full rounded bg-orange-500 px-6 py-3 font-bold text-black transition hover:bg-orange-400 sm:w-auto"
+                className="w-full rounded bg-primary px-6 py-3 font-bold text-on-primary transition hover:bg-primary/90 sm:w-auto"
                 onClick={() => {
                   const productName = typeof product.name === "string" ? product.name : "";
                   const variantDisplay = selectedVariant?.option_values?.map((value) => `${value.value}`).join(", ") || "";
@@ -342,7 +342,7 @@ export default function ProductDisplay({
                 Add to Cart
               </button>
             ) : (
-              <p className="text-lg font-semibold text-orange-500 sm:text-xl">Coming soon</p>
+              <p className="text-lg font-semibold text-warning sm:text-xl">Coming soon</p>
             )}
 
             {selectedVariant?.id && subscription?.enabled ? (

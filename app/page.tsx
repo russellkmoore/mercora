@@ -53,18 +53,18 @@ export default async function HomePage() {
     .slice(0, 3);
 
   return (
-    <div className="bg-neutral-900 text-white px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
+    <div className="bg-surface text-foreground px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
       {/* Hero Section */}
       <section className="max-w-6xl mx-auto text-center mb-16 sm:mb-20">
         <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight uppercase mb-4 sm:mb-6 leading-tight">
           This Gear Powers Your Next Escape
         </h1>
-        <p className="text-gray-400 text-base sm:text-lg max-w-2xl mx-auto mb-6 sm:mb-8 px-4">
+        <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto mb-6 sm:mb-8 px-4">
           High-performance electric gear, rugged and designed for the edge of
           the map. Modular. Adaptable. Voltique.
         </p>
         <Link href="/category/featured" className="inline-block">
-          <button className="px-4 sm:px-6 py-2 sm:py-3 text-base sm:text-lg font-semibold border border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-black transition rounded">
+          <button className="px-4 sm:px-6 py-2 sm:py-3 text-base sm:text-lg font-semibold border border-primary text-primary hover:bg-primary hover:text-on-primary transition rounded">
             Shop Featured Gear
           </button>
         </Link>
