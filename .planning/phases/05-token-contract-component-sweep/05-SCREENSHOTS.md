@@ -657,3 +657,128 @@ on `/account/orders` and inside the account overview's recent-orders list, neith
 this local environment's unauthenticated capture reaches) was verified by the Task 2 commit's
 own automated checks (`grep -q -- '-info' components/OrderCard.tsx`) rather than a screenshot,
 consistent with the account-route capture gap above.
+
+## Phase-close record (05-12)
+
+This is the phase's final record: the six transactional email builders swept, the whole-tree
+scan run with no path scope for the first time, and the phase's four ROADMAP success criteria
+answered with evidence. Four parts follow: the email before/after comparison, the D-20 coverage
+roll-up across all nine sweep chunks, the criteria answered with evidence, and the S1–S11 snap
+observation register.
+
+### 1. Email before/after comparison
+
+Emails are not on the D-20 route grid (no `/cart`-style URL a Playwright script can visit) and
+have no baseline from 05-02. Genuine pre-sweep evidence instead comes from rendering every
+builder's HTML twice — once from the pre-sweep git commit (`15d3b69`, immediately before this
+plan's Task 1), once from the swept working tree — through the same fixture data and the same
+`sendEmail`-mocking harness real unit tests in this repo already use (`vi.mock('@/lib/email/sender', ...)`),
+then hashing both. HTML files and per-file SHA-256 sums live under the git-ignored
+`.screenshots/emails/{pre-sweep,post-sweep}/` (never committed, per this file's own convention).
+
+| Template | Builder | Pre-sweep SHA-256 | Post-sweep SHA-256 | What changed |
+|---|---|---|---|---|
+| Order confirmation | `lib/utils/email.ts` — `generateOrderConfirmationHTML` | `8c9e39d4…8cf5` | `763ae3e1…c9e` | Page bg `#f6f9fc`→`surfaceInverse` (`#fdfdfb`, imperceptible); card bg `#ffffff`→`surfaceInverseElevated` (`#f3f4f6`, a real light-grey-vs-white shift — see note below); body/heading text `#1e293b`→`onInverse` (`#000000`, imperceptible); muted text `#64748b`→`mutedOnInverse` (`#6b7280`, imperceptible); item-row and total-row dividers `#e2e8f0`/`#e6ebf1`→`borderInverse` (`#374151`, **S10 — visibly darker**); brand heading/total price `#f97316`→`primary` (unchanged, already the frozen value) |
+| Order status update | `lib/utils/email.ts` — `generateOrderStatusUpdateHTML` | `d53b11f0…8478` | `18af6ec7…8256` | Same base-template changes as order confirmation, plus the status colour (shown here for the `shipped` fixture): `#10b981`→`success` (`#22c55e`, a visible shift — brighter, more saturated green) and the tracking button's `color: white`→`onPrimary` (`#000000`, **S1 — the white-on-orange label flips to black**) |
+| Merchant notification | `lib/utils/email.ts` — `sendNewOrderMerchantNotification` | `eb6a21cf…dcb7` | `8e5e630b…d090` | Only styled surface is the item-row divider: `#e2e8f0`→`borderInverse` (`#374151`, **S10**) |
+| Shipping confirmation | `lib/fulfillment/shipping-email.ts` | `20153544…970c` | `41f3a14d…870c` | Same base-template changes as order confirmation (page/card/text/divider), plus the tracking-number block's card bg `#f8fafc`→`surfaceInverseElevated`, the "Track your package" button `background:#f97316`→`primary`, and the "View your order" outline button's `#c2410c` text/border→`primary` (a visible brightening, consolidating a darker orange onto the one frozen shade) |
+| Refund settled | `lib/payments/refund-email.ts` | `5bad5bbf…d64` | `ded300ba…7b2` | Body text `#1e293b`→`onInverse` (`#000000`, imperceptible) — this template has no divider or card background of its own |
+| Subscription lifecycle | `lib/subscriptions/lifecycle-email.ts` | `1ccd53da…c99` | `7ef41261…85f` | Body text `#1e293b`→`onInverse` (imperceptible); footer line `#94a3b8`→`mutedOnInverse` (`#6b7280`, a real darkening — the lightest slate footer text used anywhere in the six builders converges onto the same muted-text shade as every other template) |
+| Review status notification | `lib/utils/review-notifications.ts` | `d26e5c80…9a9e` | `b98497f3…0164` | Response/review section backgrounds `#f8fafc`→`surfaceInverseElevated`; footer line `#94a3b8`→`mutedOnInverse` (same convergence as subscription lifecycle) |
+| Footer (shared partial) | `lib/email/footer.ts` | `d3695640…60cc` | `551c0bfc…690a` | Both the postal-address line and the unsubscribe line: `#94a3b8`→`mutedOnInverse` (`#6b7280`) — this is the single change that ripples into every other template's footer region, since all six builders append `postalFooterHtml()` |
+
+**Two visible changes beyond the S10 divider darkening the plan flagged in advance:**
+
+1. **Card/section background goes from pure white to light grey** (`#ffffff`/`#f8fafc`/`#f1f5f9` → `surfaceInverseElevated` `#f3f4f6`). This is directed verbatim by `05-TOKEN-MAP.md` §3b ("card / section background (`#ffffff`, `#f1f5f9`) → `surfaceInverseElevated`") and mirrors the main token set's own surface/surface-elevated relationship (D-06: elevated is one step toward mid-grey from the base, in both directions). It was not called out as its own S-numbered snap anywhere in this manifest before now — flagging it here rather than passing it through silently.
+2. **Footer text darkens** (`#94a3b8`, a lighter slate, → `mutedOnInverse` `#6b7280`, a darker grey). Same root cause as S9 (the drawer's muted-on-inverse convergence), now extended to the one footer partial shared by all six email builders.
+
+Both are D-15 "close enough" shade consolidations, not layout/content/polarity regressions, and both are visible only on the light email surface, not the dark storefront. Recorded here for the same reason S10 was recorded in advance: a human should see the actual rendered difference rather than a hash comparison approving it silently.
+
+**Human-check evidence status:** the S10 divider darkening and the two changes above are demonstrated by the token-value diff above (every literal colour each template used before vs. after, extracted directly from the rendered HTML), not by opening the HTML files in an actual browser — no browser automation was available in this session. The `<human-check>` in this task's own `<verify>` block — "Open the pre-sweep and post-sweep order-confirmation and shipping-notification HTML side by side in a browser" — remains open per `workflow.human_verify_mode` (`end-of-phase`, this repo's default): the rendered `.html` files exist at `.screenshots/emails/pre-sweep/order-confirmation.html`, `.screenshots/emails/post-sweep/order-confirmation.html`, and the `shipping-confirmation` pair alongside them, ready to open directly in a browser for the final visual call.
+
+### 2. Coverage roll-up — every D-20 route × every chunk
+
+| Route | Chunks that captured it | Coverage | Gap / reason |
+|---|---|---|---|
+| home | `baseline`, `chunk-1-contract`, `chunk-2-ui`, `chunk-2-shell`, `chunk-3-catalog`, `chunk-3-engagement`, `chunk-4-drawers`, `chunk-4-checkout`, `chunk-5-account` | Full — 1280/390 × resting/nav-open, plus 1280 cart-open (as the page behind the drawer) in every label from `chunk-3-catalog` on | None |
+| category | same 9 labels as home | Full — same four states, plus the `dropdown-item-focused` D-17 supplementary cell (`chunk-2-ui`) | None |
+| product | same 9 labels as home | Full — same four states, plus the `subscription-plan-selected` supplementary cell (`chunk-3-engagement`) | Two labels (`chunk-4-checkout` 1280/resting, `chunk-5-account` 1280/resting+nav-open) hit the known `next/image` load-race capture flake instead of the loaded photo; each was individually pixel-diffed and re-attempted, confirmed environmental (05-09/05-10/this record), not a token regression |
+| cart (home + drawer open) | same 9 labels as home | Full — 1280/390 cart-open in every label; supplementary populated-cart manual capture (05-09) and agent-drawer-open supplementary cells (`chunk-4-drawers`) | `CartItemCard.tsx`'s own classes (quantity buttons, Remove button, item divider) aren't exercised by the tracked empty-cart grid — confirmed instead by 05-09's untracked manual capture with one item added |
+| checkout | same 9 labels as home, plus `chunk-4-checkout`'s populated-checkout walkthrough | Full for the empty-cart state (all 4 D-20 cells every label); **no capture of the actual payment step** | Stripe Elements iframe never mounted in any session this phase (`POST /api/payment-intent` 400, upstream of every file this phase touches) — verified instead by direct code read of `StripeProvider.tsx`'s `getThemeTokens()`-sourced `appearance` config and a scoped `scan:tokens` pass (05-10); the review-form validation-error state has the same class of gap (no seeded authenticated order in local dev — 05-07) |
+| account | same 9 labels as home | The unauthenticated `/account` route 404s onto `app/not-found.tsx` (S12) in **every** label from `chunk-1-contract` on — the tracked grid has never captured the authenticated account dashboard | Task 1 files (`AccountNav`, `AddressManager`, `ProfileSettings`, `GiftCardDashboard`, `SubscriptionManager`, seven `app/account/**` routes — 05-11) verified instead by `scan:tokens --path app/account` (0 violations), build/lint/typecheck, and a full read against TOKEN-MAP §2/§2b; the Clerk sign-in widget supplementary cell (`chunk-5-account`, 05-11) is the only authenticated-adjacent surface actually screenshotted |
+| order-status | `baseline` through `chunk-5-account` — all MISSING | Zero captures across the whole phase | Local D1 seed has no orders in every session this phase ran in; every chunk from 05-02 on recorded the same `--allow-missing` gap. Coverage rests on code reads: `app/order-status/[id]/page.tsx` verified against TOKEN-MAP §2/§2b (05-11) confirms all five dead shadcn classes replaced with real tokens, and `scan:tokens --path app/order-status` reports 0 violations |
+| blog-index / blog-post / cms-page | `pre-chunk-3-content` (genuine pre-sweep, captured from a second dev server on commit `4fc3e04`), `chunk-3-content` | Full — 1280/390 resting for all three routes | Not part of the standard D-20 seven-route grid; added via `--include-content` (05-08) specifically to cover the CMS/blog surfaces D-08's sweep boundary includes. No `nav-open` or other interactive state captured for these three — out of the D-20 spec, not a gap against it |
+| transactional emails (6 builders) | This plan only (05-12) — not reachable by `screenshot:routes` at all | See Part 1 above | Not a D-20 route; own before/after evidence given in Part 1 |
+
+**Overall D-20 grid completion:** 6 of 7 routes have full resting/nav-open coverage at both viewports across all nine tracked chunk labels; `order-status` has zero captures for the entire phase (environment-limited, not code-limited) and `checkout`/`product`'s authenticated/loaded-content states have partial gaps documented above with their own evidentiary substitutes (code reads, scoped scans, or untracked manual captures). No cell in this record is marked covered without either a captured hash or an explicitly named substitute-evidence trail.
+
+### 3. ROADMAP Phase 5 success criteria — answered with evidence
+
+**Criterion 1** — *"The site renders identically to before the sweep — verified with before/after screenshots per route... with `themes/volt-dark.css` live... and `data-theme` stamped on `<html>` server-side."*
+
+TRUE, with the intentional shade-consolidation snaps (S1–S16) as the only deviations, every one traced to its root cause and none touching layout, content, or polarity. Evidence: the coverage roll-up in Part 2 above; `app/layout.tsx` stamps `data-theme="volt-dark"` server-side (05-03, unchanged since); `themes/volt-dark.css` holds the live `[data-theme="volt-dark"]` block (confirmed by the contract check below).
+
+**Criterion 2** — *"`tailwind.config.ts` maps all ~18 tokens through `runtimeColor()`, with the hardcoded `border`/`ring` hex values deleted."*
+
+TRUE. `mise exec -- npm run build` confirms the config compiles; the contract check below confirms `tailwind.config.ts` contains exactly 17 `runtimeColor("--store-` calls (the frozen contract grew from the ROADMAP's original "~18" estimate to the locked 17-colour + 4-radius + 2-font = 23-token contract per D-01) and zero hex literals of any kind.
+```
+$ /usr/bin/grep -c 'runtimeColor("--store-' tailwind.config.ts   # 17
+$ /usr/bin/grep -cE '#[0-9a-fA-F]{3,8}' tailwind.config.ts        # 0
+```
+
+**Criterion 3** — *"A whole-tree scan... finds zero hardcoded palette values in storefront code."*
+
+TRUE — this is the phase's headline claim, made for the first time by this plan.
+```
+$ mise exec -- npm run scan:tokens
+MANUAL-REVIEW  lib/utils/image-placeholders.ts  — ...
+MANUAL-REVIEW  lib/types/mach/Promotion.ts  — ...
+[scan-tokens] 0 violations
+```
+Exactly two manual-review rows print (the named-file exceptions from TOKEN-MAP §6), confirming the registry was neither quietly emptied nor grown — the zero-violation result is not silent about what it could not see.
+
+**Criterion 4** — *"`NEXT_PUBLIC_THEME_PRIMARY` no longer exists in the codebase; `logoPath` still resolves via store-config unchanged."*
+
+TRUE.
+```
+$ /usr/bin/grep -rn 'NEXT_PUBLIC_THEME_PRIMARY' app components lib scripts tests docs --include='*.ts' --include='*.tsx' --include='*.mjs' --include='*.md'
+# 0 matches
+```
+The variable was removed in 05-03; this plan's whole-tree grep (widened beyond 05-03's own narrower check) confirms it never resurfaced across the eight remaining sweep chunks. `getStoreConfig().theme.logoPath` still resolves to `/volt.png` (unchanged since 05-03; no later chunk touched `lib/store-config.ts`).
+
+**Contract-intact check (holds all nine sweep chunks accountable, not just this plan):**
+```
+$ test "$(grep -c 'runtimeColor("--store-' tailwind.config.ts)" -eq 17 \
+  && test "$(grep -cE '#[0-9a-fA-F]{3,8}' tailwind.config.ts)" -eq 0 \
+  && test "$(grep -c '^\s*--store-' themes/volt-dark.css)" -eq 23 \
+  && echo "contract-intact"
+contract-intact
+```
+The frozen 23-token contract (D-01) is unchanged since 05-03: 17 colour tokens, 4 radius tokens, 2 font tokens, none renamed or dropped across nine sweep chunks.
+
+**Full green build:**
+```
+$ mise exec -- npm run test        # 244 test files / 1882 tests passed
+$ mise exec -- npm run typecheck   # clean
+$ mise exec -- npm run lint        # 0 errors, 52 pre-existing warnings (unchanged baseline since 05-03)
+$ mise exec -- npm run build       # exit 0, "Compiled successfully"
+```
+
+### 4. S1–S11 snap register — observed or not, and where
+
+| ID | Snap | Observed in a capture? | Where |
+|----|------|------------------------|-------|
+| S1 | `on-primary`=`#000000`, white-on-orange labels flip to black | **Yes** | `chunk-3-engagement` supplementary cell `product/1280/subscription-plan-selected` (05-07) explicitly confirms the Subscribe CTA's `bg-primary/text-on-primary` treatment renders correctly; also newly confirmed in this plan's own email before/after comparison (Part 1: the shipped-status tracking button's label flips from `color: white` to `onPrimary`/`#000000`) |
+| S2 | `border`=`#404040` | **Yes** | `chunk-3-content` (05-08): `blog-index`/`blog-post` pixel-diff traces tag-pill and card borders from `border-neutral-800` (`#262626`) to `border-border` (`#404040`) explicitly |
+| S3 | `ring`=`#404040` | **No** | The only ring-related capture in this manifest (`chunk-2-ui` D-17 supplementary, `checkout/1280/discount-input-invalid`) exercises the **danger**-coloured invalid ring (`ring-danger`), not the default `ring-ring` focus ring this snap describes. No capture in the phase shows a default-focused element. Gap, stated plainly rather than passed over. |
+| S4 | `success`=`#22c55e` | **Yes** | `chunk-3-catalog` (05-06): visual read of `product__1280__resting.png`/`category__1280__resting.png` confirms "In stock" reads `text-success` green |
+| S5 | `warning`=`#f59e0b` | **Yes** | Same `chunk-3-catalog` citation as S4: unavailable states read `text-warning` amber |
+| S6 | `danger`=`#ef4444` | **Yes, live-rendered but not statically captured** | `chunk-4-checkout` supplementary walkthrough (05-10): the `bg-danger/10 border-danger text-danger` error banner "rendered exactly as intended" during a real scripted checkout session — not a saved screenshot (the walkthrough was interrupted downstream by an unrelated pricing-API 400 before a static capture was taken) |
+| S7 | `info`=`#3b82f6` | **Partially** | `chunk-4-drawers` supplementary agent-drawer-open capture (05-09) describes the chat bubble's `info`-token treatment, but that specific capture opened the drawer without sending a message, so the bubble itself isn't pixel-visible in the saved image — the description is a code-level confirmation riding along with a capture of the same surface, not a bubble-showing screenshot. The order-status "processing" blue and the promotional-banner info variant have no capture evidence anywhere in this manifest. |
+| S8 | `surface-inverse-elevated`=`#f3f4f6` | **Yes** | `chunk-4-drawers` (05-09): cart drawer quantity-control background pixel-diff |
+| S9 | `muted-on-inverse`=`#6b7280` | **Yes** | `chunk-4-drawers` (05-09): cart empty-state copy pixel-diff; also newly confirmed in this plan's email footer comparison (Part 1) |
+| S10 | `border-inverse`=`#374151` | **Yes** | `chunk-4-drawers` (05-09): cart panel border/divider pixel-diff; also this plan's own email before/after comparison (Part 1) — the divider darkening across all six builders, the visible effect the plan flagged in advance |
+| S11 | `global-error.tsx` button → base `primary` | **No** | `global-error.tsx` only renders on an unhandled exception and is not reachable via the D-20 route grid or any scripted walkthrough. 05-11 verified it by code read (`app/global-error.tsx` maps its seven inline colours to MAIN-set `getThemeTokens()` fields) and a scoped `scan:tokens` pass, not a screenshot. No capture exists; none is claimed. |
+
+**Honest summary:** 8 of 11 snaps (S1, S2, S4, S5, S6, S8, S9, S10) have direct capture or live-render evidence naming the exact chunk; S7 has partial evidence (surface confirmed, bubble pixel not captured); S3 and S11 have no capture evidence at all in this phase and are recorded as gaps rather than claimed covered.
+
