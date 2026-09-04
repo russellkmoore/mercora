@@ -36,6 +36,9 @@ jobs:
         if: github.event_name == 'pull_request'
         run: npm run check:migrations -- --base ${{ github.event.pull_request.base.sha }}
 
+      - name: Check theme manifest freshness
+        run: npm run build:themes:check
+
       - name: Lint
         run: npm run lint
 

@@ -7,7 +7,7 @@
     "node": ">=24.18.1 <25"
   },
   "scripts": {
-    "predev": "node scripts/db-local-ensure.mjs",
+    "predev": "node scripts/build-themes.mjs && node scripts/db-local-ensure.mjs",
     "dev": "next dev --turbopack",
     "build": "next build --webpack",
     "start": "next start",
@@ -24,7 +24,9 @@
     "check:migrations": "node scripts/check-migration-safety.mjs",
     "scan:tokens": "node scripts/scan-hardcoded-colors.mjs",
     "screenshot:routes": "node scripts/screenshot-routes.mjs",
-    "build:worker": "node scripts/build-with-public-env.mjs ./node_modules/.bin/opennextjs-cloudflare build",
+    "build:themes": "node scripts/build-themes.mjs",
+    "build:themes:check": "node scripts/build-themes.mjs --check",
+    "build:worker": "node scripts/build-themes.mjs && node scripts/build-with-public-env.mjs ./node_modules/.bin/opennextjs-cloudflare build",
     "clean": "rm -rf .open-next .next .wrangler/state .wrangler/public",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "db:prepare:local": "node scripts/db-local-ensure.mjs",
