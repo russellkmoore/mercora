@@ -331,3 +331,50 @@ diff against `chunk-3-catalog`.
 | product | 1280 | reviews-scrolled | .screenshots/chunk-3-engagement/product__1280__reviews-scrolled.png | 7bfaab85f5a9f60b12b659d09d1df35ff5d0489a1e24054779fb50d4186b9608 | supplementary -- Reviews tab opened; rating-summary card confirms S16 (star fill now primary orange, unfilled muted-foreground) and the elevated-surface/foreground/muted-foreground/border tokens from this plan's Task 1 sweep |
 | product | 1280 | review-form-validation-error | - | - | MISSING -- ReviewForm.tsx only renders inside an authenticated order's line item (components/OrderCard.tsx, reached via /account/orders), not on the product route; this local dev environment has no authenticated Clerk session and no seeded delivered order, the same class of gap as the order-status MISSING rows documented since 05-02. Task 1's acceptance criteria already confirmed via grep that ReviewForm.tsx references both the danger and success tokens (see 05-07-SUMMARY.md); this row records that the live-render screenshot could not be captured in this environment |
 | product | 1280 | subscription-plan-selected | .screenshots/chunk-3-engagement/product__1280__subscription-plan-selected.png | 0228794ce3504a51dccadf7b255f74be9dab97ba78ae181501535ee5aa7f2cb0 | supplementary -- Subscribe section with its default-selected plan showing ($29.99/every month, from the 2 synthetic plans above); confirms the section's border-primary/70 accent, the CTA's bg-primary/text-on-primary treatment, and the elevated-surface delivery-schedule select all render correctly; no second plan card exists to contrast against since plan choice here is a native `<select>` dropdown, not a card grid (see 05-07-SUMMARY.md decisions) |
+
+## Label: `chunk-3-content`
+
+Three cells outside the D-20 seven-route grid (05-08): the CMS block dispatcher (`/about`,
+resolving through `app/[slug]/PageRenderer.tsx` → `PageHero` + `StoryBody` + `PageCta`) and
+the two blog surfaces (`/blog`, `/blog/<slug>`). No baseline existed for these routes before
+this plan, so a genuine pre-state capture (`pre-chunk-3-content`, below) was taken from a git
+worktree checked out at `4fc3e04` (the commit immediately before this plan's Task 1), running a
+second local dev server on port 3001 against the same local D1 database. A synthetic
+local-only `blog_posts` row (`dialing-in-your-first-overnight-pack-dev`) was inserted directly
+via `wrangler d1 execute --local` so `/blog` and a real post both had content to render — this
+project's local dev seed carries zero blog posts otherwise. The row lives only in the
+gitignored `.wrangler/` state, not in any tracked seed file, matching the local-only-fixture
+precedent 05-06/05-07 already established. `scripts/screenshot-routes.mjs` gained an opt-in
+`--include-content` flag (Rule 3 — the script had no concept of blog/CMS routes at all before
+this plan, which blocked Task 3 outright) that adds these three routes as additive cells; every
+other chunk's default seven-route grid and captured-cell count is unaffected since the flag is
+off unless passed explicitly.
+
+Both `pre-chunk-3-content` and `chunk-3-content` were captured with the identical script,
+manifest, and `--include-content` flag — only the tree behind the dev server differed. Every
+differing cell below was PIL-diffed (`ImageChops.difference` bbox + 15 random differing-pixel
+samples) against its `pre-chunk-3-content` counterpart.
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| blog-index | 1280 | resting | .screenshots/chunk-3-content/blog-index__1280__resting.png | f98914b2e5e1b16baaff75f9601d0104adc21b73260d337ffbeef72d59dbcd41 | differs from pre-state (hash e685b7eb...); every sampled pixel traces to `text-orange-400`→`text-primary` (identical `#f97316` hex; antialiasing-only variance) on the tag pills and post title, and `border-neutral-800`(`#262626`)→`border-border`(`#404040`) on the tag pills and post card, the exact TOKEN-MAP §2 mapping already established. No unregistered change. |
+| blog-index | 390 | resting | .screenshots/chunk-3-content/blog-index__390__resting.png | 0de6487543a6315fc28dce7d647566d2a1047d9fecdd8b375078baabb7d584b0 | differs from pre-state (hash 5e0d9970...); same two root causes as the 1280 cell above. |
+| blog-post | 1280 | resting | .screenshots/chunk-3-content/blog-post__1280__resting.png | 411e39541477f5e878c6217cce69029eaa0bf201b96af78e6ec9b0b2c37a6564 | differs from pre-state (hash 3ce55804...); sampled pixels trace to `text-neutral-300`(`#d4d4d4`, rgb 212,212,212)→`text-muted-foreground`(`#a3a3a3`, rgb 163,163,163) on the byline and excerpt paragraphs, `border-neutral-800`→`border-border` on the related-posts card, and `text-orange-400`→`text-primary` (identical hex) on the "← Blog" link. All three are direct TOKEN-MAP §2 mappings from this plan's Task 2 sweep. No unregistered change. |
+| blog-post | 390 | resting | .screenshots/chunk-3-content/blog-post__390__resting.png | f9f19cf4f440576f578e8b7178f97cd3efa083a3df80df83c4bf3fc02e2a344d | differs from pre-state (hash 3bc30419...); same root causes as the 1280 cell above. |
+| cms-page | 1280 | resting | .screenshots/chunk-3-content/cms-page__1280__resting.png | 263126a426af6d8929c189aaaf426a260c227318cce6662bb7180d6c4c47496e | differs from pre-state (hash 75d59d04...); single root cause, isolated by `ImageChops.difference` bbox to the `PageHero` band only: `bg-neutral-950`(`#0a0a0a`, rgb 10,10,10)→`bg-surface`(`#000000`, rgb 0,0,0), the identical near-black consolidation already registered as snap S13 for `Footer.tsx`. Not a new snap; same mapping applied to a second file. |
+| cms-page | 390 | resting | .screenshots/chunk-3-content/cms-page__390__resting.png | 28b9507e9ff317cf3c8158175103514e14ada9c47b593d2fae4c64b4f7381cf1 | differs from pre-state (hash a7161f69...); same S13-pattern root cause as the 1280 cell above. |
+
+## Label: `pre-chunk-3-content`
+
+Genuine pre-sweep baseline for the three cells above, captured from a git worktree at commit
+`4fc3e04` (immediately before this plan's Task 1 commit) via a second local dev server on port
+3001. Not a fabrication: a real checkout of the pre-sweep tree was rendered and screenshotted.
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| blog-index | 1280 | resting | .screenshots/pre-chunk-3-content/blog-index__1280__resting.png | e685b7eb78359651c2add9100ec51d092627d75a5edd6244874dfa7b36757855 | pre-sweep baseline for chunk-3-content's blog-index/1280 cell |
+| blog-index | 390 | resting | .screenshots/pre-chunk-3-content/blog-index__390__resting.png | 5e0d9970622f3a8997af3ef445c231a2a16dd2272b7f2e891dc30505aed4f101 | pre-sweep baseline for chunk-3-content's blog-index/390 cell |
+| blog-post | 1280 | resting | .screenshots/pre-chunk-3-content/blog-post__1280__resting.png | 3ce558044e03d2f2d22c7a9e72551398d6a5537193af60a76b02dd65ef18e630 | pre-sweep baseline for chunk-3-content's blog-post/1280 cell |
+| blog-post | 390 | resting | .screenshots/pre-chunk-3-content/blog-post__390__resting.png | 3bc304198ed5de06554be136ff6ef965814182fec4acd943a117fc7a98863f16 | pre-sweep baseline for chunk-3-content's blog-post/390 cell |
+| cms-page | 1280 | resting | .screenshots/pre-chunk-3-content/cms-page__1280__resting.png | 75d59d044be3580746b5077cd55e84ac96b7ebf61dfd7e1cba5ab22d443475c3 | pre-sweep baseline for chunk-3-content's cms-page/1280 cell |
+| cms-page | 390 | resting | .screenshots/pre-chunk-3-content/cms-page__390__resting.png | a7161f69ac745bfef610b89c7f42c51ece1cd11e9f747c4357fc9306d3a547ae | pre-sweep baseline for chunk-3-content's cms-page/390 cell |
