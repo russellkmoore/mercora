@@ -153,6 +153,6 @@ export default function CategoryDisplay({ products }: CategoryDisplayProps) {
  */
 function toggleClass(active: boolean): string {
   return `border-neutral-700 h-auto leading-none text-xs font-semibold px-2 py-2 hover:bg-orange-400/20 transition-colors duration-200 ${
-    active ? "bg-orange-500 text-black" : ""
+    active ? "!bg-orange-500 !text-black" : ""
   }`;
 }
