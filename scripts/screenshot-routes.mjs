@@ -27,13 +27,23 @@ const ORDER_ID = flag("--order-id");
 const ALLOW_MISSING = hasFlag("--allow-missing");
 const ALLOW_REMOTE = hasFlag("--allow-remote");
 const MANIFEST_PATH = flag("--manifest", ".planning/phases/05-token-contract-component-sweep/05-SCREENSHOTS.md");
+// Opt-in only (05-08): adds three cells outside the standard D-20 seven-route grid — the
+// blog index, one blog post, and one CMS-authored page. Off by default so every other
+// chunk's captured-cell count stays exactly what D-20 and prior manifest entries expect.
+const INCLUDE_CONTENT = hasFlag("--include-content");
 
 if (!LABEL) {
   console.error(
-    "Usage: node scripts/screenshot-routes.mjs --label <name> [--base-url <url>] [--order-id <id>] [--allow-missing] [--allow-remote] [--manifest <path>]",
+    "Usage: node scripts/screenshot-routes.mjs --label <name> [--base-url <url>] [--order-id <id>] [--allow-missing] [--allow-remote] [--manifest <path>] [--include-content]",
   );
   process.exit(1);
 }
+
+// Top-level app routes that are never a CMS-authored page slug, so the sitemap's single-segment
+// page paths (/about, /privacy-policy, ...) can be told apart from the app's own reserved routes.
+const RESERVED_TOP_LEVEL_SLUGS = new Set([
+  "blog", "category", "product", "checkout", "account", "admin", "api", "media", "order-status", "orders",
+]);
 
 const OUTPUT_ROOT = ".screenshots";
 
@@ -77,13 +87,20 @@ async function resolveSitemapSlugs(baseUrl) {
   const paths = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => new URL(m[1]).pathname);
   const productPath = paths.find((p) => /^\/product\/[^/]+\/?$/.test(p));
   const categoryPath = paths.find((p) => /^\/category\/[^/]+\/?$/.test(p));
+  const blogPostPath = paths.find((p) => /^\/blog\/[^/]+\/?$/.test(p));
+  const cmsPagePath = paths.find((p) => {
+    const match = /^\/([^/]+)\/?$/.exec(p);
+    return match && !RESERVED_TOP_LEVEL_SLUGS.has(match[1]);
+  });
   return {
     product: productPath ? new URL(productPath, baseUrl).href : undefined,
     category: categoryPath ? new URL(categoryPath, baseUrl).href : undefined,
+    blogPost: blogPostPath ? new URL(blogPostPath, baseUrl).href : undefined,
+    cmsPage: cmsPagePath ? new URL(cmsPagePath, baseUrl).href : undefined,
   };
 }
 
-function buildCoverageGrid({ productUrl, categoryUrl, baseUrl, orderId }) {
+function buildCoverageGrid({ productUrl, categoryUrl, blogPostUrl, cmsPageUrl, includeContent, baseUrl, orderId }) {
   // route key -> { url, states }. `url: null` means the route's prerequisite could not
   // be resolved; every (viewport, state) pair for that route becomes a MISSING row.
   const routes = {
@@ -110,6 +127,22 @@ function buildCoverageGrid({ productUrl, categoryUrl, baseUrl, orderId }) {
       missingReason: orderId ? null : "no order id available (pass --order-id, or local D1 seed has no orders)",
     },
   };
+
+  if (includeContent) {
+    // Outside the D-20 seven-route grid (05-08): the CMS block dispatcher and blog surfaces
+    // have no baseline of their own, so these three cells are additive, not a grid change.
+    routes["blog-index"] = { url: new URL("/blog", baseUrl).href, states: ["resting"], missingReason: null };
+    routes["blog-post"] = {
+      url: blogPostUrl ?? null,
+      states: ["resting"],
+      missingReason: blogPostUrl ? null : "no blog post slug resolved from /sitemap.xml",
+    };
+    routes["cms-page"] = {
+      url: cmsPageUrl ?? null,
+      states: ["resting"],
+      missingReason: cmsPageUrl ? null : "no CMS page slug resolved from /sitemap.xml",
+    };
+  }
 
   const cells = [];
   for (const [route, def] of Object.entries(routes)) {
@@ -143,8 +176,17 @@ async function main() {
     );
   }
 
-  const { product: productUrl, category: categoryUrl } = await resolveSitemapSlugs(BASE_URL);
-  const cells = buildCoverageGrid({ productUrl, categoryUrl, baseUrl: BASE_URL, orderId: ORDER_ID });
+  const { product: productUrl, category: categoryUrl, blogPost: blogPostUrl, cmsPage: cmsPageUrl } =
+    await resolveSitemapSlugs(BASE_URL);
+  const cells = buildCoverageGrid({
+    productUrl,
+    categoryUrl,
+    blogPostUrl,
+    cmsPageUrl,
+    includeContent: INCLUDE_CONTENT,
+    baseUrl: BASE_URL,
+    orderId: ORDER_ID,
+  });
 
   const outDir = `${OUTPUT_ROOT}/${LABEL}`;
   mkdirSync(outDir, { recursive: true });
