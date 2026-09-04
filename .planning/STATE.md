@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 05
 current_phase_name: Token Contract & Component Sweep
 status: executing
-stopped_at: Completed 05-02-PLAN.md
-last_updated: "2026-09-04T06:13:04.516Z"
+stopped_at: Completed 05-03-PLAN.md
+last_updated: "2026-09-04T14:46:33.532Z"
 last_activity: 2026-09-03
 last_activity_desc: Phase 05 execution started
-state_head: e1db968f6df609a6c7ee5287590d497506167613
+state_head: 34525eaaf3ae0bc209027350f0598c3e19ee24b4
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 12
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-02 after v2 milestone start)
 ## Current Position
 
 Phase: 05 (Token Contract & Component Sweep) — EXECUTING
-Plan: 3 of 12
+Plan: 4 of 12
 Status: Ready to execute
 Last activity: 2026-09-03 — Phase 05 execution started
 
@@ -69,6 +69,7 @@ Progress: [░░░░░░░░░░] 0%
 |------|----------|-------|-------|
 | Phase 05 P01 | 20min | 2 tasks | 7 files |
 | Phase 05 P02 | 55min | 2 tasks | 5 files |
+| Phase 05 P03 | 130min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,9 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 05]: MANUAL_REVIEW files are excluded from scanning entirely (not just flagged inline), each printed with a written reason on every run. — Matches TOKEN-MAP §6's framing of them as named-file exceptions with a printed reason, so a future 0-violations result never silently omits content the scanner never looked at.
 - [Phase 05]: The screenshot harness's 'open' interactive state for every non-cart route is the header nav (desktop dropdown / mobile sheet); only two selectors (nav trigger, cart trigger) cover the whole coverage grid.
 - [Phase 05]: Local D1 dev seed (predev/seed-dev.sql) does not provide catalog data; data/d1/seed.sql is the documented but currently broken source (bad bulk-insert row) — screenshot baseline used a minimal local-only D1 fixture instead of fixing the unrelated seed file.
+- [Phase 05]: [Phase 05-03] Adopted all four discretionary volt-dark token values as derived: on-primary=black, border/ring=neutral-700 (#404040), warning=amber-500 (#f59e0b), border-inverse=gray-700 (#374151). — User decision (Task 0, adopt-all). border-inverse routes both D-05 (drawer edges) and D-10 (email dividers) to the same value, so transactional email dividers will visibly darken once plan 05-12 lands — a known, accepted consequence, recorded as the place to reverse course if it reads badly.
+- [Phase 05]: [Phase 05-03] StoreConfig.theme reduced to { logoPath: string } only; mode/primary/surface/surfaceElevated/foreground/mutedForeground deleted from both the type and defaults, not kept as a Phase 6 compatibility shim. — app/layout.tsx was the only reader of the colour fields anywhere in the tree (confirmed by whole-repo grep) and Task 1 already removed those reads, so a shim would just be a second, unused source of the same values.
+- [Phase 05]: [Phase 05-03] Added app/not-found.tsx to fix a regression Next's built-in notFound() fallback exposed once the body's inline style was removed. — Next's built-in 404 boundary injects an unlayered body{background:#fff} style that outranks Tailwind's @layer utilities regardless of specificity; the prior inline style always won by CSS origin priority, masking this. Reproduced in dev and production next start; reachable from real notFound() call sites (category, product, blog, account, order-status), not just the screenshot tooling.
 
 ### Pending Todos
 
@@ -115,8 +119,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T06:13:04.504Z
-Stopped at: Completed 05-02-PLAN.md
+Last session: 2026-09-04T14:46:33.519Z
+Stopped at: Completed 05-03-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 5` (or `/gsd-plan-phase 5` directly) to start Token Contract & Component Sweep
