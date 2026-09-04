@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 05
 current_phase_name: Token Contract & Component Sweep
 status: executing
-stopped_at: Completed 05-09-PLAN.md
-last_updated: "2026-09-04T17:01:31.787Z"
+stopped_at: Completed 05-10-PLAN.md
+last_updated: "2026-09-04T17:27:22.811Z"
 last_activity: 2026-09-03
 last_activity_desc: Phase 05 execution started
-state_head: 287a0adbe4f437a18274337c1d259759c8e43cd5
+state_head: aed5a7538ba534946a72ce4251a75f26b438e5a6
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 12
-  completed_plans: 9
+  completed_plans: 10
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-02 after v2 milestone start)
 ## Current Position
 
 Phase: 05 (Token Contract & Component Sweep) — EXECUTING
-Plan: 10 of 12
+Plan: 11 of 12
 Status: Ready to execute
 Last activity: 2026-09-03 — Phase 05 execution started
 
@@ -76,6 +76,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P07 | 55min | 3 tasks | 6 files |
 | Phase 05 P08 | 25min | 3 tasks | 13 files |
 | Phase 05 P09 | 45min | 3 tasks | 5 files |
+| Phase 05 P10 | 90min | 3 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -108,6 +109,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 05]: [Phase 05] [05-08] scripts/screenshot-routes.mjs gained an opt-in --include-content flag (Rule 3 auto-fix) to resolve blog/CMS slugs, rather than changing the default seven-route grid. — The script had no concept of blog/CMS routes despite the plan's read_first describing it as already handling them; an opt-in flag avoids changing every other chunk's expected captured-cell count.
 - [Phase 05]: [Phase 05] [05-09] The Tailwind colour key border-inverse generates the border-color class border-border-inverse, not border-inverse -- caught via screenshot pixel-diff, not by scan/build/lint/typecheck. — border-inverse alone generates no CSS rule and silently falls back to currentColor; only a screenshot comparison against the registered S10 snap value exposed the wrong resulting colour.
 - [Phase 05]: [Phase 05] [05-09] The agent chat's user bubble maps to bg-info/text-foreground per D-03, matching the existing PromotionalBanner.tsx on-colour precedent for status tokens. — D-03 names the chat bubble as one of exactly three surfaces that justify the info token's place in the contract; bg-info pairs with text-foreground everywhere else it's used.
+- [Phase 05]: [Phase 05-10] Checkout's legacy light (bg-white/text-black) panel design is normalized to the dark main-set token surface, not preserved as a fifth inverse-surface exception -- a deliberate polarity change scoped to exactly the checkout UI files, directed by Task 2's own action text.
+- [Phase 05]: [Phase 05-10] Completed-step summary boxes in CheckoutClient.tsx map to the success token, not primary, per the plan's own 'a completed step is success' instruction; confirmed by the acceptance criterion requiring danger and success as distinct tokens in that file.
 
 ### Pending Todos
 
@@ -138,8 +141,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T17:01:31.760Z
-Stopped at: Completed 05-09-PLAN.md
+Last session: 2026-09-04T17:27:22.782Z
+Stopped at: Completed 05-10-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 5` (or `/gsd-plan-phase 5` directly) to start Token Contract & Component Sweep
