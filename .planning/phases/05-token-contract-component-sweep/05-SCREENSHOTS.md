@@ -34,6 +34,7 @@ entry references a snap by its identifier (S1–S11) instead of restating it.
 | S13 | `Footer.tsx`'s `bg-neutral-950` (`oklch(14.5% 0 0)` ≈ `#0a0a0a`) consolidates onto `bg-surface` (`#000000`), per 05-TOKEN-MAP.md §2's own "`bg-black`, `bg-neutral-950` → `bg-surface`" row | `--store-surface` was frozen at `#000000` in 05-03; Footer.tsx is the first file this phase sweeps that used the near-black `neutral-950` shade instead of `black`/`neutral-900`, so the ~1% per-channel convergence (10/255 → 0/255) was latent in the frozen contract and surfaces only now, on chunk-2-shell's PIL diff of `account__*` | The footer's background (and the giant background wordmark region) goes from a barely-perceptible near-black to true black; visible only on short pages where the footer sits within the captured viewport (confirmed via `ImageChops.difference` bbox isolated to the footer's y-range, y≥596 on the 1280 viewport) — a D-15 close-enough shade snap, not a regression |
 | S14 | `HeaderClient.tsx`'s mobile category cards converge several `gray-300/400` text shades onto `muted-foreground` and several `orange-400/500/600` hover/border shades onto `primary` with alpha modifiers, first visible in the `nav-open` state at 390px (the only capture state that renders the mobile Sheet's category-card content) | Per-pixel diff against `chunk-2-ui` shows ~7% of pixels differ, entirely small single-digit RGB shifts (e.g. `rgb(145,153,166)`→`rgb(155,155,155)` on anti-aliased text edges, `rgb(42,13,0)`→`rgb(43,20,4)` on orange icon edges) with no layout, content, or polarity change — verified by side-by-side visual read of `home__390__nav-open.png` (chunk-2-shell vs. chunk-2-ui, pixel-identical to the eye) | Mobile menu category cards, chevrons, and hover-adjacent borders read marginally different shades of orange/grey; the `390 nav-open` capture is identical across every route (dedup), so this single snap explains all six differing `390 nav-open` rows below |
 | S15 | `ProductCard.tsx`'s card surface (`bg-neutral-800`, `rgb(38,38,38)`) and `ProductDisplay.tsx`'s gallery well (same class) consolidate onto `bg-surface-elevated` (`rgb(23,23,23)`), per 05-TOKEN-MAP.md §2's own "`bg-neutral-900`, `bg-neutral-800` → `bg-surface-elevated`" row | Per-pixel diff against `chunk-2-shell` on `home`, `category`, `product`, and the home page visible behind the open cart drawer isolates every differing pixel to this exact 38→23 per-channel shift (or that value dimmed under the cart drawer's backdrop scrim, `19→11`), plus antialiasing bleed where card borders/text meet the changed surface — confirmed by sampling 15-20 random differing coordinates per capture, all landing on the same pair of values | Every product card's image-well background (home, category, product-thumbnail rail) and the product detail gallery well go from a slightly lighter charcoal to the standard elevated-surface shade; imperceptible at normal viewing distance, visible only in a byte-level hash diff |
+| S16 | `StarRating.tsx`'s filled-star layer (`text-yellow-400`, `rgb(253,199,0)`) consolidates onto `text-primary` (`rgb(249,115,22)`), and its unfilled-star layer (`text-neutral-600`, `rgb(82,82,82)`) consolidates onto `text-muted-foreground` (`rgb(163,163,163)`), directed explicitly by this plan's own Task 1 action ("Filled stars take the primary token; unfilled stars take muted foreground") | `StarRating.tsx` is shared by `ProductCard.tsx` (home, category, product-detail grids) and `ProductDisplay.tsx`'s own rating summary line, so the sweep of one shared component ripples into every card showing a star badge, not just `components/reviews/*`. Per-pixel diff against `chunk-3-catalog` on `home`, `category`, `product`, and the home page visible behind the open cart drawer isolates every differing pixel to these two exact colour pairs plus antialiasing bleed at the star glyph edges — confirmed by sampling 8-15 random differing coordinates per capture across six cells, all landing on one of the two pairs | Every star-rating badge (product cards on home/category/product grids, the cart-open home background, and the product detail page's own rating line) changes from gold/dark-grey stars to brand-orange/light-grey stars; a small, deliberate, and visible colour change confined to a ~60x11px badge region per card |
 
 ## Coverage notes
 
@@ -94,6 +95,32 @@ entry references a snap by its identifier (S1–S11) instead of restating it.
     "In stock"/"Coming soon" text still say the same thing — "In stock" reads green
     (`text-success`) and unavailable states read amber (`text-warning`) at both label
     resolutions; no badge changed status meaning, only the card surface shade moved.
+- `chunk-3-engagement` (05-07, the reviews and subscription-acquisition surfaces:
+  `ProductReviewsSection.tsx`, `ReviewForm.tsx`, `StarRating.tsx`,
+  `SubscriptionAcquisitionPanel.tsx`, `SubscriptionSetupReturnHandler.tsx`) diffs against
+  `chunk-3-catalog` cell-for-cell. All differing cells trace to one root cause:
+  - `home` (1280 resting, 1280 nav-open, 390 resting), `category` (1280 resting, 1280
+    nav-open, 390 resting), `product` (1280 resting, 1280 nav-open, 390 resting), and `cart`
+    (1280 cart-open, the home page visible behind the open drawer) → **S16**,
+    `StarRating.tsx`'s filled/unfilled star colours consolidating onto `text-primary` /
+    `text-muted-foreground`. `StarRating` is shared by `ProductCard.tsx`, so this Task 1
+    change ripples into every card grid, not just `components/reviews/*`. Sampled 8-15
+    random differing pixels per capture across six cells; every sample lands on one of the
+    two S16 colour pairs plus antialiasing bleed at the star glyph edges. No layout,
+    content, or rating-value change in any sampled pixel.
+  - The `390 nav-open` rows (all six, dedup) and the `checkout`/`account` cells that still
+    differ from `baseline` carry forward **S14**/**S13** unchanged (byte-identical to
+    `chunk-3-catalog`) — this plan touched none of the files those snaps trace to.
+  - `checkout`'s `resting`/`1280 nav-open` cells and `cart` `390 cart-open` are
+    byte-identical to `chunk-3-catalog`, confirming this plan changed nothing on
+    routes/states its files don't render into.
+  - Three supplementary cells beyond the standard grid (below) capture the two surfaces
+    this plan actually rewrote: the reviews rating-summary card (Reviews tab opened) and
+    the subscription Subscribe section with its default plan selected. A fourth candidate
+    cell, the review form's validation-error state, could not be captured — `ReviewForm.tsx`
+    only renders on an authenticated order's line item, which this local dev environment
+    has no Clerk session or seeded delivered order to reach (recorded MISSING with reason
+    in the supplementary table, the same class of gap as `order-status`).
 
 ## Label: `baseline`
 
@@ -256,3 +283,51 @@ entry references a snap by its identifier (S1–S11) instead of restating it.
 | order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
 | order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
 | order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+
+## Label: `chunk-3-engagement`
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| home | 1280 | resting | .screenshots/chunk-3-engagement/home__1280__resting.png | f5d499e64a4ed1403696d6186021ba12ef4535a17d6e900ccf863e2932d3680a | S16 |
+| home | 1280 | nav-open | .screenshots/chunk-3-engagement/home__1280__nav-open.png | e8cfd69ec43eb7ae5c92747d60a0d14f681edfbafc7084909d11ce9064c5855d | S16 |
+| home | 390 | resting | .screenshots/chunk-3-engagement/home__390__resting.png | 65e03c2daafd238c67b873d696686c39b36e83522febc199c325dbc3018d4850 | S16 |
+| home | 390 | nav-open | .screenshots/chunk-3-engagement/home__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | S14 |
+| category | 1280 | resting | .screenshots/chunk-3-engagement/category__1280__resting.png | 053043895c0bea61e6af3de495c72a7153e049ffe2ca2c55791e7fb29f723c86 | S16 |
+| category | 1280 | nav-open | .screenshots/chunk-3-engagement/category__1280__nav-open.png | cfeff9c49deec815dd8b3cf67bc36a2247bab1cf5b7b8b350b0af5f86f155b76 | S16 |
+| category | 390 | resting | .screenshots/chunk-3-engagement/category__390__resting.png | 3409a7c25896219a28cbed1ee3d5e9b9a8ac988433b0aadd0d0c7fe656dd3af0 | S16 |
+| category | 390 | nav-open | .screenshots/chunk-3-engagement/category__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | S14 |
+| product | 1280 | resting | .screenshots/chunk-3-engagement/product__1280__resting.png | 109f0ab02e43b3b6a42320eacf3329a8dbbf7df35b9d87c548a45a52bd63f8a0 | S16 |
+| product | 1280 | nav-open | .screenshots/chunk-3-engagement/product__1280__nav-open.png | 8636c1a88d66e61c2dbd1512520cee7b1417a858ef8188ab7a6b12b4375694ea | S16 |
+| product | 390 | resting | .screenshots/chunk-3-engagement/product__390__resting.png | 92eae83cc0e2d916c09fc5525efe566a6e150c83fdd6271fb1938ece9a718632 | S16 |
+| product | 390 | nav-open | .screenshots/chunk-3-engagement/product__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | S14 |
+| cart | 1280 | cart-open | .screenshots/chunk-3-engagement/cart__1280__cart-open.png | 22be85133f06b6c15a84a20862e9e728d0c211e25fe424ac42f4724bd7b139f8 | S16 |
+| cart | 390 | cart-open | .screenshots/chunk-3-engagement/cart__390__cart-open.png | f41cc5071ae72cd871138a26e947763e979a3d7e48c8afb9455c7202a81b615f | - |
+| checkout | 1280 | resting | .screenshots/chunk-3-engagement/checkout__1280__resting.png | b3ee30c2d3bbc6431d5843272ce46783adce50d7fe769c941006baad9fd13734 | - |
+| checkout | 1280 | nav-open | .screenshots/chunk-3-engagement/checkout__1280__nav-open.png | fd49c5d03ad38db2d8891803b286d026994ec4cdad0e21e47435df2901c568f4 | - |
+| checkout | 390 | resting | .screenshots/chunk-3-engagement/checkout__390__resting.png | 7000b26a71fa72bde119bd01b1f54f8a8d9ea269a93bef75667e82dbe9a38896 | - |
+| checkout | 390 | nav-open | .screenshots/chunk-3-engagement/checkout__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | S14 |
+| account | 1280 | resting | .screenshots/chunk-3-engagement/account__1280__resting.png | 79bbd0d305a10b34b614efea325ee2b53ca43b61471e8634759b6d8dae762caf | S13 |
+| account | 1280 | nav-open | .screenshots/chunk-3-engagement/account__1280__nav-open.png | a4016a92afc536bf04a67250f1ae20835e8002c28402bcb8b5a125bf60c03584 | S13 |
+| account | 390 | resting | .screenshots/chunk-3-engagement/account__390__resting.png | ed89750938ee8c9b3a2e63dc6cb207c74e687d63f2486f72642e629a6b2164e7 | S13 |
+| account | 390 | nav-open | .screenshots/chunk-3-engagement/account__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | S13, S14 |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+
+## Label: `chunk-3-engagement` (supplementary cells)
+
+Captured with a second, isolated dev-server run: `STORE_FEATURE_SUBSCRIPTION_ACQUISITION`,
+`STORE_FEATURE_SUBSCRIPTION_RECONCILIATION`, and `STORE_SUBSCRIPTION_TERMS_VERSION` set, plus
+two synthetic `subscription_plans` rows inserted directly into the local D1 database (`splan_dev_1`,
+`splan_dev_2` on `prod_1`/`variant_1`) for this capture only. Both are local-only fixtures inside
+the gitignored `.wrangler/` state, not part of any tracked seed file, matching the local-only-fixture
+precedent 05-06 already established for baseline capture. Kept isolated from the standard 22-cell
+grid above (captured separately, without these flags) so that grid stays a clean apples-to-apples
+diff against `chunk-3-catalog`.
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| product | 1280 | reviews-scrolled | .screenshots/chunk-3-engagement/product__1280__reviews-scrolled.png | 7bfaab85f5a9f60b12b659d09d1df35ff5d0489a1e24054779fb50d4186b9608 | supplementary -- Reviews tab opened; rating-summary card confirms S16 (star fill now primary orange, unfilled muted-foreground) and the elevated-surface/foreground/muted-foreground/border tokens from this plan's Task 1 sweep |
+| product | 1280 | review-form-validation-error | - | - | MISSING -- ReviewForm.tsx only renders inside an authenticated order's line item (components/OrderCard.tsx, reached via /account/orders), not on the product route; this local dev environment has no authenticated Clerk session and no seeded delivered order, the same class of gap as the order-status MISSING rows documented since 05-02. Task 1's acceptance criteria already confirmed via grep that ReviewForm.tsx references both the danger and success tokens (see 05-07-SUMMARY.md); this row records that the live-render screenshot could not be captured in this environment |
+| product | 1280 | subscription-plan-selected | .screenshots/chunk-3-engagement/product__1280__subscription-plan-selected.png | 0228794ce3504a51dccadf7b255f74be9dab97ba78ae181501535ee5aa7f2cb0 | supplementary -- Subscribe section with its default-selected plan showing ($29.99/every month, from the 2 synthetic plans above); confirms the section's border-primary/70 accent, the CTA's bg-primary/text-on-primary treatment, and the elevated-surface delivery-schedule select all render correctly; no second plan card exists to contrast against since plan choice here is a native `<select>` dropdown, not a card grid (see 05-07-SUMMARY.md decisions) |
