@@ -260,7 +260,7 @@ export function generateOrderConfirmationHTML(orderData: OrderData): string {
   `;
 }
 
-function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string {
+export function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string {
   const store = getStoreConfig();
   const tokens = getThemeTokens();
   // Helper function to ensure absolute URLs for images using Cloudflare Image service
@@ -289,19 +289,19 @@ function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string
 
   // Generate status-specific content
   let statusMessage = "";
-  let statusColor = "${tokens.mutedOnInverse}";
+  let statusColor = tokens.mutedOnInverse;
   let statusContent = "";
 
   switch (orderData.status) {
     case 'processing':
       statusMessage = "Your order is being processed";
-      statusColor = "${tokens.info}";
+      statusColor = tokens.info;
       statusContent = `<p style="color: ${tokens.mutedOnInverse}; font-size: 16px; line-height: 24px; margin: 0 0 16px;">We're preparing your order for shipment. You'll receive another email with tracking information once your order ships.</p>`;
       break;
 
     case 'shipped':
       statusMessage = "Your order has shipped!";
-      statusColor = "${tokens.success}";
+      statusColor = tokens.success;
       statusContent = `
         <p style="color: ${tokens.mutedOnInverse}; font-size: 16px; line-height: 24px; margin: 0 0 16px;">Great news! Your order is on its way to you.</p>
         ${orderData.carrier ? `
@@ -321,7 +321,7 @@ function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string
 
     case 'delivered':
       statusMessage = "Your order has been delivered!";
-      statusColor = "${tokens.success}";
+      statusColor = tokens.success;
       statusContent = `
         <p style="color: ${tokens.mutedOnInverse}; font-size: 16px; line-height: 24px; margin: 0 0 16px;">Your order has been successfully delivered. We hope you enjoy your purchase!</p>
         <p style="color: ${tokens.mutedOnInverse}; font-size: 14px; line-height: 20px; margin: 0 0 16px;">If you have any issues with your order, please don't hesitate to contact our support team.</p>
@@ -330,7 +330,7 @@ function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string
 
     case 'cancelled':
       statusMessage = "Your order has been cancelled";
-      statusColor = "${tokens.danger}";
+      statusColor = tokens.danger;
       statusContent = `
         <p style="color: ${tokens.mutedOnInverse}; font-size: 16px; line-height: 24px; margin: 0 0 16px;">Your order has been cancelled as requested.</p>
         ${orderData.cancellationReason ? `
@@ -344,7 +344,7 @@ function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string
 
     case 'refunded':
       statusMessage = "Your order has been refunded";
-      statusColor = "${tokens.primary}";
+      statusColor = tokens.primary;
       statusContent = `
         <p style="color: ${tokens.mutedOnInverse}; font-size: 16px; line-height: 24px; margin: 0 0 16px;">Your order has been refunded and the payment has been processed back to your original payment method.</p>
         <div style="background-color: ${tokens.surfaceInverseElevated}; border-left: 4px solid ${tokens.primary}; padding: 12px 16px; margin: 16px 0;">
