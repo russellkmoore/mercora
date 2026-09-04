@@ -4,17 +4,17 @@ milestone: v2
 milestone_name: Themeable Storefront
 current_phase: 05
 current_phase_name: Token Contract & Component Sweep
-status: executing
-stopped_at: Completed 05-11-PLAN.md
-last_updated: "2026-09-04T17:49:18.560Z"
+status: verifying
+stopped_at: Completed 05-12-PLAN.md
+last_updated: "2026-09-04T18:12:41.397Z"
 last_activity: 2026-09-03
 last_activity_desc: Phase 05 execution started
-state_head: decfb41e46cac306039702c7f5f2000030323e7d
+state_head: 29f47595acfb924a5806953f29220b7e7fa386b0
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
   percent: 0
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-09-02 after v2 milestone start)
 
 Phase: 05 (Token Contract & Component Sweep) — EXECUTING
 Plan: 12 of 12
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-03 — Phase 05 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -78,6 +78,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P09 | 45min | 3 tasks | 5 files |
 | Phase 05 P10 | 90min | 3 tasks | 16 files |
 | Phase 05 P11 | 20min | 3 tasks | 19 files |
+| Phase 05 P12 | 95min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -116,6 +117,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 05]: [Phase 05-11] SubscriptionManager.tsx and GiftCardDashboard.tsx status badges are newly colour-coded onto the success/warning/danger/info quartet by meaning, directed explicitly by the plan's own action text -- both previously rendered as flat neutral chips with no status colour.
 - [Phase 05]: [Phase 05-11] app/order-status/[id]/page.tsx's dead shadcn classes and bg-white legacy panels normalize onto the dark main-set token surface (not the inverse set), following the same precedent 05-10 set for checkout -- it's not one of TOKEN-MAP section 3's four scoped inverse consumers.
 - [Phase 05]: [Phase 05-11] app/global-error.tsx maps its seven inline colours to MAIN-set getThemeTokens() fields only, avoiding RESEARCH Pitfall 4's predicted trap of pattern-matching the inverse-mapped drawers/Stripe/email consumers it sits near in CONTEXT.md.
+- [Phase 05]: [Phase 05] [Phase 05-12] Card/section email backgrounds map to surfaceInverseElevated (#f3f4f6), not surfaceInverse -- a real visual change (white card becomes light grey) beyond the S10 divider darkening the plan flagged in advance, per TOKEN-MAP §3b's literal table; documented explicitly in the phase-close record.
+- [Phase 05]: [Phase 05] [Phase 05-12] Phase 5 closes with a clean whole-tree scan:tokens (0 violations, 2 manual-review rows), the 23-token contract intact across all nine sweep chunks, and NEXT_PUBLIC_THEME_PRIMARY confirmed absent tree-wide -- all four ROADMAP success criteria met with command evidence in 05-SCREENSHOTS.md's phase-close section.
 
 ### Pending Todos
 
@@ -146,8 +149,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T17:49:09.621Z
-Stopped at: Completed 05-11-PLAN.md
+Last session: 2026-09-04T18:12:28.606Z
+Stopped at: Completed 05-12-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 5` (or `/gsd-plan-phase 5` directly) to start Token Contract & Component Sweep
