@@ -1,0 +1,14 @@
+.outside-before {
+  color: #123456;
+}
+
+/* gsd:scan-ignore-start */
+.inside {
+  color: #abcdef;
+  background: rgb(10 10 10);
+}
+/* gsd:scan-ignore-end */
+
+.outside-after {
+  background: rgb(20 20 20);
+}
