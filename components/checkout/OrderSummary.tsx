@@ -67,7 +67,7 @@ export default function OrderSummary({
   } : null;
 
   return (
-    <div className="bg-white text-black p-6 rounded-xl">
+    <div className="bg-surface-elevated text-foreground p-6 rounded-xl">
       <h2 className="text-lg font-semibold mb-4">Order Summary</h2>
 
       <div className="space-y-1">
@@ -108,13 +108,13 @@ export default function OrderSummary({
       
       {/* Cart Discounts */}
       {!authoritative && cartDiscounts.map((discount) => (
-        <div key={discount.promotionId} className="flex justify-between text-sm text-green-600">
+        <div key={discount.promotionId} className="flex justify-between text-sm text-success">
           <span>{discount.displayName}</span>
           <span>-{Money.fromStored(discount.amount).format()}</span>
         </div>
       ))}
       {authoritative && !authoritative.discount.isZero() && (
-        <div className="flex justify-between text-sm text-green-600">
+        <div className="flex justify-between text-sm text-success">
           <span>Discount</span>
           <span>-{authoritative.discount.format()}</span>
         </div>
@@ -127,7 +127,7 @@ export default function OrderSummary({
       
       {/* Shipping Discounts */}
       {!authoritative && shippingDiscounts.map((discount) => (
-        <div key={discount.promotionId} className="flex justify-between text-sm text-green-600">
+        <div key={discount.promotionId} className="flex justify-between text-sm text-success">
           <span>{discount.displayName}</span>
           <span>-{Money.fromStored(discount.amount).format()}</span>
         </div>
@@ -139,7 +139,7 @@ export default function OrderSummary({
       </div>
 
       {authoritative && !authoritative.tender.isZero() && (
-        <div className="flex justify-between text-sm text-green-600">
+        <div className="flex justify-between text-sm text-success">
           <span>Other tender</span>
           <span>-{authoritative.tender.format()}</span>
         </div>
