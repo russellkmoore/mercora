@@ -1,0 +1,60 @@
+/**
+ * luxe theme — the frozen 23-token contract (05-TOKEN-MAP.md §1).
+ *
+ * The light preset: warm ivory surfaces, a single champagne-gold accent,
+ * and a serif display face — the token sweep's acid test that a light
+ * theme reads correctly across every component. Converted from
+ * `docs/voltique-theme-direction.md` section 1 onto the 23-token contract
+ * per 06-UI-SPEC.md "Preset Token Contracts" (D-01, D-03, D-05..D-07).
+ *
+ * One value is a deliberate correction rather than a direct oklch->hex
+ * transcription of the direction document: the literal accent on the
+ * ivory surface measures only ~2.3:1, below the 3:1 WCAG threshold for
+ * non-text UI components (focus rings). The `ring` token below is
+ * darkened along the same hue to ~5.2:1.
+ *
+ * Because this theme's main surfaces are light, its five inverse tokens
+ * (drawers, Stripe host, email templates) go dark — the opposite polarity
+ * from every other shipped theme, per Phase 5 D-06.
+ *
+ * Per D-02, every token is required and declares a literal value. No token
+ * resolves through a second token as a fallback default. The display
+ * token below references the CSS variable app/layout.tsx exposes for
+ * Cormorant Garamond (next/font, loaded once, preload disabled) — this
+ * file itself declares no font-loading at-rule.
+ */
+/* @theme label: Luxe | industry: fashion, jewelry, watches, fragrance | synopsis: A small luxury house that wants the site to feel like a printed lookbook — ivory paper, a single champagne-gold accent, serif headlines. */
+[data-theme="luxe"] {
+  /* Main colours */
+  --store-primary: #c49f4d;
+  --store-on-primary: #15110d;
+  --store-surface: #f8f5ef;
+  --store-surface-elevated: #fdfbf9;
+  --store-foreground: #15110d;
+  --store-muted-foreground: #645c55;
+  --store-border: #ece7df;
+  --store-ring: #8b6100;
+  --store-success: #397949;
+  --store-warning: #b76b1c;
+  --store-danger: #a5292b;
+  --store-info: #42789c;
+
+  /* Inverse colours (dark panels on a light app: drawers, Stripe, emails) */
+  --store-surface-inverse: #0e0804;
+  --store-surface-inverse-elevated: #1a120c;
+  --store-on-inverse: #f8f5ef;
+  --store-muted-on-inverse: #90847a;
+  --store-border-inverse: #2b221a;
+
+  /* Shape — square corners per the direction's radius-0 intent, applied
+     literally across all four steps */
+  --store-radius-sm: 0rem;
+  --store-radius-md: 0rem;
+  --store-radius-lg: 0rem;
+  --store-radius-xl: 0rem;
+
+  /* Type — Geist stays for body copy; display is the serif stack that
+     references the layout's Cormorant Garamond variable */
+  --store-font-sans: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --store-font-display: var(--font-cormorant-garamond), 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+}
