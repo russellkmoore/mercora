@@ -11,7 +11,7 @@ const message = {
 
 beforeEach(() => {
   Reflect.deleteProperty(process.env, "EMAIL_PROVIDER");
-  delete process.env.RESEND_API_KEY;
+  Reflect.deleteProperty(process.env, "RESEND_API_KEY");
 });
 
 describe('provider-neutral email sender', () => {

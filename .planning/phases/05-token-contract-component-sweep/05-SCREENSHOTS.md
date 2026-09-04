@@ -782,3 +782,34 @@ $ mise exec -- npm run build       # exit 0, "Compiled successfully"
 
 **Honest summary:** 8 of 11 snaps (S1, S2, S4, S5, S6, S8, S9, S10) have direct capture or live-render evidence naming the exact chunk; S7 has partial evidence (surface confirmed, bubble pixel not captured); S3 and S11 have no capture evidence at all in this phase and are recorded as gaps rather than claimed covered.
 
+
+## Label: `phase-06-02-active-theme`
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| home | 1280 | resting | .screenshots/phase-06-02-active-theme/home__1280__resting.png | f5d499e64a4ed1403696d6186021ba12ef4535a17d6e900ccf863e2932d3680a | - |
+| home | 1280 | nav-open | .screenshots/phase-06-02-active-theme/home__1280__nav-open.png | e8cfd69ec43eb7ae5c92747d60a0d14f681edfbafc7084909d11ce9064c5855d | - |
+| home | 390 | resting | .screenshots/phase-06-02-active-theme/home__390__resting.png | 65e03c2daafd238c67b873d696686c39b36e83522febc199c325dbc3018d4850 | - |
+| home | 390 | nav-open | .screenshots/phase-06-02-active-theme/home__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | - |
+| category | 1280 | resting | .screenshots/phase-06-02-active-theme/category__1280__resting.png | 053043895c0bea61e6af3de495c72a7153e049ffe2ca2c55791e7fb29f723c86 | - |
+| category | 1280 | nav-open | .screenshots/phase-06-02-active-theme/category__1280__nav-open.png | cfeff9c49deec815dd8b3cf67bc36a2247bab1cf5b7b8b350b0af5f86f155b76 | - |
+| category | 390 | resting | .screenshots/phase-06-02-active-theme/category__390__resting.png | f196cbdbd230724e56a379418b37640bc7934a5bb9b5272997037a9c1150a058 | - |
+| category | 390 | nav-open | .screenshots/phase-06-02-active-theme/category__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | - |
+| product | 1280 | resting | .screenshots/phase-06-02-active-theme/product__1280__resting.png | 109f0ab02e43b3b6a42320eacf3329a8dbbf7df35b9d87c548a45a52bd63f8a0 | - |
+| product | 1280 | nav-open | .screenshots/phase-06-02-active-theme/product__1280__nav-open.png | 8636c1a88d66e61c2dbd1512520cee7b1417a858ef8188ab7a6b12b4375694ea | - |
+| product | 390 | resting | .screenshots/phase-06-02-active-theme/product__390__resting.png | 92eae83cc0e2d916c09fc5525efe566a6e150c83fdd6271fb1938ece9a718632 | - |
+| product | 390 | nav-open | .screenshots/phase-06-02-active-theme/product__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | - |
+| cart | 1280 | cart-open | .screenshots/phase-06-02-active-theme/cart__1280__cart-open.png | d5aa4e6a788e4dc72ae5ace88f073e60486ca865e38ea02a4a3792636d2460de | - |
+| cart | 390 | cart-open | .screenshots/phase-06-02-active-theme/cart__390__cart-open.png | 562107229ce4aeb2e2faed585ae0ed6985e2857a8b04c5143b2b96090dddc0d5 | - |
+| checkout | 1280 | resting | .screenshots/phase-06-02-active-theme/checkout__1280__resting.png | 67a36d04df9c04d5e0547efd6158823f5144b6307365b9ad3733a0e473df1e85 | - |
+| checkout | 1280 | nav-open | .screenshots/phase-06-02-active-theme/checkout__1280__nav-open.png | 9c526995e02d86ea892b728ad567d0d7db9ab34071b218c1551aa70781c42701 | - |
+| checkout | 390 | resting | .screenshots/phase-06-02-active-theme/checkout__390__resting.png | 8c634a185ba017d2eda279005c956ec61227d7d5d61b1d5029eab7b6f9feab55 | - |
+| checkout | 390 | nav-open | .screenshots/phase-06-02-active-theme/checkout__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | - |
+| account | 1280 | resting | .screenshots/phase-06-02-active-theme/account__1280__resting.png | 79bbd0d305a10b34b614efea325ee2b53ca43b61471e8634759b6d8dae762caf | - |
+| account | 1280 | nav-open | .screenshots/phase-06-02-active-theme/account__1280__nav-open.png | a4016a92afc536bf04a67250f1ae20835e8002c28402bcb8b5a125bf60c03584 | - |
+| account | 390 | resting | .screenshots/phase-06-02-active-theme/account__390__resting.png | ed89750938ee8c9b3a2e63dc6cb207c74e687d63f2486f72642e629a6b2164e7 | - |
+| account | 390 | nav-open | .screenshots/phase-06-02-active-theme/account__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | - |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
