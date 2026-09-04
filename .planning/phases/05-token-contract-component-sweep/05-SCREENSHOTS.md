@@ -31,6 +31,8 @@ entry references a snap by its identifier (S1–S11) instead of restating it.
 | S10 | `border-inverse` = `#374151` (gray-700), per D-05's explicit enumeration | D-05 locks `border-inverse` to cover `border-gray-700`/`border-neutral-800`; D-10 also routes email dividers here | **email dividers darken noticeably** — flagged for human review on the email chunk |
 | S11 | `global-error.tsx` button background moves from its current hover-darkened orange to base `primary` | RESEARCH Pitfall 4 | error-page button becomes slightly brighter orange |
 | S12 | New `app/not-found.tsx` replaces Next's built-in 404 fallback | Discovered during chunk-1-contract capture: Next's built-in `notFound()` boundary injects its own unlayered `body{color:#000;background:#fff}` style, which beat the token-driven `bg-surface`/`text-foreground` utility classes once `<body>`'s inline style was removed (unlayered CSS always outranks Tailwind's `@layer utilities`, regardless of specificity) — every `notFound()` call site (category, product, blog, account, order-status) would have silently rendered an unbranded white 404 in a browser with a light OS color-scheme preference. Fixed by adding a themed `app/not-found.tsx` so the site's own 404 renders on the token contract instead of the framework fallback (Rule 1 auto-fix; see 05-03-SUMMARY.md) | The 404 page gains a heading, message, and "Return home" link on the dark surface instead of Next's plain white fallback text |
+| S13 | `Footer.tsx`'s `bg-neutral-950` (`oklch(14.5% 0 0)` ≈ `#0a0a0a`) consolidates onto `bg-surface` (`#000000`), per 05-TOKEN-MAP.md §2's own "`bg-black`, `bg-neutral-950` → `bg-surface`" row | `--store-surface` was frozen at `#000000` in 05-03; Footer.tsx is the first file this phase sweeps that used the near-black `neutral-950` shade instead of `black`/`neutral-900`, so the ~1% per-channel convergence (10/255 → 0/255) was latent in the frozen contract and surfaces only now, on chunk-2-shell's PIL diff of `account__*` | The footer's background (and the giant background wordmark region) goes from a barely-perceptible near-black to true black; visible only on short pages where the footer sits within the captured viewport (confirmed via `ImageChops.difference` bbox isolated to the footer's y-range, y≥596 on the 1280 viewport) — a D-15 close-enough shade snap, not a regression |
+| S14 | `HeaderClient.tsx`'s mobile category cards converge several `gray-300/400` text shades onto `muted-foreground` and several `orange-400/500/600` hover/border shades onto `primary` with alpha modifiers, first visible in the `nav-open` state at 390px (the only capture state that renders the mobile Sheet's category-card content) | Per-pixel diff against `chunk-2-ui` shows ~7% of pixels differ, entirely small single-digit RGB shifts (e.g. `rgb(145,153,166)`→`rgb(155,155,155)` on anti-aliased text edges, `rgb(42,13,0)`→`rgb(43,20,4)` on orange icon edges) with no layout, content, or polarity change — verified by side-by-side visual read of `home__390__nav-open.png` (chunk-2-shell vs. chunk-2-ui, pixel-identical to the eye) | Mobile menu category cards, chevrons, and hover-adjacent borders read marginally different shades of orange/grey; the `390 nav-open` capture is identical across every route (dedup), so this single snap explains all six differing `390 nav-open` rows below |
 
 ## Coverage notes
 
@@ -49,6 +51,21 @@ entry references a snap by its identifier (S1–S11) instead of restating it.
   `<body>` inline style was removed (see S12), so this plan added `app/not-found.tsx` as a
   Rule 1 fix. Every other row in `chunk-1-contract` is a byte-identical hash match with
   `baseline`.
+- `chunk-2-shell` (05-05, the shared shell: `HeaderClient.tsx`, `Header.tsx`,
+  `Breadcrumbs.tsx`, `Footer.tsx`, `PromotionalBanner.tsx`, `app/layout.tsx`) diffs against
+  `chunk-2-ui` cell-for-cell: every `home`/`category`/`product`/`cart`/`checkout` `resting`
+  and `1280 nav-open` row is a byte-identical hash match. Two groups of rows differ, both
+  traced by `PIL.ImageChops.difference` to a specific, expected shade consolidation and
+  neither touches layout, content, or polarity:
+  - All six `390 nav-open` rows (identical across routes by dedup) → **S14**, the mobile
+    category-card gray/orange shade convergence, visible for the first time because this is
+    the only capture state that renders that content.
+  - All three `account` rows → **S13**, `Footer.tsx`'s `bg-neutral-950`→`bg-surface`
+    consolidation, visible only because the short 404 page's footer sits inside the
+    captured viewport; every other route's footer is below the fold and shows no diff.
+  - No footer- or breadcrumb-region difference in this label was left unexplained or
+    un-investigated: both groups above were pixel-diffed to their root cause before being
+    annotated, per this chunk's own prohibition against annotating instead of fixing.
 
 ## Label: `baseline`
 
@@ -149,3 +166,34 @@ entry references a snap by its identifier (S1–S11) instead of restating it.
 |---|---|---|---|---|---|
 | category | 1280 | dropdown-item-focused | .screenshots/chunk-2-ui/category__1280__dropdown-item-focused.png | 13b65fbafd079a27c6f24f20c3584671c894a077163f48447314216c135420fa | D-17 supplementary -- Categories dropdown opened + ArrowDown to focus first item (Featured); focus:bg-accent/focus:text-accent-foreground were dead classes before this chunk (item showed no focus indication at all), now focus:bg-surface-elevated/focus:text-foreground render a visible dark highlight and foreground text for the first time |
 | checkout | 1280 | discount-input-invalid | .screenshots/chunk-2-ui/checkout__1280__discount-input-invalid.png | 510da2e547b6bfef9358afb4533fb73d817965a728d7621d52c31e8fe9933db5 | D-17 supplementary -- Input component's aria-invalid ring/border set to true and focused; aria-invalid:ring-destructive/aria-invalid:border-destructive were dead classes before this chunk, now aria-invalid:ring-danger/aria-invalid:border-danger render a visible red ring and border for the first time (no live validation flow currently sets aria-invalid on this field, so the attribute is forced here to prove the CSS treatment renders correctly) |
+
+## Label: `chunk-2-shell`
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| home | 1280 | resting | .screenshots/chunk-2-shell/home__1280__resting.png | e3a6d3e06596035fee0c0fc2f8208df48f5222f1cf58b1bd41e64ccde5a1ee1f | - |
+| home | 1280 | nav-open | .screenshots/chunk-2-shell/home__1280__nav-open.png | 6565691e8fcfe095d9c01bd7cffe64119685d4cc0fd3e306956bdfb40a7e8841 | - |
+| home | 390 | resting | .screenshots/chunk-2-shell/home__390__resting.png | b3ac91d22cb3b2bffb98c85a209302125769ebfb0f454e47453bd5793e48d23d | - |
+| home | 390 | nav-open | .screenshots/chunk-2-shell/home__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | S14 |
+| category | 1280 | resting | .screenshots/chunk-2-shell/category__1280__resting.png | 0e9043b4b7b2424cce025bc8488aed883ce9d1a2421292a2fe5965d9f1db439a | - |
+| category | 1280 | nav-open | .screenshots/chunk-2-shell/category__1280__nav-open.png | 061b7b5134830b96bb8f16e505035fc829548ca6bc681e491dc52182dc1d7d7c | - |
+| category | 390 | resting | .screenshots/chunk-2-shell/category__390__resting.png | 67fb21c4dbdf885015e5c19d19ec8548d2fc12e1e9ed02690c54528c937e79d4 | - |
+| category | 390 | nav-open | .screenshots/chunk-2-shell/category__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | S14 |
+| product | 1280 | resting | .screenshots/chunk-2-shell/product__1280__resting.png | 13bf10e27f35e4eb6846818c64eb134be3b88f41b16bd281c871f9bb01cfe00b | - |
+| product | 1280 | nav-open | .screenshots/chunk-2-shell/product__1280__nav-open.png | 6d449a9c72e280fcd1be294ee3d15959504ed0f7de34f66b0361c79274a267ff | - |
+| product | 390 | resting | .screenshots/chunk-2-shell/product__390__resting.png | 38eca79e5d2e04241b194611b8f4375e948825994e541de811a638df5cc8cc6c | - |
+| product | 390 | nav-open | .screenshots/chunk-2-shell/product__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | S14 |
+| cart | 1280 | cart-open | .screenshots/chunk-2-shell/cart__1280__cart-open.png | e6c78a66bf84804f5f9b09c0508abbe19aed336a90949ef2cc34ccb854e34b60 | - |
+| cart | 390 | cart-open | .screenshots/chunk-2-shell/cart__390__cart-open.png | f41cc5071ae72cd871138a26e947763e979a3d7e48c8afb9455c7202a81b615f | - |
+| checkout | 1280 | resting | .screenshots/chunk-2-shell/checkout__1280__resting.png | b3ee30c2d3bbc6431d5843272ce46783adce50d7fe769c941006baad9fd13734 | - |
+| checkout | 1280 | nav-open | .screenshots/chunk-2-shell/checkout__1280__nav-open.png | fd49c5d03ad38db2d8891803b286d026994ec4cdad0e21e47435df2901c568f4 | - |
+| checkout | 390 | resting | .screenshots/chunk-2-shell/checkout__390__resting.png | 7000b26a71fa72bde119bd01b1f54f8a8d9ea269a93bef75667e82dbe9a38896 | - |
+| checkout | 390 | nav-open | .screenshots/chunk-2-shell/checkout__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | S14 |
+| account | 1280 | resting | .screenshots/chunk-2-shell/account__1280__resting.png | 79bbd0d305a10b34b614efea325ee2b53ca43b61471e8634759b6d8dae762caf | S13 |
+| account | 1280 | nav-open | .screenshots/chunk-2-shell/account__1280__nav-open.png | a4016a92afc536bf04a67250f1ae20835e8002c28402bcb8b5a125bf60c03584 | S13 |
+| account | 390 | resting | .screenshots/chunk-2-shell/account__390__resting.png | ed89750938ee8c9b3a2e63dc6cb207c74e687d63f2486f72642e629a6b2164e7 | S13 |
+| account | 390 | nav-open | .screenshots/chunk-2-shell/account__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | S13, S14 |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
