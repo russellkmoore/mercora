@@ -53,6 +53,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { parseSettingRows } from "@/lib/admin/settings-parse";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,11 +64,11 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { RecommendationSettingsCard } from "@/components/admin/RecommendationSettingsCard";
 import { useStoreConfig } from "@/lib/store";
-import { 
-  Settings, Store, Bot, Mail, Database, 
+import {
+  Settings, Store, Bot, Mail, Database,
   RefreshCw, Save, Globe, DollarSign,
   Shield, Zap, AlertCircle, CheckCircle,
-  Share2
+  Share2, Palette
 } from "lucide-react";
 
 interface SystemSettings {
@@ -126,6 +128,7 @@ interface VectorIndexStatus {
 
 export default function AdminSettingsPage() {
   const store = useStoreConfig();
+  const pathname = usePathname();
   const [activeTab, setActiveTab] = useState<"system" | "store" | "shipping" | "refunds" | "promotions" | "social" | "admins">("system");
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -466,14 +469,19 @@ export default function AdminSettingsPage() {
     }
   };
 
+  // The first seven entries are client-state tabs (setActiveTab). Appearance is
+  // architecturally different — its own route — so it carries kind: "route" and
+  // navigates via next/link instead of flipping activeTab. See 06-UI-SPEC.md
+  // "Route & navigation (D-13)".
   const tabs = [
-    { id: "system" as const, label: "System", icon: Settings, description: "Maintenance & debug" },
-    { id: "store" as const, label: "Store", icon: Store, description: "Operations & policies" },
-    { id: "shipping" as const, label: "Shipping", icon: Zap, description: "Methods & pricing" },
-    { id: "refunds" as const, label: "Refunds", icon: RefreshCw, description: "Return policies" },
-    { id: "promotions" as const, label: "Promotions", icon: DollarSign, description: "Sales & banners" },
-    { id: "social" as const, label: "Social Media", icon: Share2, description: "Social links" },
-    { id: "admins" as const, label: "Admin Users", icon: Shield, description: "Access management" }
+    { kind: "state" as const, id: "system" as const, label: "System", icon: Settings, description: "Maintenance & debug" },
+    { kind: "state" as const, id: "store" as const, label: "Store", icon: Store, description: "Operations & policies" },
+    { kind: "state" as const, id: "shipping" as const, label: "Shipping", icon: Zap, description: "Methods & pricing" },
+    { kind: "state" as const, id: "refunds" as const, label: "Refunds", icon: RefreshCw, description: "Return policies" },
+    { kind: "state" as const, id: "promotions" as const, label: "Promotions", icon: DollarSign, description: "Sales & banners" },
+    { kind: "state" as const, id: "social" as const, label: "Social Media", icon: Share2, description: "Social links" },
+    { kind: "state" as const, id: "admins" as const, label: "Admin Users", icon: Shield, description: "Access management" },
+    { kind: "route" as const, id: "appearance" as const, href: "/admin/settings/appearance", label: "Appearance", icon: Palette, description: "Theme & look" },
   ];
 
   return (
@@ -529,17 +537,41 @@ export default function AdminSettingsPage() {
       )}
 
       {/* Tab Navigation */}
-      <div className="flex space-x-1 bg-neutral-800 p-1 rounded-lg">
+      <div className="flex flex-wrap space-x-1 bg-neutral-800 p-1 rounded-lg">
         {tabs.map((tab) => {
           const Icon = tab.icon;
+
+          if (tab.kind === "route") {
+            const isCurrentRoute = pathname === tab.href;
+            return (
+              <Link
+                key={tab.id}
+                href={tab.href}
+                className={`
+                  flex items-center space-x-2 px-4 py-3 rounded-md transition-all flex-1
+                  ${isCurrentRoute
+                    ? 'bg-orange-600 text-white'
+                    : 'text-gray-400 hover:text-white hover:bg-neutral-700'
+                  }
+                `}
+              >
+                <Icon className="w-4 h-4" />
+                <div className="text-left">
+                  <div className="font-medium">{tab.label}</div>
+                  <div className="text-xs opacity-75">{tab.description}</div>
+                </div>
+              </Link>
+            );
+          }
+
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`
                 flex items-center space-x-2 px-4 py-3 rounded-md transition-all flex-1
-                ${activeTab === tab.id 
-                  ? 'bg-orange-600 text-white' 
+                ${activeTab === tab.id
+                  ? 'bg-orange-600 text-white'
                   : 'text-gray-400 hover:text-white hover:bg-neutral-700'
                 }
               `}
