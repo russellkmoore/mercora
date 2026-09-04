@@ -19,15 +19,15 @@ export default function PageRail({ sections }: { sections: PageSection[] }) {
   }, [sections]);
   return (
     <nav aria-label="On this page" className="sticky top-24 hidden self-start lg:block">
-      <p className="mb-3 text-xs uppercase tracking-widest text-neutral-500">On this page</p>
+      <p className="mb-3 text-xs uppercase tracking-widest text-muted-foreground">On this page</p>
       {sections.map((section) => (
         <a
           key={section.id}
           href={`#${section.id}`}
           className={`block border-l-2 py-2 pl-3 text-sm transition-colors ${
             activeId === section.id
-              ? "border-orange-500 font-semibold text-orange-400"
-              : "border-neutral-700 text-neutral-400 hover:border-orange-500 hover:text-white"
+              ? "border-primary font-semibold text-primary"
+              : "border-border text-muted-foreground hover:border-primary hover:text-foreground"
           }`}
         >
           {section.heading}
