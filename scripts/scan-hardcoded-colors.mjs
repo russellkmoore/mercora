@@ -26,7 +26,7 @@ const EXCLUDED_DIR_SEGMENT = "admin";
 // Theme source of truth (TOKEN-MAP §6): hex literals are legal here and
 // produce no finding. These files are skipped entirely, not filtered.
 const THEME_SOURCE_DIR = "themes";
-const THEME_SOURCE_FILES = new Set(["lib/themes/tokens.ts"]);
+const THEME_SOURCE_FILES = new Set(["lib/themes/tokens.ts", "lib/themes/manifest.generated.ts"]);
 
 // Named-file exceptions (T-05-01-01): each carries a written reason and is
 // printed on every run, so a clean verdict can never be silent about what it

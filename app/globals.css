@@ -1,5 +1,5 @@
 @import 'tailwindcss';
-@import '../themes/volt-dark.css';
+@import '../themes/index.generated.css';
 @config '../tailwind.config.ts';
 
 /* Optimize font loading to reduce preload warnings */
