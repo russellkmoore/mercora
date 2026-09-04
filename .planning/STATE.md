@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 05
 current_phase_name: Token Contract & Component Sweep
 status: executing
-stopped_at: Completed 05-05-PLAN.md
-last_updated: "2026-09-04T15:26:20.252Z"
+stopped_at: Completed 05-06-PLAN.md
+last_updated: "2026-09-04T15:43:47.018Z"
 last_activity: 2026-09-03
 last_activity_desc: Phase 05 execution started
-state_head: 0d34ce52c1e508807b955f7953d482a24541a9ed
+state_head: e0d8ed367df61f4f808d886d390802a789db6f27
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 12
-  completed_plans: 5
+  completed_plans: 6
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-02 after v2 milestone start)
 ## Current Position
 
 Phase: 05 (Token Contract & Component Sweep) — EXECUTING
-Plan: 6 of 12
+Plan: 7 of 12
 Status: Ready to execute
 Last activity: 2026-09-03 — Phase 05 execution started
 
@@ -72,6 +72,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P03 | 130min | 3 tasks | 11 files |
 | Phase 05 P04 | 55min | 3 tasks | 18 files |
 | Phase 05 P05 | 50min | 3 tasks | 6 files |
+| Phase 05 P06 | 35min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -94,6 +95,9 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 05]: [Phase 05-04] Fixed CSS-specificity regression on CategoryDisplay.tsx's sort-toggle active indicator (Rule 1) — data-[state=on]:bg-surface-elevated now legitimately outranks the page's unconditional bg-orange-500 override; marked the override !important to restore the exact prior pixel.
 - [Phase 05]: Categories dropdown panel uses bg-foreground/text-surface (main-set tokens) instead of the inverse token set, since it's not one of the four scoped inverse surfaces and both frozen values equal white/black — Satisfies both D-16 pixel-preservation and the plan's own automated no-inverse-tokens check
 - [Phase 05]: Registered two new shade-consolidation snaps S13 (Footer bg-neutral-950 to bg-surface) and S14 (mobile category-card gray/orange convergence) rather than reverting them — Both are directed by the frozen token substitution table and D-15's close-enough-snap allowance; verified via PIL pixel diff before annotating
+- [Phase 05]: [Phase 05-06] Binary available/unavailable badges map to success/warning, not success/danger -- this app's only unavailable copy ("Coming Soon", "Currently unavailable") reads as anticipatory/temporary, and there's no discontinued-product state to reserve danger for.
+- [Phase 05]: [Phase 05-06] app/page.tsx's and app/product/[slug]/page.tsx's page-wrapper bg-neutral-900 maps to bg-surface-elevated, not bg-surface -- corrected mid-plan (Rule 1) after a screenshot diff caught the initial bg-surface interpretation as an unregistered ~83% full-page pixel shift; 05-05 already established the pixel-identical mapping for the same literal class.
+- [Phase 05]: [Phase 05-06] Registered new shade-consolidation snap S15 (ProductCard.tsx/ProductDisplay.tsx bg-neutral-800 card/gallery surfaces -> bg-surface-elevated, rgb(38,38,38) -> rgb(23,23,23)) after PIL-diffing all ten differing chunk-3-catalog cells back to this single, table-directed root cause.
 
 ### Pending Todos
 
@@ -124,8 +128,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T15:26:20.237Z
-Stopped at: Completed 05-05-PLAN.md
+Last session: 2026-09-04T15:43:37.828Z
+Stopped at: Completed 05-06-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 5` (or `/gsd-plan-phase 5` directly) to start Token Contract & Component Sweep

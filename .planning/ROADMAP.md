@@ -46,7 +46,7 @@ Full phase details, success criteria, and plan lists: `milestones/v1-ROADMAP.md`
   3. A whole-tree scan (Tailwind config, inline `style={}`, SVG fill/stroke, dead shadcn-pattern classes like `bg-popover` — not just `.tsx` classNames) finds zero hardcoded palette values in storefront code
   4. `NEXT_PUBLIC_THEME_PRIMARY` no longer exists in the codebase; `logoPath` still resolves via store-config unchanged
 
-**Plans**: 5/12 plans executed
+**Plans**: 6/12 plans executed
 
 Plans:
 **Wave 1**
@@ -71,7 +71,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 05-06-PLAN.md — Sweep chunk 3a: home, category, product routes and the catalogue cards
+- [x] 05-06-PLAN.md — Sweep chunk 3a: home, category, product routes and the catalogue cards
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
@@ -154,7 +154,7 @@ Plans:
 | 2. Observability and Regression Guards | v1 | 5/5 | Complete | 2026-09-02 |
 | 3. Decision Lock-In and Operator Runbooks | v1 | 3/3 | Complete | 2026-09-02 |
 | 4. Reference Documentation Refresh | v1 | 5/5 | Complete | 2026-09-02 |
-| 5. Token Contract & Component Sweep | v2 | 5/12 | In Progress|  |
+| 5. Token Contract & Component Sweep | v2 | 6/12 | In Progress|  |
 | 6. Theme File Mechanism & Presets | v2 | 0/TBD | Not started | - |
 | 7. Layout Switches | v2 | 0/TBD | Not started | - |
 | 8. Documentation & Visual QA Close-out | v2 | 0/TBD | Not started | - |
