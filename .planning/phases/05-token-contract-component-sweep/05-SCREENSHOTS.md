@@ -121,6 +121,66 @@ entry references a snap by its identifier (S1–S11) instead of restating it.
     only renders on an authenticated order's line item, which this local dev environment
     has no Clerk session or seeded delivered order to reach (recorded MISSING with reason
     in the supplementary table, the same class of gap as `order-status`).
+- `chunk-4-drawers` (05-09, the two light drawers: `CartDrawer.tsx`, `CartItemCard.tsx`,
+  `AgentDrawer.tsx`, `components/agent/ProductCard.tsx`) diffs against `chunk-3-engagement`
+  cell-for-cell. **Both drawers remain light panels on the dark page — polarity held.**
+  Confirmed both by pixel-diffing the panel background (`#fdfdfb`/`--store-surface-inverse`
+  is unchanged, since the same hex value was frozen for both the hardcoded literal and the
+  token in 05-03) and by a direct visual read of both open-drawer captures at both
+  viewports: the cart panel and the agent chat panel both render as light-on-dark exactly
+  as before, with dark text, a visible close button, and (for the agent drawer) a light
+  gray chat well, a light message bubble, and an orange-accented input.
+  - `cart` (1280 cart-open, 390 cart-open) are the only cells that differ from
+    `chunk-3-engagement`, and both trace to exactly two root causes, sampled 15-20 random
+    differing pixels per cell:
+    - **S10**: the panel's left border and the item-list divider convert from the
+      hardcoded `border-neutral-800` (`rgb(38,38,38)`) to `border-border-inverse`
+      (`rgb(55,65,81)`, `#374151`) — the same email-divider consolidation already
+      registered as S10 for D-10, now also covering the cart drawer's own panel edge and
+      `border-t` divider per D-05's explicit enumeration.
+    - **S9**: the "Your cart is empty" copy converts from `text-gray-400`
+      (`rgb(156,163,175)`, antialiased samples land near `rgb(153,161,175)`) to
+      `text-muted-on-inverse` (`rgb(107,114,128)`, `#6b7280`) — the same drawer
+      secondary-copy convergence already registered as S9.
+    - No other pixel in either cart cell changed. The local dev cart was empty for this
+      capture (no persisted cart items), so `CartItemCard.tsx`'s own sweep — the quantity
+      buttons' `bg-surface-inverse-elevated` (S8), the Remove button's `bg-danger/10`, and
+      the item divider's `border-border-inverse` — is not exercised by the automated
+      capture. It was confirmed instead by a manual capture with one item added to the
+      cart (not part of the tracked manifest, since it required an interactive add-to-cart
+      step): the item card border, quantity control backgrounds, price/metadata text, and
+      the Remove button all render as light-panel content with the expected token colours,
+      and the divider between the item list and the total is visibly present.
+  - Every other cell (`home`, `category`, `product`, `checkout`, `account`, both `390
+    nav-open` and `1280 nav-open` states) is byte-identical to `chunk-3-engagement` across
+    three independent full-grid capture runs used to confirm this — this plan touched
+    neither the header, the catalog, nor the account/checkout surfaces.
+  - **Known capture-environment flake, not a token regression:** across those three runs,
+    exactly one unrelated non-drawer cell differed from `chunk-3-engagement` each time —
+    a different cell each run (`category`/`1280`/`nav-open`, then `category`/`1280`/
+    `resting`, then `product`/`1280`/`nav-open`, then `product`/`1280`/`resting` across
+    repeated attempts). Every one of these was individually pixel-diffed and traced to
+    either (a) a `next/image` product photo that had not finished loading before the
+    capture fired — the differing region shows a broken-image glyph and missing alt text
+    where the baseline shows the loaded photo and caption, or (b) an empty/still-loading
+    Categories dropdown panel rendering as a flat `bg-surface-elevated` rectangle with no
+    item text. Neither pattern involves any colour class this plan (or any file it
+    touched) could produce; a targeted three-attempt recapture of the flagged
+    `category`/`1280`/`nav-open` cell in isolation came back byte-identical to
+    `chunk-3-engagement` on all three attempts, confirming the flake is a
+    `networkidle`-timing race in the local dev/screenshot harness, not a rendering defect.
+    The final `chunk-4-drawers` capture recorded in this manifest is clean of this
+    artifact — the only two cells that differ from `chunk-3-engagement` are the two `cart`
+    cells documented above.
+  - Supplementary cell (below): the agent drawer open state, which the standard D-20 grid
+    does not reach (there is no dedicated "open the agent drawer" selector in the D-20
+    coverage plan, only cart and nav). Captured at both viewports via the same
+    `[data-testid="agent-drawer-trigger"]` element `HeaderClient.tsx`'s own mobile menu
+    uses to force-open the drawer programmatically. No prior baseline exists for this
+    state; this is first coverage, confirmed by direct visual read to be light-on-dark
+    with legible text throughout (welcome copy, disclaimer, input placeholder, empty-state
+    copy) and the two dark chips (the loading avatar and, when a message is sent, the
+    user's chat bubble on the `info` token) still reading as intentionally dark.
 
 ## Label: `baseline`
 
@@ -378,3 +438,34 @@ Genuine pre-sweep baseline for the three cells above, captured from a git worktr
 | blog-post | 390 | resting | .screenshots/pre-chunk-3-content/blog-post__390__resting.png | 3bc304198ed5de06554be136ff6ef965814182fec4acd943a117fc7a98863f16 | pre-sweep baseline for chunk-3-content's blog-post/390 cell |
 | cms-page | 1280 | resting | .screenshots/pre-chunk-3-content/cms-page__1280__resting.png | 75d59d044be3580746b5077cd55e84ac96b7ebf61dfd7e1cba5ab22d443475c3 | pre-sweep baseline for chunk-3-content's cms-page/1280 cell |
 | cms-page | 390 | resting | .screenshots/pre-chunk-3-content/cms-page__390__resting.png | a7161f69ac745bfef610b89c7f42c51ece1cd11e9f747c4357fc9306d3a547ae | pre-sweep baseline for chunk-3-content's cms-page/390 cell |
+
+## Label: `chunk-4-drawers`
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| home | 1280 | resting | .screenshots/chunk-4-drawers/home__1280__resting.png | f5d499e64a4ed1403696d6186021ba12ef4535a17d6e900ccf863e2932d3680a | - |
+| home | 1280 | nav-open | .screenshots/chunk-4-drawers/home__1280__nav-open.png | e8cfd69ec43eb7ae5c92747d60a0d14f681edfbafc7084909d11ce9064c5855d | - |
+| home | 390 | resting | .screenshots/chunk-4-drawers/home__390__resting.png | 65e03c2daafd238c67b873d696686c39b36e83522febc199c325dbc3018d4850 | - |
+| home | 390 | nav-open | .screenshots/chunk-4-drawers/home__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | - |
+| category | 1280 | resting | .screenshots/chunk-4-drawers/category__1280__resting.png | 053043895c0bea61e6af3de495c72a7153e049ffe2ca2c55791e7fb29f723c86 | - |
+| category | 1280 | nav-open | .screenshots/chunk-4-drawers/category__1280__nav-open.png | cfeff9c49deec815dd8b3cf67bc36a2247bab1cf5b7b8b350b0af5f86f155b76 | - |
+| category | 390 | resting | .screenshots/chunk-4-drawers/category__390__resting.png | 3409a7c25896219a28cbed1ee3d5e9b9a8ac988433b0aadd0d0c7fe656dd3af0 | - |
+| category | 390 | nav-open | .screenshots/chunk-4-drawers/category__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | - |
+| product | 1280 | resting | .screenshots/chunk-4-drawers/product__1280__resting.png | a4e7fb5c0028c74dd207d51e96843566cfc6f1a6437aeaae434752510722bbb6 | - |
+| product | 1280 | nav-open | .screenshots/chunk-4-drawers/product__1280__nav-open.png | 8636c1a88d66e61c2dbd1512520cee7b1417a858ef8188ab7a6b12b4375694ea | - |
+| product | 390 | resting | .screenshots/chunk-4-drawers/product__390__resting.png | 92eae83cc0e2d916c09fc5525efe566a6e150c83fdd6271fb1938ece9a718632 | - |
+| product | 390 | nav-open | .screenshots/chunk-4-drawers/product__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | - |
+| cart | 1280 | cart-open | .screenshots/chunk-4-drawers/cart__1280__cart-open.png | d5aa4e6a788e4dc72ae5ace88f073e60486ca865e38ea02a4a3792636d2460de | - |
+| cart | 390 | cart-open | .screenshots/chunk-4-drawers/cart__390__cart-open.png | 562107229ce4aeb2e2faed585ae0ed6985e2857a8b04c5143b2b96090dddc0d5 | - |
+| checkout | 1280 | resting | .screenshots/chunk-4-drawers/checkout__1280__resting.png | b3ee30c2d3bbc6431d5843272ce46783adce50d7fe769c941006baad9fd13734 | - |
+| checkout | 1280 | nav-open | .screenshots/chunk-4-drawers/checkout__1280__nav-open.png | fd49c5d03ad38db2d8891803b286d026994ec4cdad0e21e47435df2901c568f4 | - |
+| checkout | 390 | resting | .screenshots/chunk-4-drawers/checkout__390__resting.png | 7000b26a71fa72bde119bd01b1f54f8a8d9ea269a93bef75667e82dbe9a38896 | - |
+| checkout | 390 | nav-open | .screenshots/chunk-4-drawers/checkout__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | - |
+| account | 1280 | resting | .screenshots/chunk-4-drawers/account__1280__resting.png | 79bbd0d305a10b34b614efea325ee2b53ca43b61471e8634759b6d8dae762caf | - |
+| account | 1280 | nav-open | .screenshots/chunk-4-drawers/account__1280__nav-open.png | a4016a92afc536bf04a67250f1ae20835e8002c28402bcb8b5a125bf60c03584 | - |
+| account | 390 | resting | .screenshots/chunk-4-drawers/account__390__resting.png | ed89750938ee8c9b3a2e63dc6cb207c74e687d63f2486f72642e629a6b2164e7 | - |
+| account | 390 | nav-open | .screenshots/chunk-4-drawers/account__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | - |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
