@@ -81,14 +81,14 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "3.984.0",
-    "@cloudflare/vitest-pool-workers": "0.21.3",
-    "@cloudflare/workers-types": "^5.20260809.1",
-    "@opennextjs/cloudflare": "^1.20.2",
-    "@smithy/node-http-handler": "4.9.13",
+    "@aws-sdk/client-s3": "3.1121.0",
+    "@cloudflare/vitest-pool-workers": "0.22.0",
+    "@cloudflare/workers-types": "^5.20260829.1",
+    "@opennextjs/cloudflare": "^1.20.4",
+    "@smithy/node-http-handler": "4.11.3",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/big.js": "^7.0.0",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.4.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/sanitize-html": "2.16.1",
@@ -96,13 +96,13 @@
     "csv-parse": "6.1.0",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.36.0",
-    "eslint-config-next": "^16.3.1",
+    "eslint-config-next": "^16.3.3",
     "postcss": "^8.5.26",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.12",
     "tw-animate-css": "^1.3.5",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.10",
+    "vitest": "^4.1.11",
     "wrangler": "^4.120.0"
   }
 }
