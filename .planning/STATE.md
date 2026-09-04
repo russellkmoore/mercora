@@ -4,17 +4,17 @@ milestone: v2
 milestone_name: Themeable Storefront
 current_phase: 06
 current_phase_name: Theme File Mechanism & Presets
-status: executing
-stopped_at: Completed 06-04-PLAN.md
-last_updated: "2026-09-04T20:31:11.452Z"
+status: verifying
+stopped_at: Completed 06-05-PLAN.md — Phase 06 complete (5/5 plans)
+last_updated: "2026-09-04T20:56:26.814Z"
 last_activity: 2026-09-04
 last_activity_desc: Phase 06 execution started
-state_head: 8d28ac4fc24a7c14f3da60b2721874bf67824c11
+state_head: 73dc85e69e4ad443db53db45ff71402bbd313626
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 17
-  completed_plans: 16
+  completed_plans: 17
   percent: 25
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-09-04 after Phase 5)
 
 Phase: 06 (Theme File Mechanism & Presets) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-04 — Phase 06 execution started
 
 Progress: [███░░░░░░░] 25%
@@ -83,6 +83,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 06 P02 | 25min | 3 tasks | 9 files |
 | Phase 06 P03 | 20min | 3 tasks | 6 files |
 | Phase 06 P04 | 16min | 3 tasks | 4 files |
+| Phase 06 P05 | 35min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -132,6 +133,7 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 06]: [Phase 06-03] font-display is fully wired (Tailwind class, CSS var, next/font load) but unused by any component in app/ or components/ — luxe's serif display face does not currently render anywhere; flagged in .planning/WINDOWS.md for plan 06-05.
 - [Phase 06]: [Phase 06-04] Imported the appearance setting constants directly from lib/themes/active-theme.ts into the client ThemePresetGrid component per the plan's interface contract, verified via a real npm run build that this does not break the client bundle.
 - [Phase 06]: [Phase 06-04] Settings hub tabs array gained a kind: "state" | "route" discriminant so the new Appearance entry navigates via next/link while the seven existing entries keep setActiveTab, with correct TS narrowing on tab.id.
+- [Phase 06]: [Phase 06-05] Three of four light-preset scrim sites (Dialog, AlertDialog, Sheet) fixed to literal dark-alpha via the scanner's sentinel; category hero overlay accepted as-is after evidence-based inspection. — bg-surface/NN composited to near-invisible near-white under luxe for the modal/drawer backdrops (verified live and via compositing tests); the category hero's different job and weaker opacity supported a genuinely different outcome, not a blanket fix.
 
 ### Pending Todos
 
@@ -170,8 +172,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T20:31:11.370Z
-Stopped at: Completed 06-04-PLAN.md
+Last session: 2026-09-04T20:56:26.717Z
+Stopped at: Completed 06-05-PLAN.md — Phase 06 complete (5/5 plans)
 Resume file: None
 
 Next: `/gsd-discuss-phase 6` (or `/gsd-plan-phase 6` directly) to start Theme File Mechanism & Presets
