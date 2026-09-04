@@ -55,40 +55,40 @@ export default async function Footer() {
   const columns = [
     pages.length > 0 ? (
       <div key="pages" className="space-y-2">
-        <h2 className="mb-3 font-semibold text-white">Explore</h2>
-        {pages.map((page) => <Link key={page.id} href={`/${page.slug}`} className="block hover:text-white">{page.nav_title || page.title}</Link>)}
-        {!pages.some(({ slug }) => slug === "blog") && <Link href="/blog" className="block hover:text-white">Blog</Link>}
+        <h2 className="mb-3 font-semibold text-foreground">Explore</h2>
+        {pages.map((page) => <Link key={page.id} href={`/${page.slug}`} className="block hover:text-foreground">{page.nav_title || page.title}</Link>)}
+        {!pages.some(({ slug }) => slug === "blog") && <Link href="/blog" className="block hover:text-foreground">Blog</Link>}
       </div>
     ) : (
       <div key="pages" className="space-y-2">
-        <h2 className="mb-3 font-semibold text-white">Explore</h2>
-        <Link href="/" className="block hover:text-white">Home</Link>
-        <Link href="/blog" className="block hover:text-white">Blog</Link>
+        <h2 className="mb-3 font-semibold text-foreground">Explore</h2>
+        <Link href="/" className="block hover:text-foreground">Home</Link>
+        <Link href="/blog" className="block hover:text-foreground">Blog</Link>
       </div>
     ),
     <div key="support" className="space-y-2">
-      <h2 className="mb-3 font-semibold text-white">Support</h2>
-      <a href={`mailto:${store.contact.supportEmail}`} className="block hover:text-white">Contact support</a>
-      {policyLinks.map(([label, href]) => <Link key={label} href={href} className="block hover:text-white">{label}</Link>)}
+      <h2 className="mb-3 font-semibold text-foreground">Support</h2>
+      <a href={`mailto:${store.contact.supportEmail}`} className="block hover:text-foreground">Contact support</a>
+      {policyLinks.map(([label, href]) => <Link key={label} href={href} className="block hover:text-foreground">{label}</Link>)}
     </div>,
     ...(social.length > 0 ? [
       <div key="social" className="space-y-2">
-        <h2 className="mb-3 font-semibold text-white">Follow</h2>
-        {social.map((item) => <a key={item.href} href={item.href} target="_blank" rel="noopener noreferrer" className="block hover:text-white">{item.label}</a>)}
+        <h2 className="mb-3 font-semibold text-foreground">Follow</h2>
+        {social.map((item) => <a key={item.href} href={item.href} target="_blank" rel="noopener noreferrer" className="block hover:text-foreground">{item.label}</a>)}
       </div>,
     ] : []),
   ];
   const grid = GRID_CLASSES[Math.min(4, columns.length) as keyof typeof GRID_CLASSES];
 
   return (
-    <footer className="relative z-10 mt-16 overflow-hidden bg-neutral-950 text-white">
-      <div className={`relative z-10 mx-auto grid max-w-6xl grid-cols-1 gap-8 px-4 py-12 text-sm text-neutral-400 sm:grid-cols-2 sm:px-6 sm:py-16 ${grid}`}>
+    <footer className="relative z-10 mt-16 overflow-hidden bg-surface text-foreground">
+      <div className={`relative z-10 mx-auto grid max-w-6xl grid-cols-1 gap-8 px-4 py-12 text-sm text-muted-foreground sm:grid-cols-2 sm:px-6 sm:py-16 ${grid}`}>
         {columns}
       </div>
-      <div className="relative z-10 pb-4 pt-2 text-center text-xs text-neutral-500">
+      <div className="relative z-10 pb-4 pt-2 text-center text-xs text-muted-foreground">
         ©{new Date().getFullYear()} {store.identity.name}. All rights reserved.
       </div>
-      <div aria-hidden className="absolute bottom-0 left-4 select-none whitespace-nowrap text-6xl font-bold leading-none text-neutral-900 sm:text-8xl lg:text-9xl">
+      <div aria-hidden className="absolute bottom-0 left-4 select-none whitespace-nowrap text-6xl font-bold leading-none text-surface-elevated sm:text-8xl lg:text-9xl">
         {store.identity.name.toUpperCase()}
       </div>
     </footer>

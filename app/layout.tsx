@@ -141,7 +141,7 @@ export default function RootLayout({
           </Suspense>
 
           {/* Global navigation header with suspense boundary */}
-          <Suspense fallback={<div className="h-16 bg-neutral-900" />}>
+          <Suspense fallback={<div className="h-16 bg-surface-elevated" />}>
             <Header />
           </Suspense>
 
