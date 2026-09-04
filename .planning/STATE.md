@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2
 milestone_name: Themeable Storefront
-current_phase: 5
+current_phase: 05
 current_phase_name: Token Contract & Component Sweep
-status: planning
-stopped_at: Phase 5 context gathered
-last_updated: "2026-09-03T23:44:59.018Z"
-last_activity: 2026-09-02
-last_activity_desc: "ROADMAP.md created for v2: 4 phases (5-8), 16/16 requirements mapped"
-state_head: 234600f5f271516d47b452739ba3680999a45108
+status: executing
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-09-04T05:47:09.676Z"
+last_activity: 2026-09-03
+last_activity_desc: Phase 05 execution started
+state_head: eebec30b9bf5503b9579a6f72657f94a0862b9f1
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 12
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -25,14 +25,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-02 after v2 milestone start)
 
 **Core value:** A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** v2 Themeable Storefront — Phase 5 (Token Contract & Component Sweep), first of 4 phases
+**Current focus:** Phase 05 — Token Contract & Component Sweep
 
 ## Current Position
 
-Phase: 5 (Token Contract & Component Sweep) — READY TO EXECUTE
-Plan: — (not yet planned)
-Status: Roadmap complete, ready to plan Phase 5
-Last activity: 2026-09-02 — ROADMAP.md created for v2: 4 phases (5-8), 16/16 requirements mapped
+Phase: 05 (Token Contract & Component Sweep) — EXECUTING
+Plan: 2 of 12
+Status: Ready to execute
+Last activity: 2026-09-03 — Phase 05 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -63,6 +63,11 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: -
 
 *Updated after each plan completion*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 05 P01 | 20min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -76,6 +81,7 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - `theme.mode` (dark/light) folds into the theme file — a theme IS a mode; no separate mode switch
 - Per-theme component/markup overrides and per-category layout overrides are rejected — tokens + enumerated variants is the line
 - Admin theming is out of scope for this milestone; admin keeps its hardcoded palette
+- [Phase 05]: MANUAL_REVIEW files are excluded from scanning entirely (not just flagged inline), each printed with a written reason on every run. — Matches TOKEN-MAP §6's framing of them as named-file exceptions with a printed reason, so a future 0-violations result never silently omits content the scanner never looked at.
 
 ### Pending Todos
 
@@ -106,8 +112,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-03T20:21:50.207Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-token-contract-component-sweep/05-CONTEXT.md
+Last session: 2026-09-04T05:47:09.664Z
+Stopped at: Completed 05-01-PLAN.md
+Resume file: None
 
 Next: `/gsd-discuss-phase 5` (or `/gsd-plan-phase 5` directly) to start Token Contract & Component Sweep
