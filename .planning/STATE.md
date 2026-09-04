@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 06
 current_phase_name: Theme File Mechanism & Presets
 status: executing
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-09-04T19:45:37.471Z"
+stopped_at: Completed 06-02-PLAN.md
+last_updated: "2026-09-04T20:00:09.814Z"
 last_activity: 2026-09-04
 last_activity_desc: Phase 06 execution started
-state_head: 80f264bdc135f0d87c29fbf8f950ca5bbb27b08b
+state_head: 4790f3c965ba68ad668ce664fbe200b5e13d4f1c
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 17
-  completed_plans: 13
+  completed_plans: 14
   percent: 25
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-04 after Phase 5)
 ## Current Position
 
 Phase: 06 (Theme File Mechanism & Presets) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-09-04 — Phase 06 execution started
 
@@ -80,6 +80,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 05 P11 | 20min | 3 tasks | 19 files |
 | Phase 05 P12 | 95min | 3 tasks | 7 files |
 | Phase 06 P01 | 15min | 3 tasks | 19 files |
+| Phase 06 P02 | 25min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -122,6 +123,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 05]: [Phase 05] [Phase 05-12] Phase 5 closes with a clean whole-tree scan:tokens (0 violations, 2 manual-review rows), the 23-token contract intact across all nine sweep chunks, and NEXT_PUBLIC_THEME_PRIMARY confirmed absent tree-wide -- all four ROADMAP success criteria met with command evidence in 05-SCREENSHOTS.md's phase-close section.
 - [Phase 06]: [Phase 06-01] lib/themes/manifest.generated.ts added to scan-hardcoded-colors.mjs's THEME_SOURCE_FILES exclusion set (same treatment as lib/themes/tokens.ts) so scan:tokens stays 0 violations on the generated hex-bearing manifest.
 - [Phase 06]: [Phase 06-01] Barrel @import lines use an explicit relative prefix (./volt-dark.css) — a bare specifier broke the real Next.js build because Tailwind's CSS import resolution treats it as a Node-style module lookup, not a relative path.
+- [Phase 06-02]: theme.unknown_selection registered a task early (Task 1, not Task 2) because recordTelemetry's event param is a literal-union type that Task 1's own typecheck gate requires satisfied
+- [Phase 06-02]: An env default (NEXT_PUBLIC_THEME_DEFAULT) that is not a manifest name falls through silently with no telemetry -- treated as operator error at deploy, not a per-request anomaly
 
 ### Pending Todos
 
@@ -159,8 +162,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T19:45:37.394Z
-Stopped at: Completed 06-01-PLAN.md
+Last session: 2026-09-04T20:00:09.736Z
+Stopped at: Completed 06-02-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 6` (or `/gsd-plan-phase 6` directly) to start Theme File Mechanism & Presets
