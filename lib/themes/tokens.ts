@@ -7,18 +7,23 @@
  *
  * This is a plain object literal, not a CSS-file reader. Workers cannot
  * reliably read the filesystem at request time under the OpenNext build,
- * and D-09 rejected that approach explicitly. The values below are a
- * deliberate duplicate of `themes/volt-dark.css`; a contract test
- * (`tests/unit/lib/themes/token-contract.test.ts`) parses the CSS file and
- * asserts parity so the two can never silently drift.
+ * and D-09 rejected that approach explicitly. `getThemeTokens()` reads the
+ * generated manifest (`lib/themes/manifest.generated.ts`), which is itself
+ * parsed from `themes/*.css` at build time by `scripts/build-themes.mjs` —
+ * so the CSS file remains the single source of truth and the two can never
+ * silently drift.
  *
  * Do not read the environment here and do not import anything server-only —
  * Stripe's provider is a client component and will import this module into
  * the browser bundle.
  *
- * Phase 6 replaces only this function's body to read the generated
- * manifest for the active theme; callers never change again (D-09).
+ * getThemeTokens(name?) is a synchronous manifest lookup, defaulting to
+ * DEFAULT_THEME_NAME when no name is given or the name is not a manifest
+ * key. Callers never change again (D-11); this is the last body swap this
+ * function needs.
  */
+
+import { DEFAULT_THEME_NAME, THEME_MANIFEST } from "@/lib/themes/manifest.generated";
 
 export type ThemeTokens = {
   primary: string;
@@ -46,35 +51,14 @@ export type ThemeTokens = {
   fontDisplay: string;
 };
 
-const VOLT_DARK_TOKENS: ThemeTokens = {
-  primary: "#f97316",
-  onPrimary: "#000000",
-  surface: "#000000",
-  surfaceElevated: "#171717",
-  foreground: "#ffffff",
-  mutedForeground: "#a3a3a3",
-  border: "#404040",
-  ring: "#404040",
-  success: "#22c55e",
-  warning: "#f59e0b",
-  danger: "#ef4444",
-  info: "#3b82f6",
-  surfaceInverse: "#fdfdfb",
-  surfaceInverseElevated: "#f3f4f6",
-  onInverse: "#000000",
-  mutedOnInverse: "#6b7280",
-  borderInverse: "#374151",
-  radiusSm: "0.25rem",
-  radiusMd: "0.375rem",
-  radiusLg: "0.5rem",
-  radiusXl: "0.75rem",
-  fontSans:
-    "var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-  fontDisplay:
-    "var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-};
-
-/** Returns the active theme's typed token values (currently always volt-dark). */
-export function getThemeTokens(): ThemeTokens {
-  return VOLT_DARK_TOKENS;
+/**
+ * Returns the named theme's typed token values, falling back to
+ * DEFAULT_THEME_NAME when `name` is absent or not a manifest key.
+ */
+export function getThemeTokens(name: string = DEFAULT_THEME_NAME): ThemeTokens {
+  const entry =
+    THEME_MANIFEST.find((theme) => theme.name === name) ??
+    THEME_MANIFEST.find((theme) => theme.name === DEFAULT_THEME_NAME) ??
+    THEME_MANIFEST[0];
+  return entry.tokens as ThemeTokens;
 }

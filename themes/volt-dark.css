@@ -8,6 +8,7 @@
  * Per D-02, every token is required and declares a literal value. No token
  * resolves through a second token as a fallback default.
  */
+/* @theme label: Volt Dark | industry: outdoor & technical gear | synopsis: The store's original look — high-contrast black, electric-orange accent, built for gear that gets used hard. */
 [data-theme="volt-dark"] {
   /* Main colours */
   --store-primary: #f97316;
