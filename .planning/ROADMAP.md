@@ -112,7 +112,7 @@ Plans:
   3. Admin's Appearance section shows manifest-driven swatch-preview cards for every shipped theme, indicates the active one, and saves a selection through the existing `admin_settings` API pattern
   4. 2-3 preset themes ship, at least one light; the light preset's shadows and overlays read correctly rather than as dark-tuned leftovers
 
-**Plans**: 1/5 plans executed
+**Plans**: 2/5 plans executed
 
 Plans:
 **Wave 1**
@@ -121,7 +121,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 06-02-PLAN.md — `getActiveTheme()` D1 → env → manifest default, async root layout, `theme.unknown_selection` telemetry, Cormorant Garamond load
+- [x] 06-02-PLAN.md — `getActiveTheme()` D1 → env → manifest default, async root layout, `theme.unknown_selection` telemetry, Cormorant Garamond load
 
 **Wave 3** *(blocked on Wave 2 completion; 06-03 and 06-04 run in parallel)*
 
@@ -174,7 +174,7 @@ Plans:
 | 3. Decision Lock-In and Operator Runbooks | v1 | 3/3 | Complete | 2026-09-02 |
 | 4. Reference Documentation Refresh | v1 | 5/5 | Complete | 2026-09-02 |
 | 5. Token Contract & Component Sweep | v2 | 12/12 | Complete    | 2026-09-04 |
-| 6. Theme File Mechanism & Presets | v2 | 1/5 | In Progress|  |
+| 6. Theme File Mechanism & Presets | v2 | 2/5 | In Progress|  |
 | 7. Layout Switches | v2 | 0/TBD | Not started | - |
 | 8. Documentation & Visual QA Close-out | v2 | 0/TBD | Not started | - |
 
