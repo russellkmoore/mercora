@@ -537,7 +537,7 @@ export default function AdminSettingsPage() {
       )}
 
       {/* Tab Navigation */}
-      <div className="flex flex-wrap space-x-1 bg-neutral-800 p-1 rounded-lg">
+      <div className="flex flex-wrap gap-1 bg-neutral-800 p-1 rounded-lg">
         {tabs.map((tab) => {
           const Icon = tab.icon;
 
