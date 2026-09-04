@@ -36,7 +36,7 @@ export default function CartItemCard({ item }: CartItemCardProps) {
             <Button
               variant="outline"
               size="sm"
-              className="h-10 w-10 p-0 text-base touch-manipulation bg-surface-inverse-elevated text-on-inverse border border-inverse hover:bg-surface-inverse-elevated"
+              className="h-10 w-10 p-0 text-base touch-manipulation bg-surface-inverse-elevated text-on-inverse border border-border-inverse hover:bg-surface-inverse-elevated"
               onClick={() => updateQuantity(item.lineId, item.quantity - 1)}
             >
               -
@@ -47,7 +47,7 @@ export default function CartItemCard({ item }: CartItemCardProps) {
             <Button
               variant="outline"
               size="sm"
-              className="h-10 w-10 p-0 text-base touch-manipulation bg-surface-inverse-elevated text-on-inverse border border-inverse hover:bg-surface-inverse-elevated"
+              className="h-10 w-10 p-0 text-base touch-manipulation bg-surface-inverse-elevated text-on-inverse border border-border-inverse hover:bg-surface-inverse-elevated"
               onClick={() => updateQuantity(item.lineId, item.quantity + 1)}
             >
               +
