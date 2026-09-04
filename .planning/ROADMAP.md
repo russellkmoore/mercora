@@ -112,7 +112,7 @@ Plans:
   3. Admin's Appearance section shows manifest-driven swatch-preview cards for every shipped theme, indicates the active one, and saves a selection through the existing `admin_settings` API pattern
   4. 2-3 preset themes ship, at least one light; the light preset's shadows and overlays read correctly rather than as dark-tuned leftovers
 
-**Plans**: 4/5 plans executed
+**Plans**: 5/5 plans executed
 
 Plans:
 **Wave 1**
@@ -130,7 +130,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 06-05-PLAN.md — Light-preset acid test: per-preset capture grids, overlay/shadow QA with case-by-case fixes, phase-close evidence roll-up
+- [x] 06-05-PLAN.md — Light-preset acid test: per-preset capture grids, overlay/shadow QA with case-by-case fixes, phase-close evidence roll-up
 
 **UI hint**: yes
 
@@ -174,7 +174,7 @@ Plans:
 | 3. Decision Lock-In and Operator Runbooks | v1 | 3/3 | Complete | 2026-09-02 |
 | 4. Reference Documentation Refresh | v1 | 5/5 | Complete | 2026-09-02 |
 | 5. Token Contract & Component Sweep | v2 | 12/12 | Complete    | 2026-09-04 |
-| 6. Theme File Mechanism & Presets | v2 | 4/5 | In Progress|  |
+| 6. Theme File Mechanism & Presets | v2 | 5/5 | In Progress|  |
 | 7. Layout Switches | v2 | 0/TBD | Not started | - |
 | 8. Documentation & Visual QA Close-out | v2 | 0/TBD | Not started | - |
 

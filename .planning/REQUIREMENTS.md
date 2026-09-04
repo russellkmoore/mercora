@@ -21,7 +21,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **THEME-01**: A prebuild script (`scripts/build-themes.mjs`) scans `themes/*.css`, generates a CSS import barrel + `lib/themes/manifest.generated.ts` (`{ name, label, tokens }`), and fails the build if a theme misses a required token or contains any selector other than its own `[data-theme]` block — wired into `build:worker` AND `predev` (the real deploy path calls `build:worker`, not `build`; verified by breaking a theme file and running the deploy build)
 - [x] **THEME-02**: `getActiveTheme()` resolves `admin_settings` → `NEXT_PUBLIC_THEME_DEFAULT` env → manifest default, server-side in the root layout (blocking, never Suspense-wrapped, never isolate-cached); an unknown stored theme name falls back and emits a telemetry event registered in both `commerce.telemetry.v1` parity files
 - [x] **THEME-03**: Admin has an "Appearance" section with manifest-driven swatch-preview theme cards, the active theme indicated, saving via the existing `admin_settings` API pattern
-- [ ] **THEME-04**: 2–3 preset themes ship, at least one light; the light preset gets explicit visual QA of shadows/overlays (dark-tuned treatments), serving as the sweep-completeness acid test
+- [x] **THEME-04**: 2–3 preset themes ship, at least one light; the light preset gets explicit visual QA of shadows/overlays (dark-tuned treatments), serving as the sweep-completeness acid test
 
 ### Layout Switches
 
@@ -74,7 +74,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | THEME-01 | Phase 6 | Complete |
 | THEME-02 | Phase 6 | Complete |
 | THEME-03 | Phase 6 | Complete |
-| THEME-04 | Phase 6 | Pending |
+| THEME-04 | Phase 6 | Complete |
 | LAYOUT-01 | Phase 7 | Pending |
 | LAYOUT-02 | Phase 7 | Pending |
 | LAYOUT-03 | Phase 7 | Pending |
