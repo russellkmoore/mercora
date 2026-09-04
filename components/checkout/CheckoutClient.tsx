@@ -225,8 +225,6 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
         throw new Error(err.error || 'Failed to create order');
       }
 
-      const orderResponse = await res.json();
-      console.log('Order created successfully:', orderResponse);
       clearPendingCheckout(paymentIntentId);
 
       // Clear cart immediately after successful order creation
