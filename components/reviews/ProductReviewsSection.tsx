@@ -144,17 +144,17 @@ export function ProductReviewsSection({
   return (
     <div className="space-y-6">
       {eligibility?.canReview && (
-        <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+        <div className="rounded-lg border border-border bg-surface-elevated p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-base font-semibold text-white">Share your experience</h2>
-              <p className="text-sm text-gray-400">
+              <h2 className="text-base font-semibold text-foreground">Share your experience</h2>
+              <p className="text-sm text-muted-foreground">
                 Reviews are limited to verified purchases—head to your order history to add yours.
               </p>
             </div>
             <Link
               href="/orders"
-              className="inline-flex items-center justify-center rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-black transition hover:bg-orange-400"
+              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-on-primary transition hover:bg-primary/90"
             >
               Review your order
             </Link>
@@ -163,19 +163,19 @@ export function ProductReviewsSection({
       )}
 
       {ratingSummary ? (
-        <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+        <section className="rounded-lg border border-border bg-surface-elevated p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
               <StarRating value={ratingSummary.average} size="lg" />
               <div>
-                <p className="text-3xl font-semibold text-white">{ratingSummary.average.toFixed(1)}</p>
-                <p className="text-sm text-gray-400">
+                <p className="text-3xl font-semibold text-foreground">{ratingSummary.average.toFixed(1)}</p>
+                <p className="text-sm text-muted-foreground">
                   {ratingSummary.count} review{ratingSummary.count === 1 ? "" : "s"}
                 </p>
               </div>
             </div>
             {lastPublishedLabel && (
-              <p className="text-xs text-gray-500 sm:text-right">Last review {lastPublishedLabel}</p>
+              <p className="text-xs text-muted-foreground sm:text-right">Last review {lastPublishedLabel}</p>
             )}
           </div>
           {hasDistribution && ratingSummary?.distribution && (
@@ -184,17 +184,17 @@ export function ProductReviewsSection({
                 const count = ratingSummary.distribution?.[bucket] ?? 0;
                 const percent = ratingSummary.count > 0 ? Math.round((count / ratingSummary.count) * 100) : 0;
                 return (
-                  <div key={bucket} className="flex items-center gap-3 text-xs text-gray-300">
-                    <dt className="w-10 font-medium text-gray-400">{bucket}★</dt>
+                  <div key={bucket} className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <dt className="w-10 font-medium text-muted-foreground">{bucket}★</dt>
                     <dd className="flex-1">
-                      <div className="h-2 rounded-full bg-neutral-800">
+                      <div className="h-2 rounded-full bg-border">
                         <div
-                          className="h-full rounded-full bg-yellow-400"
+                          className="h-full rounded-full bg-primary"
                           style={{ width: `${percent}%` }}
                         />
                       </div>
                     </dd>
-                    <span className="w-10 text-right text-gray-500">{count}</span>
+                    <span className="w-10 text-right text-muted-foreground">{count}</span>
                   </div>
                 );
               })}
@@ -202,43 +202,43 @@ export function ProductReviewsSection({
           )}
         </section>
       ) : (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted-foreground">
           No reviews yet — be the first to share your experience after delivery.
         </p>
       )}
 
       {highlightEntries.length > 0 && (
-        <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+        <section className="rounded-lg border border-border bg-surface-elevated p-4">
           <div className="mb-4">
-            <h2 className="text-lg font-semibold text-white">Review highlights</h2>
-            <p className="text-sm text-gray-400">Balanced perspective from shoppers at both ends of the rating scale.</p>
+            <h2 className="text-lg font-semibold text-foreground">Review highlights</h2>
+            <p className="text-sm text-muted-foreground">Balanced perspective from shoppers at both ends of the rating scale.</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             {highlightEntries.map(({ key, tone, review, label }) => (
               <article
                 key={key}
-                className="rounded-md border border-neutral-700 bg-neutral-950 p-4"
+                className="rounded-md border border-border bg-surface p-4"
                 aria-label={label}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
                     <div className="mt-1 flex items-center gap-2">
                       <StarRating value={review.rating} size="sm" />
-                      <span className="text-sm font-semibold text-white">{review.rating.toFixed(1)}</span>
+                      <span className="text-sm font-semibold text-foreground">{review.rating.toFixed(1)}</span>
                     </div>
                   </div>
                   <span
-                    className={`text-xs font-medium ${tone === "positive" ? "text-green-300" : "text-amber-300"}`}
+                    className={`text-xs font-medium ${tone === "positive" ? "text-success" : "text-warning"}`}
                   >
                     {tone === "positive" ? "Positive" : "Critical"}
                   </span>
                 </div>
-                {review.title && <h3 className="mt-3 text-base font-semibold text-white">{review.title}</h3>}
+                {review.title && <h3 className="mt-3 text-base font-semibold text-foreground">{review.title}</h3>}
                 {review.body && (
-                  <p className="mt-2 text-sm text-gray-300 whitespace-pre-wrap">{review.body}</p>
+                  <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">{review.body}</p>
                 )}
-                <p className="mt-3 text-xs text-gray-500">
+                <p className="mt-3 text-xs text-muted-foreground">
                   {formatReviewDate(review.published_at ?? review.submitted_at ?? review.created_at) ?? "Recently updated"}
                 </p>
               </article>
@@ -248,11 +248,11 @@ export function ProductReviewsSection({
       )}
 
       {reviewCount > 0 && (
-        <section className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+        <section className="rounded-lg border border-border bg-surface-elevated p-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-white">All reviews</h2>
-              <p className="text-sm text-gray-400">
+              <h2 className="text-lg font-semibold text-foreground">All reviews</h2>
+              <p className="text-sm text-muted-foreground">
                 Showing {filteredReviews.length} of {reviewCount} review{reviewCount === 1 ? "" : "s"}.
               </p>
             </div>
@@ -261,18 +261,18 @@ export function ProductReviewsSection({
                 value={ratingSelectValue}
                 onValueChange={(value) => setRatingFilter(value === "all" ? "all" : Number(value))}
               >
-                <SelectTrigger className="w-full bg-neutral-800 border-neutral-700 text-white hover:bg-neutral-700 sm:w-40">
+                <SelectTrigger className="w-full bg-surface-elevated border-border text-foreground hover:bg-border sm:w-40">
                   <SelectValue placeholder="Filter rating" />
                 </SelectTrigger>
-                <SelectContent className="bg-neutral-800 border-neutral-700">
-                  <SelectItem value="all" className="text-white hover:bg-neutral-700">
+                <SelectContent className="bg-surface-elevated border-border">
+                  <SelectItem value="all" className="text-foreground hover:bg-border">
                     All ratings
                   </SelectItem>
                   {[5, 4, 3, 2, 1].map((value) => (
                     <SelectItem
                       key={`filter-${value}`}
                       value={String(value)}
-                      className="text-white hover:bg-neutral-700"
+                      className="text-foreground hover:bg-border"
                     >
                       {value} star{value === 1 ? "" : "s"}
                     </SelectItem>
@@ -280,17 +280,17 @@ export function ProductReviewsSection({
                 </SelectContent>
               </Select>
               <Select value={sortBy} onValueChange={(value) => setSortBy(value as typeof sortBy)}>
-                <SelectTrigger className="w-full bg-neutral-800 border-neutral-700 text-white hover:bg-neutral-700 sm:w-40">
+                <SelectTrigger className="w-full bg-surface-elevated border-border text-foreground hover:bg-border sm:w-40">
                   <SelectValue placeholder="Sort reviews" />
                 </SelectTrigger>
-                <SelectContent className="bg-neutral-800 border-neutral-700">
-                  <SelectItem value="recent" className="text-white hover:bg-neutral-700">
+                <SelectContent className="bg-surface-elevated border-border">
+                  <SelectItem value="recent" className="text-foreground hover:bg-border">
                     Most recent
                   </SelectItem>
-                  <SelectItem value="highest" className="text-white hover:bg-neutral-700">
+                  <SelectItem value="highest" className="text-foreground hover:bg-border">
                     Highest rated
                   </SelectItem>
-                  <SelectItem value="lowest" className="text-white hover:bg-neutral-700">
+                  <SelectItem value="lowest" className="text-foreground hover:bg-border">
                     Lowest rated
                   </SelectItem>
                 </SelectContent>
@@ -307,26 +307,26 @@ export function ProductReviewsSection({
                 return (
                   <article
                     key={review.id}
-                    className="rounded-lg border border-neutral-800 bg-neutral-950 p-4"
+                    className="rounded-lg border border-border bg-surface p-4"
                     aria-label={`Review rated ${review.rating} stars`}
                   >
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-2">
                         <StarRating value={review.rating} size="sm" />
-                        <span className="text-sm font-semibold text-white">{review.rating.toFixed(1)}</span>
+                        <span className="text-sm font-semibold text-foreground">{review.rating.toFixed(1)}</span>
                         {review.is_verified && (
-                          <span className="rounded-full bg-green-500/20 px-2 py-1 text-xs font-medium text-green-200">
+                          <span className="rounded-full bg-success/20 px-2 py-1 text-xs font-medium text-success">
                             Verified purchase
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-500">{submittedLabel}</p>
+                      <p className="text-xs text-muted-foreground">{submittedLabel}</p>
                     </div>
                     {review.title && (
-                      <h3 className="mt-3 text-base font-semibold text-white">{review.title}</h3>
+                      <h3 className="mt-3 text-base font-semibold text-foreground">{review.title}</h3>
                     )}
                     {review.body && (
-                      <p className="mt-2 text-sm text-gray-300 whitespace-pre-wrap">{review.body}</p>
+                      <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">{review.body}</p>
                     )}
                     {review.media?.length ? (
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -336,7 +336,7 @@ export function ProductReviewsSection({
                             href={media.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs font-medium text-orange-300 underline"
+                            className="text-xs font-medium text-primary underline"
                           >
                             View {media.type === "video" ? "video" : "photo"}
                           </a>
@@ -344,16 +344,16 @@ export function ProductReviewsSection({
                       </div>
                     ) : null}
                     {review.admin_response && (
-                      <div className="mt-4 rounded-md border border-neutral-700 bg-neutral-900 p-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-orange-400">Merchant response</p>
-                        <p className="mt-1 text-sm text-gray-200 whitespace-pre-wrap">{review.admin_response}</p>
+                      <div className="mt-4 rounded-md border border-border bg-surface-elevated p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-primary">Merchant response</p>
+                        <p className="mt-1 text-sm text-foreground whitespace-pre-wrap">{review.admin_response}</p>
                       </div>
                     )}
                   </article>
                 );
               })
             ) : (
-              <p className="text-sm text-gray-400">No reviews match the selected filters yet.</p>
+              <p className="text-sm text-muted-foreground">No reviews match the selected filters yet.</p>
             )}
           </div>
         </section>
