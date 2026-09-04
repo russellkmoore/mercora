@@ -130,13 +130,13 @@ export default async function CategoryPage({
             sizes="(min-width: 1024px) 100vw, 100vw"
             priority={true}
           />
-          <div className="absolute inset-0 bg-black/40 flex items-end">
-            <div className="p-6 sm:p-8 text-white">
+          <div className="absolute inset-0 bg-surface/40 flex items-end">
+            <div className="p-6 sm:p-8 text-foreground">
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2">
                 {typeof category.name === 'string' ? category.name : (category.name?.en || 'Category')}
               </h1>
               {category.description && (
-                <p className="line-clamp-3 max-w-2xl whitespace-pre-line text-lg text-gray-200">
+                <p className="line-clamp-3 max-w-2xl whitespace-pre-line text-lg text-foreground">
                   {typeof category.description === 'string' ? category.description : (category.description?.en || '')}
                 </p>
               )}
@@ -152,7 +152,7 @@ export default async function CategoryPage({
             {typeof category.name === 'string' ? category.name : (category.name?.en || 'Category')}
           </h1>
           {category.description && (
-            <p className="mx-auto max-w-2xl whitespace-pre-line text-gray-400">
+            <p className="mx-auto max-w-2xl whitespace-pre-line text-muted-foreground">
               {typeof category.description === 'string' ? category.description : (category.description?.en || '')}
             </p>
           )}
@@ -162,7 +162,7 @@ export default async function CategoryPage({
       {/* Error Display */}
       {error && (
         <div className="text-center py-8">
-          <p className="text-red-400">Error loading products: {error}</p>
+          <p className="text-danger">Error loading products: {error}</p>
         </div>
       )}
 
