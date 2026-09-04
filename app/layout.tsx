@@ -8,7 +8,9 @@
  * === Features ===
  * - **Global Layout**: Header, main content area, and footer structure
  * - **Authentication Provider**: Clerk authentication with dark theme
- * - **Typography**: Geist font family for modern, clean appearance
+ * - **Typography**: Geist font family plus an on-demand display face
+ *   (Cormorant Garamond) that theme files reference without loading it
+ *   themselves
  * - **Toast Notifications**: Sonner toaster with custom orange styling
  * - **Dynamic Routing**: Force dynamic rendering for server-side auth
  * - **Responsive Design**: Mobile-first approach with proper viewport handling
@@ -17,7 +19,13 @@
  * === Technical Implementation ===
  * - **Next.js App Router**: Latest routing system with layout nesting
  * - **Clerk Integration**: Full authentication provider with custom theming
- * - **Font Optimization**: Google Fonts with variable font loading
+ * - **Active Theming**: Async component that resolves the active theme
+ *   server-side (D1 -> env default -> manifest default, see
+ *   lib/themes/active-theme.ts) and stamps it on the html element before
+ *   any HTML is returned — never behind a Suspense boundary
+ * - **Font Optimization**: Google Fonts with variable font loading; the
+ *   display face never preloads, so only a page actually rendering it pays
+ *   for the fetch
  * - **CSS Variables**: Custom properties for consistent design system
  * - **Toast System**: Global notification system with custom positioning
  *
@@ -43,7 +51,7 @@
 export const dynamic = "force-dynamic";
 
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Cormorant_Garamond, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -54,6 +62,7 @@ import { Suspense } from "react";
 import WebVitals from "@/components/analytics/WebVitals";
 import { getStoreConfig, toPublicStoreConfig } from "@/lib/store-config";
 import { getThemeTokens } from "@/lib/themes/tokens";
+import { getActiveTheme } from "@/lib/themes/active-theme";
 import { StoreConfigProvider } from "@/lib/store";
 import SubscriptionSetupReturnHandler from "@/components/subscriptions/SubscriptionSetupReturnHandler";
 
@@ -79,6 +88,19 @@ const geistMono = Geist_Mono({
   preload: false, // Load on demand only
   weight: ["400"], // Single weight to minimize preload
   fallback: ["ui-monospace", "SFMono-Regular"],
+});
+
+// Display face for themes whose --store-font-display references it (e.g.
+// Luxe). Loaded once here so no theme file ever needs a font-loading
+// at-rule (D-02). preload stays off: a page that never renders text in
+// this face pays nothing extra; the browser only fetches it when a
+// [data-theme] block that references the variable actually renders text.
+const cormorantGaramond = Cormorant_Garamond({
+  variable: "--font-cormorant-garamond",
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  display: "swap",
+  preload: false,
 });
 
 // SEO metadata for the application
@@ -107,18 +129,25 @@ export const viewport: Viewport = {
 };
 
 /**
- * Root layout component that wraps all application pages
+ * Root layout component that wraps all application pages.
+ *
+ * Async so the active theme can be resolved server-side, blocking, before
+ * any HTML is returned (never wrapped in Suspense — RESEARCH Pitfall 3):
+ * the resolved name must already be on the html element in the first byte
+ * of the response, or the browser paints before the matching
+ * [data-theme] CSS block exists.
  *
  * @param children - Page components to render within the layout
  * @returns Complete application layout with global providers
  */
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   const config = getStoreConfig();
-  const themeTokens = getThemeTokens();
+  const activeTheme = await getActiveTheme();
+  const themeTokens = getThemeTokens(activeTheme);
   return (
     <ClerkProvider
       appearance={{
@@ -137,14 +166,14 @@ export default function RootLayout({
         },
       }}
     >
-      <html lang="en" data-theme="volt-dark" suppressHydrationWarning>
+      <html lang="en" data-theme={activeTheme} suppressHydrationWarning>
         <head>
           {/* MCP discovery links complement the metadata emitted by generateMetadata. */}
           <link rel="mcp-server" href="/api/mcp" type="application/json" />
           <link rel="mcp-schema" href="/api/mcp/schema" type="application/json" />
         </head>
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen bg-surface text-foreground`}
+          className={`${geistSans.variable} ${geistMono.variable} ${cormorantGaramond.variable} antialiased flex flex-col min-h-screen bg-surface text-foreground`}
           suppressHydrationWarning
         >
           <StoreConfigProvider config={toPublicStoreConfig(config)} themeTokens={themeTokens}>
