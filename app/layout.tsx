@@ -123,6 +123,18 @@ export default function RootLayout({
     <ClerkProvider
       appearance={{
         theme: dark,
+        variables: {
+          colorPrimary: themeTokens.primary,
+          colorPrimaryForeground: themeTokens.onPrimary,
+          colorBackground: themeTokens.surfaceElevated,
+          colorForeground: themeTokens.foreground,
+          colorMutedForeground: themeTokens.mutedForeground,
+          colorBorder: themeTokens.border,
+          colorNeutral: themeTokens.border,
+          colorDanger: themeTokens.danger,
+          colorSuccess: themeTokens.success,
+          colorWarning: themeTokens.warning,
+        },
       }}
     >
       <html lang="en" data-theme="volt-dark" suppressHydrationWarning>

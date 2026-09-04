@@ -573,3 +573,87 @@ live human-check — walk a real checkout to the payment step in a browser and c
 card fields, focus border, and invalid state render as expected — since a code read
 confirms the *values* are correct but not that Stripe's `appearance` API applies them as
 this plan intends.
+
+## Label: `chunk-5-account`
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| home | 1280 | resting | .screenshots/chunk-5-account/home__1280__resting.png | f5d499e64a4ed1403696d6186021ba12ef4535a17d6e900ccf863e2932d3680a | - |
+| home | 1280 | nav-open | .screenshots/chunk-5-account/home__1280__nav-open.png | e8cfd69ec43eb7ae5c92747d60a0d14f681edfbafc7084909d11ce9064c5855d | - |
+| home | 390 | resting | .screenshots/chunk-5-account/home__390__resting.png | 65e03c2daafd238c67b873d696686c39b36e83522febc199c325dbc3018d4850 | - |
+| home | 390 | nav-open | .screenshots/chunk-5-account/home__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | - |
+| category | 1280 | resting | .screenshots/chunk-5-account/category__1280__resting.png | 053043895c0bea61e6af3de495c72a7153e049ffe2ca2c55791e7fb29f723c86 | - |
+| category | 1280 | nav-open | .screenshots/chunk-5-account/category__1280__nav-open.png | cfeff9c49deec815dd8b3cf67bc36a2247bab1cf5b7b8b350b0af5f86f155b76 | - |
+| category | 390 | resting | .screenshots/chunk-5-account/category__390__resting.png | 3409a7c25896219a28cbed1ee3d5e9b9a8ac988433b0aadd0d0c7fe656dd3af0 | - |
+| category | 390 | nav-open | .screenshots/chunk-5-account/category__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | - |
+| product | 1280 | resting | .screenshots/chunk-5-account/product__1280__resting.png | a4e7fb5c0028c74dd207d51e96843566cfc6f1a6437aeaae434752510722bbb6 | - |
+| product | 1280 | nav-open | .screenshots/chunk-5-account/product__1280__nav-open.png | d5c03fe64d51a353f45113a778c442f0a4839686d36dc384ed544531d6574952 | - |
+| product | 390 | resting | .screenshots/chunk-5-account/product__390__resting.png | 92eae83cc0e2d916c09fc5525efe566a6e150c83fdd6271fb1938ece9a718632 | - |
+| product | 390 | nav-open | .screenshots/chunk-5-account/product__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | - |
+| cart | 1280 | cart-open | .screenshots/chunk-5-account/cart__1280__cart-open.png | d5aa4e6a788e4dc72ae5ace88f073e60486ca865e38ea02a4a3792636d2460de | - |
+| cart | 390 | cart-open | .screenshots/chunk-5-account/cart__390__cart-open.png | 562107229ce4aeb2e2faed585ae0ed6985e2857a8b04c5143b2b96090dddc0d5 | - |
+| checkout | 1280 | resting | .screenshots/chunk-5-account/checkout__1280__resting.png | 67a36d04df9c04d5e0547efd6158823f5144b6307365b9ad3733a0e473df1e85 | - |
+| checkout | 1280 | nav-open | .screenshots/chunk-5-account/checkout__1280__nav-open.png | 0f766c1d9d9391eb32220010acd11e4f2e684811e67902627d147f8072284b36 | - |
+| checkout | 390 | resting | .screenshots/chunk-5-account/checkout__390__resting.png | 8c634a185ba017d2eda279005c956ec61227d7d5d61b1d5029eab7b6f9feab55 | - |
+| checkout | 390 | nav-open | .screenshots/chunk-5-account/checkout__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | - |
+| account | 1280 | resting | .screenshots/chunk-5-account/account__1280__resting.png | 79bbd0d305a10b34b614efea325ee2b53ca43b61471e8634759b6d8dae762caf | - |
+| account | 1280 | nav-open | .screenshots/chunk-5-account/account__1280__nav-open.png | a4016a92afc536bf04a67250f1ae20835e8002c28402bcb8b5a125bf60c03584 | - |
+| account | 390 | resting | .screenshots/chunk-5-account/account__390__resting.png | ed89750938ee8c9b3a2e63dc6cb207c74e687d63f2486f72642e629a6b2164e7 | - |
+| account | 390 | nav-open | .screenshots/chunk-5-account/account__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | - |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+
+### chunk-5-account verdict
+
+Diffed against `chunk-4-checkout` (the prior tracked label). 21 of 22 captured cells are
+byte-identical. One cell differs:
+
+- **`product` / 1280 / resting, 1280 / nav-open**: isolates to the same large bounding box
+  over the product image and its thumbnail strip that 05-09 and 05-10 both already
+  documented — the alt-text placeholder standing in for the photo where the baseline shows
+  the fully loaded image. This is the same intermittent `next/image` load-race
+  capture-environment flake, unrelated to any file this plan touches (`app/product/[slug]/*`
+  is not in this plan's file list). Not re-chased further, per the same reasoning 05-09 and
+  05-10 recorded.
+
+All three tracked `account` cells (`1280 resting`, `1280 nav-open`, `390 resting`; the
+`390 nav-open` cell is the shared mobile-menu hash every route reuses) are byte-identical to
+`chunk-4-checkout`. This is expected, not a gap: the unauthenticated `/account` route still
+redirects to `/sign-in`, which this app never defines, so every captured `account` cell is
+still the S12 404 fallback (confirmed by content: `404` / `This page could not be loaded.`),
+not the authenticated account dashboard this plan's Task 1 files render. Task 1's files
+(`AccountNav`, `AddressManager`, `ProfileSettings`, `GiftCardDashboard`,
+`SubscriptionManager`, and the seven `app/account/**` route files) were verified instead by
+`scan:tokens` (0 violations), `build`/`lint`/`typecheck`, and a full read of every swept file
+against 05-TOKEN-MAP.md §2 — the same fallback this local dev environment has used for every
+prior account-route capture since `chunk-1-contract`.
+
+**`order-status` remains MISSING**, unchanged from every prior label. The local dev D1 seed
+still has no orders and this task's own verification step passes `--allow-missing` for
+exactly this reason (05-02 and every chunk since have recorded the same gap). That route's
+coverage rests on the same evidence prior chunks used: a full read of
+`app/order-status/[id]/page.tsx` against 05-TOKEN-MAP.md §2/§2b confirms all five dead
+shadcn classes (`text-text-secondary`, `text-text-primary`, `border-border-default`,
+`text-primary-700`, `text-primary-900`) are gone and replaced with real contract tokens
+(`text-muted-foreground`, `text-foreground`, `border-border`, `text-primary`), plus
+`scan:tokens --path app/order-status` reporting 0 violations. The task's own `<human-check>`
+covers the remaining behavioral gap (status colours reading correctly against real orders)
+for whoever seeds a local order or checks the deployed environment.
+
+**Supplementary cell: Clerk sign-in widget.** Captured manually (not part of the D-20
+tracked grid) by opening the header's "Sign In / Register" button and screenshotting the
+resulting modal at 1280px. The widget renders as a dark card (matching
+`--store-surface-elevated`) with white body text, an orange "Continue" button and orange
+"Sign up" / "Development mode" accents (matching `--store-primary`) — visibly branded as
+part of this store rather than a default light Clerk skin. This is the surface
+`appearance.variables` actually changed; before this task the provider passed only
+`{ theme: dark }` with no brand variables at all, so there is no prior-label cell to diff
+against — described here rather than treated as a snap, per this task's own instruction.
+
+**Task 2 order-status quartet reminder:** `components/OrderCard.tsx`'s status badge (visible
+on `/account/orders` and inside the account overview's recent-orders list, neither of which
+this local environment's unauthenticated capture reaches) was verified by the Task 2 commit's
+own automated checks (`grep -q -- '-info' components/OrderCard.tsx`) rather than a screenshot,
+consistent with the account-route capture gap above.

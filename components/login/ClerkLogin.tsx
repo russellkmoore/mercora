@@ -26,7 +26,7 @@ export default function ClerkLogin() {
     return (
       <Button
         variant="ghost"
-        className="text-white hover:bg-white hover:text-orange-500"
+        className="text-foreground hover:bg-foreground hover:text-primary"
         disabled
       >
         <LogIn className="mr-2 h-4 w-4" /> Loading...
@@ -40,7 +40,7 @@ export default function ClerkLogin() {
         <SignInButton mode="modal">
           <Button
             variant="ghost"
-            className="text-white hover:bg-white hover:text-orange-500"
+            className="text-foreground hover:bg-foreground hover:text-primary"
           >
             <LogIn className="mr-2 h-4 w-4" /> Sign In / Register
           </Button>
