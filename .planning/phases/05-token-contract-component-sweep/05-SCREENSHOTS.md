@@ -30,6 +30,7 @@ entry references a snap by its identifier (S1–S11) instead of restating it.
 | S9 | `muted-on-inverse` = `#6b7280` (gray-500) | drawer muted text spans gray-400..700; 500 is the midpoint | drawer secondary copy converges |
 | S10 | `border-inverse` = `#374151` (gray-700), per D-05's explicit enumeration | D-05 locks `border-inverse` to cover `border-gray-700`/`border-neutral-800`; D-10 also routes email dividers here | **email dividers darken noticeably** — flagged for human review on the email chunk |
 | S11 | `global-error.tsx` button background moves from its current hover-darkened orange to base `primary` | RESEARCH Pitfall 4 | error-page button becomes slightly brighter orange |
+| S12 | New `app/not-found.tsx` replaces Next's built-in 404 fallback | Discovered during chunk-1-contract capture: Next's built-in `notFound()` boundary injects its own unlayered `body{color:#000;background:#fff}` style, which beat the token-driven `bg-surface`/`text-foreground` utility classes once `<body>`'s inline style was removed (unlayered CSS always outranks Tailwind's `@layer utilities`, regardless of specificity) — every `notFound()` call site (category, product, blog, account, order-status) would have silently rendered an unbranded white 404 in a browser with a light OS color-scheme preference. Fixed by adding a themed `app/not-found.tsx` so the site's own 404 renders on the token contract instead of the framework fallback (Rule 1 auto-fix; see 05-03-SUMMARY.md) | The 404 page gains a heading, message, and "Return home" link on the dark surface instead of Next's plain white fallback text |
 
 ## Coverage notes
 
@@ -41,6 +42,13 @@ entry references a snap by its identifier (S1–S11) instead of restating it.
   covers the underlying route — by the app's own design, `nav-open` screenshots at 390px
   are visually identical across routes (same nav content, different filenames). This is
   expected, not a capture defect.
+- `chunk-1-contract`'s three `account` rows are the only rows in that label that differ
+  from `baseline`, and the cause is S12, not the token contract itself: the unauthenticated
+  `/account` route redirects to a `/sign-in` path this app never defines, so it always hits
+  the framework's built-in `notFound()` fallback. That fallback broke once the root layout's
+  `<body>` inline style was removed (see S12), so this plan added `app/not-found.tsx` as a
+  Rule 1 fix. Every other row in `chunk-1-contract` is a byte-identical hash match with
+  `baseline`.
 
 ## Label: `baseline`
 
@@ -68,6 +76,37 @@ entry references a snap by its identifier (S1–S11) instead of restating it.
 | account | 1280 | nav-open | .screenshots/baseline/account__1280__nav-open.png | 8b44a82de6a9dc3deb1cb5900301370a1e206106dd20ea7803ed3b5672e4b28c | - |
 | account | 390 | resting | .screenshots/baseline/account__390__resting.png | cb077f2117688ed312fab3f0fbfee836a309d729c5e706e5b0e3cbb5f6980996 | - |
 | account | 390 | nav-open | .screenshots/baseline/account__390__nav-open.png | 1347ff110437d5036ed218236ad82be19a50aa6215ffe86c9c44cf1906668256 | - |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+
+## Label: `chunk-1-contract`
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| home | 1280 | resting | .screenshots/chunk-1-contract/home__1280__resting.png | e3a6d3e06596035fee0c0fc2f8208df48f5222f1cf58b1bd41e64ccde5a1ee1f | - |
+| home | 1280 | nav-open | .screenshots/chunk-1-contract/home__1280__nav-open.png | 6565691e8fcfe095d9c01bd7cffe64119685d4cc0fd3e306956bdfb40a7e8841 | - |
+| home | 390 | resting | .screenshots/chunk-1-contract/home__390__resting.png | b3ac91d22cb3b2bffb98c85a209302125769ebfb0f454e47453bd5793e48d23d | - |
+| home | 390 | nav-open | .screenshots/chunk-1-contract/home__390__nav-open.png | 1347ff110437d5036ed218236ad82be19a50aa6215ffe86c9c44cf1906668256 | - |
+| category | 1280 | resting | .screenshots/chunk-1-contract/category__1280__resting.png | 0e9043b4b7b2424cce025bc8488aed883ce9d1a2421292a2fe5965d9f1db439a | - |
+| category | 1280 | nav-open | .screenshots/chunk-1-contract/category__1280__nav-open.png | 061b7b5134830b96bb8f16e505035fc829548ca6bc681e491dc52182dc1d7d7c | - |
+| category | 390 | resting | .screenshots/chunk-1-contract/category__390__resting.png | b7739154a537d2ef19761b0b4b4c129f7c4960984e075df88e756c78f0a122a3 | - |
+| category | 390 | nav-open | .screenshots/chunk-1-contract/category__390__nav-open.png | 1347ff110437d5036ed218236ad82be19a50aa6215ffe86c9c44cf1906668256 | - |
+| product | 1280 | resting | .screenshots/chunk-1-contract/product__1280__resting.png | 13bf10e27f35e4eb6846818c64eb134be3b88f41b16bd281c871f9bb01cfe00b | - |
+| product | 1280 | nav-open | .screenshots/chunk-1-contract/product__1280__nav-open.png | 6d449a9c72e280fcd1be294ee3d15959504ed0f7de34f66b0361c79274a267ff | - |
+| product | 390 | resting | .screenshots/chunk-1-contract/product__390__resting.png | 38eca79e5d2e04241b194611b8f4375e948825994e541de811a638df5cc8cc6c | - |
+| product | 390 | nav-open | .screenshots/chunk-1-contract/product__390__nav-open.png | 1347ff110437d5036ed218236ad82be19a50aa6215ffe86c9c44cf1906668256 | - |
+| cart | 1280 | cart-open | .screenshots/chunk-1-contract/cart__1280__cart-open.png | e6c78a66bf84804f5f9b09c0508abbe19aed336a90949ef2cc34ccb854e34b60 | - |
+| cart | 390 | cart-open | .screenshots/chunk-1-contract/cart__390__cart-open.png | f41cc5071ae72cd871138a26e947763e979a3d7e48c8afb9455c7202a81b615f | - |
+| checkout | 1280 | resting | .screenshots/chunk-1-contract/checkout__1280__resting.png | b3ee30c2d3bbc6431d5843272ce46783adce50d7fe769c941006baad9fd13734 | - |
+| checkout | 1280 | nav-open | .screenshots/chunk-1-contract/checkout__1280__nav-open.png | fd49c5d03ad38db2d8891803b286d026994ec4cdad0e21e47435df2901c568f4 | - |
+| checkout | 390 | resting | .screenshots/chunk-1-contract/checkout__390__resting.png | 7000b26a71fa72bde119bd01b1f54f8a8d9ea269a93bef75667e82dbe9a38896 | - |
+| checkout | 390 | nav-open | .screenshots/chunk-1-contract/checkout__390__nav-open.png | 1347ff110437d5036ed218236ad82be19a50aa6215ffe86c9c44cf1906668256 | - |
+| account | 1280 | resting | .screenshots/chunk-1-contract/account__1280__resting.png | 56453cfe2f1025a1011b92d75931a7e4cf70737ab6e5167114b7e63f2069d8cd | S12 — unauthenticated /account redirects to /sign-in, which 404s; the 404 page's own content changed (see S12) |
+| account | 1280 | nav-open | .screenshots/chunk-1-contract/account__1280__nav-open.png | a4d93b037356cc5f03972f227872a0acf3ea63bc985cdf62dbc31d3e7030e1be | S12 — same 404 boundary as above |
+| account | 390 | resting | .screenshots/chunk-1-contract/account__390__resting.png | 45d934fdf96bf7cbbff981e0af25d18c2178d024c12a6db49adcaa379c79eaa1 | S12 — same 404 boundary as above |
+| account | 390 | nav-open | .screenshots/chunk-1-contract/account__390__nav-open.png | 1347ff110437d5036ed218236ad82be19a50aa6215ffe86c9c44cf1906668256 | - |
 | order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
 | order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
 | order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |

@@ -52,12 +52,6 @@ export type StoreConfig = {
     chatKey: string;
   };
   theme: {
-    mode: "dark" | "light";
-    primary: string;
-    surface: string;
-    surfaceElevated: string;
-    foreground: string;
-    mutedForeground: string;
     logoPath: string;
   };
   social: Record<"instagram" | "facebook" | "x" | "youtube" | "linkedin", string>;
@@ -112,12 +106,6 @@ export const storeDefaults: StoreConfig = {
     chatKey: "mercora.chat",
   },
   theme: {
-    mode: "dark",
-    primary: "#f97316",
-    surface: "#000000",
-    surfaceElevated: "#171717",
-    foreground: "#ffffff",
-    mutedForeground: "#a3a3a3",
     logoPath: "/volt.png",
   },
   social: { instagram: "", facebook: "", x: "", youtube: "", linkedin: "" },
@@ -419,7 +407,6 @@ export function resolveStoreConfig(env: Environment = {}): StoreConfig {
     },
     theme: {
       ...storeDefaults.theme,
-      primary: text(env, "NEXT_PUBLIC_THEME_PRIMARY", storeDefaults.theme.primary),
       logoPath: text(env, "NEXT_PUBLIC_STORE_LOGO_PATH", storeDefaults.theme.logoPath),
     },
     mcp: {
