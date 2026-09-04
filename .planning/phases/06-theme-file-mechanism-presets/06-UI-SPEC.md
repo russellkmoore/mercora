@@ -75,12 +75,12 @@ Exceptions: none.
 
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
-| Page title (h1) | 24px (`text-2xl`) | bold 700 | 1.2 |
+| Page title (h1) | 24px (`text-2xl`) | semibold 600 | 1.2 |
 | Card / section heading (h3) | 18px (`text-lg`) | semibold 600 | 1.2 |
 | Body / labels | 14px (`text-sm`) | regular 400 | 1.5 |
 | Caption (industry line, helper text) | 12px (`text-xs`) | regular 400 | 1.5 |
 
-**Two weights declared: regular (400) and semibold (600).** Bold (700) appears exactly once — the page-level `<h1>` — inherited verbatim from the existing settings hub's own `<h1 className="text-2xl font-bold text-white">` (`app/admin/settings/page.tsx:484`), not a new weight introduced by this phase.
+**Two weights declared and used on this page: regular (400) and semibold (600).** The new Appearance page renders its own `<h1>` at `font-semibold` (600), not the settings hub's `font-bold` (700); the hub page itself is outside this phase's files and is not modified. No element on the Appearance page uses a third weight.
 
 **Storefront preset typography** is not specified here — it is entirely the frozen `font-sans` / `font-display` token pair from the Phase 5 contract. See `## Preset Token Contracts` for the two presets' font-stack values.
 
@@ -97,9 +97,39 @@ Exceptions: none.
 | Accent (10%) | `#ea580c` (`bg-orange-600`, hover `#c2410c bg-orange-700`) | Save button, the active nav-tab indicator style if the Appearance entry is styled as a tab |
 | Destructive | `#dc2626`-family via the existing `Button variant="destructive"` | Not used in this phase — no destructive action exists (theme selection is reversible) |
 
-Accent reserved for: the Save button and (if styled as a tab entry rather than a plain link) the active-tab background on the settings hub's tab strip. **Not** used for the theme cards' own selection state — see `## UI Considerations` for the selected-vs-active visual distinction.
+Accent reserved for: the Save button and (if styled as a tab entry rather than a plain link) the active-tab background on the settings hub's tab strip. **Not** used for the theme cards' own selection state — see `## UI Considerations
 
-Card preview chips and the inline mock (D-14, D-16) are the **one legitimate exception**: they render raw hex values from the theme manifest via inline `style={}`, because they are literally previewing colors that are not the admin's own palette. This needs no scanner exception — admin paths are already excluded (D-16).
+Probe: `ui-consideration-probe.cjs` over 5 authored elements (E1 theme card grid = list-collection; E2 theme card = interactive-control + static-content + media; E3 selection & save form = form + interactive-control; E4 settings-hub nav entry = nav; E5 page status messages = static-content). 24 applicable considerations: 20 resolved (explicit), 4 resolved (backstop), 0 dismissed; plus 3 researcher-added rows (1 unresolved, flagged by design under D-04). Autonomous run: kinds authored from the spec prose, not the heuristic classifier.
+
+| Category | Element | Status | Verification | Resolution |
+|----------|---------|--------|--------------|------------|
+| empty | E1 grid | resolved | explicit | The grid can never be empty: `build-themes.mjs` fails the build unless at least `volt-dark` validates, so the manifest always has ≥1 entry (see Copywriting "Empty state — N/A") |
+| loading | E1 grid | resolved | explicit | Cards render immediately from the build-time manifest; only the Active badge and Save button are disabled until the `appearance.theme` GET resolves (mirrors the hub's `settingsLoaded` guard) |
+| error | E1 grid | resolved | explicit | Settings GET failure shows the hub's load-failure banner copy verbatim and keeps Save disabled |
+| populated | E1 grid | resolved | explicit | Three cards (`volt-dark`, `luxe`, `midnight`) in `grid-cols-1 md:grid-cols-2 lg:grid-cols-3` with `gap-6` |
+| partial | E1 grid | resolved | explicit | A theme whose header omits `industry`/`synopsis` renders without those lines; no empty placeholders |
+| overflow | E1 grid | resolved | explicit | Grid wraps rows; the page never scrolls horizontally |
+| zero-one-many | E1 grid | resolved | explicit | Layout is not hardcoded to three; one card renders alone in the first column, N cards wrap. Copy has no plural forms that depend on count |
+| empty | E2 card | resolved | explicit | Cannot occur: the validator guarantees all 23 tokens, so all 5 chips and the mini mock always have values |
+| loading | E2 card | resolved | explicit | No per-card loading state; chips and mock are static manifest values rendered on first paint |
+| error | E2 card | resolved | explicit | No per-card error state; an invalid colour cannot reach the manifest (validator enforces 6-digit hex) |
+| populated | E2 card | resolved | explicit | Fixed 6-step anatomy (chips → mock → label → industry → synopsis → Active badge) |
+| overflow | E2 card | resolved | backstop | { statement: "Synopsis is clamped with `line-clamp-3` so cards stay uniform height; industry line and label use `truncate`", verification: backstop } — confirm visually with the three real synopses and one deliberately long label |
+| long-text | E2 card | resolved | backstop | { statement: "A label longer than the card width truncates with an ellipsis rather than wrapping the badge onto a new line", verification: backstop } — verify with a 60-character test label |
+| empty | E3 form | resolved | explicit | With no pending selection, or a pending selection equal to the saved theme, Save Changes is disabled |
+| loading | E3 form | resolved | explicit | While the POST is in flight the button is disabled and reads "Saving…"; cards stay selectable but a second submit is blocked |
+| error | E3 form | resolved | explicit | Error toast "Couldn't save your theme selection. Try again."; the pending selection and the ring outline are retained so retry is one click |
+| partial | E3 form | resolved | explicit | Not applicable by shape: the form has exactly one atomic value (`appearance.theme`); there is no half-filled state |
+| long-text | E3 form | resolved | explicit | Not applicable: the only value is a theme name validated against the manifest; the button label is fixed copy |
+| loading | E4 nav | resolved | explicit | Static `next/link`; no loading state. Current-route highlight comes from `usePathname()`, available on first render |
+| error | E4 nav | resolved | explicit | Not applicable: navigation to a static route; a missing route falls to the admin layout's existing not-found handling |
+| overflow | E4 nav | resolved | explicit | The hub's tab strip already wraps (`flex-wrap`); the eighth entry wraps like the others at narrow widths |
+| long-text | E4 nav | resolved | explicit | Fixed copy: label "Appearance", description "Theme & look" |
+| overflow | E5 status | resolved | explicit | Toasts are fixed-length copy; the load-failure banner wraps inside its container as it does on the hub today |
+| long-text | E5 status | resolved | backstop | { statement: "The success toast interpolates the theme label (\"Theme updated to {label}.\") and wraps rather than clips for labels up to 60 characters", verification: backstop } — verify once with a long test label |
+| selection-vs-saved divergence | E2/E3 | resolved | explicit | Clicking a card sets a pending selection shown with `ring-2 ring-orange-500`; the Active badge moves only after a successful Save |
+| a11y radio semantics | E1/E2 | resolved | backstop | { statement: "Grid is `role=\"radiogroup\"`, each card `role=\"radio\"` with `aria-checked`, arrow keys move selection, Space/Enter select", verification: backstop } — screen-reader pass in the phase's QA |
+| light-preset overlay polarity (D-04) | Dialog/AlertDialog/Sheet scrims, category hero overlay | ⚠ unresolved — planner must treat as assumption | — | Flagged finding: `bg-surface/NN` scrims read as a light ivory backdrop under `luxe`. Left for the THEME-04 light-preset QA task to resolve case by case per D-04; see `## Preset Token Contracts § Light-Preset QA Finding` |
 
 ---
 
