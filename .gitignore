@@ -70,3 +70,7 @@ linkedin-article.md
 /scripts/shopify-migration/**/manifest*.json
 !/scripts/shopify-migration/input/.gitkeep
 !/scripts/shopify-migration/output/.gitkeep
+
+# Visual-regression screenshot captures (05-02): never committed, may contain
+# customer names, addresses, and order contents.
+/.screenshots
