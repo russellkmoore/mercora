@@ -146,7 +146,26 @@ Plans:
   3. Each preset is captured across the seven-route grid; the three light presets (clinical, atelier, market) have their overlays and shadows inspected with every judgement recorded, fixes made only where something reads wrong
   4. The admin Appearance page shows all seven cards with industry and synopsis; selecting any of the four new presets switches the storefront on the next request; `scan:tokens` stays at 0 and the 23-token contract is unchanged
 
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+
+**Wave 1**
+
+- [ ] 06.1-01-PLAN.md — Tracer: `clinical` end to end — theme file, validator, regenerated manifest, served `data-theme`, first capture grid; opens `06.1-SCREENSHOTS.md`
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 06.1-02-PLAN.md — `retro`/`atelier`/`market` theme files, three `next/font` display faces in the root layout, regenerate to seven entries, switch probe and full gate
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 06.1-03-PLAN.md — Close the Phase 6 `font-display` carry-over by measurement: apply to 23 storefront headings, measure the `volt-dark` pixel delta, keep on zero or revert and hand off to Phase 8
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 06.1-04-PLAN.md — Canonical capture grids for all four presets, light-preset acid tests with every judgement recorded, per-preset backlog, phase-close roll-up, THEME-05 marked complete
+
 **UI hint**: yes
 
 ### Phase 7: Layout Switches
