@@ -85,7 +85,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   ]);
 
   return (
-    <div className="bg-surface text-foreground min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
+    <div className="bg-surface-elevated text-foreground min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
       <div className="max-w-5xl mx-auto">
         <ProductDisplay
           product={product}
