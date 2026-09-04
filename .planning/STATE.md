@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 06
 current_phase_name: Theme File Mechanism & Presets
 status: executing
-stopped_at: Phase 6 UI-SPEC approved
-last_updated: "2026-09-04T19:30:00.229Z"
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-09-04T19:45:37.471Z"
 last_activity: 2026-09-04
-last_activity_desc: Phase 05 complete, transitioned to Phase 6
-state_head: 4b0f2fea30c41e3ab954b2177ce8e25f8196850e
+last_activity_desc: Phase 06 execution started
+state_head: 80f264bdc135f0d87c29fbf8f950ca5bbb27b08b
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 17
-  completed_plans: 12
+  completed_plans: 13
   percent: 25
 ---
 
@@ -25,16 +25,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-04 after Phase 5)
 
 **Core value:** A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** Phase 6 — Theme File Mechanism & Presets
+**Current focus:** Phase 06 — Theme File Mechanism & Presets
 
 ## Current Position
 
-Phase: 06 (Theme File Mechanism & Presets) — READY TO EXECUTE
-Plan: Not started
+Phase: 06 (Theme File Mechanism & Presets) — EXECUTING
+Plan: 2 of 5
 Status: Ready to execute
-Last activity: 2026-09-04 — Phase 05 complete, transitioned to Phase 6
+Last activity: 2026-09-04 — Phase 06 execution started
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███░░░░░░░] 25%
 
 ## Performance Metrics
 
@@ -79,6 +79,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P10 | 90min | 3 tasks | 16 files |
 | Phase 05 P11 | 20min | 3 tasks | 19 files |
 | Phase 05 P12 | 95min | 3 tasks | 7 files |
+| Phase 06 P01 | 15min | 3 tasks | 19 files |
 
 ## Accumulated Context
 
@@ -119,6 +120,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 05]: [Phase 05-11] app/global-error.tsx maps its seven inline colours to MAIN-set getThemeTokens() fields only, avoiding RESEARCH Pitfall 4's predicted trap of pattern-matching the inverse-mapped drawers/Stripe/email consumers it sits near in CONTEXT.md.
 - [Phase 05]: [Phase 05] [Phase 05-12] Card/section email backgrounds map to surfaceInverseElevated (#f3f4f6), not surfaceInverse -- a real visual change (white card becomes light grey) beyond the S10 divider darkening the plan flagged in advance, per TOKEN-MAP §3b's literal table; documented explicitly in the phase-close record.
 - [Phase 05]: [Phase 05] [Phase 05-12] Phase 5 closes with a clean whole-tree scan:tokens (0 violations, 2 manual-review rows), the 23-token contract intact across all nine sweep chunks, and NEXT_PUBLIC_THEME_PRIMARY confirmed absent tree-wide -- all four ROADMAP success criteria met with command evidence in 05-SCREENSHOTS.md's phase-close section.
+- [Phase 06]: [Phase 06-01] lib/themes/manifest.generated.ts added to scan-hardcoded-colors.mjs's THEME_SOURCE_FILES exclusion set (same treatment as lib/themes/tokens.ts) so scan:tokens stays 0 violations on the generated hex-bearing manifest.
+- [Phase 06]: [Phase 06-01] Barrel @import lines use an explicit relative prefix (./volt-dark.css) — a bare specifier broke the real Next.js build because Tailwind's CSS import resolution treats it as a Node-style module lookup, not a relative path.
 
 ### Pending Todos
 
@@ -156,8 +159,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T18:51:08.693Z
-Stopped at: Phase 6 UI-SPEC approved
-Resume file: .planning/phases/06-theme-file-mechanism-presets/06-UI-SPEC.md
+Last session: 2026-09-04T19:45:37.394Z
+Stopped at: Completed 06-01-PLAN.md
+Resume file: None
 
 Next: `/gsd-discuss-phase 6` (or `/gsd-plan-phase 6` directly) to start Theme File Mechanism & Presets
