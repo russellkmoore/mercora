@@ -68,6 +68,19 @@ describe('observability Tail Worker parser and renderer', () => {
     expect([...TAIL_ROUTE_PATHS]).toEqual([...TELEMETRY_PATHS]);
   });
 
+  it('registers theme.unknown_selection at warning severity outside the tail critical list', () => {
+    // D-12 / RESEARCH Pitfall 4: this is a warning-severity, non-payment
+    // event. TAIL_CRITICAL_EVENTS is structurally critical-only (enforced
+    // above and by the tail parser's own runtime severity guard), so this
+    // event must be registered in TELEMETRY_EVENTS without ever joining
+    // that array.
+    expect(TELEMETRY_EVENTS['theme.unknown_selection']).toEqual({
+      severity: 'warning',
+      sampleRate: 1,
+    });
+    expect(TAIL_CRITICAL_EVENTS).not.toContain('theme.unknown_selection');
+  });
+
   it('keeps documented telemetry paths inside the closed route contract', () => {
     const documentation = readFileSync(join(process.cwd(), 'docs/observability.md'), 'utf8');
     const documentedPaths = [...documentation.matchAll(/path:\s*`?"([^"]+)"/g)]
