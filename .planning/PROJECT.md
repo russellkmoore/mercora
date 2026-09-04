@@ -97,13 +97,13 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 
 - ✓ Reference docs are current: every model mention names `@cf/openai/gpt-oss-20b` (no "Llama" anywhere in `docs/`), the MCP tool count reads 19 with the full list in `docs/CLAUDE.md`, the Testing section describes the three vitest suites and six CI gates, dependency versions point at `package.json`, no doc references the dead `API_STRUCTURE.md`, `docs/README.md` links all 27 files with the MCP server shown live at `/api/mcp`, and the four historical or proposal documents carry `Status: Historical` banners with the mobile checklist's 12 shipped items ticked — Phase 4 (REF-01, REF-02, REF-03, REF-04)
 - ✓ Dependency baseline current: `npm audit --omit=dev --audit-level=high` exits 0 under Next 16.3.1 and Node 24.18.1, CI gates at `high`, both Next-bundled exceptions closed on observed evidence (Sharp 0.35.3, PostCSS 8.5.23/8.5.26), next review 2026-12-01 — Phase 4 (DEP-01)
+- ✓ Token contract defined (23 tokens: 17 colours, 4 radii, 2 font faces) and the current volt-dark look moved verbatim to `themes/volt-dark.css` under `[data-theme="volt-dark"]` — Phase 5
+- ✓ All storefront components and page templates use token classes; whole-tree `scan:tokens` finds zero hardcoded palette values in storefront code (admin excluded) — Phase 5
 
 ### Active
 
 <!-- v2 Themeable Storefront — defined by /gsd-new-milestone 2026-09-02. REQ-IDs assigned in .planning/REQUIREMENTS.md. -->
 
-- [ ] Token contract defined (~18 tokens) and the current volt-dark look moved verbatim to `themes/volt-dark.css` under `[data-theme="volt-dark"]`
-- [ ] All storefront components and page templates use token classes; no hardcoded palette values remain in storefront code (admin excluded)
 - [ ] Prebuild theme scan generates the import barrel + manifest and fails the build on an invalid theme file
 - [ ] `getActiveTheme()` resolves `admin_settings` → env default → manifest default server-side, with telemetry on unknown theme names
 - [ ] Admin "Appearance" section: theme selection with swatch previews plus the three layout switches
@@ -212,6 +212,12 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 | `commerce-observability-tail` wired as a `tail_consumers` entry in `wrangler.jsonc` at milestone close (post-Phase 4) | The audit found the tail Worker deployed but not attached, so critical-severity alerts never reached the consumer | ✓ Good — email delivery check pending the next deploy |
 | Milestone v1 closed with tech debt accepted, not with open gaps | The audit satisfied all 19 requirements; the remaining items are operator follow-ups outside the repo, Cloudflare hygiene, or backlog | ✓ Good |
 
+| Token contract frozen at 23 tokens (17 colours incl. a 5-token inverse set, 4 radii, 2 font faces), not ~18; four discretionary volt-dark values adopted as measured: on-primary=black, border/ring=neutral-700, warning=amber-500, border-inverse=gray-700 (Phase 5) | Names locked in discussion (D-01); values derived from usage counts. border-inverse serves both drawer edges and email dividers, so email dividers darkened — accepted, with Phase 6 as the place to split the token if it reads badly | ✓ Good — user decision `adopt-all` 2026-09-04 |
+| The palette scan gate (`scripts/scan-hardcoded-colors.mjs`, `scan:tokens`) was built first and proven to fail on the dirty tree before any sweep; the Playwright harness (`screenshot:routes`) diffs every chunk against one pre-sweep baseline (Phase 5) | A "zero violations" claim is only worth something if the gate was seen failing; the pixel diff caught four real regressions that scanner, build, lint, typecheck and tests all missed | ✓ Good |
+| Checkout and order-status panels normalised from legacy light (`bg-white`) to the dark main-set tokens rather than kept as extra inverse-surface exceptions; only the two drawers, Stripe Elements, and emails use the inverse set (Phase 5) | Keeps the inverse set scoped to the four surfaces TOKEN-MAP names; the largest deliberate visual change in the phase, accepted at human verification | ✓ Good |
+| Non-cascade consumers (Stripe Elements, Clerk, emails, global-error) read hex via `getThemeTokens()`; the client receives a narrowed `PublicStoreConfig` (no merchant email) through `StoreConfigProvider` (Phase 5) | Server-computed tokens mean Phase 6 can make the active theme a per-request D1 read without touching callers; the narrowing closed a code-review finding | ✓ Good |
+| `app/not-found.tsx` added because Next's built-in 404 injects an unlayered white body background that beats Tailwind once the root inline style is gone (Phase 5) | Reachable from every `notFound()` call site, not just tooling; caught by the screenshot diff | ✓ Good |
+
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
@@ -230,4 +236,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-02 after v2 milestone start (Themeable Storefront)*
+*Last updated: 2026-09-04 after Phase 5 (Token Contract & Component Sweep)*
