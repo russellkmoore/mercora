@@ -277,3 +277,121 @@ than fixed here: the category page's hero image slot renders a broken-image icon
 environment because the local D1 fixture's one category has no configured image URL — unrelated
 to theming, a data-fixture gap, not a token or polarity issue (see the category hero row's own
 carried-forward note above for the QA implication).
+
+---
+
+## Task 3: Phase-close evidence roll-up
+
+Phase 6's four ROADMAP success criteria, each quoted, with the named evidence and the command or
+label that produced it. Requirements: THEME-01, THEME-02, THEME-03, THEME-04.
+
+### Criterion 1 (THEME-01) — evidence
+
+> *"Running the real deploy build (`build:worker`) against a deliberately broken theme file fails
+> the build, and `predev` runs the same scan."*
+
+TRUE. Evidenced by plan 06-01's deploy-gate run: deleting `--store-primary` from
+`themes/volt-dark.css` and running `npm run build:worker` exited non-zero, the captured log
+ending at `[build-themes] ABORT: 1 error(s).` with zero output from the Cloudflare builder
+(`opennextjs-cloudflare build`) — confirmed two ways in 06-01-SUMMARY.md (the raw log's early
+termination, and a `--silent` re-run removing npm's own script-echo preamble so the absence of
+builder output is unambiguous). `predev` runs the identical validator (`node
+scripts/build-themes.mjs`) before `db-local-ensure.mjs`, per `package.json`. Re-confirmed fresh
+at phase close: `mise exec -- node scripts/build-themes.mjs --check` → `[build-themes] check
+passed — generated output for 3 theme(s) is fresh.`
+
+### Criterion 2 (THEME-02) — evidence
+
+> *"`getActiveTheme()` resolves `admin_settings` → `NEXT_PUBLIC_THEME_DEFAULT` env → manifest
+> default, blocking server-side in the root layout (no FOUC, no Suspense, no isolate cache); an
+> unknown stored theme name falls back and emits a telemetry event present in both
+> `commerce.telemetry.v1` parity files."*
+
+TRUE. Evidenced by plan 06-02: `tests/unit/lib/themes/active-theme.test.ts` (15 tests) covers
+every row of the fallback chain (D1 present/absent/empty/invalid, env valid/invalid, manifest
+default) and asserts `theme.unknown_selection` fires exactly once, with no stored string leaked
+into any telemetry field. `app/layout.tsx`'s `RootLayout` is an `async function` that `await`s
+`getActiveTheme()` directly in the body, never behind either of the file's two `<Suspense>`
+boundaries and never isolate-cached (no module-scope state in `lib/themes/active-theme.ts`,
+confirmed by its own file-header comment and this plan's re-read of the file in Task 2's
+`<read_first>`). `theme.unknown_selection` is registered in `TELEMETRY_EVENTS`
+(`lib/observability/telemetry.ts`) and proven structurally absent from the tail Worker's
+critical-only list in `tests/unit/workers/observability-tail-core.test.ts`. Served-HTML probe:
+`curl http://localhost:3000/` showed `data-theme="volt-dark"` on first load in this session
+(Task 1), confirming the blocking server-side stamp with no FOUC-enabling client branch.
+
+### Criterion 3 (THEME-03) — evidence
+
+> *"Admin's Appearance section shows manifest-driven swatch-preview cards for every shipped
+> theme, indicates the active one, and saves a selection through the existing `admin_settings`
+> API pattern."*
+
+TRUE. Evidenced by plan 06-04: `components/admin/ThemePresetGrid.tsx` renders one card per
+`THEME_MANIFEST` entry with no hardcoded card-count literal (pinned by
+`tests/unit/app/admin-appearance-source.test.ts`, 8 tests), an Active badge driven by the loaded
+saved value, and a Save flow posting through the existing `POST /api/admin/settings` endpoint
+using the imported `APPEARANCE_SETTINGS_CATEGORY`/`APPEARANCE_THEME_SETTING_KEY` constants — no
+new API route. 06-04's own end-to-end proof (`x-dev-admin` dev-bypass header, since no Clerk
+session exists in this environment) posted `appearance.theme=midnight` and confirmed the
+storefront's `data-theme` attribute flipped with no restart. This plan's own Task 1 captures used
+the identical mechanism three more times (`volt-dark` → `midnight` → `luxe` → restored to
+`volt-dark`), re-confirming the save path still works at phase close. The human-observable
+click/ring/badge/toast/keyboard walkthrough remains unrun in this environment (no Clerk session)
+— tracked as WINDOWS #2, carried forward below, not re-attempted here since nothing in this
+plan's scope changes that constraint.
+
+### Criterion 4 (THEME-04) — evidence
+
+> *"2-3 preset themes ship, at least one light; the light preset's shadows and overlays read
+> correctly rather than as dark-tuned leftovers."*
+
+TRUE, with three narrow fixes required to make it true. Evidenced by plan 06-03's per-file
+assertions (`themes/midnight.css`, `themes/luxe.css`, both 23-token pure data files passing the
+validator unmodified) and this plan's own findings table (Task 2): all four UI-SPEC-located
+scrim sites were inspected under `luxe` against a real dark-preset baseline captured in the same
+session (Task 1). Two of the four read genuinely wrong (`Dialog`'s and `Sheet`'s/`AlertDialog`'s
+`bg-surface/NN` overlays composited to a near-invisible near-white wash instead of a scrim) and
+were fixed to a literal, sentinel-wrapped dark value; the fourth (`app/category/[slug]/page.tsx`
+hero overlay) was inspected and accepted as-is with a written reason. **Answering the plan's own
+required one-sentence summary: the acid test did expose dark-tuned leftovers — three of the four
+inspected sites (`Dialog`, `Sheet`, `AlertDialog`) shared one `bg-surface/NN` overlay pattern
+whose polarity assumption broke under the light preset, all three fixed the same way.**
+
+### Full green build (re-run at phase close)
+
+```
+$ mise exec -- node scripts/build-themes.mjs --check
+[build-themes] check passed — generated output for 3 theme(s) is fresh.
+$ mise exec -- npm run scan:tokens
+MANUAL-REVIEW  lib/utils/image-placeholders.ts  — ...
+MANUAL-REVIEW  lib/types/mach/Promotion.ts  — ...
+[scan-tokens] 0 violations
+$ mise exec -- npm run lint        # 0 errors, 52 pre-existing warnings (unchanged since Phase 5 close)
+$ mise exec -- npm run typecheck   # clean
+$ mise exec -- npm test            # 248 test files / 1932 tests, all green
+$ mise exec -- npm run build       # exit 0, "Compiled successfully"
+```
+
+### Carried forward
+
+Items this phase either closed or is handing to the next phase, each with why it is still open
+and where it should be picked up:
+
+| Item | Status | Where to pick up |
+|---|---|---|
+| Phase 5 screenshot coverage gaps: `order-status` (no seeded order), Stripe payment step (payment-intent 400 locally), authenticated account dashboard (no Clerk session), review-form error state | Still open — every capture run this phase (Task 1's three labels, the post-fix re-capture) hit the same four missing cells for the same environmental reasons | Phase 8's visual QA close-out; needs a seeded order and a Clerk session in whatever environment runs it |
+| `border-inverse`'s dual role within `volt-dark` (drawer edges + email dividers share one value) | Still open — re-checked under `luxe` this plan (Task 2) and confirmed unaffected: `luxe` and `midnight` each declare their own independent `border-inverse` value, so this is purely a `volt-dark`-internal question, not a cross-theme leak | Whoever next touches email templates or drawer borders; a token split is the likely resolution if the darker email divider (Phase 5 S10) reads badly |
+| Dropped direction-doc properties (`shadow`, `border-width`, `image-aspect`, `accent-2`, `font-mono`, `letter-spacing`) not expressible in the frozen 23-token contract | Backlog, not blocking | `.planning/todos/pending/theme-contract-dropped-properties.md` (written in plan 06-03) |
+| `NEXT_PUBLIC_THEME_DEFAULT` env-default-invalid case emits no telemetry (only a *stored* unknown value does, per D-12's literal wording) | Flagged planner decision from plan 06-02, not resolved either way | Revisit if deploy-time misconfiguration turns out to need its own signal |
+| `font-display` (Cormorant Garamond) fully wired end-to-end but applied by no component — `luxe`'s serif headings do not currently render anywhere | Still open (WINDOWS #1) | A future component-wiring task, or Phase 8's QA pass; this plan's Task 1/2 captures confirm the gap is unchanged (no heading in any captured cell renders serif) |
+| Task 3 (06-04) human-observable admin walkthrough (click a card, ring vs. badge, toast, keyboard radiogroup) never run — no Clerk session in this environment | Still open (WINDOWS #2) | Whoever next has a real Clerk-authenticated browser session against this environment |
+| `GET /api/admin/settings?category=X` inserts the full `defaultSettings` array (every category) when the filtered result is empty, not scoped to `X` — a latent bug in shared, unmodified code | Still open (WINDOWS #3) | A real fix scoping the insert to the requested category, before a genuinely fresh install exercises the Appearance page |
+| **Human action required:** `NEXT_PUBLIC_THEME_DEFAULT` Workers Build variable | Still outstanding — flagged in plan 06-02's `user_setup`, no evidence in this session or `STATE.md`'s Blockers/Concerns that it was completed | Cloudflare Dashboard → Workers & Pages → the Voltique Worker → Settings → Build → Variables and Secrets. RESEARCH Pitfall 7 notes this may already be redundant given `scripts/build-with-public-env.mjs`'s auto-injection of every `wrangler.jsonc` `NEXT_PUBLIC_*` var into `build:worker`, but the safer default (both the wrangler var, already done, and the dashboard variable) was followed as written |
+
+Category-hero overlay's judgement (Task 2, F4) rests on a synthetic reproduction rather than a
+live photo, since the local D1 fixture's one category has no configured image — carried forward
+above as part of the light-preset findings, worth a real look once a category has a real image.
+
+No cell in this record is marked covered without either a captured hash or an explicitly named
+substitute-evidence trail, matching the convention `05-SCREENSHOTS.md`'s own phase-close record
+established.
