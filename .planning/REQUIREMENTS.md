@@ -84,6 +84,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DOCS-03 | Phase 8 | Pending |
 
 **Coverage:**
+
 - v2 requirements: 16 total
 - Mapped to phases: 16
 - Unmapped: 0 ✓
