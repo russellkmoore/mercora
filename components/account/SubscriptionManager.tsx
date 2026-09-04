@@ -7,6 +7,7 @@ import {
   submitCustomerSubscriptionAction,
   subscriptionStatusLabel,
   type CustomerSubscriptionAction,
+  type CustomerSubscriptionStatus,
   type CustomerSubscriptionSummary,
 } from './subscription-dashboard';
 
@@ -21,7 +22,24 @@ interface SubscriptionContentProps {
 
 function detail(label: string, value: string | number | undefined) {
   if (value === undefined) return null;
-  return <div><dt className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</dt><dd className="mt-1 text-sm text-gray-200">{value}</dd></div>;
+  return <div><dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</dt><dd className="mt-1 text-sm text-foreground">{value}</dd></div>;
+}
+
+function statusToneClasses(status: CustomerSubscriptionStatus): string {
+  switch (status) {
+    case 'active':
+    case 'trialing':
+      return 'border-success bg-success/10 text-success';
+    case 'paused':
+    case 'past_due':
+      return 'border-warning bg-warning/10 text-warning';
+    case 'canceled':
+    case 'unpaid':
+    case 'incomplete_expired':
+      return 'border-danger bg-danger/10 text-danger';
+    default:
+      return 'border-info bg-info/10 text-info';
+  }
 }
 
 function lifecycleNotice(subscription: CustomerSubscriptionSummary): string | undefined {
@@ -68,13 +86,13 @@ export function SubscriptionContent({
   onRefresh,
 }: SubscriptionContentProps) {
   if (loading) {
-    return <div role="status" aria-live="polite" className="rounded-lg border border-neutral-700 bg-neutral-900 p-6 text-sm text-gray-300">Loading subscriptions…</div>;
+    return <div role="status" aria-live="polite" className="rounded-lg border border-border bg-surface-elevated p-6 text-sm text-muted-foreground">Loading subscriptions…</div>;
   }
   if (error) {
-    return <div role="alert" className="rounded-lg border border-red-900 bg-red-950/40 p-5"><p className="text-sm text-red-200">{error}</p><button type="button" onClick={onRefresh} className="mt-4 rounded-md border border-red-700 px-3 py-2 text-sm text-red-100 hover:border-red-500">Try again</button></div>;
+    return <div role="alert" className="rounded-lg border border-danger bg-danger/40 p-5"><p className="text-sm text-danger">{error}</p><button type="button" onClick={onRefresh} className="mt-4 rounded-md border border-danger px-3 py-2 text-sm text-danger hover:border-danger">Try again</button></div>;
   }
   if (subscriptions.length === 0) {
-    return <div className="rounded-lg border border-neutral-700 bg-neutral-900 p-6"><h2 className="font-semibold text-white">No subscriptions yet</h2><p className="mt-2 text-sm text-gray-400">Active and past subscriptions will appear here after provider confirmation.</p></div>;
+    return <div className="rounded-lg border border-border bg-surface-elevated p-6"><h2 className="font-semibold text-foreground">No subscriptions yet</h2><p className="mt-2 text-sm text-muted-foreground">Active and past subscriptions will appear here after provider confirmation.</p></div>;
   }
 
   return <div className="space-y-5">
@@ -83,10 +101,10 @@ export function SubscriptionContent({
       const collectionAction = subscriptionCollectionAction(subscription);
       const notice = lifecycleNotice(subscription);
       const isBusy = busyId === subscription.id;
-      return <article key={subscription.id} aria-labelledby={`${subscription.id}-heading`} className="rounded-lg border border-neutral-700 bg-neutral-900 p-5 shadow-sm">
+      return <article key={subscription.id} aria-labelledby={`${subscription.id}-heading`} className="rounded-lg border border-border bg-surface-elevated p-5 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0"><h2 id={`${subscription.id}-heading`} className="break-words text-lg font-semibold text-white">Plan {subscription.planId}</h2><p className="mt-1 break-all text-xs text-gray-500">Subscription {subscription.id}</p></div>
-          <span className="w-fit rounded-full border border-neutral-600 bg-neutral-950 px-3 py-1 text-xs font-medium text-gray-200">{subscriptionStatusLabel(subscription.status)}</span>
+          <div className="min-w-0"><h2 id={`${subscription.id}-heading`} className="break-words text-lg font-semibold text-foreground">Plan {subscription.planId}</h2><p className="mt-1 break-all text-xs text-muted-foreground">Subscription {subscription.id}</p></div>
+          <span className={`w-fit rounded-full border px-3 py-1 text-xs font-medium ${statusToneClasses(subscription.status)}`}>{subscriptionStatusLabel(subscription.status)}</span>
         </div>
         <dl className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {detail('Quantity', subscription.quantity)}
@@ -94,12 +112,12 @@ export function SubscriptionContent({
           {detail('Period ends', formatSubscriptionDate(subscription.currentPeriodEnd))}
           {detail('Canceled', formatSubscriptionDate(subscription.canceledAt))}
         </dl>
-        {notice && <p className="mt-5 rounded-md border border-amber-900/70 bg-amber-950/30 px-3 py-2 text-sm text-amber-100">{notice}</p>}
-        {manageable && <div className="mt-5 flex flex-wrap gap-3 border-t border-neutral-800 pt-4">
-          {collectionAction?.type === 'resume' && <button type="button" disabled={busyId !== null} onClick={() => onAction(subscription, collectionAction)} className="rounded-md border border-neutral-600 px-3 py-2 text-sm text-gray-100 hover:border-orange-500 disabled:cursor-not-allowed disabled:opacity-50">{isBusy ? 'Requesting…' : 'Resume collection'}</button>}
-          {collectionAction?.type === 'pause' && <button type="button" disabled={busyId !== null} onClick={() => onAction(subscription, collectionAction)} className="rounded-md border border-neutral-600 px-3 py-2 text-sm text-gray-100 hover:border-orange-500 disabled:cursor-not-allowed disabled:opacity-50">{isBusy ? 'Requesting…' : 'Pause collection'}</button>}
-          {!subscription.cancelAtPeriodEnd && <button type="button" disabled={busyId !== null} onClick={() => onAction(subscription, { type: 'cancel', mode: 'period_end' })} className="rounded-md border border-neutral-600 px-3 py-2 text-sm text-gray-100 hover:border-orange-500 disabled:cursor-not-allowed disabled:opacity-50">Cancel at period end</button>}
-          <button type="button" disabled={busyId !== null} onClick={() => onAction(subscription, { type: 'cancel', mode: 'immediate' })} className="rounded-md border border-red-900 px-3 py-2 text-sm text-red-300 hover:border-red-600 disabled:cursor-not-allowed disabled:opacity-50">Cancel immediately</button>
+        {notice && <p className="mt-5 rounded-md border border-warning/70 bg-warning/30 px-3 py-2 text-sm text-warning">{notice}</p>}
+        {manageable && <div className="mt-5 flex flex-wrap gap-3 border-t border-border pt-4">
+          {collectionAction?.type === 'resume' && <button type="button" disabled={busyId !== null} onClick={() => onAction(subscription, collectionAction)} className="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:border-primary disabled:cursor-not-allowed disabled:opacity-50">{isBusy ? 'Requesting…' : 'Resume collection'}</button>}
+          {collectionAction?.type === 'pause' && <button type="button" disabled={busyId !== null} onClick={() => onAction(subscription, collectionAction)} className="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:border-primary disabled:cursor-not-allowed disabled:opacity-50">{isBusy ? 'Requesting…' : 'Pause collection'}</button>}
+          {!subscription.cancelAtPeriodEnd && <button type="button" disabled={busyId !== null} onClick={() => onAction(subscription, { type: 'cancel', mode: 'period_end' })} className="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:border-primary disabled:cursor-not-allowed disabled:opacity-50">Cancel at period end</button>}
+          <button type="button" disabled={busyId !== null} onClick={() => onAction(subscription, { type: 'cancel', mode: 'immediate' })} className="rounded-md border border-danger px-3 py-2 text-sm text-danger hover:border-danger disabled:cursor-not-allowed disabled:opacity-50">Cancel immediately</button>
         </div>}
       </article>;
     })}
@@ -165,8 +183,8 @@ export function SubscriptionManager() {
   }
 
   return <div className="space-y-4">
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="max-w-2xl text-sm text-gray-400">Changes are confirmed by the payment provider before the status shown here updates.</p><button type="button" disabled={loading || busyId !== null} onClick={() => void refresh(true)} className="w-fit rounded-md border border-neutral-700 px-3 py-2 text-sm text-gray-200 hover:border-orange-500 disabled:cursor-not-allowed disabled:opacity-50">Refresh</button></div>
-    {notice && <p role="status" aria-live="polite" className="rounded-md border border-emerald-900 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-100">{notice}</p>}
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="max-w-2xl text-sm text-muted-foreground">Changes are confirmed by the payment provider before the status shown here updates.</p><button type="button" disabled={loading || busyId !== null} onClick={() => void refresh(true)} className="w-fit rounded-md border border-border px-3 py-2 text-sm text-foreground hover:border-primary disabled:cursor-not-allowed disabled:opacity-50">Refresh</button></div>
+    {notice && <p role="status" aria-live="polite" className="rounded-md border border-success bg-success/30 px-4 py-3 text-sm text-success">{notice}</p>}
     <SubscriptionContent loading={loading} error={error} subscriptions={subscriptions} busyId={busyId} onAction={(subscription, action) => void act(subscription, action)} onRefresh={() => void refresh(true)} />
   </div>;
 }
