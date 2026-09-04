@@ -99,15 +99,16 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 - ✓ Dependency baseline current: `npm audit --omit=dev --audit-level=high` exits 0 under Next 16.3.1 and Node 24.18.1, CI gates at `high`, both Next-bundled exceptions closed on observed evidence (Sharp 0.35.3, PostCSS 8.5.23/8.5.26), next review 2026-12-01 — Phase 4 (DEP-01)
 - ✓ Token contract defined (23 tokens: 17 colours, 4 radii, 2 font faces) and the current volt-dark look moved verbatim to `themes/volt-dark.css` under `[data-theme="volt-dark"]` — Phase 5
 - ✓ All storefront components and page templates use token classes; whole-tree `scan:tokens` finds zero hardcoded palette values in storefront code (admin excluded) — Phase 5
+- ✓ Prebuild theme scan (`scripts/build-themes.mjs`) generates the CSS barrel + typed manifest and fails `build:worker`/`predev` on an invalid theme file — Phase 6
+- ✓ `getActiveTheme()` resolves `admin_settings` → `NEXT_PUBLIC_THEME_DEFAULT` → manifest default per request in the async root layout, with `theme.unknown_selection` telemetry — Phase 6
+- ✓ Admin Appearance page with manifest-driven swatch-preview cards (industry + synopsis metadata), Active badge, explicit Save through the existing settings API — Phase 6
+- ✓ Three presets ship (`volt-dark`, `luxe` light, `midnight` dark); light-preset scrim QA fixed three shadcn overlays — Phase 6
 
 ### Active
 
 <!-- v2 Themeable Storefront — defined by /gsd-new-milestone 2026-09-02. REQ-IDs assigned in .planning/REQUIREMENTS.md. -->
 
-- [ ] Prebuild theme scan generates the import barrel + manifest and fails the build on an invalid theme file
-- [ ] `getActiveTheme()` resolves `admin_settings` → env default → manifest default server-side, with telemetry on unknown theme names
-- [ ] Admin "Appearance" section: theme selection with swatch previews plus the three layout switches
-- [ ] 2–3 preset themes ship, at least one light
+- [ ] Admin "Appearance" section: the three layout switches (theme selection with swatch previews shipped in Phase 6)
 - [ ] Category, home hero, and product gallery render as enumerated server-chosen variants with one render test each
 - [ ] `docs/theming.md` documents the token contract, theme duplication, and build validation
 
@@ -218,6 +219,12 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 | Non-cascade consumers (Stripe Elements, Clerk, emails, global-error) read hex via `getThemeTokens()`; the client receives a narrowed `PublicStoreConfig` (no merchant email) through `StoreConfigProvider` (Phase 5) | Server-computed tokens mean Phase 6 can make the active theme a per-request D1 read without touching callers; the narrowing closed a code-review finding | ✓ Good |
 | `app/not-found.tsx` added because Next's built-in 404 injects an unlayered white body background that beats Tailwind once the root inline style is gone (Phase 5) | Reachable from every `notFound()` call site, not just tooling; caught by the screenshot diff | ✓ Good |
 
+| A theme is one CSS file: a metadata header comment (`@theme label | industry | synopsis`) plus a single `[data-theme="<name>"]` block with all 23 tokens as 6-digit hex; the validator rejects anything else (`@import`, `@font-face`, second selectors, unknown tokens); generated barrel + manifest are committed with a CI `--check` (Phase 6) | Themes are data, not code; email/Stripe read hex from the manifest; committed generated files keep `tsc`/vitest working on a fresh clone | ✓ Good |
+| `theme.unknown_selection` is registered in `TELEMETRY_EVENTS` only, not in the tail Worker's `TAIL_CRITICAL_EVENTS` (Phase 6) | That list is `severity: critical`-only and test-enforced; a warning event there breaks a passing test. Parity test asserts the event is known and correctly absent | ✓ Good — accepted reading of THEME-02 |
+| Theme resolution is one blocking D1 read per request in the root layout, no isolate cache, no Suspense; `NEXT_PUBLIC_THEME_DEFAULT` declared in `wrangler.jsonc` and as a Workers Build variable (Phase 6) | An isolate-level cache serves a stale theme after an admin save; Suspense would cause FOUC | ✓ Good — Build variable pending Russell |
+| Presets beyond the three shipped (Clinical, Retro, Atelier, Market) and the direction doc's extra properties (shadow, border-width, image-aspect, accent-2, mono) are deferred; the 23-token contract stays frozen (Phase 6) | Contract is one-way (Phase 5 D-01); extra properties would touch the validator, every theme file and the sweep | ✓ Good — backlog |
+| Light-preset scrims: `dialog`, `alert-dialog`, `sheet` use `bg-black/NN` under the scanner sentinel; the category hero overlay was inspected and left as-is (Phase 6) | Token-driven scrims inherit theme polarity and washed out under `luxe`; a scrim must be polarity-neutral; no new token | ✓ Good |
+
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
@@ -236,4 +243,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-04 after Phase 5 (Token Contract & Component Sweep)*
+*Last updated: 2026-09-04 after Phase 6 (Theme File Mechanism & Presets)*

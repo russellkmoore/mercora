@@ -22,7 +22,7 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-04 after Phase 5)
+See: .planning/PROJECT.md (updated 2026-09-04 after Phase 6)
 
 **Core value:** A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
 **Current focus:** Phase 06 — Theme File Mechanism & Presets
@@ -151,16 +151,21 @@ Open items carried from v1 close (blocks v2 feature work; full list in `mileston
 
 Research flags for v2 execution (from `.planning/research/SUMMARY.md`):
 
-- Phase 6: any new telemetry event needs both `commerce.telemetry.v1` parity files updated (`lib/observability/telemetry.ts` + `workers/observability-tail/src/core.ts`) — locked v1 rule
-- Phase 6: `scripts/build-themes.mjs` must be wired into `build:worker` and `predev` explicitly — a `prebuild` script name never fires on the real deploy path
 
 Carried out of Phase 5:
 
 - [Phase 5] `data/d1/seed.sql` products bulk insert has a row missing its `options` value; the documented `--file=data/d1/seed.sql` load fails. Not fixed (out of scope); a local-only D1 fixture was used for screenshots
 - [Phase 5] Screenshot coverage gaps for Phase 8's visual QA: order-status (no seeded order), Stripe payment step (payment-intent 400 locally), authenticated account dashboard, review-form error state. Seed an order and a Clerk session before the cross-preset QA pass
 - [Phase 5] Prose blocks (`prose-invert prose-orange`) run on Typography plugin defaults; prose accent colour will not follow a theme until Phase 6 wires typography colours off the CSS variables
-- [Phase 5] `border-inverse` serves both drawer edges and email dividers; if the darker email divider reads badly, Phase 6 should split it into a second token rather than hardcode an exception
-- [Phase 5] Six pre-packaged theme specs in `docs/voltique-theme-direction.md` (untracked) use different token names than the frozen contract; Phase 6 needs a rename map. See `.planning/todos/pending/theme-metadata-industry-synopsis-admin.md`
+- [Phase 5] `border-inverse` serves both drawer edges and email dividers; split into a second token in a later milestone only if a preset's email dividers read badly
+
+Carried out of Phase 6 (see `.planning/WINDOWS.md`):
+
+- [Needs Russell] Add `NEXT_PUBLIC_THEME_DEFAULT=volt-dark` as a Cloudflare Workers Build variable before the next deploy
+- [Phase 6] `--store-font-display` is wired end to end but no component applies the `font-display` class, so Luxe's serif headings never render; wire it onto heading elements (no visual change under volt-dark) — Phase 7 or 8
+- [Phase 6] `app/api/admin/settings/route.ts` GET re-inserts the entire `defaultSettings` array when a category filter returns no rows; would 500 a fresh install's first Appearance-page load. Pre-existing, out of scope so far
+- [Phase 6] Admin Appearance page has not been walked through in a real browser with a Clerk admin session; Dialog/AlertDialog scrims under `luxe` verified by compositing test only
+- [Phase 6] Four more preset specs (Clinical, Retro, Atelier, Market) and the direction doc's extra properties are backlog
 - [Phase 06-04] app/api/admin/settings/route.ts's GET ?category=X inserts the full defaultSettings array (all categories) when the filtered result is empty; appearance has no defaults, so a fresh DB with other categories already populated would 500 on the Appearance page's own load. Out of scope for 06-04 (interfaces explicitly forbid touching this file); logged in WINDOWS.md #3.
 
 ## Deferred Items
@@ -173,8 +178,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T20:56:26.717Z
+Last session: 2026-09-04T21:20:20Z
 Stopped at: Phase 06 complete, ready to plan Phase 7
 Resume file: None
 
-Next: `/gsd-discuss-phase 6` (or `/gsd-plan-phase 6` directly) to start Theme File Mechanism & Presets
+Next: `/gsd-discuss-phase 7` (or `/gsd-plan-phase 7` directly) to start Layout Switches
