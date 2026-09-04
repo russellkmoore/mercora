@@ -134,6 +134,21 @@ Plans:
 
 **UI hint**: yes
 
+### Phase 06.1: Remaining Presets: Clinical, Retro, Atelier, Market (INSERTED)
+
+**Goal**: The four remaining presets from `docs/voltique-theme-direction.md` — `clinical`, `retro`, `atelier`, `market` — ship as validated theme files on the frozen 23-token contract, each with header metadata and screenshot evidence, and the three light ones pass the same scrim/shadow QA Luxe did, so the admin Appearance page offers all six merchant looks plus volt-dark.
+**Depends on**: Phase 6 — uses the validator, manifest, resolver, admin grid and screenshot harness exactly as shipped; no mechanism changes.
+**Requirements**: THEME-05
+**Success Criteria** (what must be TRUE):
+
+  1. `themes/clinical.css`, `themes/retro.css`, `themes/atelier.css`, `themes/market.css` exist, each a single `[data-theme]` block with all 23 tokens as hex plus a `@theme` header (label, industry, synopsis); `build-themes.mjs --check` passes and the committed manifest lists seven themes
+  2. Display fonts named by the direction doc (Orbitron/Righteous, Fraunces, Nunito) load via `next/font` with `preload: false` and reach `--store-font-display`; volt-dark pages pay no extra font bytes
+  3. Each preset is captured across the seven-route grid; the three light presets (clinical, atelier, market) have their overlays and shadows inspected with every judgement recorded, fixes made only where something reads wrong
+  4. The admin Appearance page shows all seven cards with industry and synopsis; selecting any of the four new presets switches the storefront on the next request; `scan:tokens` stays at 0 and the 23-token contract is unchanged
+
+**Plans**: TBD
+**UI hint**: yes
+
 ### Phase 7: Layout Switches
 
 **Goal**: Admins can change a page template's structure — category density, home hero style, product gallery position — through enumerated, server-chosen variant components, independent of which theme is active.
