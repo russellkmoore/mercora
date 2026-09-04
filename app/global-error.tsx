@@ -1,5 +1,7 @@
 "use client";
 
+import { getThemeTokens } from "@/lib/themes/tokens";
+
 interface GlobalErrorProps {
   error: Error & { digest?: string };
   reset: () => void;
@@ -8,8 +10,12 @@ interface GlobalErrorProps {
 /**
  * Root fallback rendered in place of the normal layout. It deliberately uses
  * no application provider, router component, stylesheet, or error detail.
+ * Because it renders with no stylesheet, its colors come from getThemeTokens()
+ * directly rather than the client theme-token hook, which throws outside the
+ * provider this page is, by definition, rendered without.
  */
 export default function GlobalError({ reset }: GlobalErrorProps) {
+  const tokens = getThemeTokens();
   return (
     <html lang="en">
       <head>
@@ -20,8 +26,8 @@ export default function GlobalError({ reset }: GlobalErrorProps) {
         style={{
           margin: 0,
           minHeight: "100vh",
-          background: "#171717",
-          color: "#ffffff",
+          background: tokens.surfaceElevated,
+          color: tokens.foreground,
           fontFamily: "system-ui, sans-serif",
         }}
       >
@@ -38,7 +44,7 @@ export default function GlobalError({ reset }: GlobalErrorProps) {
           }}
         >
           <h1 style={{ margin: 0, fontSize: "1.5rem" }}>Something went wrong</h1>
-          <p style={{ maxWidth: "28rem", margin: "0.75rem 0 0", color: "#d4d4d4" }}>
+          <p style={{ maxWidth: "28rem", margin: "0.75rem 0 0", color: tokens.mutedForeground }}>
             The storefront could not be loaded. Please try again.
           </p>
           <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.5rem" }}>
@@ -48,8 +54,8 @@ export default function GlobalError({ reset }: GlobalErrorProps) {
               style={{
                 border: 0,
                 borderRadius: "0.375rem",
-                background: "#ea580c",
-                color: "#ffffff",
+                background: tokens.primary,
+                color: tokens.onPrimary,
                 padding: "0.625rem 1.25rem",
                 fontWeight: 600,
                 cursor: "pointer",
@@ -62,9 +68,9 @@ export default function GlobalError({ reset }: GlobalErrorProps) {
             <a
               href="/"
               style={{
-                border: "1px solid #737373",
+                border: `1px solid ${tokens.border}`,
                 borderRadius: "0.375rem",
-                color: "#ffffff",
+                color: tokens.foreground,
                 padding: "0.625rem 1.25rem",
                 fontWeight: 600,
                 textDecoration: "none",
