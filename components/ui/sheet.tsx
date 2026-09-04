@@ -125,7 +125,16 @@ function SheetOverlay({
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-surface/50",
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50",
+        // gsd:scan-ignore-start — Light-preset acid-test fix (06-05, D-04). A token-driven
+        // bg-surface/NN scrim inherits its theme's polarity: under the light "luxe" preset,
+        // --store-surface is near-white, so bg-surface/50 read as an almost-invisible wash
+        // instead of a backdrop that recedes the page behind the cart/nav drawer. Verified
+        // live: with the cart drawer open under luxe, the overlay's computed background
+        // was oklab(~0.97 lightness / 0.5 alpha) and the page content behind it showed no
+        // visible dimming. Kept dark-alpha and polarity-independent, per D-04.
+        "bg-black/50",
+        // gsd:scan-ignore-end
         className
       )}
       {...props}

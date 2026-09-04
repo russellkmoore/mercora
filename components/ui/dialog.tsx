@@ -103,7 +103,15 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-surface/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      // gsd:scan-ignore-start — Light-preset acid-test fix (06-05, D-04). A token-driven
+      // bg-surface/NN scrim inherits its theme's polarity: under the light "luxe" preset,
+      // --store-surface is near-white, so bg-surface/80 rendered as an almost-invisible
+      // wash instead of a backdrop that recedes the page behind the modal (verified via a
+      // live compositing test: content brightness was unchanged with the overlay present).
+      // This full-viewport scrim is deliberately kept dark-alpha and polarity-independent,
+      // per D-04's "scrims stay black-alpha" rule, across every shipped theme.
+      "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      // gsd:scan-ignore-end
       className
     )}
     {...props}

@@ -36,7 +36,15 @@ function AlertDialogOverlay({
     <AlertDialogPrimitive.Overlay
       data-slot="alert-dialog-overlay"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-surface/50",
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50",
+        // gsd:scan-ignore-start — Light-preset acid-test fix (06-05, D-04). A token-driven
+        // bg-surface/NN scrim inherits its theme's polarity: under the light "luxe" preset,
+        // --store-surface is near-white, so bg-surface/50 read as an almost-invisible wash
+        // rather than a backdrop that recedes the page (same underlying token as sheet.tsx's
+        // overlay, verified live under luxe: page brightness behind the overlay was
+        // unchanged). Kept dark-alpha and polarity-independent, per D-04.
+        "bg-black/50",
+        // gsd:scan-ignore-end
         className
       )}
       {...props}
