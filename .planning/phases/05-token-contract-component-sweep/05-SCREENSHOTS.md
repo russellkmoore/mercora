@@ -469,3 +469,107 @@ Genuine pre-sweep baseline for the three cells above, captured from a git worktr
 | order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
 | order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
 | order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+
+## Label: `chunk-4-checkout`
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| home | 1280 | resting | .screenshots/chunk-4-checkout/home__1280__resting.png | f5d499e64a4ed1403696d6186021ba12ef4535a17d6e900ccf863e2932d3680a | - |
+| home | 1280 | nav-open | .screenshots/chunk-4-checkout/home__1280__nav-open.png | e8cfd69ec43eb7ae5c92747d60a0d14f681edfbafc7084909d11ce9064c5855d | - |
+| home | 390 | resting | .screenshots/chunk-4-checkout/home__390__resting.png | 65e03c2daafd238c67b873d696686c39b36e83522febc199c325dbc3018d4850 | - |
+| home | 390 | nav-open | .screenshots/chunk-4-checkout/home__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | - |
+| category | 1280 | resting | .screenshots/chunk-4-checkout/category__1280__resting.png | 053043895c0bea61e6af3de495c72a7153e049ffe2ca2c55791e7fb29f723c86 | - |
+| category | 1280 | nav-open | .screenshots/chunk-4-checkout/category__1280__nav-open.png | cfeff9c49deec815dd8b3cf67bc36a2247bab1cf5b7b8b350b0af5f86f155b76 | - |
+| category | 390 | resting | .screenshots/chunk-4-checkout/category__390__resting.png | 3409a7c25896219a28cbed1ee3d5e9b9a8ac988433b0aadd0d0c7fe656dd3af0 | - |
+| category | 390 | nav-open | .screenshots/chunk-4-checkout/category__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | - |
+| product | 1280 | resting | .screenshots/chunk-4-checkout/product__1280__resting.png | 109f0ab02e43b3b6a42320eacf3329a8dbbf7df35b9d87c548a45a52bd63f8a0 | - |
+| product | 1280 | nav-open | .screenshots/chunk-4-checkout/product__1280__nav-open.png | 8636c1a88d66e61c2dbd1512520cee7b1417a858ef8188ab7a6b12b4375694ea | - |
+| product | 390 | resting | .screenshots/chunk-4-checkout/product__390__resting.png | 92eae83cc0e2d916c09fc5525efe566a6e150c83fdd6271fb1938ece9a718632 | - |
+| product | 390 | nav-open | .screenshots/chunk-4-checkout/product__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | - |
+| cart | 1280 | cart-open | .screenshots/chunk-4-checkout/cart__1280__cart-open.png | d5aa4e6a788e4dc72ae5ace88f073e60486ca865e38ea02a4a3792636d2460de | - |
+| cart | 390 | cart-open | .screenshots/chunk-4-checkout/cart__390__cart-open.png | 562107229ce4aeb2e2faed585ae0ed6985e2857a8b04c5143b2b96090dddc0d5 | - |
+| checkout | 1280 | resting | .screenshots/chunk-4-checkout/checkout__1280__resting.png | 67a36d04df9c04d5e0547efd6158823f5144b6307365b9ad3733a0e473df1e85 | - |
+| checkout | 1280 | nav-open | .screenshots/chunk-4-checkout/checkout__1280__nav-open.png | 0f766c1d9d9391eb32220010acd11e4f2e684811e67902627d147f8072284b36 | - |
+| checkout | 390 | resting | .screenshots/chunk-4-checkout/checkout__390__resting.png | 8c634a185ba017d2eda279005c956ec61227d7d5d61b1d5029eab7b6f9feab55 | - |
+| checkout | 390 | nav-open | .screenshots/chunk-4-checkout/checkout__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | - |
+| account | 1280 | resting | .screenshots/chunk-4-checkout/account__1280__resting.png | 79bbd0d305a10b34b614efea325ee2b53ca43b61471e8634759b6d8dae762caf | - |
+| account | 1280 | nav-open | .screenshots/chunk-4-checkout/account__1280__nav-open.png | a4016a92afc536bf04a67250f1ae20835e8002c28402bcb8b5a125bf60c03584 | - |
+| account | 390 | resting | .screenshots/chunk-4-checkout/account__390__resting.png | ed89750938ee8c9b3a2e63dc6cb207c74e687d63f2486f72642e629a6b2164e7 | - |
+| account | 390 | nav-open | .screenshots/chunk-4-checkout/account__390__nav-open.png | ee617831f0bbfbf560aa2c79629c83bbbed92aed847278e8ccfb79defe78ada4 | - |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+
+### chunk-4-checkout verdict
+
+Diffed against `chunk-4-drawers` (the prior tracked label). 19 of 22 captured cells are
+byte-identical. Three cells differ, each individually pixel-diffed
+(`ImageChops.difference` bbox + 8 random differing-pixel samples):
+
+- **`checkout` / 1280 / resting, 1280 / nav-open, 390 / resting** (the three non-identical
+  checkout cells; `390/nav-open` is byte-identical, matching the shared mobile-menu-open
+  hash every other route reuses). All three isolate to the same single line of text in the
+  empty-cart state — `CheckoutClient.tsx`'s "Add some items to your cart to continue."
+  subtitle. Sampled pixels move from a cool-tinted grey (e.g. rgb(130,136,148), the
+  antialiased edge of `text-gray-400` / `#9ca3af`) to a neutral grey with no blue tint
+  (e.g. rgb(138,138,138), the antialiased edge of `text-muted-foreground` / `#a3a3a3`) —
+  the exact TOKEN-MAP §2 `text-gray-400 → text-muted-foreground` mapping this plan's Task 2
+  applied. No other pixel in any of the three cells changed; the rest of the empty-cart
+  state (heading, header, page background) was already on dark tokens before this plan and
+  is untouched. Registered as **new snap S17** (checkout empty-cart subtitle colour
+  consolidation) since no prior snap ID covers this specific class name. This is the entire
+  visible effect of this plan on the tracked, empty-cart grid — every panel this plan
+  actually repainted (shipping form, shipping options, order summary, payment section) only
+  renders once the cart holds an item, which the standard grid does not exercise (same gap
+  05-09 documented for `CartItemCard.tsx`; see the supplementary section below for a manual,
+  populated-cart walkthrough instead).
+- **`product` / 1280 / resting**: isolates to a large bounding box over the product image
+  and its thumbnail strip — the alt-text placeholder ("Vivid Mission Pack") stands in for
+  the photo in the new capture where the baseline shows the fully loaded image. This is the
+  same `next/image` load-race capture-environment flake 05-09 documented (a different cell
+  each run, unrelated to any file this plan touches — `app/product/[slug]/*` is not in this
+  plan's file list). An isolated recapture (`waitUntil: "load"` plus a fixed settle delay,
+  matching the standard grid's own capture method) reproduced the same partial-image miss
+  rather than resolving it, confirming a genuine intermittent local-dev image-loading race
+  rather than a one-off fluke — still not attributable to this plan's own files, and not
+  re-chased further per the same reasoning 05-09 recorded.
+
+All 19 unchanged cells (home, category, cart, account, and the fourth checkout cell) are
+byte-identical to `chunk-4-drawers`, confirming this plan changed nothing outside the
+checkout route and the one registered snap.
+
+### Supplementary cells: focused payment field and payment validation error
+
+Attempted via a scripted checkout walkthrough (add `vivid-mission-pack` to cart, fill and
+submit the shipping form, select the Standard shipping option) to reach the payment step
+and capture the embedded Stripe Elements iframe with a field focused and with an invalid
+card number entered. The walkthrough reached the shipping-method step correctly — and
+along the way exercised this plan's own token sweep live: the dark `bg-surface-elevated`
+panels, the `border-primary`/`bg-primary/10` selected-shipping-option state, and the
+`bg-danger/10 border-danger text-danger` error banner all rendered exactly as intended —
+but `POST /api/payment-intent` returned 400 ("Checkout details are invalid or unavailable")
+before a client secret was ever issued, so the Stripe Elements iframe this plan actually
+changed never mounted. The 400 originates in `lib/services/checkout-pricing.ts`'s
+`priceCheckout`, upstream of anything this plan's files touch (item pricing, tax, or
+shipping-method validation, not appearance) — the same class of environment gap 05-07
+recorded for `ReviewForm.tsx` (a real code path this local dev environment cannot fully
+exercise) rather than a regression this plan introduced.
+
+**Supplementary cells: MISSING.** No live screenshot of the payment step exists for this
+plan. In its place, Task 1's own acceptance-criteria verification already confirmed by
+direct code read that `StripeProvider.tsx` sources every appearance value from
+`useThemeTokens()` — `colorBackground: tokens.surfaceInverse` (`#fdfdfb`),
+`colorText: tokens.onInverse` (`#000000`), input borders from `tokens.borderInverse`
+(`#374151`), and the focused/invalid states from `tokens.primary` (`#f97316`) /
+`tokens.danger` (`#ef4444`) — the identical D-11 inverse mapping the transactional emails
+use. `mise exec -- npm run scan:tokens -- --path components/checkout/StripeProvider.tsx`
+independently confirms zero hex/rgb literals remain in the file.
+
+**The Stripe payment form is still a light surface.** This is stated from the verified
+token wiring above (a `#fdfdfb` background with `#000000` text is unambiguously light)
+rather than from a rendered screenshot. A human should still complete the plan's own
+live human-check — walk a real checkout to the payment step in a browser and confirm the
+card fields, focus border, and invalid state render as expected — since a code read
+confirms the *values* are correct but not that Stripe's `appearance` API applies them as
+this plan intends.
