@@ -111,3 +111,41 @@ entry references a snap by its identifier (S1–S11) instead of restating it.
 | order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
 | order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
 | order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+
+## Label: `chunk-2-ui`
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| home | 1280 | resting | .screenshots/chunk-2-ui/home__1280__resting.png | e3a6d3e06596035fee0c0fc2f8208df48f5222f1cf58b1bd41e64ccde5a1ee1f | - |
+| home | 1280 | nav-open | .screenshots/chunk-2-ui/home__1280__nav-open.png | 6565691e8fcfe095d9c01bd7cffe64119685d4cc0fd3e306956bdfb40a7e8841 | - |
+| home | 390 | resting | .screenshots/chunk-2-ui/home__390__resting.png | b3ac91d22cb3b2bffb98c85a209302125769ebfb0f454e47453bd5793e48d23d | - |
+| home | 390 | nav-open | .screenshots/chunk-2-ui/home__390__nav-open.png | 1347ff110437d5036ed218236ad82be19a50aa6215ffe86c9c44cf1906668256 | - |
+| category | 1280 | resting | .screenshots/chunk-2-ui/category__1280__resting.png | 0e9043b4b7b2424cce025bc8488aed883ce9d1a2421292a2fe5965d9f1db439a | - |
+| category | 1280 | nav-open | .screenshots/chunk-2-ui/category__1280__nav-open.png | 061b7b5134830b96bb8f16e505035fc829548ca6bc681e491dc52182dc1d7d7c | - |
+| category | 390 | resting | .screenshots/chunk-2-ui/category__390__resting.png | b7739154a537d2ef19761b0b4b4c129f7c4960984e075df88e756c78f0a122a3 | - |
+| category | 390 | nav-open | .screenshots/chunk-2-ui/category__390__nav-open.png | 1347ff110437d5036ed218236ad82be19a50aa6215ffe86c9c44cf1906668256 | - |
+| product | 1280 | resting | .screenshots/chunk-2-ui/product__1280__resting.png | 13bf10e27f35e4eb6846818c64eb134be3b88f41b16bd281c871f9bb01cfe00b | - |
+| product | 1280 | nav-open | .screenshots/chunk-2-ui/product__1280__nav-open.png | 6d449a9c72e280fcd1be294ee3d15959504ed0f7de34f66b0361c79274a267ff | - |
+| product | 390 | resting | .screenshots/chunk-2-ui/product__390__resting.png | 38eca79e5d2e04241b194611b8f4375e948825994e541de811a638df5cc8cc6c | - |
+| product | 390 | nav-open | .screenshots/chunk-2-ui/product__390__nav-open.png | 1347ff110437d5036ed218236ad82be19a50aa6215ffe86c9c44cf1906668256 | - |
+| cart | 1280 | cart-open | .screenshots/chunk-2-ui/cart__1280__cart-open.png | e6c78a66bf84804f5f9b09c0508abbe19aed336a90949ef2cc34ccb854e34b60 | - |
+| cart | 390 | cart-open | .screenshots/chunk-2-ui/cart__390__cart-open.png | f41cc5071ae72cd871138a26e947763e979a3d7e48c8afb9455c7202a81b615f | - |
+| checkout | 1280 | resting | .screenshots/chunk-2-ui/checkout__1280__resting.png | b3ee30c2d3bbc6431d5843272ce46783adce50d7fe769c941006baad9fd13734 | - |
+| checkout | 1280 | nav-open | .screenshots/chunk-2-ui/checkout__1280__nav-open.png | fd49c5d03ad38db2d8891803b286d026994ec4cdad0e21e47435df2901c568f4 | - |
+| checkout | 390 | resting | .screenshots/chunk-2-ui/checkout__390__resting.png | 7000b26a71fa72bde119bd01b1f54f8a8d9ea269a93bef75667e82dbe9a38896 | - |
+| checkout | 390 | nav-open | .screenshots/chunk-2-ui/checkout__390__nav-open.png | 1347ff110437d5036ed218236ad82be19a50aa6215ffe86c9c44cf1906668256 | - |
+| account | 1280 | resting | .screenshots/chunk-2-ui/account__1280__resting.png | 56453cfe2f1025a1011b92d75931a7e4cf70737ab6e5167114b7e63f2069d8cd | S12 — same as chunk-1-contract (hash-identical); unauthenticated /account redirects to /sign-in, which 404s onto app/not-found.tsx (05-03 fix), unrelated to this chunk's components/ui rewrite |
+| account | 1280 | nav-open | .screenshots/chunk-2-ui/account__1280__nav-open.png | a4d93b037356cc5f03972f227872a0acf3ea63bc985cdf62dbc31d3e7030e1be | S12 — same as chunk-1-contract (hash-identical); same 404 boundary as above |
+| account | 390 | resting | .screenshots/chunk-2-ui/account__390__resting.png | 45d934fdf96bf7cbbff981e0af25d18c2178d024c12a6db49adcaa379c79eaa1 | S12 — same as chunk-1-contract (hash-identical); same 404 boundary as above |
+| account | 390 | nav-open | .screenshots/chunk-2-ui/account__390__nav-open.png | 1347ff110437d5036ed218236ad82be19a50aa6215ffe86c9c44cf1906668256 | - |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+
+## Label: `chunk-2-ui` (supplementary D-17 cells)
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| category | 1280 | dropdown-item-focused | .screenshots/chunk-2-ui/category__1280__dropdown-item-focused.png | 13b65fbafd079a27c6f24f20c3584671c894a077163f48447314216c135420fa | D-17 supplementary -- Categories dropdown opened + ArrowDown to focus first item (Featured); focus:bg-accent/focus:text-accent-foreground were dead classes before this chunk (item showed no focus indication at all), now focus:bg-surface-elevated/focus:text-foreground render a visible dark highlight and foreground text for the first time |
+| checkout | 1280 | discount-input-invalid | .screenshots/chunk-2-ui/checkout__1280__discount-input-invalid.png | 510da2e547b6bfef9358afb4533fb73d817965a728d7621d52c31e8fe9933db5 | D-17 supplementary -- Input component's aria-invalid ring/border set to true and focused; aria-invalid:ring-destructive/aria-invalid:border-destructive were dead classes before this chunk, now aria-invalid:ring-danger/aria-invalid:border-danger render a visible red ring and border for the first time (no live validation flow currently sets aria-invalid on this field, so the attribute is forced here to prove the CSS treatment renders correctly) |
