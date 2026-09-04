@@ -28,7 +28,7 @@ export default function ProductCard({ product }: { product: any }) {
     (product.description?.en || '');
 
   return (
-    <div className="border rounded-md p-2 bg-white shadow-sm hover:shadow-md transition-shadow">
+    <div className="border rounded-md p-2 bg-surface-inverse-elevated shadow-sm hover:shadow-md transition-shadow">
       <Link href={`/product/${product.slug}`} className="flex items-center space-x-2" prefetch={true}>
         {/* Smaller image for drawer */}
         <div className="w-12 h-12 relative shrink-0 overflow-hidden rounded border">
@@ -42,14 +42,14 @@ export default function ProductCard({ product }: { product: any }) {
         </div>
         <div className="flex-1 min-w-0">
           {/* Smaller, more compact text */}
-          <h4 className="text-xs font-semibold truncate text-gray-900">{product.name}</h4>
-          <p className="text-xs text-gray-500 truncate">
+          <h4 className="text-xs font-semibold truncate text-on-inverse">{product.name}</h4>
+          <p className="text-xs text-muted-on-inverse truncate">
             {description.length > 60 ? description.substring(0, 60) + '...' : description}
           </p>
-          <p className="text-xs font-medium text-orange-600 mt-0.5">
+          <p className="text-xs font-medium text-primary mt-0.5">
             {price.format()}
             {isOnSale && (
-              <span className="text-xs text-gray-400 line-through ml-1">
+              <span className="text-xs text-muted-on-inverse line-through ml-1">
                 {compareAtPrice.format()}
               </span>
             )}
