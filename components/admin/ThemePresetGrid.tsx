@@ -27,8 +27,11 @@ type SettingsResponse = { settings: SettingRow[] };
 /** Reads the appearance.theme row out of a settings API response, falling back to the
  * manifest default for anything absent, unparseable, or outside the manifest — the same
  * allow-list posture getActiveTheme() uses server-side (06-02), applied client-side here
- * so the badge never claims a theme the storefront would not actually render. */
-function extractThemeName(rows: SettingRow[]): string {
+ * so the badge never claims a theme the storefront would not actually render.
+ *
+ * Exported so tests exercise the real parsing/allow-list logic directly, instead of
+ * grepping the source file for its shape (06-REVIEW WR-03). */
+export function extractThemeName(rows: SettingRow[]): string {
   const row = rows.find((candidate) => candidate.key === APPEARANCE_THEME_SETTING_KEY);
   if (!row) return DEFAULT_THEME_NAME;
   try {
@@ -42,92 +45,43 @@ function extractThemeName(rows: SettingRow[]): string {
   return DEFAULT_THEME_NAME;
 }
 
-export function ThemePresetGrid() {
-  const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
-  const [savedTheme, setSavedTheme] = useState<string | null>(null);
-  const [pendingTheme, setPendingTheme] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+/** Computes the next roving-tabindex index for an arrow-key press on the radiogroup,
+ * wrapping at both ends. Exported and unit-tested directly (06-REVIEW WR-03) rather than
+ * only reachable through a simulated DOM keydown, which this test suite has no jsdom/DOM
+ * testing library available to drive. */
+export function nextRovingIndex(currentIndex: number, key: string, length: number): number {
+  const delta = key === "ArrowRight" || key === "ArrowDown" ? 1 : -1;
+  return (currentIndex + delta + length) % length;
+}
 
-  useEffect(() => {
-    let cancelled = false;
-    void fetch(`/api/admin/settings?category=${APPEARANCE_SETTINGS_CATEGORY}`)
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Could not load settings");
-        const body = (await response.json()) as SettingsResponse;
-        if (cancelled) return;
-        setSavedTheme(extractThemeName(body.settings));
-        setStatus("loaded");
-      })
-      .catch(() => {
-        if (!cancelled) setStatus("error");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+export type ThemePresetGridContentProps = {
+  status: "loading" | "loaded" | "error";
+  savedTheme: string | null;
+  pendingTheme: string | null;
+  saving: boolean;
+  onSelectTheme: (name: string) => void;
+  onGridKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+  onSave: () => void;
+};
 
-  function selectTheme(name: string) {
-    setPendingTheme(name);
-  }
-
-  function handleGridKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-    if (!["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"].includes(event.key)) return;
-    event.preventDefault();
-    const currentName = pendingTheme ?? savedTheme ?? THEME_MANIFEST[0]?.name;
-    const currentIndex = Math.max(
-      0,
-      THEME_MANIFEST.findIndex((theme) => theme.name === currentName),
-    );
-    const delta = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : -1;
-    const nextIndex = (currentIndex + delta + THEME_MANIFEST.length) % THEME_MANIFEST.length;
-    const next = THEME_MANIFEST[nextIndex];
-    if (!next) return;
-    selectTheme(next.name);
-    document.getElementById(`theme-card-${next.name}`)?.focus();
-  }
-
-  async function save() {
-    // The pending name can only ever come from selectTheme(theme.name), which only ever
-    // receives a manifest entry's own name — but the read-time check in 06-02 is the
-    // authoritative gate, so this re-check is a cheap first line, not the real control.
-    if (!pendingTheme || !THEME_MANIFEST.some((theme) => theme.name === pendingTheme)) return;
-    if (pendingTheme === savedTheme) return;
-
-    setSaving(true);
-    try {
-      const response = await fetch("/api/admin/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          updates: [
-            {
-              key: APPEARANCE_THEME_SETTING_KEY,
-              value: pendingTheme,
-              category: APPEARANCE_SETTINGS_CATEGORY,
-              data_type: "string",
-            },
-          ],
-        }),
-      });
-      if (!response.ok) throw new Error("Save failed");
-
-      // Re-read the stored value from the endpoint's own response rather than assuming
-      // the optimistic pendingTheme — the settings endpoint is last-write-wins, so a
-      // concurrent admin save must not leave this page showing a value the storefront
-      // is not serving.
-      const body = (await response.json()) as SettingsResponse;
-      const confirmedName = extractThemeName(body.settings);
-      const label = THEME_MANIFEST.find((theme) => theme.name === pendingTheme)?.label ?? pendingTheme;
-      setSavedTheme(confirmedName);
-      setPendingTheme(null);
-      toast.success(`Theme updated to ${label}.`);
-    } catch {
-      toast.error("Couldn't save your theme selection. Try again.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
+/**
+ * Pure, props-driven view: no state, no effects, no fetch. Exported (and consumed by the
+ * stateful ThemePresetGrid wrapper below) so tests can render real DOM output via
+ * react-dom/server's renderToStaticMarkup and assert on actual behavior — manifest-driven
+ * card count, Active-badge/Save-disabled state combinations, and ARIA roles — instead of
+ * grepping the source file for literal substrings (06-REVIEW WR-03). This mirrors the
+ * SubscriptionContent/SubscriptionManager split already used elsewhere in this test suite
+ * (tests/unit/components/account/subscription-manager.test.ts).
+ */
+export function ThemePresetGridContent({
+  status,
+  savedTheme,
+  pendingTheme,
+  saving,
+  onSelectTheme,
+  onGridKeyDown,
+  onSave,
+}: ThemePresetGridContentProps) {
   const saveDisabled =
     status !== "loaded" || saving || !pendingTheme || pendingTheme === savedTheme;
 
@@ -151,7 +105,7 @@ export function ThemePresetGrid() {
         role="radiogroup"
         aria-label="Storefront theme"
         className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3"
-        onKeyDown={handleGridKeyDown}
+        onKeyDown={onGridKeyDown}
       >
         {THEME_MANIFEST.map((theme) => {
           const isSelected = (pendingTheme ?? savedTheme) === theme.name;
@@ -167,11 +121,11 @@ export function ThemePresetGrid() {
               aria-checked={isSelected}
               aria-label={theme.label}
               tabIndex={rovingTarget === theme.name ? 0 : -1}
-              onClick={() => selectTheme(theme.name)}
+              onClick={() => onSelectTheme(theme.name)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
-                  selectTheme(theme.name);
+                  onSelectTheme(theme.name);
                 }
               }}
               className={`cursor-pointer border-neutral-700 bg-neutral-800 p-6 outline-none transition-colors ${
@@ -239,7 +193,7 @@ export function ThemePresetGrid() {
       </div>
 
       <Button
-        onClick={() => void save()}
+        onClick={onSave}
         disabled={saveDisabled}
         title={
           status === "loaded"
@@ -256,5 +210,103 @@ export function ThemePresetGrid() {
         {saving ? "Saving…" : "Save Changes"}
       </Button>
     </div>
+  );
+}
+
+export function ThemePresetGrid() {
+  const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
+  const [savedTheme, setSavedTheme] = useState<string | null>(null);
+  const [pendingTheme, setPendingTheme] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(`/api/admin/settings?category=${APPEARANCE_SETTINGS_CATEGORY}`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Could not load settings");
+        const body = (await response.json()) as SettingsResponse;
+        if (cancelled) return;
+        setSavedTheme(extractThemeName(body.settings));
+        setStatus("loaded");
+      })
+      .catch(() => {
+        if (!cancelled) setStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function selectTheme(name: string) {
+    setPendingTheme(name);
+  }
+
+  function handleGridKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (!["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"].includes(event.key)) return;
+    event.preventDefault();
+    const currentName = pendingTheme ?? savedTheme ?? THEME_MANIFEST[0]?.name;
+    const currentIndex = Math.max(
+      0,
+      THEME_MANIFEST.findIndex((theme) => theme.name === currentName),
+    );
+    const nextIndex = nextRovingIndex(currentIndex, event.key, THEME_MANIFEST.length);
+    const next = THEME_MANIFEST[nextIndex];
+    if (!next) return;
+    selectTheme(next.name);
+    document.getElementById(`theme-card-${next.name}`)?.focus();
+  }
+
+  async function save() {
+    // The pending name can only ever come from selectTheme(theme.name), which only ever
+    // receives a manifest entry's own name — but the read-time check in 06-02 is the
+    // authoritative gate, so this re-check is a cheap first line, not the real control.
+    if (!pendingTheme || !THEME_MANIFEST.some((theme) => theme.name === pendingTheme)) return;
+    if (pendingTheme === savedTheme) return;
+
+    setSaving(true);
+    try {
+      const response = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          updates: [
+            {
+              key: APPEARANCE_THEME_SETTING_KEY,
+              value: pendingTheme,
+              category: APPEARANCE_SETTINGS_CATEGORY,
+              data_type: "string",
+            },
+          ],
+        }),
+      });
+      if (!response.ok) throw new Error("Save failed");
+
+      // Re-read the stored value from the endpoint's own response rather than assuming
+      // the optimistic pendingTheme — the settings endpoint is last-write-wins, so a
+      // concurrent admin save must not leave this page showing a value the storefront
+      // is not serving.
+      const body = (await response.json()) as SettingsResponse;
+      const confirmedName = extractThemeName(body.settings);
+      const label = THEME_MANIFEST.find((theme) => theme.name === pendingTheme)?.label ?? pendingTheme;
+      setSavedTheme(confirmedName);
+      setPendingTheme(null);
+      toast.success(`Theme updated to ${label}.`);
+    } catch {
+      toast.error("Couldn't save your theme selection. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <ThemePresetGridContent
+      status={status}
+      savedTheme={savedTheme}
+      pendingTheme={pendingTheme}
+      saving={saving}
+      onSelectTheme={selectTheme}
+      onGridKeyDown={handleGridKeyDown}
+      onSave={() => void save()}
+    />
   );
 }
