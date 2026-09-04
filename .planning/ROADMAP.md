@@ -112,7 +112,26 @@ Plans:
   3. Admin's Appearance section shows manifest-driven swatch-preview cards for every shipped theme, indicates the active one, and saves a selection through the existing `admin_settings` API pattern
   4. 2-3 preset themes ship, at least one light; the light preset's shadows and overlays read correctly rather than as dark-tuned leftovers
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 06-01-PLAN.md — TRACER: theme file → validator → generated manifest + barrel → rendered `data-theme`, wired into `build:worker`/`predev`/CI
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 06-02-PLAN.md — `getActiveTheme()` D1 → env → manifest default, async root layout, `theme.unknown_selection` telemetry, Cormorant Garamond load
+
+**Wave 3** *(blocked on Wave 2 completion; 06-03 and 06-04 run in parallel)*
+
+- [ ] 06-03-PLAN.md — Two presets: `midnight` (dark) and `luxe` (light), regenerated three-entry manifest, dropped-properties backlog note
+- [ ] 06-04-PLAN.md — Admin Appearance route: manifest-driven swatch cards, pending selection vs Active badge, save through the existing settings endpoint
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 06-05-PLAN.md — Light-preset acid test: per-preset capture grids, overlay/shadow QA with case-by-case fixes, phase-close evidence roll-up
+
 **UI hint**: yes
 
 ### Phase 7: Layout Switches
