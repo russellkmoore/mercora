@@ -389,7 +389,7 @@ export default function AgentDrawer({
         </div>
 
         {/* Divider */}
-        <hr className="my-4 shrink-0 border-inverse" />
+        <hr className="my-4 shrink-0 border-border-inverse" />
 
         {/* Products area - scrollable */}
         <div className="flex-1 overflow-y-auto text-sm text-muted-on-inverse">

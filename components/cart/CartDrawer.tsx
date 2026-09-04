@@ -71,7 +71,7 @@ export default function CartDrawer() {
     <Sheet open={isOpen} onOpenChange={setCartOpen}>
       <SheetContent
         side="right"
-        className="bg-surface-inverse text-on-inverse  transition-all ease-in-out px-3 w-full sm:w-[400px] max-w-[400px]! duration-600! data-[state=closed]:duration-600! data-[state=open]:duration-600! flex flex-col h-full border-inverse"
+        className="bg-surface-inverse text-on-inverse  transition-all ease-in-out px-3 w-full sm:w-[400px] max-w-[400px]! duration-600! data-[state=closed]:duration-600! data-[state=open]:duration-600! flex flex-col h-full border-border-inverse"
       >
         {/* Accessibility components */}
         <VisuallyHidden>
@@ -111,7 +111,7 @@ export default function CartDrawer() {
                 <CartItemCard key={item.lineId} item={item} />
               ))}
 
-              <div className="border-t border-inverse pt-4">
+              <div className="border-t border-border-inverse pt-4">
                 <div className="flex justify-between items-center text-lg font-bold">
                   <span>Total: {total.format()}</span>
                 </div>
