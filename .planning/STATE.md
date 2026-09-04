@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 05
 current_phase_name: Token Contract & Component Sweep
 status: executing
-stopped_at: Completed 05-06-PLAN.md
-last_updated: "2026-09-04T15:43:47.018Z"
+stopped_at: Completed 05-07-PLAN.md
+last_updated: "2026-09-04T16:08:34.590Z"
 last_activity: 2026-09-03
 last_activity_desc: Phase 05 execution started
-state_head: e0d8ed367df61f4f808d886d390802a789db6f27
+state_head: 05e71c3e4da017e867e426559cd906407d52077c
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 12
-  completed_plans: 6
+  completed_plans: 7
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-02 after v2 milestone start)
 ## Current Position
 
 Phase: 05 (Token Contract & Component Sweep) — EXECUTING
-Plan: 7 of 12
+Plan: 8 of 12
 Status: Ready to execute
 Last activity: 2026-09-03 — Phase 05 execution started
 
@@ -73,6 +73,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P04 | 55min | 3 tasks | 18 files |
 | Phase 05 P05 | 50min | 3 tasks | 6 files |
 | Phase 05 P06 | 35min | 3 tasks | 8 files |
+| Phase 05 P07 | 55min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -98,6 +99,9 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 05]: [Phase 05-06] Binary available/unavailable badges map to success/warning, not success/danger -- this app's only unavailable copy ("Coming Soon", "Currently unavailable") reads as anticipatory/temporary, and there's no discontinued-product state to reserve danger for.
 - [Phase 05]: [Phase 05-06] app/page.tsx's and app/product/[slug]/page.tsx's page-wrapper bg-neutral-900 maps to bg-surface-elevated, not bg-surface -- corrected mid-plan (Rule 1) after a screenshot diff caught the initial bg-surface interpretation as an unregistered ~83% full-page pixel shift; 05-05 already established the pixel-identical mapping for the same literal class.
 - [Phase 05]: [Phase 05-06] Registered new shade-consolidation snap S15 (ProductCard.tsx/ProductDisplay.tsx bg-neutral-800 card/gallery surfaces -> bg-surface-elevated, rgb(38,38,38) -> rgb(23,23,23)) after PIL-diffing all ten differing chunk-3-catalog cells back to this single, table-directed root cause.
+- [Phase 05]: [Phase 05] [Phase 05-07] StarRating.tsx's filled/unfilled colours (primary/muted-foreground) ripple into every ProductCard star badge across home/category/product grids since StarRating is a shared component; registered as new snap S16 after a full pixel-diff against chunk-3-catalog confirmed no other change.
+- [Phase 05]: [Phase 05] [Phase 05-07] SubscriptionAcquisitionPanel.tsx's Stripe setup host wrapper (previously bg-white/text-black) moved to bg-surface-elevated/text-foreground on the main token set rather than the inverse token set, since it is not one of TOKEN-MAP section 3's four scoped inverse surfaces; the Stripe iframe itself stays light independently via StripeProvider.tsx's own hardcoded appearance config, untouched by this plan.
+- [Phase 05]: [Phase 05] [Phase 05-07] SubscriptionAcquisitionPanel.tsx has no plan-card selection UI to give a selected-vs-unselected contrast -- plan choice is a native select dropdown -- so the selected-plan primary-token mitigation is satisfied by the Subscribe section's own accent styling rather than inventing new card markup.
 
 ### Pending Todos
 
@@ -128,8 +132,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T15:43:37.828Z
-Stopped at: Completed 05-06-PLAN.md
+Last session: 2026-09-04T16:08:34.568Z
+Stopped at: Completed 05-07-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 5` (or `/gsd-plan-phase 5` directly) to start Token Contract & Component Sweep
