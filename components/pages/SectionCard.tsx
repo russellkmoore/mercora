@@ -5,14 +5,14 @@ import type { ProductCardData } from "@/lib/cms/page-products";
 
 export default function SectionCard({ section, product }: { section: PageSection; product?: ProductCardData }) {
   return (
-    <section id={section.id} className="mb-5 scroll-mt-24 rounded-xl border border-neutral-700 bg-neutral-900 p-6">
+    <section id={section.id} className="mb-5 scroll-mt-24 rounded-xl border border-border bg-surface-elevated p-6">
       <div className={product ? "grid gap-7 sm:grid-cols-[1fr_168px]" : ""}>
         <div>
-          <h2 className="text-2xl font-semibold text-white">{section.heading}</h2>
+          <h2 className="text-2xl font-semibold text-foreground">{section.heading}</h2>
           {section.specs.length > 0 && (
             <ul className="my-4 flex list-none flex-wrap gap-2 p-0">
               {section.specs.map((spec) => (
-                <li key={spec} className="rounded-full border border-neutral-600 bg-neutral-800 px-3 py-1 text-xs text-neutral-300">{spec}</li>
+                <li key={spec} className="rounded-full border border-border bg-surface-elevated px-3 py-1 text-xs text-muted-foreground">{spec}</li>
               ))}
             </ul>
           )}
@@ -24,17 +24,17 @@ export default function SectionCard({ section, product }: { section: PageSection
             />
           )}
           {section.callouts.map((callout) => (
-            <p key={callout} className="mt-4 rounded-r-lg border-l-4 border-orange-500 bg-neutral-800 p-4 text-neutral-300">{callout}</p>
+            <p key={callout} className="mt-4 rounded-r-lg border-l-4 border-primary bg-surface-elevated p-4 text-muted-foreground">{callout}</p>
           ))}
         </div>
         {product && (
           <div className="text-center">
             <Link href={`/product/${product.slug}`}>
-              <Image src={product.imageKey} alt={product.name} width={168} height={224} className="w-full rounded-lg border border-neutral-700" />
+              <Image src={product.imageKey} alt={product.name} width={168} height={224} className="w-full rounded-lg border border-border" />
             </Link>
-            <p className="mt-3 text-sm font-semibold text-white">{product.name}</p>
-            {product.price && <p className="mt-1 text-sm text-neutral-400">{product.price}</p>}
-            <Link href={`/product/${product.slug}`} className="mt-3 block rounded-md border border-orange-500 px-3 py-2 text-sm text-orange-400 hover:bg-orange-500 hover:text-white">
+            <p className="mt-3 text-sm font-semibold text-foreground">{product.name}</p>
+            {product.price && <p className="mt-1 text-sm text-muted-foreground">{product.price}</p>}
+            <Link href={`/product/${product.slug}`} className="mt-3 block rounded-md border border-primary px-3 py-2 text-sm text-primary hover:bg-primary hover:text-on-primary">
               View product
             </Link>
           </div>
