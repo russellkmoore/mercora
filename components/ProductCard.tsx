@@ -122,10 +122,10 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
     <Link
       href={`/product/${slug}`}
       prefetch={true}
-      className="group block overflow-hidden rounded-lg bg-neutral-800 shadow transition hover:shadow-lg touch-manipulation"
+      className="group block overflow-hidden rounded-lg bg-surface-elevated shadow transition hover:shadow-lg touch-manipulation"
     >
       <div>
-        <div className="relative aspect-video bg-neutral-700">
+        <div className="relative aspect-video bg-border">
             <Image
               src={imageUrl}
               alt={imageAlt}
@@ -143,23 +143,23 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
           <h3 className="text-lg sm:text-xl font-semibold line-clamp-2 leading-snug">
             {name}
           </h3>
-          <p className="text-gray-400 text-sm sm:text-sm line-clamp-2 leading-relaxed">
+          <p className="text-muted-foreground text-sm sm:text-sm line-clamp-2 leading-relaxed">
             {shortDescription}
           </p>
           <div className="flex items-center justify-between gap-2 text-xs sm:text-sm">
             {hasRatings ? (
               <div className="flex items-center gap-2">
                 <StarRating value={ratingSummary!.average} size="sm" />
-                <span className="text-sm font-semibold text-white">
+                <span className="text-sm font-semibold text-foreground">
                   {ratingSummary!.average.toFixed(1)}
                 </span>
-                <span className="text-xs text-gray-400">({ratingSummary!.count})</span>
+                <span className="text-xs text-muted-foreground">({ratingSummary!.count})</span>
               </div>
             ) : (
-              <span className="text-xs text-gray-500">Be the first to review</span>
+              <span className="text-xs text-muted-foreground">Be the first to review</span>
             )}
             {lastUpdatedLabel && (
-              <span className="hidden text-[11px] text-gray-500 sm:inline">
+              <span className="hidden text-[11px] text-muted-foreground sm:inline">
                 Updated {lastUpdatedLabel}
               </span>
             )}
@@ -167,19 +167,19 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
           {price !== null && (
             <div className="text-sm">
               {onSale && compareAt != null ? (
-                <div className="text-green-400">
-                  <span className="line-through text-gray-400 mr-2">
+                <div className="text-primary">
+                  <span className="line-through text-muted-foreground mr-2">
                     {Money.fromMinor(compareAt).format()}
                   </span>
                   <span className="font-semibold">
                     {Money.fromMinor(price).format()}
                   </span>
-                  <span className="ml-2 text-xs text-orange-500 font-bold">
+                  <span className="ml-2 text-xs text-primary font-bold">
                     On Sale
                   </span>
                 </div>
               ) : (
-                <div className="text-white font-semibold">
+                <div className="text-foreground font-semibold">
                   {Money.fromMinor(price).format()}
                 </div>
               )}
@@ -188,14 +188,14 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
           <p
             className={`mt-2 text-xs ${
               availability === "available"
-                ? "text-green-400"
-                : "text-orange-500"
+                ? "text-success"
+                : "text-warning"
             }`}
           >
             {availability === "available" ? "In Stock" : "Coming Soon"}
           </p>
 
-          <span className="text-orange-500 group-hover:underline text-sm font-medium">
+          <span className="text-primary group-hover:underline text-sm font-medium">
             Learn more →
           </span>
         </div>

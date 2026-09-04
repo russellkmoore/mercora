@@ -97,7 +97,7 @@ export default function CategoryDisplay({ products }: CategoryDisplayProps) {
             type="single"
             value={sortBy}
             onValueChange={(val) => val && setSortBy(val)}
-            className="flex flex-wrap gap-0 leading-none border-neutral-700 scale-90 sm:scale-100"
+            className="flex flex-wrap gap-0 leading-none border-border scale-90 sm:scale-100"
           >
             <ToggleGroupItem
               value="featured"
@@ -136,7 +136,7 @@ export default function CategoryDisplay({ products }: CategoryDisplayProps) {
             <ProductCard key={product.id} product={product} />
           ))
         ) : (
-          <div className="col-span-full text-center text-gray-400 py-8">
+          <div className="col-span-full text-center text-muted-foreground py-8">
             No products found in this category.
           </div>
         )}
@@ -152,7 +152,7 @@ export default function CategoryDisplay({ products }: CategoryDisplayProps) {
  * @returns CSS class string with conditional active styling
  */
 function toggleClass(active: boolean): string {
-  return `border-neutral-700 h-auto leading-none text-xs font-semibold px-2 py-2 hover:bg-orange-400/20 transition-colors duration-200 ${
-    active ? "!bg-orange-500 !text-black" : ""
+  return `border-border h-auto leading-none text-xs font-semibold px-2 py-2 hover:bg-primary/20 transition-colors duration-200 ${
+    active ? "!bg-primary !text-on-primary" : ""
   }`;
 }
