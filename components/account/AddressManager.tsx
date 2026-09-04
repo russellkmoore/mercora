@@ -68,23 +68,23 @@ export function AddressManager({ initial }: { initial: MACHCustomerAddress[] }) 
     } finally { setBusy(false); }
   }
 
-  const input = "w-full rounded-md border border-neutral-600 bg-neutral-950 px-3 py-2 text-white";
+  const input = "w-full rounded-md border border-border bg-surface px-3 py-2 text-foreground";
   return (
     <div className="space-y-8">
       <div className="grid gap-4 sm:grid-cols-2">
         {addresses.map((entry) => (
-          <article key={entry.id} className="rounded-lg border border-neutral-700 bg-neutral-900 p-4">
-            <h2 className="font-semibold text-white">{entry.label || (entry.type === "billing" ? "Billing address" : "Shipping address")}{entry.is_default ? " · Default" : ""}</h2>
-            <p className="mt-2 whitespace-pre-line text-sm text-gray-300">{[entry.address.line1, entry.address.line2, `${entry.address.city}, ${entry.address.region ?? ""} ${entry.address.postal_code ?? ""}`, entry.address.country].filter(Boolean).join("\n")}</p>
+          <article key={entry.id} className="rounded-lg border border-border bg-surface-elevated p-4">
+            <h2 className="font-semibold text-foreground">{entry.label || (entry.type === "billing" ? "Billing address" : "Shipping address")}{entry.is_default ? " · Default" : ""}</h2>
+            <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">{[entry.address.line1, entry.address.line2, `${entry.address.city}, ${entry.address.region ?? ""} ${entry.address.postal_code ?? ""}`, entry.address.country].filter(Boolean).join("\n")}</p>
             <div className="mt-4 flex gap-3 text-sm">
-              <button type="button" disabled={busy} className="text-orange-400" onClick={() => { setEditing(entry.id ?? null); setForm(toForm(entry)); }}>Edit</button>
-              {entry.id && <button type="button" disabled={busy} className="text-red-400" onClick={() => void remove(entry.id!)}>Remove</button>}
+              <button type="button" disabled={busy} className="text-primary" onClick={() => { setEditing(entry.id ?? null); setForm(toForm(entry)); }}>Edit</button>
+              {entry.id && <button type="button" disabled={busy} className="text-danger" onClick={() => void remove(entry.id!)}>Remove</button>}
             </div>
           </article>
         ))}
       </div>
-      <form onSubmit={save} className="space-y-4 rounded-lg border border-neutral-700 bg-neutral-900 p-5">
-        <h2 className="text-lg font-semibold text-white">{editing ? "Edit address" : "Add an address"}</h2>
+      <form onSubmit={save} className="space-y-4 rounded-lg border border-border bg-surface-elevated p-5">
+        <h2 className="text-lg font-semibold text-foreground">{editing ? "Edit address" : "Add an address"}</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <input className={input} maxLength={80} placeholder="Label" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
           <select className={input} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as FormState["type"] })}><option value="shipping">Shipping</option><option value="billing">Billing</option></select>
@@ -95,9 +95,9 @@ export function AddressManager({ initial }: { initial: MACHCustomerAddress[] }) 
           <input className={input} maxLength={32} placeholder="Postal code" value={form.postal_code} onChange={(e) => setForm({ ...form, postal_code: e.target.value })} />
           <input className={input} required maxLength={2} pattern="[A-Za-z]{2}" aria-label="Two-letter country code" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value.toUpperCase() })} />
         </div>
-        <label className="flex gap-2 text-sm text-gray-300"><input type="checkbox" checked={form.is_default} onChange={(e) => setForm({ ...form, is_default: e.target.checked })} />Use as default</label>
-        <div className="flex gap-3"><button disabled={busy} className="rounded-md bg-orange-500 px-4 py-2 font-medium text-black">{busy ? "Saving…" : "Save"}</button>{editing && <button type="button" onClick={() => { setEditing(null); setForm(empty); }} className="text-gray-300">Cancel</button>}</div>
-        {message && <p role="status" className="text-sm text-gray-300">{message}</p>}
+        <label className="flex gap-2 text-sm text-muted-foreground"><input type="checkbox" checked={form.is_default} onChange={(e) => setForm({ ...form, is_default: e.target.checked })} />Use as default</label>
+        <div className="flex gap-3"><button disabled={busy} className="rounded-md bg-primary px-4 py-2 font-medium text-on-primary">{busy ? "Saving…" : "Save"}</button>{editing && <button type="button" onClick={() => { setEditing(null); setForm(empty); }} className="text-muted-foreground">Cancel</button>}</div>
+        {message && <p role="status" className="text-sm text-muted-foreground">{message}</p>}
       </form>
     </div>
   );
