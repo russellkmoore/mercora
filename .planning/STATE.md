@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 06
 current_phase_name: Theme File Mechanism & Presets
 status: executing
-stopped_at: Completed 06-03-PLAN.md
-last_updated: "2026-09-04T20:13:33.497Z"
+stopped_at: Completed 06-04-PLAN.md
+last_updated: "2026-09-04T20:31:11.452Z"
 last_activity: 2026-09-04
 last_activity_desc: Phase 06 execution started
-state_head: d3371cf34234843e6a681ab436b301d782431f2d
+state_head: 8d28ac4fc24a7c14f3da60b2721874bf67824c11
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 17
-  completed_plans: 15
+  completed_plans: 16
   percent: 25
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-04 after Phase 5)
 ## Current Position
 
 Phase: 06 (Theme File Mechanism & Presets) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-09-04 — Phase 06 execution started
 
@@ -82,6 +82,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 06 P01 | 15min | 3 tasks | 19 files |
 | Phase 06 P02 | 25min | 3 tasks | 9 files |
 | Phase 06 P03 | 20min | 3 tasks | 6 files |
+| Phase 06 P04 | 16min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -129,6 +130,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 06]: [Phase 06-03] Both presets took every token value from 06-UI-SPEC.md's pre-computed table verbatim, including its two flagged accessibility corrections (Midnight's on-primary, Luxe's ring) — no oklch value was re-derived by hand.
 - [Phase 06]: [Phase 06-03] Direction-doc properties dropped under D-03 were folded into existing tokens where the role overlapped (Midnight's accent-2 cyan into info; Luxe's surface-sunken into border) rather than lost outright; recorded in .planning/todos/pending/theme-contract-dropped-properties.md.
 - [Phase 06]: [Phase 06-03] font-display is fully wired (Tailwind class, CSS var, next/font load) but unused by any component in app/ or components/ — luxe's serif display face does not currently render anywhere; flagged in .planning/WINDOWS.md for plan 06-05.
+- [Phase 06]: [Phase 06-04] Imported the appearance setting constants directly from lib/themes/active-theme.ts into the client ThemePresetGrid component per the plan's interface contract, verified via a real npm run build that this does not break the client bundle.
+- [Phase 06]: [Phase 06-04] Settings hub tabs array gained a kind: "state" | "route" discriminant so the new Appearance entry navigates via next/link while the seven existing entries keep setActiveTab, with correct TS narrowing on tab.id.
 
 ### Pending Todos
 
@@ -136,7 +139,7 @@ None.
 
 ### Blockers/Concerns
 
-Open items carried from v1 close (none blocks v2 feature work; full list in `milestones/v1-MILESTONE-AUDIT.md`):
+Open items carried from v1 close (blocks v2 feature work; full list in `milestones/v1-MILESTONE-AUDIT.md`):
 
 - [Needs Russell] Add `NEXT_PUBLIC_SITE_URL` as a Cloudflare Workers Build variable and redeploy (sitemap still advertises `mercora.example.com`)
 - [Cloudflare hygiene] Delete the unused `ADMIN_USER_IDS` Worker secret
@@ -155,6 +158,7 @@ Carried out of Phase 5:
 - [Phase 5] Prose blocks (`prose-invert prose-orange`) run on Typography plugin defaults; prose accent colour will not follow a theme until Phase 6 wires typography colours off the CSS variables
 - [Phase 5] `border-inverse` serves both drawer edges and email dividers; if the darker email divider reads badly, Phase 6 should split it into a second token rather than hardcode an exception
 - [Phase 5] Six pre-packaged theme specs in `docs/voltique-theme-direction.md` (untracked) use different token names than the frozen contract; Phase 6 needs a rename map. See `.planning/todos/pending/theme-metadata-industry-synopsis-admin.md`
+- [Phase 06-04] app/api/admin/settings/route.ts's GET ?category=X inserts the full defaultSettings array (all categories) when the filtered result is empty; appearance has no defaults, so a fresh DB with other categories already populated would 500 on the Appearance page's own load. Out of scope for 06-04 (interfaces explicitly forbid touching this file); logged in WINDOWS.md #3.
 
 ## Deferred Items
 
@@ -166,8 +170,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T20:13:22.783Z
-Stopped at: Completed 06-03-PLAN.md
+Last session: 2026-09-04T20:31:11.370Z
+Stopped at: Completed 06-04-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 6` (or `/gsd-plan-phase 6` directly) to start Theme File Mechanism & Presets
