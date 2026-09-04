@@ -2,37 +2,37 @@
 gsd_state_version: 1.0
 milestone: v2
 milestone_name: Themeable Storefront
-current_phase: 05
-current_phase_name: Token Contract & Component Sweep
-status: verifying
-stopped_at: Completed 05-12-PLAN.md
-last_updated: "2026-09-04T18:12:41.397Z"
-last_activity: 2026-09-03
-last_activity_desc: Phase 05 execution started
-state_head: 29f47595acfb924a5806953f29220b7e7fa386b0
+current_phase: 6
+current_phase_name: Theme File Mechanism & Presets
+status: planning
+stopped_at: Phase 05 complete, ready to plan Phase 6
+last_updated: "2026-09-04T18:34:14.855Z"
+last_activity: 2026-09-04
+last_activity_desc: Phase 05 complete, transitioned to Phase 6
+state_head: d04ebbdd057a5d70e409dfd8dabfc9fcf81bba69
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 12
   completed_plans: 12
-  percent: 0
+  percent: 25
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-02 after v2 milestone start)
+See: .planning/PROJECT.md (updated 2026-09-04 after Phase 5)
 
 **Core value:** A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** Phase 05 — Token Contract & Component Sweep
+**Current focus:** Phase 6 — Theme File Mechanism & Presets
 
 ## Current Position
 
-Phase: 05 (Token Contract & Component Sweep) — EXECUTING
-Plan: 12 of 12
-Status: Phase complete — ready for verification
-Last activity: 2026-09-03 — Phase 05 execution started
+Phase: 6 — Theme File Mechanism & Presets
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-09-04 — Phase 05 complete, transitioned to Phase 6
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -40,9 +40,9 @@ Progress: [░░░░░░░░░░] 0%
 
 **Velocity:**
 
-- Total plans completed: 17 (all v1)
-- Average duration: - (v2 not started)
-- Total execution time: 0.0 hours (v2)
+- Total plans completed: 29 (all v1)
+- Average duration: 56 min/plan (Phase 5, 12 plans)
+- Total execution time: ~11.3 hours (v2)
 
 **By Phase:**
 
@@ -52,15 +52,15 @@ Progress: [░░░░░░░░░░] 0%
 | 2 (v1) | 5 | - | - |
 | 3 (v1) | 3 | - | - |
 | 4 (v1) | 5 | - | - |
-| 5 (v2) | - | - | - |
 | 6 (v2) | - | - | - |
 | 7 (v2) | - | - | - |
 | 8 (v2) | - | - | - |
+| 5 (v2) | 12 | ~11.3h | 56min |
 
 **Recent Trend:**
 
-- Last 5 plans: - (v2 not started)
-- Trend: -
+- Last 5 plans: 25, 45, 90, 20, 95 min
+- Trend: sweep chunks 20–55 min; bridge/email chunks 90+ min
 
 *Updated after each plan completion*
 **Per-Plan Metrics:**
@@ -135,9 +135,16 @@ Open items carried from v1 close (none blocks v2 feature work; full list in `mil
 
 Research flags for v2 execution (from `.planning/research/SUMMARY.md`):
 
-- Phase 5: the sweep grep must cover the whole tree (Tailwind config, inline `style={}`, SVG fill/stroke, dead shadcn classes) — a className-only pass will look complete and won't be
 - Phase 6: any new telemetry event needs both `commerce.telemetry.v1` parity files updated (`lib/observability/telemetry.ts` + `workers/observability-tail/src/core.ts`) — locked v1 rule
 - Phase 6: `scripts/build-themes.mjs` must be wired into `build:worker` and `predev` explicitly — a `prebuild` script name never fires on the real deploy path
+
+Carried out of Phase 5:
+
+- [Phase 5] `data/d1/seed.sql` products bulk insert has a row missing its `options` value; the documented `--file=data/d1/seed.sql` load fails. Not fixed (out of scope); a local-only D1 fixture was used for screenshots
+- [Phase 5] Screenshot coverage gaps for Phase 8's visual QA: order-status (no seeded order), Stripe payment step (payment-intent 400 locally), authenticated account dashboard, review-form error state. Seed an order and a Clerk session before the cross-preset QA pass
+- [Phase 5] Prose blocks (`prose-invert prose-orange`) run on Typography plugin defaults; prose accent colour will not follow a theme until Phase 6 wires typography colours off the CSS variables
+- [Phase 5] `border-inverse` serves both drawer edges and email dividers; if the darker email divider reads badly, Phase 6 should split it into a second token rather than hardcode an exception
+- [Phase 5] Six pre-packaged theme specs in `docs/voltique-theme-direction.md` (untracked) use different token names than the frozen contract; Phase 6 needs a rename map. See `.planning/todos/pending/theme-metadata-industry-synopsis-admin.md`
 
 ## Deferred Items
 
@@ -149,8 +156,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T18:12:28.606Z
-Stopped at: Completed 05-12-PLAN.md
+Last session: 2026-09-04T18:40:00Z
+Stopped at: Phase 05 complete, ready to plan Phase 6
 Resume file: None
 
-Next: `/gsd-discuss-phase 5` (or `/gsd-plan-phase 5` directly) to start Token Contract & Component Sweep
+Next: `/gsd-discuss-phase 6` (or `/gsd-plan-phase 6` directly) to start Theme File Mechanism & Presets

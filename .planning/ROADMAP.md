@@ -25,7 +25,7 @@ Full phase details, success criteria, and plan lists: `milestones/v1-ROADMAP.md`
 
 **Milestone Goal:** The storefront is skinnable without touching component code — a theme is a CSS file in `themes/`, selectable from admin with swatch previews, and page templates expose enumerated layout switches configurable from admin. Tokens + enumerated variants, never free composition, never per-theme markup.
 
-- [ ] **Phase 5: Token Contract & Component Sweep** - Freeze the ~18-token contract, relocate the current look verbatim to `themes/volt-dark.css`, and sweep every storefront component/template to token classes (admin excluded)
+- [x] **Phase 5: Token Contract & Component Sweep** - Freeze the ~18-token contract, relocate the current look verbatim to `themes/volt-dark.css`, and sweep every storefront component/template to token classes (admin excluded) (completed 2026-09-04)
 - [ ] **Phase 6: Theme File Mechanism & Presets** - Build the prebuild theme scanner/validator, `getActiveTheme()` server resolution, the admin Appearance swatch picker, and ship 2-3 preset themes including one light
 - [ ] **Phase 7: Layout Switches** - Add three enumerated, server-chosen layout variants (category grid/list, home hero, product gallery) wired into the Appearance admin section
 - [ ] **Phase 8: Documentation & Visual QA Close-out** - Document the theming system, record a visual QA pass across presets x layout variants, and refresh the affected `.planning/codebase/` docs
@@ -154,7 +154,7 @@ Plans:
 | 2. Observability and Regression Guards | v1 | 5/5 | Complete | 2026-09-02 |
 | 3. Decision Lock-In and Operator Runbooks | v1 | 3/3 | Complete | 2026-09-02 |
 | 4. Reference Documentation Refresh | v1 | 5/5 | Complete | 2026-09-02 |
-| 5. Token Contract & Component Sweep | v2 | 12/12 | In Progress|  |
+| 5. Token Contract & Component Sweep | v2 | 12/12 | Complete    | 2026-09-04 |
 | 6. Theme File Mechanism & Presets | v2 | 0/TBD | Not started | - |
 | 7. Layout Switches | v2 | 0/TBD | Not started | - |
 | 8. Documentation & Visual QA Close-out | v2 | 0/TBD | Not started | - |
