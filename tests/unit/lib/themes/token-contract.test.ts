@@ -1,17 +1,20 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { getThemeTokens } from "@/lib/themes/tokens";
+import { DEFAULT_THEME_NAME } from "@/lib/themes/manifest.generated";
 
 /**
- * Contract test: getThemeTokens() must never silently drift from
- * themes/volt-dark.css. This test reads the CSS file itself rather than
- * restating its values a second time, so a hand-edited hex in one place
- * without the other fails here.
+ * Contract test: getThemeTokens() must never silently drift from the theme
+ * files under themes/. This test reads every themes/*.css file itself
+ * rather than restating its values a second time, so a hand-edited hex in
+ * one place without the other fails here. Extended in Phase 6 (D-11) to
+ * loop over every shipped theme, not just volt-dark.
  */
 
-const THEME_CSS_PATH = path.resolve(process.cwd(), "themes/volt-dark.css");
+const THEMES_DIR = path.resolve(process.cwd(), "themes");
 const TAILWIND_CONFIG_PATH = path.resolve(process.cwd(), "tailwind.config.ts");
+const GENERATED_BARREL_FILENAME = "index.generated.css";
 
 const EXPECTED_KEYS = [
   "primary",
@@ -56,9 +59,6 @@ function parseThemeCssProperties(cssSource: string): Record<string, string> {
   return props;
 }
 
-const themeCssSource = readFileSync(THEME_CSS_PATH, "utf-8");
-const themeCssProps = parseThemeCssProperties(themeCssSource);
-
 const COLOUR_KEYS = [
   "primary",
   "onPrimary",
@@ -81,47 +81,67 @@ const COLOUR_KEYS = [
 
 const RADIUS_KEYS = ["radiusSm", "radiusMd", "radiusLg", "radiusXl"] as const;
 
+/** Every shipped theme file's stem, derived from the filesystem, in filename order. */
+const themeStems = readdirSync(THEMES_DIR)
+  .filter((f) => f.endsWith(".css") && f !== GENERATED_BARREL_FILENAME)
+  .map((f) => path.basename(f, ".css"))
+  .sort();
+
 describe("getThemeTokens()", () => {
-  it("returns an object with exactly 23 own keys, matching the token map's camelCase names", () => {
-    const tokens = getThemeTokens();
-    const keys = Object.keys(tokens);
-
-    expect(keys).toHaveLength(23);
-    expect(keys.sort()).toEqual([...EXPECTED_KEYS].sort());
+  it("finds at least one shipped theme file to loop over", () => {
+    expect(themeStems.length).toBeGreaterThan(0);
   });
 
-  it("keeps every one of the 17 colour tokens byte-identical (case-insensitive, trimmed) to themes/volt-dark.css", () => {
-    const tokens = getThemeTokens() as unknown as Record<string, string>;
+  for (const stem of themeStems) {
+    describe(`theme: ${stem}`, () => {
+      const cssSource = readFileSync(path.join(THEMES_DIR, `${stem}.css`), "utf-8");
+      const cssProps = parseThemeCssProperties(cssSource);
 
-    expect(COLOUR_KEYS).toHaveLength(17);
-    for (const key of COLOUR_KEYS) {
-      const cssValue = themeCssProps[key];
-      expect(cssValue, `themes/volt-dark.css is missing --store-${key}`).toBeDefined();
-      expect(tokens[key].trim().toLowerCase()).toBe(cssValue.trim().toLowerCase());
-    }
-  });
+      it("returns an object with exactly 23 own keys, matching the token map's camelCase names", () => {
+        const tokens = getThemeTokens(stem);
+        const keys = Object.keys(tokens);
 
-  it("keeps every one of the 4 radius tokens identical to themes/volt-dark.css", () => {
-    const tokens = getThemeTokens() as unknown as Record<string, string>;
+        expect(keys).toHaveLength(23);
+        expect(keys.sort()).toEqual([...EXPECTED_KEYS].sort());
+      });
 
-    expect(RADIUS_KEYS).toHaveLength(4);
-    for (const key of RADIUS_KEYS) {
-      const cssValue = themeCssProps[key];
-      expect(cssValue, `themes/volt-dark.css is missing --store-${key}`).toBeDefined();
-      expect(tokens[key].trim().toLowerCase()).toBe(cssValue.trim().toLowerCase());
-    }
-  });
+      it("keeps every one of the 17 colour tokens byte-identical (case-insensitive, trimmed) to its own theme file", () => {
+        const tokens = getThemeTokens(stem) as unknown as Record<string, string>;
+
+        expect(COLOUR_KEYS).toHaveLength(17);
+        for (const key of COLOUR_KEYS) {
+          const cssValue = cssProps[key];
+          expect(cssValue, `themes/${stem}.css is missing --store-${key}`).toBeDefined();
+          expect(tokens[key].trim().toLowerCase()).toBe(cssValue.trim().toLowerCase());
+        }
+      });
+
+      it("keeps every one of the 4 radius tokens identical to its own theme file", () => {
+        const tokens = getThemeTokens(stem) as unknown as Record<string, string>;
+
+        expect(RADIUS_KEYS).toHaveLength(4);
+        for (const key of RADIUS_KEYS) {
+          const cssValue = cssProps[key];
+          expect(cssValue, `themes/${stem}.css is missing --store-${key}`).toBeDefined();
+          expect(tokens[key].trim().toLowerCase()).toBe(cssValue.trim().toLowerCase());
+        }
+      });
+    });
+  }
 
   it("reads no environment variable and imports nothing server-only (D1/Cloudflare/next)", () => {
-    const moduleSource = readFileSync(
-      path.resolve(process.cwd(), "lib/themes/tokens.ts"),
+    const tokensSource = readFileSync(path.resolve(process.cwd(), "lib/themes/tokens.ts"), "utf-8");
+    const manifestSource = readFileSync(
+      path.resolve(process.cwd(), "lib/themes/manifest.generated.ts"),
       "utf-8",
     );
 
-    expect(moduleSource).not.toMatch(/process\.env/);
-    expect(moduleSource).not.toMatch(/from\s+["'](.*\/)?d1[^"']*["']/i);
-    expect(moduleSource).not.toMatch(/from\s+["']next\//);
-    expect(moduleSource).not.toMatch(/from\s+["']@cloudflare\//);
+    for (const moduleSource of [tokensSource, manifestSource]) {
+      expect(moduleSource).not.toMatch(/process\.env/);
+      expect(moduleSource).not.toMatch(/from\s+["'](.*\/)?d1[^"']*["']/i);
+      expect(moduleSource).not.toMatch(/from\s+["']next\//);
+      expect(moduleSource).not.toMatch(/from\s+["']@cloudflare\//);
+    }
   });
 
   it("returns equal values across repeated calls", () => {
@@ -129,6 +149,11 @@ describe("getThemeTokens()", () => {
     const second = getThemeTokens();
 
     expect(first).toEqual(second);
+  });
+
+  it("defaults to DEFAULT_THEME_NAME when called with no argument or an unknown name", () => {
+    expect(getThemeTokens()).toEqual(getThemeTokens(DEFAULT_THEME_NAME));
+    expect(getThemeTokens("not-a-real-theme")).toEqual(getThemeTokens(DEFAULT_THEME_NAME));
   });
 
   it("keeps tailwind.config.ts free of hex literals (static half of TOKEN-01)", () => {
