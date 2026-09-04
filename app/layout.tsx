@@ -53,6 +53,7 @@ import { dark } from "@clerk/themes";
 import { Suspense } from "react";
 import WebVitals from "@/components/analytics/WebVitals";
 import { getStoreConfig } from "@/lib/store-config";
+import { getThemeTokens } from "@/lib/themes/tokens";
 import { StoreConfigProvider } from "@/lib/store";
 import SubscriptionSetupReturnHandler from "@/components/subscriptions/SubscriptionSetupReturnHandler";
 
@@ -117,6 +118,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const config = getStoreConfig();
+  const themeTokens = getThemeTokens();
   return (
     <ClerkProvider
       appearance={{
@@ -133,7 +135,7 @@ export default function RootLayout({
           className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen bg-surface text-foreground`}
           suppressHydrationWarning
         >
-          <StoreConfigProvider config={config}>
+          <StoreConfigProvider config={config} themeTokens={themeTokens}>
           <SubscriptionSetupReturnHandler />
           {/* Promotional banner - shown above header when enabled */}
           <Suspense fallback={null}>

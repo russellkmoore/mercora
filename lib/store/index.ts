@@ -1,1 +1,1 @@
-export { StoreConfigProvider, useStoreConfig } from "./StoreConfigProvider";
+export { StoreConfigProvider, useStoreConfig, useThemeTokens } from "./StoreConfigProvider";
