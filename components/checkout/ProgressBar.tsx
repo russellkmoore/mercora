@@ -37,22 +37,22 @@ export default function ProgressBar({ step }: { step: number }) {
             {/* Circle */}
             <div className="mb-1 h-5 sm:h-6 flex items-center justify-center">
               {isCompleted ? (
-                <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500" />
+                <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
               ) : (
                 <div
                   className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 ${
                     isCurrent
-                      ? "bg-orange-500 border-orange-500"
-                      : "border-gray-300"
+                      ? "bg-primary border-primary"
+                      : "border-border"
                   }`}
                 />
               )}
             </div>
 
             {/* Bar */}
-            <div className="w-full h-1 bg-gray-300 relative overflow-hidden">
+            <div className="w-full h-1 bg-border relative overflow-hidden">
               <div
-                className="absolute top-0 left-0 h-1 bg-orange-500 transition-all duration-1000 ease-in-out"
+                className="absolute top-0 left-0 h-1 bg-primary transition-all duration-1000 ease-in-out"
                 style={{ width: `${fillWidths[index]}%` }}
               />
             </div>
@@ -60,7 +60,7 @@ export default function ProgressBar({ step }: { step: number }) {
             {/* Label */}
             <div className="mt-1 text-[10px] sm:text-xs font-semibold text-center px-1">
               <span
-                className={index <= step ? "text-orange-500" : "text-gray-400"}
+                className={index <= step ? "text-primary" : "text-muted-foreground"}
               >
                 {label}
               </span>

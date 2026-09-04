@@ -42,7 +42,7 @@ export default function ShippingForm({
 
   return (
     <div
-      className={`bg-white text-black p-6 rounded-xl transition-opacity ${
+      className={`bg-surface-elevated text-foreground p-6 rounded-xl transition-opacity ${
         disabled ? "opacity-50 pointer-events-none" : ""
       }`}
     >
@@ -121,10 +121,10 @@ export default function ShippingForm({
         <div className="flex gap-2 items-end">
           <div className="flex-3">
             <Select onValueChange={onSelectCountry} value={address.country || ""}>
-              <SelectTrigger id="country" className="bg-white text-black touch-manipulation">
+              <SelectTrigger id="country" className="bg-surface-elevated text-foreground touch-manipulation">
                 <SelectValue placeholder="Select Country" />
               </SelectTrigger>
-              <SelectContent className="bg-white text-black">
+              <SelectContent className="bg-surface-elevated text-foreground">
                 <SelectItem value="US">United States</SelectItem>
                 <SelectItem value="CA">Canada</SelectItem>
                 <SelectItem value="UK">United Kingdom</SelectItem>
@@ -134,7 +134,7 @@ export default function ShippingForm({
           <div className="flex-1">
             <Button
               onClick={() => onSubmit(address)}
-              className="w-full bg-black text-white hover:bg-orange-500 touch-manipulation"
+              className="w-full bg-surface text-foreground hover:bg-primary touch-manipulation"
               disabled={isSubmitDisabled}
             >
               Use Address
@@ -143,7 +143,7 @@ export default function ShippingForm({
         </div>
 
         {error && (
-          <div className="text-red-600 text-sm font-medium mt-2">{error}</div>
+          <div className="text-danger text-sm font-medium mt-2">{error}</div>
         )}
       </div>
     </div>
