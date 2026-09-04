@@ -6,16 +6,16 @@ current_phase: 7
 current_phase_name: Layout Switches
 status: planning
 stopped_at: Phase 06 complete, ready to plan Phase 7
-last_updated: "2026-09-04T21:19:44.482Z"
+last_updated: "2026-09-04T21:22:17.703Z"
 last_activity: 2026-09-04
 last_activity_desc: Phase 06 complete, transitioned to Phase 7
-state_head: aae87fa4b95f0fa627e14aaf8aa44605a3b9f615
+state_head: 28f1ece407e28410caba637feaa5cb42df15a081
 progress:
-  total_phases: 4
+  total_phases: 5
   completed_phases: 2
   total_plans: 17
   completed_plans: 17
-  percent: 50
+  percent: 40
 ---
 
 # Project State
@@ -151,7 +151,6 @@ Open items carried from v1 close (blocks v2 feature work; full list in `mileston
 
 Research flags for v2 execution (from `.planning/research/SUMMARY.md`):
 
-
 Carried out of Phase 5:
 
 - [Phase 5] `data/d1/seed.sql` products bulk insert has a row missing its `options` value; the documented `--file=data/d1/seed.sql` load fails. Not fixed (out of scope); a local-only D1 fixture was used for screenshots
@@ -167,6 +166,10 @@ Carried out of Phase 6 (see `.planning/WINDOWS.md`):
 - [Phase 6] Admin Appearance page has not been walked through in a real browser with a Clerk admin session; Dialog/AlertDialog scrims under `luxe` verified by compositing test only
 - [Phase 6] Four more preset specs (Clinical, Retro, Atelier, Market) and the direction doc's extra properties are backlog
 - [Phase 06-04] app/api/admin/settings/route.ts's GET ?category=X inserts the full defaultSettings array (all categories) when the filtered result is empty; appearance has no defaults, so a fresh DB with other categories already populated would 500 on the Appearance page's own load. Out of scope for 06-04 (interfaces explicitly forbid touching this file); logged in WINDOWS.md #3.
+
+### Roadmap Evolution
+
+- Phase 06.1 inserted after Phase 6: Remaining presets from the theme direction doc (Clinical, Retro, Atelier, Market) — Russell asked for all six during autonomous run (URGENT)
 
 ## Deferred Items
 
