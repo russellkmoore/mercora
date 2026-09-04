@@ -54,11 +54,21 @@ export type ThemeTokens = {
 /**
  * Returns the named theme's typed token values, falling back to
  * DEFAULT_THEME_NAME when `name` is absent or not a manifest key.
+ *
+ * Fails loudly (throws) if THEME_MANIFEST is empty. `build-themes.mjs`
+ * refuses to generate output for zero theme files, so an empty manifest
+ * here means that guarantee was violated some other way (e.g. a hand-edited
+ * generated file) — surfacing a clear error beats a silent, unrelated
+ * `TypeError: Cannot read properties of undefined` at every call site,
+ * including the unconditional call in `app/layout.tsx`'s RootLayout.
  */
 export function getThemeTokens(name: string = DEFAULT_THEME_NAME): ThemeTokens {
   const entry =
     THEME_MANIFEST.find((theme) => theme.name === name) ??
     THEME_MANIFEST.find((theme) => theme.name === DEFAULT_THEME_NAME) ??
     THEME_MANIFEST[0];
+  if (!entry) {
+    throw new Error("getThemeTokens: THEME_MANIFEST is empty — run `npm run build:themes`");
+  }
   return entry.tokens as ThemeTokens;
 }
