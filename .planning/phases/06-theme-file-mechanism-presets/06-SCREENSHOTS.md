@@ -154,3 +154,126 @@ Phase 5 closed with (nothing in this task changed source).
 | order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
 
 <!-- gsd:write-continue -->
+
+## Label: `phase-06-05-luxe-postfix`
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| home | 1280 | resting | .screenshots/phase-06-05-luxe-postfix/home__1280__resting.png | d53e3f278592f286b33e595d514b35148b4e574745a63c7a7e9b5d93c95a66ff | - |
+| home | 1280 | nav-open | .screenshots/phase-06-05-luxe-postfix/home__1280__nav-open.png | 3876c4f852874c3a24c71a8c704c1575d958571a1487baa32140ecf572b7aeaf | - |
+| home | 390 | resting | .screenshots/phase-06-05-luxe-postfix/home__390__resting.png | caebb86b39129d2e3732f0a79d085b15eebfb63203d5057cdaa30802022c3eb0 | - |
+| home | 390 | nav-open | .screenshots/phase-06-05-luxe-postfix/home__390__nav-open.png | 09f26cdeb7ade75b42950f521c6a46e6f0cc906a6e6a3ce31ec0632eeef497a7 | - |
+| category | 1280 | resting | .screenshots/phase-06-05-luxe-postfix/category__1280__resting.png | bd487f9b3e0f0810a7a6249618041d0b6b6112f633749cc061a50fa21f5c507b | - |
+| category | 1280 | nav-open | .screenshots/phase-06-05-luxe-postfix/category__1280__nav-open.png | 77c3bc094a360d8ebaa88ffca9d3dca9e79e92e5c55069fa95701cb2df6b1c13 | - |
+| category | 390 | resting | .screenshots/phase-06-05-luxe-postfix/category__390__resting.png | 2e3cc4bc3983cf4320e4759240cc54594b0da7af3d9fa4ef5b61b5026493a477 | - |
+| category | 390 | nav-open | .screenshots/phase-06-05-luxe-postfix/category__390__nav-open.png | 09f26cdeb7ade75b42950f521c6a46e6f0cc906a6e6a3ce31ec0632eeef497a7 | - |
+| product | 1280 | resting | .screenshots/phase-06-05-luxe-postfix/product__1280__resting.png | 6c6322b35ae7505a10b57d3ff657dbce149ab18053399279fb261f0763548c03 | - |
+| product | 1280 | nav-open | .screenshots/phase-06-05-luxe-postfix/product__1280__nav-open.png | 20abaf81763b551465c2f204f88be397bb79b0761feb722c0eedef06a7951111 | - |
+| product | 390 | resting | .screenshots/phase-06-05-luxe-postfix/product__390__resting.png | 9948ab23bed3d0094907cfb3a1e90eb8420a1c5dcde31541c8c70592f091ce3e | - |
+| product | 390 | nav-open | .screenshots/phase-06-05-luxe-postfix/product__390__nav-open.png | 09f26cdeb7ade75b42950f521c6a46e6f0cc906a6e6a3ce31ec0632eeef497a7 | - |
+| cart | 1280 | cart-open | .screenshots/phase-06-05-luxe-postfix/cart__1280__cart-open.png | 91eae9aee96c6cc8991fd75ac2c4d5294d1ef3bd0f6327da91a783d0b340d82d | - |
+| cart | 390 | cart-open | .screenshots/phase-06-05-luxe-postfix/cart__390__cart-open.png | 98e6c138e635e221c51825d6bcd1003fd5768cc16040be53f9a2a0aea7d39b11 | - |
+| checkout | 1280 | resting | .screenshots/phase-06-05-luxe-postfix/checkout__1280__resting.png | fe13e930773dce613ce22ed07bf7bef503ce4bea64d7aa8e56c7e65654c588b0 | - |
+| checkout | 1280 | nav-open | .screenshots/phase-06-05-luxe-postfix/checkout__1280__nav-open.png | 6fca758e54c7c454ab3550295e7446c2db9a6dd6d9f54576c3affa2bed541609 | - |
+| checkout | 390 | resting | .screenshots/phase-06-05-luxe-postfix/checkout__390__resting.png | 2a2e2f96b0d82fb283b1c6c988a2885de4817e9983958ce95ce32c8c6517e4b4 | - |
+| checkout | 390 | nav-open | .screenshots/phase-06-05-luxe-postfix/checkout__390__nav-open.png | 09f26cdeb7ade75b42950f521c6a46e6f0cc906a6e6a3ce31ec0632eeef497a7 | - |
+| account | 1280 | resting | .screenshots/phase-06-05-luxe-postfix/account__1280__resting.png | 9062b935c1520073778e3e5dfd99a147b43e2c474e04fc1a3e42daed3d47bb95 | - |
+| account | 1280 | nav-open | .screenshots/phase-06-05-luxe-postfix/account__1280__nav-open.png | daccf8aff6e7523c98dc5bde962a3db5a5d220b7d6f7891c1c39a64e0b8278ba | - |
+| account | 390 | resting | .screenshots/phase-06-05-luxe-postfix/account__390__resting.png | 81d61c1372fce37302129ae65a637146dcf16d21f80e063526afa63a3d278e79 | - |
+| account | 390 | nav-open | .screenshots/phase-06-05-luxe-postfix/account__390__nav-open.png | 09f26cdeb7ade75b42950f521c6a46e6f0cc906a6e6a3ce31ec0632eeef497a7 | - |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+
+---
+
+## Task 2: The light-preset acid test
+
+Per D-04 and the UI-SPEC's pre-located finding, the light preset is where a token-driven scrim's
+polarity dependence would surface: `bg-surface/NN` at any opacity inherits `--store-surface`,
+which is near-white (`#f8f5ef`) under `luxe`, so the same class that reads as a correct black-alpha
+scrim under every dark preset can read as an invisible or near-invisible wash under the light one.
+
+**Method.** With the stored theme switched to `luxe` (confirmed via the served `data-theme`
+attribute), each of the four UI-SPEC-located sites was inspected two ways: (1) live, in the
+running app, wherever a real trigger exists in this environment (the cart drawer and mobile nav
+Sheet, both reachable with no auth; the category hero, reachable but without a real photo behind
+it in the local fixture); and (2) via a live-DOM compositing check — injecting the exact same
+Tailwind class (`bg-surface/NN`) over a realistic photographic gradient on an actual page load (so
+the real compiled CSS custom properties resolve exactly as production would), for the two sites
+this environment cannot reach with a real trigger (`Dialog`'s `OrderConfirmationModal`, gated
+behind a completed Stripe checkout that fails locally; `AlertDialog`, used only inside the admin
+tree, which requires a Clerk session unavailable here). The `SheetOverlay` finding was additionally
+confirmed by reading its live computed style with the cart drawer open under `luxe`:
+`background-color: oklab(0.970797 0.000856102 0.0085628 / 0.5)` — `--store-surface` at 50% alpha,
+confirming the overlay renders exactly as specified but is visually indistinguishable from the
+page behind it.
+
+### Findings
+
+| # | Site | File:line | Class in play | What it looks like under `luxe` | Judgement | Reason |
+|---|---|---|---|---|---|---|
+| F1 | Dialog backdrop | `components/ui/dialog.tsx:106` | `bg-surface/80` | Near-invisible near-white wash over a photographic backdrop (verified via live-DOM injection test, `.screenshots/scrim-inspect-luxe.png` vs. `.screenshots/scrim-inspect-volt-dark.png`: the volt-dark cell darkens the same gradient to near-black; the luxe cell barely tints it) | **Changed** | This backdrop's entire purpose is to obscure the full page behind a centered modal. At 80% opacity — the strongest of the three overlay classes — a near-white value over an already-light page produces essentially no visible separation, the clearest failure of the three. |
+| F2 | AlertDialog backdrop | `components/ui/alert-dialog.tsx:39` | `bg-surface/50` | Same underlying token and mechanism as `SheetOverlay` below (byte-identical class before this fix); not independently live-triggerable in this environment (admin-only, no Clerk session — same limitation WINDOWS #2 already records for 06-04) | **Changed** | Applied the same fix as `SheetOverlay` (F3) for consistency: both call sites shared the identical `bg-surface/50` class and the identical composited-color mechanism, so the live evidence gathered for the Sheet overlay applies here directly — this is a case-by-case fix scoped to the two sites that shared this exact class, not a blanket rule change. |
+| F3 | Sheet backdrop (cart drawer, mobile nav) | `components/ui/sheet.tsx:128` | `bg-surface/50` | Live-verified: with the cart drawer open under `luxe`, the overlay's computed background was `--store-surface` at 50% alpha (near-white) and the home page visible behind it showed no discernible dimming — compare `.screenshots/phase-06-05-luxe/cart__1280__cart-open.png` (before) against `.screenshots/phase-06-05-luxe-postfix/cart__1280__cart-open.png` (after) | **Changed** | Same failure class as F1: the backdrop's job is to visually separate the drawer/menu from the page behind it, and a near-white-on-near-white overlay does not do that. The drawer panel itself (`bg-surface-inverse`) already correctly inverts to dark under `luxe` — only the full-viewport backdrop scrim behind it was wrong. |
+| F4 | Category hero image overlay | `app/category/[slug]/page.tsx:133` | `bg-surface/40` | Live-DOM injection test reproducing the real markup (`text-foreground` heading/description over a photographic gradient at 40% opacity, no shadow): `.screenshots/scrim-category-hero-luxe.png`. Black heading/body text stayed clearly legible across the whole gradient; the overlay read as a soft, natural lightening of the photo rather than an unintended light haze obscuring it. The local D1 fixture's category has no real image configured, so a live in-app capture with a real photo was not possible this session — the injection test is the closest available substitute, using the component's actual classes and text styling. | **Accepted as-is** | This site's job is different from the other three: it is a permanent background treatment providing contrast for overlaid heading text, not a modal-separation backdrop that must fully obscure content behind a floating panel. At 40% — the weakest of the three overlay opacities — and paired with `text-foreground` (black under `luxe`, already high-contrast against the photo independent of the overlay's own direction), the site did not exhibit the same failure the other three did. Per D-04's "polarity-neutral" framing and the plan's own instruction to fix only what genuinely reads wrong, this is left as a real, deliberate "accept" rather than folded into the same fix as F1–F3 for the sake of consistency alone. Carried forward: this judgement rests on a synthetic reproduction, not a live photo in this fixture — worth a real look once a category has a configured image. |
+
+**A QA pass whose record contains only changes is a pass that did not consider leaving things
+alone** — F4 is that record's one deliberate "accept," and it stands on the same evidentiary
+footing as the three changes (a controlled compositing test against the real compiled CSS and the
+real component markup), not a default or an omission.
+
+### Change register (before / after)
+
+| Site | File | Before | After | Reason | Mechanism |
+|---|---|---|---|---|---|
+| Dialog backdrop | `components/ui/dialog.tsx` | `bg-surface/80` | `bg-black/80` | F1 — token-driven scrim inherited light-preset polarity, reading as a near-invisible wash instead of a full-page-obscuring backdrop | `gsd:scan-ignore-start`/`-end` sentinel around the literal, with a written reason in the surrounding comment (scanner's existing exception mechanism, `scripts/scan-hardcoded-colors.mjs`) |
+| AlertDialog backdrop | `components/ui/alert-dialog.tsx` | `bg-surface/50` | `bg-black/50` | F2 — identical class/mechanism to the Sheet backdrop fix | Same sentinel mechanism |
+| Sheet backdrop | `components/ui/sheet.tsx` | `bg-surface/50` | `bg-black/50` | F3 — live-verified near-zero visible dimming under `luxe` | Same sentinel mechanism |
+| Category hero overlay | `app/category/[slug]/page.tsx` | `bg-surface/40` | *(unchanged)* | F4 — accepted as-is; see Findings table | n/a |
+
+No new `--store-*` token was added to satisfy any of these three fixes, and no shared/blanket
+overlay class was introduced — each fix is a literal value scoped to the one primitive's own
+overlay declaration, per D-03/D-04's explicit prohibitions. Post-fix gates: `mise exec -- npm run
+scan:tokens` → 0 violations (sentinel-excluded, same 2 manual-review rows); `for f in themes/*.css`
+token-count check → 23 for every shipped theme; `mise exec -- node scripts/build-themes.mjs
+--check` → fresh; `mise exec -- npm run lint` → 0 errors (52 pre-existing warnings, unchanged);
+`mise exec -- npm run typecheck` → clean; `mise exec -- npm test` → 248 files / 1932 tests, all
+green.
+
+### Newly-inverted surfaces re-checked under `luxe`
+
+- **Drawer edges (`border-border-inverse`).** `themes/luxe.css` declares its own
+  `--store-border-inverse: #2b221a` (a dark warm brown), independently authored for luxe's own
+  dark inverse panel — not a value shared across themes. The Phase 5 carry-over note ("the shared
+  border token serving both drawer edges and email dividers") is about `volt-dark`'s own single
+  `border-inverse` value serving two consumers *within that one theme*; it is unaffected by luxe
+  or midnight existing, since each theme declares its own independent value. Re-checked and
+  confirmed no cross-theme leakage: `.screenshots/phase-06-05-luxe-postfix/cart__1280__cart-open.png`
+  shows the cart drawer's dark panel with a visible dark divider against the (now correctly
+  darkened) page behind it. The original Phase 5 question — whether `volt-dark`'s one value
+  serving both consumers reads badly — is unchanged by this plan and remains open for whoever
+  next touches email templates or drawer borders (still carried forward, not resolved here).
+- **Stripe host panel.** Per the Phase 5 decision log, `SubscriptionAcquisitionPanel.tsx`'s Stripe
+  setup host wrapper deliberately uses the **main** token set (`bg-surface-elevated`/
+  `text-foreground`), not the inverse set — so under `luxe` it renders as part of the normal light
+  page, not as a newly-inverted dark panel. Confirmed by reading the file: no inverse-token class
+  present. Not a scrim site, no finding to register.
+- **Mobile nav Sheet at 390px.** Per the existing coverage note carried from Phase 5, the 390px
+  `nav-open` state's Sheet is full-width and covers the entire viewport, so there is no visible
+  page content behind it to judge a backdrop against at that viewport — expected, not a gap. The
+  1280px cart-drawer capture (F3 above) is where the backdrop is actually visible and was judged.
+
+### Cross-check: anything else read as a dark-tuned leftover under `luxe`?
+
+Beyond the four UI-SPEC-located sites, the full route-grid captures from Task 1
+(`phase-06-05-luxe`) and the post-fix re-capture (`phase-06-05-luxe-postfix`) were reviewed for
+any other surface that reads wrong under the light preset. Home, category, product, checkout, and
+account pages all rendered with correct light-preset polarity (ivory surfaces, black foreground
+text, gold accent, dark inverse cart drawer) — no additional dark-tuned leftover was found beyond
+the three fixed scrim sites. One pre-existing, out-of-scope observation carried forward rather
+than fixed here: the category page's hero image slot renders a broken-image icon in this
+environment because the local D1 fixture's one category has no configured image URL — unrelated
+to theming, a data-fixture gap, not a token or polarity issue (see the category hero row's own
+carried-forward note above for the QA implication).
