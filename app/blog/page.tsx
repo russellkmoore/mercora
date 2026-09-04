@@ -36,8 +36,8 @@ export default async function BlogPage({
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
       <header className="mb-10">
-        <p className="text-sm font-semibold uppercase tracking-widest text-orange-400">Editorial</p>
-        <h1 className="mt-2 text-4xl font-bold text-white sm:text-5xl">Blog</h1>
+        <p className="text-sm font-semibold uppercase tracking-widest text-primary">Editorial</p>
+        <h1 className="mt-2 text-4xl font-bold text-foreground sm:text-5xl">Blog</h1>
       </header>
       <BlogIndex posts={posts} page={page} hasMore={result.length > pageSize} />
     </div>

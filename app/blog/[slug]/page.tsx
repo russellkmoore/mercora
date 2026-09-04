@@ -68,19 +68,19 @@ export default async function BlogPostPage({ params }: Props) {
   return (
     <article className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: structured }} />
-      <Link href="/blog" className="text-sm text-orange-400 hover:text-orange-300">← Blog</Link>
+      <Link href="/blog" className="text-sm text-primary hover:text-primary/90">← Blog</Link>
       <header className="mt-6">
-        <h1 className="text-4xl font-bold text-white sm:text-5xl">{post.title}</h1>
-        <p className="mt-4 text-neutral-400">By {post.author} · {formatCmsTimestamp(post.publishedAt)} · {post.readingTime} min read</p>
-        {post.excerpt && <p className="mt-5 text-xl leading-relaxed text-neutral-300">{post.excerpt}</p>}
+        <h1 className="text-4xl font-bold text-foreground sm:text-5xl">{post.title}</h1>
+        <p className="mt-4 text-muted-foreground">By {post.author} · {formatCmsTimestamp(post.publishedAt)} · {post.readingTime} min read</p>
+        {post.excerpt && <p className="mt-5 text-xl leading-relaxed text-muted-foreground">{post.excerpt}</p>}
       </header>
       {post.coverImageUrl && <Image src={post.coverImageUrl} alt={post.coverImageAlt || ""} width={1200} height={675} className="mt-8 aspect-video w-full rounded-xl object-cover" priority />}
       <div className="prose prose-invert prose-orange mt-10 max-w-none" dangerouslySetInnerHTML={{ __html: html }} />
       {related.length > 0 && (
-        <aside className="mt-12 border-t border-neutral-800 pt-8">
-          <h2 className="text-2xl font-semibold text-white">Related posts</h2>
+        <aside className="mt-12 border-t border-border pt-8">
+          <h2 className="text-2xl font-semibold text-foreground">Related posts</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            {related.map((item) => <Link key={item.id} href={`/blog/${item.slug}`} className="rounded-lg border border-neutral-800 bg-neutral-900 p-4 text-neutral-200 hover:border-orange-500">{item.title}</Link>)}
+            {related.map((item) => <Link key={item.id} href={`/blog/${item.slug}`} className="rounded-lg border border-border bg-surface-elevated p-4 text-foreground hover:border-primary">{item.title}</Link>)}
           </div>
         </aside>
       )}
