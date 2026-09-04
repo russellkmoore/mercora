@@ -123,23 +123,14 @@ export default function RootLayout({
         theme: dark,
       }}
     >
-      <html lang="en" suppressHydrationWarning>
+      <html lang="en" data-theme="volt-dark" suppressHydrationWarning>
         <head>
           {/* MCP discovery links complement the metadata emitted by generateMetadata. */}
           <link rel="mcp-server" href="/api/mcp" type="application/json" />
           <link rel="mcp-schema" href="/api/mcp/schema" type="application/json" />
         </head>
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
-          style={{
-            backgroundColor: config.theme.surface,
-            color: config.theme.foreground,
-            "--store-primary": config.theme.primary,
-            "--store-surface": config.theme.surface,
-            "--store-surface-elevated": config.theme.surfaceElevated,
-            "--store-foreground": config.theme.foreground,
-            "--store-muted-foreground": config.theme.mutedForeground,
-          } as React.CSSProperties}
+          className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen bg-surface text-foreground`}
           suppressHydrationWarning
         >
           <StoreConfigProvider config={config}>
@@ -167,7 +158,7 @@ export default function RootLayout({
             position="top-center"
             toastOptions={{
               className:
-                "bg-(--store-primary)/80 text-black font-semibold rounded-md mt-[60px] shadow-lg animate-in fade-in slide-in-from-top-5",
+                "bg-primary/80 text-on-primary font-semibold rounded-md mt-[60px] shadow-lg animate-in fade-in slide-in-from-top-5",
               duration: 3000,
             }}
           />

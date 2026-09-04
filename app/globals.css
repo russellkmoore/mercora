@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import '../themes/volt-dark.css';
 @config '../tailwind.config.ts';
 
 /* Optimize font loading to reduce preload warnings */
@@ -11,7 +12,7 @@
   
   /* Progressive font enhancement */
   .font-sans {
-    font-family: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: var(--store-font-sans);
     font-display: swap;
   }
   
@@ -30,7 +31,8 @@
   }
 }
 
-/* Admin Layout Specific Styles */
+/* Admin Layout Specific Styles — hardcoded palette by decision D-14, excluded from the token scan */
+/* gsd:scan-ignore-start */
 @layer components {
   /* Admin layout container */
   .admin-layout {
@@ -127,6 +129,7 @@
     background: rgb(82 82 82); /* neutral-600 */
   }
 }
+/* gsd:scan-ignore-end */
 
 @layer utilities {
   .touch-manipulation {
@@ -152,7 +155,7 @@
     input:focus-visible,
     select:focus-visible,
     textarea:focus-visible {
-      outline: 2px solid #f97316;
+      outline: 2px solid var(--store-primary);
       outline-offset: 2px;
     }
   }
