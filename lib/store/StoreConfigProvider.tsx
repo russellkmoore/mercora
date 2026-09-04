@@ -1,10 +1,10 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
-import type { StoreConfig } from "@/lib/store-config";
+import type { PublicStoreConfig } from "@/lib/store-config";
 import type { ThemeTokens } from "@/lib/themes/tokens";
 
-const StoreConfigContext = createContext<StoreConfig | null>(null);
+const StoreConfigContext = createContext<PublicStoreConfig | null>(null);
 const ThemeTokensContext = createContext<ThemeTokens | null>(null);
 
 export function StoreConfigProvider({
@@ -12,7 +12,7 @@ export function StoreConfigProvider({
   themeTokens,
   children,
 }: {
-  config: StoreConfig;
+  config: PublicStoreConfig;
   themeTokens: ThemeTokens;
   children: ReactNode;
 }) {
