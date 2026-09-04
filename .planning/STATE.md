@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 05
 current_phase_name: Token Contract & Component Sweep
 status: executing
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-09-04T05:47:09.676Z"
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-09-04T06:13:04.516Z"
 last_activity: 2026-09-03
 last_activity_desc: Phase 05 execution started
-state_head: eebec30b9bf5503b9579a6f72657f94a0862b9f1
+state_head: e1db968f6df609a6c7ee5287590d497506167613
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 12
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-02 after v2 milestone start)
 ## Current Position
 
 Phase: 05 (Token Contract & Component Sweep) — EXECUTING
-Plan: 2 of 12
+Plan: 3 of 12
 Status: Ready to execute
 Last activity: 2026-09-03 — Phase 05 execution started
 
@@ -68,6 +68,7 @@ Progress: [░░░░░░░░░░] 0%
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 05 P01 | 20min | 2 tasks | 7 files |
+| Phase 05 P02 | 55min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - Per-theme component/markup overrides and per-category layout overrides are rejected — tokens + enumerated variants is the line
 - Admin theming is out of scope for this milestone; admin keeps its hardcoded palette
 - [Phase 05]: MANUAL_REVIEW files are excluded from scanning entirely (not just flagged inline), each printed with a written reason on every run. — Matches TOKEN-MAP §6's framing of them as named-file exceptions with a printed reason, so a future 0-violations result never silently omits content the scanner never looked at.
+- [Phase 05]: The screenshot harness's 'open' interactive state for every non-cart route is the header nav (desktop dropdown / mobile sheet); only two selectors (nav trigger, cart trigger) cover the whole coverage grid.
+- [Phase 05]: Local D1 dev seed (predev/seed-dev.sql) does not provide catalog data; data/d1/seed.sql is the documented but currently broken source (bad bulk-insert row) — screenshot baseline used a minimal local-only D1 fixture instead of fixing the unrelated seed file.
 
 ### Pending Todos
 
@@ -112,8 +115,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T05:47:09.664Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-09-04T06:13:04.504Z
+Stopped at: Completed 05-02-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 5` (or `/gsd-plan-phase 5` directly) to start Token Contract & Component Sweep
