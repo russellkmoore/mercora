@@ -20,3 +20,19 @@ describe("configured email footer", () => {
     expect(unsubscribeFooterHtml('https://example.test/?x="bad"', defaultTokens)).toContain("&quot;bad&quot;");
   });
 });
+
+describe("footer follows its caller's theme, not a fixed one", () => {
+  const luxeTokens = getThemeTokens("luxe");
+
+  it("postalFooterHtml renders the muted-on-inverse value of whichever preset it is handed", () => {
+    expect(defaultTokens.mutedOnInverse).not.toBe(luxeTokens.mutedOnInverse);
+    expect(postalFooterHtml(defaultTokens)).toContain(`color:${defaultTokens.mutedOnInverse};`);
+    expect(postalFooterHtml(luxeTokens)).toContain(`color:${luxeTokens.mutedOnInverse};`);
+  });
+
+  it("unsubscribeFooterHtml renders the muted-on-inverse value of whichever preset it is handed", () => {
+    const url = "https://example.test/unsubscribe";
+    expect(unsubscribeFooterHtml(url, defaultTokens)).toContain(`color:${defaultTokens.mutedOnInverse};`);
+    expect(unsubscribeFooterHtml(url, luxeTokens)).toContain(`color:${luxeTokens.mutedOnInverse};`);
+  });
+});
