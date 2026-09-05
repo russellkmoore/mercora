@@ -246,6 +246,49 @@ SET status = 'processing', attempt_count = 99, claim_token = 'owner-old',
     );
   });
 
+  it('clamps the backoff exponent for an out-of-range attempt_count (defense-in-depth)', async () => {
+    const paid = order('paid');
+    await insertOrder(paid);
+    await stagePaidOrderEffects(paid, { database: env.DB, now: start, includeEmail: false });
+    await keepOnly('inventory');
+    const claimed = await claimNextOrderEffect(env.DB, {
+      now: start,
+      claimToken: 'owner-boundary',
+    });
+    expect(claimed).not.toBeNull();
+
+    // `attempt_count` is always >= 1 through the public claim path (and the
+    // `order_effects` table itself enforces a `CHECK (attempt_count >= 0)`
+    // constraint, so a negative/NaN value can never be persisted). The hostile
+    // values below are only ever passed in-memory via a hand-constructed
+    // `ClaimedOrderEffect`, simulating a corrupted or misused caller — the row
+    // itself keeps a schema-valid `attempt_count` throughout. Each case must
+    // resolve to a finite, non-negative delay bounded by the five-minute base
+    // and six-hour cap — never NaN, Infinity, or a delay before `start`.
+    const cases: Array<{ attempt_count: number; expectedDelayMs: number }> = [
+      { attempt_count: 0, expectedDelayMs: 5 * 60 * 1_000 }, // exponent would be -1 without clamping
+      { attempt_count: -5, expectedDelayMs: 5 * 60 * 1_000 }, // negative input, clamped to exponent 0
+      { attempt_count: Number.NaN, expectedDelayMs: 5 * 60 * 1_000 }, // non-finite, falls back to attempt 1
+    ];
+
+    for (const { attempt_count, expectedDelayMs } of cases) {
+      await env.DB.prepare(`
+UPDATE order_effects
+SET status = 'processing', claim_token = 'owner-boundary',
+    lease_expires_at = ?, next_attempt_at = NULL
+`).bind(new Date(start.getTime() + 60_000).toISOString()).run();
+      const boundary: ClaimedOrderEffect = {
+        ...claimed!,
+        attempt_count,
+        claim_token: 'owner-boundary',
+      };
+      await failOrderEffect(env.DB, boundary, new Error('boundary'), start);
+      const row = await env.DB.prepare('SELECT next_attempt_at FROM order_effects')
+        .first<{ next_attempt_at: string }>();
+      expect(row?.next_attempt_at).toBe(new Date(start.getTime() + expectedDelayMs).toISOString());
+    }
+  });
+
   it('recovers stage→paid→skipped-inline work and invokes every idempotent recipient', async () => {
     const pending = order();
     const paid = order('paid');

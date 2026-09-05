@@ -370,10 +370,15 @@ export async function failOrderEffect(
   now: Date,
   options: { needsReview?: boolean } = {}
 ): Promise<boolean> {
-  const delayMs = Math.min(
-    6 * 60 * 60 * 1000,
-    5 * 60 * 1000 * 2 ** Math.min(effect.attempt_count - 1, 10)
-  );
+  // Defense-in-depth: `attempt_count` is always >= 1 by the time a claimed
+  // effect reaches this function via the public claim path, but this export
+  // takes a bare object with no runtime enforcement on that invariant. Clamp
+  // the exponent to a sane [0, 10] range so a corrupted or hand-constructed
+  // `attempt_count` (0, negative, NaN, or absurdly large) can never produce a
+  // fractional, negative, NaN, or Infinity delay.
+  const rawAttemptCount = Number.isFinite(effect.attempt_count) ? effect.attempt_count : 1;
+  const exponent = Math.max(0, Math.min(rawAttemptCount - 1, 10));
+  const delayMs = Math.min(6 * 60 * 60 * 1000, 5 * 60 * 1000 * 2 ** exponent);
   const nextAttemptAt = options.needsReview ? null : new Date(now.getTime() + delayMs).toISOString();
   const message = (error instanceof Error ? error.message : String(error)).slice(0, MAX_EFFECT_ERROR);
   const reviewResult = options.needsReview
