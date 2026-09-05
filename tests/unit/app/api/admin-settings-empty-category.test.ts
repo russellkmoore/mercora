@@ -32,7 +32,8 @@ function request(category?: string) {
  * needing to parse the `eq()` condition object `.where()` actually receives.
  */
 function buildDb() {
-  const insertValues = vi.fn().mockResolvedValue(undefined);
+  const onConflictDoNothing = vi.fn().mockResolvedValue(undefined);
+  const insertValues = vi.fn().mockReturnValue({ onConflictDoNothing });
   const insert = vi.fn(() => ({ values: insertValues }));
   const whereMock = vi.fn();
   const unfilteredMock = vi.fn();
@@ -45,7 +46,7 @@ function buildDb() {
 
   const select = vi.fn(() => ({ from }));
 
-  return { select, insert, insertValues, whereMock, unfilteredMock, from };
+  return { select, insert, insertValues, onConflictDoNothing, whereMock, unfilteredMock, from };
 }
 
 describe("GET /api/admin/settings — category-scoped seeding", () => {
@@ -57,9 +58,11 @@ describe("GET /api/admin/settings — category-scoped seeding", () => {
 
   it("returns an empty list for a category with no defaults, on a partially-seeded table, without inserting", async () => {
     const db = buildDb();
-    // Partially-seeded table: an unfiltered read would find other categories'
-    // rows, but the appearance-filtered read resolves empty both times this
-    // handler queries it (initial read, then the scoped re-select).
+    // Partially-seeded table: the unconditional existing-keys read (always
+    // unfiltered, regardless of the requested category) finds other
+    // categories' rows, but the appearance-filtered read resolves empty both
+    // times this handler queries it (initial read, then the scoped re-select
+    // — which doesn't run here since nothing was missing to seed).
     db.unfilteredMock.mockResolvedValue([{ key: "system.debug_mode", category: "system" }]);
     db.whereMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     mocks.getDbAsync.mockResolvedValue(db);
@@ -77,6 +80,9 @@ describe("GET /api/admin/settings — category-scoped seeding", () => {
     expect(systemDefaults.length).toBeGreaterThan(0);
     expect(systemDefaults.length).toBeLessThan(defaultSettings.length);
 
+    // Existing-keys read (unfiltered) finds nothing yet — every system
+    // default is missing and should be inserted.
+    db.unfilteredMock.mockResolvedValue([]);
     db.whereMock.mockResolvedValueOnce([]).mockResolvedValueOnce(systemDefaults);
     mocks.getDbAsync.mockResolvedValue(db);
 
@@ -93,7 +99,13 @@ describe("GET /api/admin/settings — category-scoped seeding", () => {
 
   it("seeds the full defaults array unchanged when no category is requested on a genuinely empty table", async () => {
     const db = buildDb();
-    db.unfilteredMock.mockResolvedValueOnce([]).mockResolvedValueOnce(defaultSettings);
+    // Three unfiltered reads in sequence: initial settings load, the
+    // existing-keys read used to compute missing defaults, then the
+    // post-seed re-select.
+    db.unfilteredMock
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(defaultSettings);
     mocks.getDbAsync.mockResolvedValue(db);
 
     const response = await GET(request());
@@ -109,6 +121,7 @@ describe("GET /api/admin/settings — category-scoped seeding", () => {
     const existingAppearanceRows = [
       { key: "appearance.theme", value: JSON.stringify("luxe"), category: "appearance" },
     ];
+    db.unfilteredMock.mockResolvedValue([]);
     db.whereMock.mockResolvedValueOnce(existingAppearanceRows);
     mocks.getDbAsync.mockResolvedValue(db);
 
@@ -131,6 +144,7 @@ describe("GET /api/admin/settings — category-scoped seeding", () => {
   it("scopes the post-seed re-select to the requested category, never leaking other categories' rows", async () => {
     const db = buildDb();
     const systemDefaults = defaultSettings.filter((s) => s.category === "system");
+    db.unfilteredMock.mockResolvedValue([]);
     db.whereMock.mockResolvedValueOnce([]).mockResolvedValueOnce(systemDefaults);
     mocks.getDbAsync.mockResolvedValue(db);
 
@@ -138,9 +152,64 @@ describe("GET /api/admin/settings — category-scoped seeding", () => {
 
     const body = (await response.json()) as { settings: { category: string }[] };
     expect(body.settings.every((row) => row.category === "system")).toBe(true);
-    // Both the initial read and the re-select went through the scoped
-    // `.where()` chain — the unfiltered path was never used for this request.
+    // The initial read and the re-select both went through the scoped
+    // `.where()` chain — only the unconditional existing-keys check uses the
+    // unfiltered path, once, regardless of the category filter.
     expect(db.whereMock).toHaveBeenCalledTimes(2);
-    expect(db.unfilteredMock).not.toHaveBeenCalled();
+    expect(db.unfilteredMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("only inserts the categories' missing keys when the table is partially seeded, leaving existing rows untouched", async () => {
+    const db = buildDb();
+    const systemDefaults = defaultSettings.filter((s) => s.category === "system");
+    expect(systemDefaults.length).toBeGreaterThan(1);
+    const [alreadySeeded, ...restOfSystemDefaults] = systemDefaults;
+
+    // Existing-keys read finds one system key already present; the rest of
+    // the system defaults (and every other category's defaults) are missing.
+    db.unfilteredMock.mockResolvedValue([{ key: alreadySeeded.key, category: "system" }]);
+    db.whereMock.mockResolvedValueOnce([alreadySeeded]).mockResolvedValueOnce(systemDefaults);
+    mocks.getDbAsync.mockResolvedValue(db);
+
+    const response = await GET(request("system"));
+
+    expect(response.status).toBe(200);
+    expect(db.insertValues).toHaveBeenCalledTimes(1);
+    expect(db.insertValues).toHaveBeenCalledWith(restOfSystemDefaults);
+  });
+
+  it("seeds other categories' missing defaults on an unfiltered load, even when one category was already seeded", async () => {
+    const db = buildDb();
+    const refundDefaults = defaultSettings.filter((s) => s.category === "refund");
+    expect(refundDefaults.length).toBeGreaterThan(0);
+    const missingDefaults = defaultSettings.filter((s) => s.category !== "refund");
+    expect(missingDefaults.length).toBeGreaterThan(0);
+
+    // Table only has `refund.*` rows seeded (e.g. from a prior
+    // category-scoped call); an unfiltered load should pick up every other
+    // category's still-missing defaults.
+    db.unfilteredMock
+      .mockResolvedValueOnce(refundDefaults)
+      .mockResolvedValueOnce(refundDefaults)
+      .mockResolvedValueOnce([...refundDefaults, ...missingDefaults]);
+    mocks.getDbAsync.mockResolvedValue(db);
+
+    const response = await GET(request());
+
+    expect(response.status).toBe(200);
+    expect(db.insertValues).toHaveBeenCalledTimes(1);
+    expect(db.insertValues).toHaveBeenCalledWith(missingDefaults);
+  });
+
+  it("calls onConflictDoNothing() on the seed insert so a concurrent seed race degrades to a no-op instead of a 500", async () => {
+    const db = buildDb();
+    db.unfilteredMock.mockResolvedValue([]);
+    db.whereMock.mockResolvedValueOnce([]).mockResolvedValueOnce(defaultSettings.filter((s) => s.category === "system"));
+    mocks.getDbAsync.mockResolvedValue(db);
+
+    const response = await GET(request("system"));
+
+    expect(response.status).toBe(200);
+    expect(db.onConflictDoNothing).toHaveBeenCalledTimes(1);
   });
 });
