@@ -202,7 +202,7 @@ Carried out of Phase 6 (see `.planning/WINDOWS.md`):
 
 - [Needs Russell] Add `NEXT_PUBLIC_THEME_DEFAULT=volt-dark` as a Cloudflare Workers Build variable before the next deploy
 - [Phase 6] `--store-font-display` is wired end to end but no component applies the `font-display` class, so Luxe's serif headings never render — **closed at 06.1-03**: `font-display` is applied to all 23 storefront headings, the `volt-dark` change is registered as intentional snap `S-TYPE-01`, and WINDOWS #1 is marked fixed
-- [Phase 6] `app/api/admin/settings/route.ts` GET re-inserts the entire `defaultSettings` array when a category filter returns no rows; would 500 a fresh install's first Appearance-page load. Pre-existing, out of scope so far (WINDOWS #3)
+- [Phase 6] `app/api/admin/settings/route.ts` GET re-inserts the entire `defaultSettings` array when a category filter returns no rows; would 500 a fresh install's first Appearance-page load. Pre-existing, out of scope so far (WINDOWS #3) — **closed at Phase 8 (08-01)**: the seed set is computed and guarded per category before any insert runs; WINDOWS #3 is marked fixed
 - [Phase 6] Admin Appearance page has not been walked through in a real browser with a Clerk admin session; Dialog/AlertDialog scrims under `luxe` verified by compositing test only (WINDOWS #2)
 - [Phase 6] Four more preset specs (Clinical, Retro, Atelier, Market) — **shipped at Phase 6.1** (06.1-01 through 06.1-04); the direction doc's extra properties (shadow, border-width, image-aspect, some `accent-2` values, font-mono, letter-spacing) remain backlog, recorded per preset in `.planning/todos/pending/theme-contract-dropped-properties.md` (luxe/midnight) and `.planning/todos/pending/theme-direction-doc-backlog-06.1.md` (clinical/retro/atelier/market)
 - [Phase 06-04] app/api/admin/settings/route.ts's GET ?category=X inserts the full defaultSettings array (all categories) when the filtered result is empty; appearance has no defaults, so a fresh DB with other categories already populated would 500 on the Appearance page's own load. Out of scope for 06-04 (interfaces explicitly forbid touching this file); logged in WINDOWS.md #3.
@@ -216,6 +216,17 @@ Carried out of Phase 7 (see `.planning/WINDOWS.md`):
 - [Phase 7] Admin Layout section and Appearance theme grid have not had a real-browser Clerk-session walkthrough; both verified by dev-bypass probes and render tests only
 - [Phase 7] Two image-URL resolvers coexist (`gallery-media-url.ts` verbatim from ProductDisplay vs `lib/utils/product-image.ts`); consolidate when the product display is next touched
 - [Phase 7] Pre-extraction parity tests self-write a missing baseline snapshot; snapshots are committed today, but a deleted snapshot would silently regenerate
+
+Carried out of Phase 8 (milestone close-out; see `.planning/WINDOWS.md` and `docs/theming.md` "Known limits and backlog"):
+
+- [Needs Russell] `NEXT_PUBLIC_THEME_DEFAULT` still needs to be added as a Cloudflare Workers Build variable and the site redeployed — `wrangler.jsonc`'s own `vars` entry is a local/preview default only
+- [Phase 8] The admin Appearance page (theme grid + layout switches) has never been walked through in a real browser with a real Clerk admin session (WINDOWS #2, unchanged from Phase 6/7)
+- [Phase 8] Six of the seven presets carry direction-doc properties (shadow, border-width, image-aspect, some `accent-2` values, font-mono, letter-spacing, per-theme layout behaviours) that this milestone's tokens-only architecture deliberately does not carry — recorded in `.planning/todos/pending/theme-contract-dropped-properties.md` (luxe/midnight) and `.planning/todos/pending/theme-direction-doc-backlog-06.1.md` (clinical/retro/atelier/market)
+- [Phase 8] Two image-URL resolvers coexist (`components/layout/product/gallery-media-url.ts`, `lib/utils/product-image.ts`); consolidate the next time the product display is touched (unchanged from Phase 7)
+- [Phase 8] Pre-extraction parity tests self-write a missing baseline snapshot instead of failing (unchanged from Phase 7)
+- [Phase 8] `npm run scan:tokens` is not wired into CI — a local gate run by convention, not an automated check
+- [Phase 8] The settings-GET empty-category bug (WINDOWS #3) is now **closed**, fixed at plan 08-01 — see the Phase 6 entry above
+- [Phase 8] Visual QA (08-QA-MATRIX.md, 46 findings across all seven presets and three packed layout combinations) found zero unresolved defects — no new item to carry from that pass
 
 ## Deferred Items
 
