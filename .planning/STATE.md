@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 08
 current_phase_name: Documentation & Visual QA Close-out
 status: executing
-stopped_at: Phase 07 complete, ready to plan Phase 8
-last_updated: "2026-09-05T15:49:34.249Z"
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-09-05T15:57:04.597Z"
 last_activity: 2026-09-05
-last_activity_desc: Phase 07 complete, transitioned to Phase 8
-state_head: 9b39b3dcd894d15725b7da1f0a7fe118f14e7bb7
+last_activity_desc: Phase 08 execution started
+state_head: 3e20550cacecb14b1a878c9a5a042837a59f8042
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 31
-  completed_plans: 26
+  completed_plans: 27
   percent: 80
 ---
 
@@ -25,16 +25,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-05 after Phase 7)
 
 **Core value:** A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** Phase 8 — Documentation & Visual QA Close-out
+**Current focus:** Phase 08 — Documentation & Visual QA Close-out
 
 ## Current Position
 
-Phase: 08 (Documentation & Visual QA Close-out) — READY TO EXECUTE
-Plan: Not started
+Phase: 08 (Documentation & Visual QA Close-out) — EXECUTING
+Plan: 2 of 5
 Status: Ready to execute
-Last activity: 2026-09-05 — Phase 07 complete, transitioned to Phase 8
+Last activity: 2026-09-05 — Phase 08 execution started
 
-Progress: [██████░░░░] 60%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
@@ -96,6 +96,7 @@ Progress: [██████░░░░] 60%
 | Phase 07 P03 | 13min | 3 tasks | 7 files |
 | Phase 07 P04 | 25min | 2 tasks | 3 files |
 | Phase 07 P05 | 40min | 3 tasks | 5 files |
+| Phase 08 P01 | 6min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -164,6 +165,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 07]: [Phase 07] [07-04] The whole Layout admin section (heading, subtitle, three radiogroups, Save button) lives inside components/admin/LayoutSwitches.tsx itself, not split with the page -- app/admin/settings/appearance/page.tsx's change is a two-line import+render addition, keeping ThemePresetGrid.tsx byte-for-byte unchanged.
 - [Phase 07]: [Phase 07] [07-05] The three map-holding source files are category-layout-map.ts, home-hero-map.ts, and ProductDisplay.tsx (not the page files a shorthand read_first line named) -- the repo-wide contract test targets the files that actually declare each production map.
 - [Phase 07]: [Phase 07] [07-05] Registered snap S-07-01: a 2-pixel, 1/255-intensity defaults-parity screenshot difference (product|390|resting) is headless-Chromium rendering noise, not a code regression -- root-caused via PIL pixel-diff and cross-validated against a passing source-level parity test, rather than tolerated or endlessly re-captured. Logged to WINDOWS.md #4.
+- [Phase 08]: [Phase 08] [08-01] Settings-GET seed guard: compute the category-scoped (or whole) seed set first and only insert when non-empty, and scope the post-seed re-select the same way -- closes WINDOWS #3 without relying on Drizzle's untested insert().values([]) behavior.
+- [Phase 08]: [Phase 08] [08-01] docs/theming.md's status line describes its actual in-progress, multi-plan state (sections land across 08-01/08-02/08-04/08-05) rather than a placeholder Draft/Accepted value.
 
 ### Pending Todos
 
@@ -216,8 +219,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T15:09:36Z
-Stopped at: Phase 07 complete, ready to plan Phase 8
+Last session: 2026-09-05T15:57:04.379Z
+Stopped at: Completed 08-01-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 8` (or `/gsd-plan-phase 8` directly) to start Documentation & Visual QA Close-out

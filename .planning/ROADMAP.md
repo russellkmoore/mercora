@@ -212,12 +212,12 @@ Plans:
   3. A visual QA pass covering every preset theme crossed with every layout variant is recorded with results
   4. `.planning/codebase/` structure/architecture docs carry a targeted refresh reflecting the token sweep and theme mechanism
 
-**Plans:** 5 plans
+**Plans:** 1/5 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 08-01-PLAN.md — Tracer: category-scoped settings-GET seed guard with regression test, plus `docs/theming.md` with its admin switching section and the 23-token contract table
+- [x] 08-01-PLAN.md — Tracer: category-scoped settings-GET seed guard with regression test, plus `docs/theming.md` with its admin switching section and the 23-token contract table
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -245,7 +245,7 @@ Plans:
 | 5. Token Contract & Component Sweep | v2 | 12/12 | Complete    | 2026-09-04 |
 | 6. Theme File Mechanism & Presets | v2 | 5/5 | Complete    | 2026-09-04 |
 | 7. Layout Switches | v2 | 5/5 | Complete    | 2026-09-05 |
-| 8. Documentation & Visual QA Close-out | v2 | 0/TBD | Not started | - |
+| 8. Documentation & Visual QA Close-out | v2 | 1/5 | In Progress|  |
 
 ---
 *Roadmap created: 2026-09-01 from doc ingest (26 docs) and codebase map (2026-08-31)*
