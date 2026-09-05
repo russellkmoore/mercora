@@ -73,17 +73,16 @@ export async function getActiveTheme(): Promise<string> {
     if (manifestNames.has(trimmed)) {
       return trimmed;
     }
-    // Present but doesn't match any manifest theme name: genuinely unknown
-    // (RESEARCH Pitfall 6, case b). Emit exactly one telemetry signal. Do
-    // not pass the stored string in any field — the sanitiser would drop it
-    // anyway, and reflecting an untrusted value into a log line is the
-    // disclosure this plan's threat register (T-06-06) closes.
-    recordTelemetry("theme.unknown_selection", { outcome: "invalid" });
-    return resolveEnvOrManifestDefault(manifestNames);
   }
 
-  // A present non-string value (number, object, boolean, ...) is also
-  // genuinely unknown.
+  // Reaching here means `stored` is either a non-empty string absent from
+  // the manifest, or a present non-string value (number, object, boolean,
+  // ...) — both outcomes are genuinely unknown (RESEARCH Pitfall 6, case
+  // b), so they funnel through one telemetry signal and one fallback
+  // return rather than two duplicated pairs. Do not pass the stored string
+  // in any field — the sanitiser would drop it anyway, and reflecting an
+  // untrusted value into a log line is the disclosure this plan's threat
+  // register (T-06-06) closes.
   recordTelemetry("theme.unknown_selection", { outcome: "invalid" });
   return resolveEnvOrManifestDefault(manifestNames);
 }
