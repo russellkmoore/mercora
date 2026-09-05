@@ -146,7 +146,7 @@ Plans:
   3. Each preset is captured across the seven-route grid; the three light presets (clinical, atelier, market) have their overlays and shadows inspected with every judgement recorded, fixes made only where something reads wrong
   4. The admin Appearance page shows all seven cards with industry and synopsis; selecting any of the four new presets switches the storefront on the next request; `scan:tokens` stays at 0 and the 23-token contract is unchanged
 
-**Plans**: 1/4 plans executed
+**Plans**: 2/4 plans executed
 
 Plans:
 
@@ -156,7 +156,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 06.1-02-PLAN.md — `retro`/`atelier`/`market` theme files, three `next/font` display faces in the root layout, regenerate to seven entries, switch probe and full gate
+- [x] 06.1-02-PLAN.md — `retro`/`atelier`/`market` theme files, three `next/font` display faces in the root layout, regenerate to seven entries, switch probe and full gate
 
 **Wave 3** *(blocked on Wave 2)*
 
