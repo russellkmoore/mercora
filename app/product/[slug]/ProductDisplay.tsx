@@ -270,7 +270,7 @@ export default function ProductDisplay({
                         <SelectItem
                           key={variant.id}
                           value={variant.id}
-                          className="text-foreground hover:bg-surface-elevated focus:bg-surface-elevated"
+                          className="text-foreground"
                         >
                           <div className="flex w-full items-center justify-between">
                             <span>{optionDisplay}</span>
