@@ -160,7 +160,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 06.1-03-PLAN.md — Close the Phase 6 `font-display` carry-over by measurement: apply to 23 storefront headings, measure the `volt-dark` pixel delta, keep on zero or revert and hand off to Phase 8
+- [ ] 06.1-03-PLAN.md — Wire both type tokens site-wide per D-10: `--store-font-sans` on the body, `font-display` on 23 storefront headings; register the `volt-dark` system-font→Geist shift as snap `S-TYPE-01` and prove every preset's display face renders
 
 **Wave 4** *(blocked on Wave 3)*
 
