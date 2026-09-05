@@ -2,37 +2,37 @@
 gsd_state_version: 1.0
 milestone: v2
 milestone_name: Themeable Storefront
-current_phase: 08.1
-current_phase_name: v2 Tech-Debt Closure
-status: verifying
-stopped_at: Completed 08.1-07-PLAN.md — Phase 8.1 complete
-last_updated: "2026-09-05T22:09:38.611Z"
+current_phase: 08.2
+current_phase_name: Documentation Overhaul & Agent Onboarding
+status: planning
+stopped_at: Phase 08.1 complete, ready to plan Phase 08.2
+last_updated: "2026-09-05T22:20:18.552Z"
 last_activity: 2026-09-05
-last_activity_desc: Phase 08.1 execution started
-state_head: 24927c65e871561a3f049adbdbe6ba53027775ea
+last_activity_desc: Phase 08.1 complete, transitioned to Phase 08.2
+state_head: 5a28d28f109eb7f1c6e459c07aeb48e213af69fa
 progress:
   total_phases: 7
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 38
   completed_plans: 38
-  percent: 71
+  percent: 86
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-05 after Phase 8)
+See: .planning/PROJECT.md (updated 2026-09-05 after Phase 8.1)
 
 **Core value:** A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** Phase 08.1 — v2 Tech-Debt Closure
+**Current focus:** Phase 8.2 — Documentation Overhaul & Agent Onboarding
 
 ## Current Position
 
-Phase: 08.1 (v2 Tech-Debt Closure) — EXECUTING
-Plan: 7 of 7
-Status: Phase complete — ready for verification
-Last activity: 2026-09-05 — Phase 08.1 execution started
+Phase: 08.2 — Documentation Overhaul & Agent Onboarding
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-09-05 — Phase 08.1 complete, transitioned to Phase 08.2
 
 Progress: [███████░░░] 71%
 
@@ -40,7 +40,7 @@ Progress: [███████░░░] 71%
 
 **Velocity:**
 
-- Total plans completed: 48 (all v1)
+- Total plans completed: 55 (all v1)
 - Average duration: 56 min/plan (Phase 5, 12 plans)
 - Total execution time: ~11.3 hours (v2)
 
@@ -60,6 +60,7 @@ Progress: [███████░░░] 71%
 | 06.1 | 4 | - | - |
 | 07 | 5 | - | - |
 | 08 | 5 | - | - |
+| 08.1 | 7 | - | - |
 
 **Recent Trend:**
 
@@ -238,8 +239,6 @@ Carried out of Phase 6 (see `.planning/WINDOWS.md`):
 Carried out of Phase 7 (see `.planning/WINDOWS.md`):
 
 - [Phase 7] Admin Layout section and Appearance theme grid have not had a real-browser Clerk-session walkthrough; both verified by dev-bypass probes and render tests only
-- [Phase 7] Two image-URL resolvers coexist (`gallery-media-url.ts` verbatim from ProductDisplay vs `lib/utils/product-image.ts`); consolidate when the product display is next touched
-- [Phase 7] Pre-extraction parity tests self-write a missing baseline snapshot; snapshots are committed today, but a deleted snapshot would silently regenerate
 
 Carried out of Phase 8 (milestone close-out; see `.planning/WINDOWS.md` and `docs/theming.md` "Known limits and backlog"):
 
@@ -264,8 +263,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T22:09:38.266Z
-Stopped at: Completed 08.1-07-PLAN.md — Phase 8.1 complete
+Last session: 2026-09-05T22:20:18Z
+Stopped at: Phase 08.1 complete, ready to plan Phase 08.2
 Resume file: None
 
-Next: review `.planning/v2-MILESTONE-AUDIT.md`, optionally `/gsd-phase --insert 8 "Address v2 tech debt"`, then `/gsd-complete-milestone v2` → `/gsd-cleanup`
+Next: `/gsd-plan-phase 8.2` (context exists) then execute; then `/gsd-audit-milestone` → `/gsd-complete-milestone v2` → `/gsd-cleanup`

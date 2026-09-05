@@ -107,6 +107,7 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 - ✓ Admin Appearance page: three layout switches (category layout, home hero, product gallery) as segmented controls, saved through the settings API — Phase 7
 - ✓ Category, home hero and product gallery render as enumerated, server-chosen named variants (8 components, typed lookup maps, repo-wide contract test) — Phase 7
 - ✓ `docs/theming.md` (contract, anatomy, duplication recipe, validator rejections, resolution, admin, layouts, gates, QA summary, known limits), `docs/CLAUDE.md` refreshed, codebase docs refreshed, 21-run visual QA matrix with zero defects — Phase 8
+- ✓ v2 tech debt closed: emails and the crash page follow the admin-selected theme (staged on effect rows for cron retries), `scan:tokens` in CI, one request-scoped appearance read, one image resolver, loud parity snapshots, logged seed fallback, review Info items, order-status screenshots via a dev-only seeded order — Phase 8.1
 
 ### Active
 
@@ -238,6 +239,10 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 | `scan:tokens` is documented as NOT wired into CI (only `build-themes --check` is); adding it is a recorded follow-up rather than a same-phase CI change that would falsify the doc it ships with (Phase 8) | Docs and CI must agree on the day they land | ✓ Good — follow-up |
 | Visual QA matrix judged 7 presets × 3 packed layout combinations (21 runs, 672 cells) via a stated factorisation of the six criteria, not exhaustive per-cell inspection; 46 judgements, zero defects (Phase 8) | Criteria that vary by combination were checked once per combination, criteria that vary by preset once per preset, plus a light-preset cross-check under full-bleed | ✓ Good |
 
+| Emails and the crash page follow the admin-selected theme: pure builders take `tokens`; senders resolve once via `resolveEmailTheme()`; effects staged during a request carry `themeName` in a new nullable `order_effects.payload` column (expand-only migration 0023) so the cron drain renders the right theme without a request context; `global-error.tsx` fetches public `GET /api/theme` after a default first paint (Phase 8.1) | Russell's decision; `getActiveTheme()` cannot run in `scheduled()`, and a client crash page cannot read D1 | ✓ Good |
+| One request-scoped `React.cache` reader (`lib/themes/appearance-read.ts`) shared by the theme and layout resolvers; `React.cache` is a no-op outside a render, so it is the one allowed cache (Phase 8.1) | Avoids a second D1 read per page without an isolate cache | ✓ Good |
+| Bare relative image paths now resolve root-relative (`/products/x.jpg`) after consolidating on `resolveProductImageSrc`; the one accepted output change, product route hash-identical (Phase 8.1, D-11) | A bare path resolves against the current route and was the less correct form | ✓ Good |
+
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
@@ -256,4 +261,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-05 after Phase 8 (Documentation & Visual QA Close-out) — milestone v2 phases complete*
+*Last updated: 2026-09-05 after Phase 8.1 (v2 Tech-Debt Closure)*
