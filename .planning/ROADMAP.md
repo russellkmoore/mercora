@@ -180,7 +180,7 @@ Plans:
   3. Admin can set `appearance.product_gallery` to `left` or `top`, and the product page renders the matching named server component
   4. Every layout variant component has a passing render test, and none of the three switches is implemented as a generic `layout` prop
 
-**Plans**: 1/5 plans executed
+**Plans**: 2/5 plans executed
 
 Plans:
 
@@ -190,7 +190,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1; 07-02, 07-03 and 07-04 touch disjoint files)*
 
-- [ ] 07-02-PLAN.md — Home hero switch: `minimal` extracted verbatim, `split` and `full-bleed` added, scrim fenced by an inline scanner sentinel, home page rewired and probed live
+- [x] 07-02-PLAN.md — Home hero switch: `minimal` extracted verbatim, `split` and `full-bleed` added, scrim fenced by an inline scanner sentinel, home page rewired and probed live
 - [ ] 07-03-PLAN.md — Product gallery switch: `left` extracted verbatim, `top` added, media helper moved out, typed enum crossing the server→client boundary, product page rewired and probed live
 - [ ] 07-04-PLAN.md — Admin Layout section: independent `LayoutSwitches` island with three radiogroups, one three-key save through the existing guarded settings endpoint, hosted below the theme grid
 
@@ -226,7 +226,7 @@ Plans:
 | 4. Reference Documentation Refresh | v1 | 5/5 | Complete | 2026-09-02 |
 | 5. Token Contract & Component Sweep | v2 | 12/12 | Complete    | 2026-09-04 |
 | 6. Theme File Mechanism & Presets | v2 | 5/5 | Complete    | 2026-09-04 |
-| 7. Layout Switches | v2 | 1/5 | In Progress|  |
+| 7. Layout Switches | v2 | 2/5 | In Progress|  |
 | 8. Documentation & Visual QA Close-out | v2 | 0/TBD | Not started | - |
 
 ---
