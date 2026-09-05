@@ -279,7 +279,7 @@ Plans:
   3. One image-URL resolver serves both the product gallery variants and cards; parity tests fail loudly when a baseline snapshot is missing; the settings seed fallback logs instead of swallowing; the Phase 6/7/8 review Info items are closed
   4. A local D1 order fixture exists and the order-status route is captured across the seven-theme grid; gates stay green (scan 0, build-themes --check, full suite, build)
 
-**Plans:** 2/7 plans executed
+**Plans:** 3/7 plans executed
 
 Plans:
 **Wave 1**
@@ -289,7 +289,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 08.1-02-PLAN.md — Transactional email builders take tokens; senders resolve the active theme once at send time (D-01)
+- [x] 08.1-02-PLAN.md — Transactional email builders take tokens; senders resolve the active theme once at send time (D-01)
 - [ ] 08.1-05-PLAN.md — One product-image resolver for both gallery variants; `productGallery` becomes required (D-05, D-11, D-08)
 
 **Wave 3** *(blocked on Wave 2 completion)*

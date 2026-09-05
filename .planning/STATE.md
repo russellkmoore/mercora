@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 08.1
 current_phase_name: v2 Tech-Debt Closure
 status: executing
-stopped_at: Completed 08.1-03-PLAN.md
-last_updated: "2026-09-05T20:23:05.653Z"
+stopped_at: Completed 08.1-02-PLAN.md
+last_updated: "2026-09-05T20:40:35.898Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 08.1 execution started
-state_head: dd16c2bc0a01923db0728b80a0fe014b721193f1
+state_head: 1a800815005207e6e1aa22fb1a0dd1b47267f72b
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 38
-  completed_plans: 33
+  completed_plans: 34
   percent: 71
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-05 after Phase 8)
 ## Current Position
 
 Phase: 08.1 (v2 Tech-Debt Closure) — EXECUTING
-Plan: 3 of 7
+Plan: 4 of 7
 Status: Ready to execute
 Last activity: 2026-09-05 — Phase 08.1 execution started
 
@@ -104,6 +104,7 @@ Progress: [███████░░░] 71%
 | Phase 08 P05 | 45min | 3 tasks | 7 files |
 | Phase 08.1 P01 | 55min | 3 tasks | 9 files |
 | Phase 08.1 P03 | 24min | 3 tasks | 9 files |
+| Phase 08.1 P02 | 16min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -183,6 +184,7 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 08]: [Phase 08] [08-05] Milestone close-out: all three requirements (DOCS-01/02/03) Complete, full gate suite green (lint, typecheck, scan:tokens 0/2, build:themes:check fresh, 260 files/2136 tests, production build) in one pass, closing v2 Themeable Storefront.
 - [Phase 08.1]: Shared appearance-read helper lives in lib/themes/appearance-read.ts (not inlined in active-theme.ts) to avoid a circular import while lib/layout/settings.ts imports it directly.
 - [Phase 08.1]: readParitySnapshot resolves its path with path.resolve(process.cwd(), relativePath) rather than join(), so its own test can pass absolute temp-dir paths while the three real parity suites keep passing their existing repo-relative constants unchanged.
+- [Phase 08.1]: [Phase 08.1] [08.1-02] lib/email/footer.ts's tokens parameter uses a minimal local FooterTokens type instead of importing ThemeTokens — The task's own verify command greps the whole file for the literal string themes/tokens and fails on any import from that module, including a type-only one; a minimal structural type satisfies every real caller.
 
 ### Pending Todos
 
@@ -248,8 +250,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T20:23:05.340Z
-Stopped at: Completed 08.1-03-PLAN.md
+Last session: 2026-09-05T20:40:35.577Z
+Stopped at: Completed 08.1-02-PLAN.md
 Resume file: None
 
 Next: review `.planning/v2-MILESTONE-AUDIT.md`, optionally `/gsd-phase --insert 8 "Address v2 tech debt"`, then `/gsd-complete-milestone v2` → `/gsd-cleanup`
