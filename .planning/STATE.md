@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 06.1
 current_phase_name: "Remaining Presets: Clinical, Retro, Atelier, Market"
 status: executing
-stopped_at: Completed 06.1-02-PLAN.md
-last_updated: "2026-09-05T05:49:13.889Z"
+stopped_at: Completed 06.1-03-PLAN.md
+last_updated: "2026-09-05T06:16:54.345Z"
 last_activity: 2026-09-04
 last_activity_desc: Phase 06.1 execution started
-state_head: df336b47104d9c481940ce9df36e515d7a4f93e5
+state_head: a58b9a1b84ea7407d74b897dac87b8b7ec388751
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 21
-  completed_plans: 19
+  completed_plans: 20
   percent: 40
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-04 after Phase 6)
 ## Current Position
 
 Phase: 06.1 (Remaining Presets: Clinical, Retro, Atelier, Market) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-09-04 — Phase 06.1 execution started
 
@@ -87,6 +87,7 @@ Progress: [████░░░░░░] 40%
 | Phase 06 P05 | 35min | 3 tasks | 4 files |
 | Phase 06.1 P01 | 20min | 2 tasks | 4 files |
 | Phase 06.1 P02 | 27min | 3 tasks | 6 files |
+| Phase 06.1 P03 | 20min | 3 tasks | 26 files |
 
 ## Accumulated Context
 
@@ -141,6 +142,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 06.1]: [Phase 06.1] [06.1-01] Clinical ships no new font dependency -- both font tokens stay the existing Geist stack byte-identical to volt-dark.css, proving the pipeline's thinnest possible slice with zero app/layout.tsx involvement.
 - [Phase 06.1]: [Phase 06.1] [06.1-02] Font weight arrays (Orbitron [600,700,800], Fraunces [500,600,700,800], Nunito [600,700,800]) extend each UI-SPEC floor with the storefront's actual font-semibold/font-bold/font-extrabold heading classes rather than the doc's bare minimum.
 - [Phase 06.1]: [Phase 06.1] [06.1-02] Market's success token deliberately keeps the direction doc's literal, uncorrected value even though primary (same hue family) needed a contrast correction -- success renders as tinted text/panel backgrounds, not solid white-on-green button text, so the AA failure forcing primary's correction doesn't apply.
+- [Phase 06.1]: [Phase 06.1] [06.1-03] Fixed a real CSS scoping bug beyond the plan's design: a custom property whose value nests a var() reference resolves at the element that DECLARES it ([data-theme] on <html>), not the element that CONSUMES it (<body>'s font-family) -- applied the six next/font variable classes to <html> as well as <body>.
+- [Phase 06.1]: [Phase 06.1] [06.1-03] document.fonts.check() must query at the heading's own live rendered font-weight, not the default 400 -- Orbitron/Fraunces/Nunito load no 400 cut, so a weight-naive check would have false-negatived three of the four new display faces.
 
 ### Pending Todos
 
@@ -187,8 +190,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T05:49:06.529Z
-Stopped at: Completed 06.1-02-PLAN.md
+Last session: 2026-09-05T06:16:54.214Z
+Stopped at: Completed 06.1-03-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 7` (or `/gsd-plan-phase 7` directly) to start Layout Switches
