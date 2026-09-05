@@ -12,7 +12,7 @@ time.
 | Public host and SEO | `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_ROBOTS_INDEX=true` |
 | Images | `NEXT_PUBLIC_IMAGE_CDN`, `NEXT_PUBLIC_IMAGE_TRANSFORMS=false` |
 | Browser persistence | `NEXT_PUBLIC_STORAGE_NAMESPACE`, `NEXT_PUBLIC_CART_STORAGE_KEY`, `NEXT_PUBLIC_CHAT_STORAGE_KEY` |
-| Theme | `NEXT_PUBLIC_STORE_LOGO_PATH` |
+| Theme | `NEXT_PUBLIC_STORE_LOGO_PATH`, `NEXT_PUBLIC_THEME_DEFAULT` (deploy-time theme fallback; see `docs/theming.md`) |
 | Contact and legal links | `STORE_SUPPORT_EMAIL`, `STORE_SENDER_EMAIL`, `STORE_REPLY_TO_EMAIL`, `STORE_MERCHANT_NOTIFICATION_EMAIL`, `STORE_POSTAL_ADDRESS`, `STORE_SUPPORT_HOURS`, `NEXT_PUBLIC_PRIVACY_URL`, `NEXT_PUBLIC_TERMS_URL`, `NEXT_PUBLIC_RETURNS_URL` |
 | Commerce formatting | `STORE_LOCALE` (canonical BCP 47 locale, defaults to `en-US`), `STORE_CURRENCY` (must match active catalog variant currency; Mercora checkout is single-currency per cart) |
 | Gift-card reconciliation | `STORE_FEATURE_GIFT_CARD_RECONCILIATION=true` (defaults off; keep enabled while reservations or balances exist) |
