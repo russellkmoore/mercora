@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 07
 current_phase_name: Layout Switches
 status: executing
-stopped_at: Completed 07-02-PLAN.md
-last_updated: "2026-09-05T08:21:59.922Z"
+stopped_at: Completed 07-03-PLAN.md
+last_updated: "2026-09-05T08:37:12.292Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 07 execution started
-state_head: e4e07b10162dce1d75149699319ed36be969090d
+state_head: d461dd9b0c764606793449410c1a1ff079568f6a
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 26
-  completed_plans: 23
+  completed_plans: 24
   percent: 60
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-05 after Phase 6.1)
 ## Current Position
 
 Phase: 07 (Layout Switches) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-09-05 — Phase 07 execution started
 
@@ -92,6 +92,7 @@ Progress: [██████░░░░] 60%
 | Phase 06.1 P04 | 45min | 3 tasks | 5 files |
 | Phase 07 P01 | 35min | 3 tasks | 17 files |
 | Phase 07 P02 | 25min | 3 tasks | 7 files |
+| Phase 07 P03 | 13min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -154,6 +155,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 07]: Accepted two D1 reads per request for getLayoutSettings() (RESEARCH Pitfall 1) rather than sharing a memoised readAppearance() helper with getActiveTheme() -- keeps the new resolver fully independent of the frozen theme-resolver test suite.
 - [Phase 07]: Home hero's split/full-bleed variants delegate fully to HomeHeroMinimal (not a placeholder image) when there is no featured product — Supersedes RESEARCH assumption A1 per the UI-SPEC's explicit decision
 - [Phase 07]: Added components/layout/home/home-hero-map.ts, a small module not enumerated in 07-02's files_modified list — Mirrors category-layout-map.ts's precedent from 07-01 so the map's key/enum equality and every-member-renders invariants are directly testable
+- [Phase 07]: [Phase 07] [07-03] PRODUCT_GALLERY_MAP and a sibling PRODUCT_GALLERY_LAYOUT map both live inside ProductDisplay.tsx (not a separate module) — both plain object lookups keyed by the gallery enum, never a comparison against a member name literal, giving each variant its own outer container/info-column geometry without a generic layout prop.
+- [Phase 07]: [Phase 07] [07-03] productGallery declared optional on ProductDisplayProps with a DEFAULT_LAYOUTS fallback rather than required, because the plan's task/file split puts app/product/[slug]/page.tsx's wiring in Task 3 while the prop is introduced in Task 2, whose own typecheck gate had to stay green immediately after that commit.
 
 ### Pending Todos
 
@@ -200,8 +203,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T08:21:59.746Z
-Stopped at: Completed 07-02-PLAN.md
+Last session: 2026-09-05T08:37:12.122Z
+Stopped at: Completed 07-03-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 7` (or `/gsd-plan-phase 7` directly) to start Layout Switches
