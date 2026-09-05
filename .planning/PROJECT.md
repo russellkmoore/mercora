@@ -106,12 +106,12 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 - ✓ All six direction-doc presets ship (`luxe`, `midnight`, `clinical`, `retro`, `atelier`, `market`) plus `volt-dark`; both type tokens wired site-wide so each preset's display face renders — Phase 6.1
 - ✓ Admin Appearance page: three layout switches (category layout, home hero, product gallery) as segmented controls, saved through the settings API — Phase 7
 - ✓ Category, home hero and product gallery render as enumerated, server-chosen named variants (8 components, typed lookup maps, repo-wide contract test) — Phase 7
+- ✓ `docs/theming.md` (contract, anatomy, duplication recipe, validator rejections, resolution, admin, layouts, gates, QA summary, known limits), `docs/CLAUDE.md` refreshed, codebase docs refreshed, 21-run visual QA matrix with zero defects — Phase 8
 
 ### Active
 
 <!-- v2 Themeable Storefront — defined by /gsd-new-milestone 2026-09-02. REQ-IDs assigned in .planning/REQUIREMENTS.md. -->
 
-- [ ] `docs/theming.md` documents the token contract, theme duplication, and build validation
 
 ### Out of Scope
 
@@ -234,6 +234,10 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 | Default variants (`grid-3`, `minimal`, `left`) are verbatim extractions proven by pre-extraction snapshots and volt-dark screenshot parity; non-default variants are new captures, not diffs (Phase 7) | Extraction must not move pixels; new layouts have no baseline | ✓ Good — one 2-pixel headless-rendering residual accepted as S-07-01 |
 | Admin `LayoutSwitches` POSTs only changed keys and shares `nextRovingIndex` with `ThemePresetGrid` via `components/admin/roving-index.ts` (Phase 7 code review) | Rewriting all three keys risked lost updates between concurrent admins; a copied helper drifts | ✓ Good |
 
+| Admin settings GET seeds only the default keys absent in the requested scope, with `onConflictDoNothing()` so concurrent cold starts degrade to a no-op re-select (Phase 8) | The previous "any row exists" gate starved other categories forever once one category was seeded, and a category-filtered GET on an empty category re-inserted every default and collided on the primary key | ✓ Good — 9-case regression test |
+| `scan:tokens` is documented as NOT wired into CI (only `build-themes --check` is); adding it is a recorded follow-up rather than a same-phase CI change that would falsify the doc it ships with (Phase 8) | Docs and CI must agree on the day they land | ✓ Good — follow-up |
+| Visual QA matrix judged 7 presets × 3 packed layout combinations (21 runs, 672 cells) via a stated factorisation of the six criteria, not exhaustive per-cell inspection; 46 judgements, zero defects (Phase 8) | Criteria that vary by combination were checked once per combination, criteria that vary by preset once per preset, plus a light-preset cross-check under full-bleed | ✓ Good |
+
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
@@ -252,4 +256,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-05 after Phase 7 (Layout Switches)*
+*Last updated: 2026-09-05 after Phase 8 (Documentation & Visual QA Close-out) — milestone v2 phases complete*
