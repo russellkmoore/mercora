@@ -312,6 +312,42 @@ Timestamp fields use `number` (epoch milliseconds).
   export const MAX_DISCOUNT_CODES = 25;
   ```
 
+## Styling and Colour Tokens
+
+**Rule:** The storefront tree uses token utility classes (`bg-surface`, `text-foreground`,
+`border-border`, ...) and carries no hardcoded palette value — no Tailwind palette utility
+(`bg-neutral-800`, `text-gray-400`, ...), no raw hex literal, no `rgb()`/`hsl()` function. The full
+23-token contract table lives in `docs/theming.md`; this section states the rule the sweep
+enforced, not the table itself.
+
+**The admin tree is excluded by path, deliberately.** `scripts/scan-hardcoded-colors.mjs` skips any
+path with a directory segment named `admin` outright — the admin dashboard keeps its own fixed
+dark palette and does not change with the storefront theme. That is a decision, not an oversight:
+admin theming is out of scope for this milestone (see `PROJECT.md`).
+
+**A genuinely polarity-neutral literal** — one that must read correctly under both a light preset
+and a dark preset, such as a modal/drawer scrim — is wrapped in the scanner's sentinel comment
+pair with a written reason at the site:
+
+```css
+/* gsd:scan-ignore-start — reason for the exception */
+background-color: rgba(0, 0, 0, 0.6);
+/* gsd:scan-ignore-end */
+```
+
+This is never used as a blanket exception; it marks one specific literal, with one specific
+reason, at one specific call site.
+
+**A whole file may be excluded only by being named in the scanner's manual-review registry**
+(`MANUAL_REVIEW` in `scripts/scan-hardcoded-colors.mjs`), which prints its file and reason on every
+run — a clean 0-violation result can never be silent about what it deliberately did not look at.
+
+Run the scanner with:
+
+```bash
+npm run scan:tokens
+```
+
 ---
 
 *Convention analysis: 2026-08-31*
