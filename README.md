@@ -1,289 +1,116 @@
-# Mercora - AI-Powered Outdoor Gear eCommerce
+# Mercora
 
-> **Production-ready eCommerce platform with advanced AI assistant and comprehensive admin dashboard**
+Mercora is a themeable reference storefront on Cloudflare — Next.js on Workers, D1, R2, Vectorize,
+Workers AI, Clerk, and Stripe — built to render any catalogue. The outdoor-gear catalogue shipped in
+this repository is sample data, not the product; the default look is one of seven presets the
+storefront can render, chosen by an admin without touching component code.
 
-Mercora is a sophisticated, AI-enhanced eCommerce platform specializing in outdoor gear. Built on Cloudflare's edge infrastructure, it features **Volt**, an intelligent AI shopping assistant with semantic search, personalization, and vector-based product recommendations.
+## Quick start
 
-**🌐 Live Demo**: [voltique.russellkmoore.me](https://voltique.russellkmoore.me)  
-**🚀 Status**: Production-ready with full admin dashboard and AI analytics
-
-## ✨ Key Features
-
-### 🤖 AI-Powered Shopping Assistant
-- **Volt AI Agent**: Conversational shopping assistant with personality and expertise
-- **Semantic Search**: Vector-based product discovery using BGE embeddings (768 dimensions)
-- **Contextual Recommendations**: AI suggests products based on user queries and history
-- **Knowledge Base Integration**: AI-powered customer support with vectorized FAQ/policies
-- **Anti-Hallucination**: Strict guardrails prevent fake product recommendations
-- **Personalization**: VIP customer recognition and tailored experiences
-
-### 🛒 Complete eCommerce Platform
-- **Product Catalog**: Dynamic categories with filtering, sorting, and search
-- **User Authentication**: Secure login/registration via Clerk
-- **Shopping Cart**: Persistent cart with real-time updates
-- **Stripe Integration**: Secure payments with real-time tax calculation
-- **Discount System**: MACH Alliance-compliant promotional codes with stacking
-- **Order Management**: Complete order history, tracking, and status updates
-
-### 👨‍💼 Comprehensive Admin Dashboard
-- **Product Management**: Complete CRUD operations, bulk editing, inventory tracking
-- **Order Management**: Full order processing, status updates, customer communication
-- **Category Management**: Hierarchical organization with accurate product mapping
-- **Promotion Management**: Discount codes, campaigns, and promotional system
-- **AI Analytics**: Real-time business intelligence with natural language insights
-- **Knowledge Management**: Customer support content and AI training material
-- **CMS Page Management**: Create and manage static pages (privacy, terms, about)
-- **Admin User Management**: Complete admin user CRUD operations
-- **AI Content Generation**: Generate articles and product descriptions
-- **Settings Management**: Store configuration, AI tuning, system monitoring
-- **🔐 Production Authentication**: Multi-layered admin access control with role-based security
-
-### ⚡ Edge-Optimized Performance
-- **Cloudflare Workers**: Global edge deployment for sub-100ms response times
-- **Cloudflare D1**: Distributed SQLite database with Drizzle ORM
-- **Cloudflare R2**: Object storage for product images and content
-- **Cloudflare Vectorize**: 38-item vector index for semantic search
-- **Next.js 15**: Modern React framework with App Router and TypeScript
-
-## 🏗️ Architecture
-
-### **Tech Stack**
-- **Frontend**: Next.js 15, TypeScript, Tailwind CSS, shadcn/ui
-- **Backend**: Cloudflare Workers with OpenNext
-- **Database**: Cloudflare D1 (SQLite) with Drizzle ORM
-- **Storage**: Cloudflare R2 Object Storage
-- **AI**: Cloudflare AI (Llama 3.1 8B, BGE embeddings)
-- **Vector DB**: Cloudflare Vectorize
-- **Auth**: Clerk Authentication
-- **Payments**: Stripe with Stripe Tax
-
-### **AI Infrastructure**
-```
-User Query → AI Embeddings → Vector Search → Context Retrieval → LLM Response + Products
-```
-
-- **Vector Database**: 38 indexed items (30 products + 8 knowledge articles)
-- **Embedding Model**: BAAI BGE-base-en-v1.5 (768 dimensions)
-- **Language Model**: Meta Llama 3.1 8B Instruct (temperature 0.3 for accuracy)
-- **Context Window**: Semantic search with top-K retrieval and context limits
-- **Admin Analytics**: AI-powered business intelligence with natural language insights
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Node.js 18+ and npm/yarn/pnpm
-- Cloudflare account with Workers paid plan
-- Clerk account (for authentication)
-- Stripe account (for payments)
-
-### Installation
-
-1. **Clone and Install**
+1. Clone the repository and enter it:
    ```bash
-   git clone https://github.com/russellkmoore/mercora.git
-   cd mercora
+   git clone https://github.com/russellkmoore/mercora.git && cd mercora
+   ```
+2. Install the pinned Node version:
+   ```bash
+   mise install
+   ```
+3. Install dependencies:
+   ```bash
    npm install
    ```
-
-2. **Environment Setup**
-   ```bash
-   cp .env.example .env.local
-   # Add your Clerk and Stripe keys
-   ```
-
-3. **Database Setup**
-   ```bash
-   # Create the database (first time only)
-   npx wrangler d1 create mercora-db
-   
-   # Update wrangler.jsonc with the database ID from the output above
-   # Copy the database ID and update the "database_id" field in the d1_databases section
-   
-   # Apply schema migrations
-   npx wrangler d1 migrations apply mercora-db --local     # Local development
-   npx wrangler d1 migrations apply mercora-db --remote    # Remote production
-
-   # Load sample data (optional)
-   npx wrangler d1 execute mercora-db --local --file=data/d1/seed.sql   # Local
-   npx wrangler d1 execute mercora-db --remote --file=data/d1/seed.sql  # Remote
-   ```
-
-4. **Start Development**
+4. Create `.dev.vars` in the repo root (never committed) with at least these five keys, values from
+   your Stripe and Clerk dashboards — names only below, no values:
+   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+   - `CLERK_SECRET_KEY`
+   - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+   - `STRIPE_SECRET_KEY`
+   - `STRIPE_WEBHOOK_SECRET`
+5. Start the dev server:
    ```bash
    npm run dev
    ```
+   This runs a `predev` hook automatically: it builds the theme CSS and applies local D1 migrations
+   and the development seed. There is no separate seed step.
 
-## 📚 Documentation
+Prefer to have a coding assistant do this for you? Hand it [AGENTS.md](AGENTS.md) and ask it to set
+the project up end to end.
 
-### **🚀 Getting Started**
-- **[⚡ Quick Start](#-quick-start)** - Get up and running locally
-- **[🚀 Production Deployment](docs/DEPLOYMENT_SETUP.md)** - Complete deployment with all services
+## Themes and layouts
 
-### **🔧 Technical Documentation**  
-- **[🏗️ System Architecture](docs/architecture.md)** - Complete system design with diagrams
-- **[🤖 AI Processing Pipeline](docs/ai-pipeline.md)** - Deep dive into AI workflows and anti-hallucination
-- **[🔧 Development Context](docs/CLAUDE.md)** - Essential context for developers and AI assistants
-- **[🎨 Theming System](docs/theming.md)** - Token contract, presets, and layout switches
+Every row below is copied verbatim from that theme file's header comment in `themes/`.
 
-### **💼 Admin & Business Features**
-- **[🔐 Admin Authentication](docs/admin-authentication.md)** - Production-ready authentication and security
-- **[💳 Stripe Setup](docs/DEPLOYMENT_SETUP.md)** - Account setup, payment processing, and tax calculation
+| Preset | Industry | Synopsis |
+|---|---|---|
+| Volt Dark (default) | outdoor & technical gear | The store's original look — high-contrast black, electric-orange accent, built for gear that gets used hard. |
+| Luxe | fashion, jewelry, watches, fragrance | A small luxury house that wants the site to feel like a printed lookbook — ivory paper, a single champagne-gold accent, serif headlines. |
+| Midnight | consumer electronics, audio, gaming peripherals | For shoppers who compare specs before they buy — indigo-black surfaces, a violet accent, a polished, cinematic feel. |
+| Clinical | skincare, wellness, supplements, pharmacy, dental | Trustworthy and regulated — pure white surfaces, cool graphite text, one sea-teal accent, and a lot of air. Reads like a well-designed pharmacy label. |
+| Retro | vintage clothing, record stores, arcade & collectibles, nostalgia brands | Deep purple, magenta and cyan with cream text — loud on purpose but legible; the joke is in the decoration, not the contrast. |
+| Atelier | furniture, ceramics, home goods, handmade & small-batch | Warm linen surfaces, a clay accent, a sage secondary, and soft serif headlines — feels like a maker's studio page. |
+| Market | grocery, specialty food, coffee, farm boxes | Bright, dense and friendly — off-white surfaces, forest-green text, a produce-green accent, and big radius rounded sans. Feels like a good neighborhood grocer's app. |
 
-### **🚀 Innovation & Future**
-- **[🌟 MCP Server Integration](docs/mcp-server-specification.md)** - Revolutionary agentic commerce through developer tools
+The same default layout, one home page, all seven presets:
 
-## 🎯 Development
+![Volt Dark](docs/images/presets/volt-dark.png) ![Luxe](docs/images/presets/luxe.png) ![Midnight](docs/images/presets/midnight.png) ![Clinical](docs/images/presets/clinical.png)
+![Retro](docs/images/presets/retro.png) ![Atelier](docs/images/presets/atelier.png) ![Market](docs/images/presets/market.png)
 
-### **Key Commands**
-```bash
-# Development
-npm run dev                 # Start dev server
-npm run build              # Build for production
-npm run deploy             # Deploy to Cloudflare
+Three independent layout switches, members and defaults copied verbatim from `lib/layout/variants.ts`:
 
-# Database
-npx wrangler d1 migrations apply mercora-db --local    # Apply schema migrations (local)
-npx wrangler d1 migrations apply mercora-db            # Apply schema migrations (production)
-npx wrangler d1 execute mercora-db --local --file=data/d1/seed.sql  # Load sample data (local)
+| Switch | Members | Default |
+|---|---|---|
+| Category grid density | `grid-3`, `grid-2`, `list` | `grid-3` |
+| Home hero style | `full-bleed`, `split`, `minimal` | `minimal` |
+| Product gallery position | `left`, `top` | `left` |
 
-# AI Content Management (Development Mode - Auth Disabled)
-curl -X GET "localhost:3000/api/admin/vectorize"  # Index products + knowledge (consolidated)
+All four appearance choices — the preset and the three layout switches — are set from the admin.
+Switching between shipped presets needs no deploy. There is one deployment and seven looks, not seven
+demo sites. See [docs/theming.md](docs/theming.md) for the token contract and switching mechanism.
+
+## Architecture at a glance
+
+```
+Browser
+  └─▶ Next.js Worker (OpenNext on Cloudflare Workers)
+        ├─▶ D1 database (binding: DB) — products, orders, appearance, subscriptions, gift cards
+        ├─▶ R2 buckets (bindings: MEDIA, NEXT_INC_CACHE_R2_BUCKET) — product, category and CMS media
+        ├─▶ Vectorize index (binding: VECTORIZE) — semantic product and knowledge search
+        ├─▶ Workers AI (binding: AI) — Volt chat and embeddings
+        ├─▶ Analytics Engine (binding: WEB_VITALS) — observability
+        ├─▶ Clerk — authentication and admin role
+        ├─▶ Stripe — payments, tax, webhooks, subscriptions
+        └─▶ Email Sending (binding: EMAIL) — transactional email
 ```
 
-### **Project Structure**
-```
-mercora/
-├── app/                      # Next.js App Router
-│   ├── admin/                # Admin dashboard interface
-│   ├── api/                  # API Routes (unified structure)
-│   ├── checkout/             # Complete checkout flow
-│   └── orders/               # Order management
-├── components/               # React Components
-│   ├── admin/                # Admin dashboard components
-│   ├── agent/                # AI chat components
-│   ├── cart/                 # Shopping cart
-│   ├── checkout/             # Stripe checkout integration
-│   └── ui/                   # shadcn/ui components
-├── lib/                      # Core Logic
-│   ├── db/                   # Database schema & migrations
-│   ├── models/               # Data access layer with MACH compliance
-│   ├── auth/                 # Authentication & authorization
-│   ├── stores/               # Zustand state management
-│   ├── types/                # TypeScript definitions
-│   └── stripe.ts             # Stripe configuration
-├── data/                     # Content & Data
-│   ├── d1/                   # D1 Database files
-│   │   └── seed.sql          # Database seed data
-│   └── r2/                   # R2 Object Storage files
-│       ├── categories/       # Category images
-│       ├── products/         # Product images
-│       ├── products_md/      # Product descriptions (vectorized)
-│       └── knowledge_md/     # Support articles (vectorized)
-└── docs/                     # Comprehensive documentation
-```
+An external AI agent can shop through the same pricing and checkout-finalization path the storefront
+itself uses, over an authenticated HTTP API. See
+[docs/mcp-server-specification.md](docs/mcp-server-specification.md) for the tool schema and
+authentication.
 
-## 🎪 Demo Features
+## Documentation
 
-### **🎟️ Demo Discount Codes**
-Test the promotional system with these codes:
+The full index is [docs/README.md](docs/README.md). The most useful entries, grouped the same way:
 
-| Code | Type | Description |
-|------|------|-------------|
-| **SAVE20** | 20% off | $50+ minimum |
-| **FREESHIP** | Free shipping | Any order |
-| **10OFF** | $10 off | No minimum |
-| **TOOLS30** | 30% off tools | Tools category only |
-| **VIP25** | 25% off VIP | $100+ minimum |
+**Setup** — [AGENTS.md](AGENTS.md) (assistant-led setup), [docs/DEPLOYMENT_SETUP.md](docs/DEPLOYMENT_SETUP.md),
+[docs/runtime-configuration.md](docs/runtime-configuration.md), [docs/theming.md](docs/theming.md)
 
-### **💳 Test Payment Cards**
-- **Success**: `4242424242424242`
-- **Decline**: `4000000000000002`
-- **3D Secure**: `4000002500003155`
+**Architecture** — [docs/architecture.md](docs/architecture.md), [docs/ai-pipeline.md](docs/ai-pipeline.md),
+[docs/mcp-server-specification.md](docs/mcp-server-specification.md), [docs/observability.md](docs/observability.md)
 
-## 📈 Performance & Capabilities
+**Operations** — [docs/admin-authentication.md](docs/admin-authentication.md),
+[docs/customer-communications.md](docs/customer-communications.md),
+[docs/dependency-security.md](docs/dependency-security.md), [docs/shopify-migration.md](docs/shopify-migration.md)
 
-### **🌍 Global Performance**
-- **Edge Response Times**: Sub-100ms worldwide via Cloudflare Workers
-- **Vector Search Speed**: ~50ms semantic similarity queries  
-- **AI Response Time**: ~2-3s for contextual responses with Llama 3.1
-- **Database Queries**: ~10-20ms with D1 distributed SQLite
-- **Core Web Vitals**: Mobile-optimized with 95+ Lighthouse scores
+**Reference** — the locked ADRs ([checkout](docs/checkout-trust-boundary.md),
+[webhooks/refunds](docs/webhooks-refunds-inventory.md), [migrations](docs/database-migrations.md),
+[subscriptions](docs/subscriptions.md)), [docs/CLAUDE.md](docs/CLAUDE.md) (AI-assistant context)
 
-### **🎯 Current Scale**
-- **Vector Index**: 38 items (30 products + 8 knowledge articles)
-- **AI Context**: 768-dimension embeddings with BGE model
-- **Admin Dashboard**: Full CRUD operations with real-time analytics
-- **Order Processing**: Complete workflow from cart to fulfillment
-- **Payment Processing**: Production-ready Stripe integration with tax calculation
+## Contributing and gates
 
-## 🤝 Contributing
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full list of validation commands to run before a
+commit. CI runs a superset of that list on every push and pull request. Report security issues
+privately per [SECURITY.md](SECURITY.md).
 
-### **Development Guidelines**
-1. Review the [architecture documentation](docs/architecture.md)
-2. Follow established patterns and code style
-3. Update relevant documentation for changes
-4. Test thoroughly before submitting PRs
+## License
 
-### **Documentation Standards**
-- Keep code documentation up to date
-- Update Mermaid diagrams for architecture changes
-- Maintain API documentation accuracy
-
-## 🔐 Security
-
-### **Security Features**
-- **Multi-layered Authentication**: Clerk integration with secure session management
-- **Admin Access Control**: Role-based admin authentication with dev/production modes
-- **API Protection**: Comprehensive admin API security with token authentication
-- **Payment Security**: PCI-compliant Stripe integration with webhook verification
-- **Route Protection**: Client-side and server-side admin route protection
-- **Content Security**: CSP headers and XSS prevention
-
-### **Data Protection**
-- All secrets stored in Cloudflare encrypted storage
-- No sensitive data in client-side code
-- GDPR-compliant data handling practices
-
-## 🚀 Current Status
-
-### **✅ Production-Ready Features**
-- **Complete eCommerce Platform**: Product catalog, cart, checkout, order management
-- **AI Shopping Assistant**: Volt with semantic search and personalization  
-- **Payment Processing**: Full Stripe integration with real-time tax calculation
-- **Comprehensive Admin Dashboard**: Complete management interface with AI analytics
-- **Content Management System**: Create and manage static pages and content
-- **Admin User Management**: Database-driven admin user CRUD operations
-- **Edge Infrastructure**: Global deployment on Cloudflare with 99.9% uptime
-- **Production Authentication**: Multi-layered security with role-based access control
-
-### **🎯 Recent Achievements** 
-- ✅ **CMS System**: Complete content management for pages and articles
-- ✅ **Admin User Management**: Database-based admin user CRUD operations
-- ✅ **Enhanced Admin Dashboard**: Advanced features including promotions, knowledge management
-- ✅ **AI Content Generation**: Automated article and product description creation
-- ✅ **Production Authentication**: Secure multi-layered authentication system
-- ✅ **Advanced Order Management**: Complete order workflow with status tracking
-
-### **🔮 Next Phase**
-- **MCP Server Integration**: Revolutionary shopping through developer tools
-- **Advanced Personalization**: Enhanced AI recommendations and customer insights
-- **Email Notifications**: Transactional email system for order updates
-- **Mobile App**: Progressive Web App with offline capabilities
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- **Cloudflare**: For the incredible edge platform and AI infrastructure
-- **Clerk**: For seamless authentication
-- **Stripe**: For robust payment and tax solutions
-- **Next.js**: For the amazing developer experience
-- **shadcn/ui**: For beautiful, accessible components
-
----
-
-**Built with ❤️ for outdoor enthusiasts who love great gear and great technology.**
-
-**💡 Ready to explore? Visit the [live demo](https://voltique.russellkmoore.me) and chat with Volt!**
+MIT — see [LICENSE](LICENSE). Copyright (c) 2025-present Russell K. Moore and Mercora contributors.
