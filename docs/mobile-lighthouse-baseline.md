@@ -130,11 +130,15 @@ all in the low-to-mid 70s and product highest at 80.
 
 Two follow-ons, neither performed by this plan:
 
-- **Phase 4 REF-04** ticks the measurement checkboxes in
-  `docs/mobile-improvements-actionable.md` now that this baseline exists.
-- **`REQ-mobile-test-automation`** (backlog) covers turning this one-time
-  measurement into automated Lighthouse CI, per
-  `docs/mobile-testing-automation.md`.
+- **The measurement follow-up** (Phase 4 REF-04) that once cross-referenced
+  the mobile improvements guide is tracked in the project's planning
+  backlog now that guide is retired.
+- **The automation follow-up** that once cross-referenced the mobile
+  testing proposal is tracked in the same planning backlog now that
+  proposal is retired.
+
+The baseline's own scores above remain the current source of truth for
+mobile performance status.
 
 ---
 *Measured: 2026-09-02*

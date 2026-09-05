@@ -83,8 +83,8 @@ Mercora has evolved into a comprehensive AI-enhanced eCommerce platform featurin
 ### 📱 **Mobile Experience (Status: Optimization Underway)**
 
 - ✅ **Core Web Vitals Monitoring Live**: `useWebVitals` hook captures CLS/FCP/INP/LCP/TTFB and touch latency analytics
-- ✅ **Mobile UX Assessment Complete**: Comprehensive evaluation finished Sept 2, 2025 (`docs/mobile-ux-assessment.md`)
-- 🔄 **Optimization Workstream Active**: Implementing touch-target, navigation, and product card updates (`docs/mobile-improvements-actionable.md`)
+- ✅ **Mobile UX Assessment Complete**: Comprehensive evaluation finished Sept 2, 2025
+- 🔄 **Optimization Workstream Active**: Implementing touch-target, navigation, and product card updates
 - 📋 **PWA Features**: Potential offline browsing, push notifications, app-like experience
 - 📋 **Touch Interactions**: Refine gestures and spacing for mobile-first design
 
