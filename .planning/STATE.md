@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 06.1
 current_phase_name: "Remaining Presets: Clinical, Retro, Atelier, Market"
 status: executing
-stopped_at: Completed 06.1-01-PLAN.md
-last_updated: "2026-09-05T05:39:27.760Z"
+stopped_at: Completed 06.1-02-PLAN.md
+last_updated: "2026-09-05T05:49:13.889Z"
 last_activity: 2026-09-04
 last_activity_desc: Phase 06.1 execution started
-state_head: f8a4cb8b67bb2cf3cfc2d194c436bb7bfc083965
+state_head: df336b47104d9c481940ce9df36e515d7a4f93e5
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 21
-  completed_plans: 18
+  completed_plans: 19
   percent: 40
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-04 after Phase 6)
 ## Current Position
 
 Phase: 06.1 (Remaining Presets: Clinical, Retro, Atelier, Market) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-09-04 — Phase 06.1 execution started
 
@@ -86,6 +86,7 @@ Progress: [████░░░░░░] 40%
 | Phase 06 P04 | 16min | 3 tasks | 4 files |
 | Phase 06 P05 | 35min | 3 tasks | 4 files |
 | Phase 06.1 P01 | 20min | 2 tasks | 4 files |
+| Phase 06.1 P02 | 27min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -138,6 +139,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 06]: [Phase 06-05] Three of four light-preset scrim sites (Dialog, AlertDialog, Sheet) fixed to literal dark-alpha via the scanner's sentinel; category hero overlay accepted as-is after evidence-based inspection. — bg-surface/NN composited to near-invisible near-white under luxe for the modal/drawer backdrops (verified live and via compositing tests); the category hero's different job and weaker opacity supported a genuinely different outcome, not a blanket fix.
 - [Phase 06.1]: [Phase 06.1] [06.1-01] Every clinical token value copied verbatim from 06.1-UI-SPEC.md's pre-computed table, including its one flagged deviation (primary/ring darkened to #00828a, 4.61:1) -- no oklch value re-derived by hand.
 - [Phase 06.1]: [Phase 06.1] [06.1-01] Clinical ships no new font dependency -- both font tokens stay the existing Geist stack byte-identical to volt-dark.css, proving the pipeline's thinnest possible slice with zero app/layout.tsx involvement.
+- [Phase 06.1]: [Phase 06.1] [06.1-02] Font weight arrays (Orbitron [600,700,800], Fraunces [500,600,700,800], Nunito [600,700,800]) extend each UI-SPEC floor with the storefront's actual font-semibold/font-bold/font-extrabold heading classes rather than the doc's bare minimum.
+- [Phase 06.1]: [Phase 06.1] [06.1-02] Market's success token deliberately keeps the direction doc's literal, uncorrected value even though primary (same hue family) needed a contrast correction -- success renders as tinted text/panel backgrounds, not solid white-on-green button text, so the AA failure forcing primary's correction doesn't apply.
 
 ### Pending Todos
 
@@ -184,8 +187,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T05:39:11.066Z
-Stopped at: Completed 06.1-01-PLAN.md
+Last session: 2026-09-05T05:49:06.529Z
+Stopped at: Completed 06.1-02-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 7` (or `/gsd-plan-phase 7` directly) to start Layout Switches
