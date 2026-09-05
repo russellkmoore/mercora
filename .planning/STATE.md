@@ -5,17 +5,17 @@ milestone_name: Themeable Storefront
 current_phase: 08.1
 current_phase_name: v2 Tech-Debt Closure
 status: executing
-stopped_at: "Milestone v2: all 5 phases complete and verified; audit status tech_debt; Russell chose to address debt before /gsd-complete-milestone v2"
-last_updated: "2026-09-05T19:58:27.368Z"
+stopped_at: Completed 08.1-01-PLAN.md
+last_updated: "2026-09-05T20:09:27.632Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 08.1 execution started
-state_head: c3d460b006b2a6c79b1ef9e2dcb4b1aa16fbef36
+state_head: 16d22427941e89795f02e70c7428ca947bcef003
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 38
-  completed_plans: 31
-  percent: 82
+  completed_plans: 32
+  percent: 83
 ---
 
 # Project State
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-09-05 after Phase 8)
 ## Current Position
 
 Phase: 08.1 (v2 Tech-Debt Closure) — EXECUTING
-Plan: 1 of 7
-Status: Executing Phase 08.1
+Plan: 2 of 7
+Status: Ready to execute
 Last activity: 2026-09-05 — Phase 08.1 execution started
 
-Progress: [████████░░] 80%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
@@ -102,6 +102,7 @@ Progress: [████████░░] 80%
 | Phase 08 P02 | 15min | 3 tasks | 4 files |
 | Phase 08 P04 | 55min | 3 tasks | 3 files |
 | Phase 08 P05 | 45min | 3 tasks | 7 files |
+| Phase 08.1 P01 | 55min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -179,6 +180,7 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 08]: [Phase 08] [08-04] Zero defects found across 46 findings rows judging all seven presets and three packed layout combinations; the settings-GET empty-category bug (WINDOWS #3) was marked fixed via gsd-tools windows fixed 3, citing plan 08-01 as the closing plan.
 - [Phase 08]: [Phase 08] [08-05] Codebase-docs refresh (ARCHITECTURE/STRUCTURE/CONVENTIONS/TESTING) was pure splice into named sections; only TESTING.md's stale unit-test count (233/1701) was an actual correction, replaced with a number measured this session (260/2136), not carried forward.
 - [Phase 08]: [Phase 08] [08-05] Milestone close-out: all three requirements (DOCS-01/02/03) Complete, full gate suite green (lint, typecheck, scan:tokens 0/2, build:themes:check fresh, 260 files/2136 tests, production build) in one pass, closing v2 Themeable Storefront.
+- [Phase 08.1]: Shared appearance-read helper lives in lib/themes/appearance-read.ts (not inlined in active-theme.ts) to avoid a circular import while lib/layout/settings.ts imports it directly.
 
 ### Pending Todos
 
@@ -243,8 +245,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T18:16:48.028Z
-Stopped at: Milestone v2: all 5 phases complete and verified; audit status tech_debt; Russell chose to address debt before /gsd-complete-milestone v2
-Resume file: .planning/v2-MILESTONE-AUDIT.md
+Last session: 2026-09-05T20:09:23.622Z
+Stopped at: Completed 08.1-01-PLAN.md
+Resume file: None
 
 Next: review `.planning/v2-MILESTONE-AUDIT.md`, optionally `/gsd-phase --insert 8 "Address v2 tech debt"`, then `/gsd-complete-milestone v2` → `/gsd-cleanup`
