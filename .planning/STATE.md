@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 08.1
 current_phase_name: v2 Tech-Debt Closure
 status: executing
-stopped_at: Completed 08.1-05-PLAN.md
-last_updated: "2026-09-05T21:25:20.037Z"
+stopped_at: Completed 08.1-04-PLAN.md
+last_updated: "2026-09-05T21:38:47.398Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 08.1 execution started
-state_head: ed76ef5b60bf061a1c8b48ffb692520ab98a17d5
+state_head: 5ab84bd15eb9265d017644b9a4fa78493d3d2971
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 38
-  completed_plans: 35
+  completed_plans: 36
   percent: 71
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-05 after Phase 8)
 ## Current Position
 
 Phase: 08.1 (v2 Tech-Debt Closure) — EXECUTING
-Plan: 5 of 7
+Plan: 6 of 7
 Status: Ready to execute
 Last activity: 2026-09-05 — Phase 08.1 execution started
 
@@ -106,6 +106,7 @@ Progress: [███████░░░] 71%
 | Phase 08.1 P03 | 24min | 3 tasks | 9 files |
 | Phase 08.1 P02 | 16min | 3 tasks | 12 files |
 | Phase 08.1 P05 | 20min | 2 tasks | 7 files |
+| Phase 08.1 P04 | 12min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -189,6 +190,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 08.1]: D-05 closed: gallery-media-url.ts retired in favor of resolveProductImageSrc for both gallery variants; explicit placeholder argument preserves the exact fallback filename.
 - [Phase 08.1]: D-11 accepted: bare relative image paths gain a leading slash; every other input shape stays byte-identical.
 - [Phase 08.1]: D-08 (07-REVIEW IN-01) closed: productGallery is now a required prop on ProductDisplay with no default; the sole caller already always supplied it.
+- [Phase 08.1]: [Phase 08.1] [08.1-04] emailThemeForStagedPayload() does its own manifest-membership check rather than delegating to getThemeTokens()'s built-in fallback, so it can distinguish an absent payload (no telemetry, normal pre-migration-row state) from a present-but-unknown theme name (telemetry required).
+- [Phase 08.1]: [Phase 08.1] [08.1-04] stagePaidOrderEffects is the only call site in lib/services/order-effects.ts allowed to call getActiveTheme() (enforced by the plan's occurrence-count gate); invoice-service.ts's two preparePaidOrderEffectStatements call sites resolve the theme themselves since both are already async and request-scoped.
 
 ### Pending Todos
 
@@ -254,8 +257,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T21:25:19.717Z
-Stopped at: Completed 08.1-05-PLAN.md
+Last session: 2026-09-05T21:38:47.082Z
+Stopped at: Completed 08.1-04-PLAN.md
 Resume file: None
 
 Next: review `.planning/v2-MILESTONE-AUDIT.md`, optionally `/gsd-phase --insert 8 "Address v2 tech debt"`, then `/gsd-complete-milestone v2` → `/gsd-cleanup`

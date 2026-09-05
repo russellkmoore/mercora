@@ -279,7 +279,7 @@ Plans:
   3. One image-URL resolver serves both the product gallery variants and cards; parity tests fail loudly when a baseline snapshot is missing; the settings seed fallback logs instead of swallowing; the Phase 6/7/8 review Info items are closed
   4. A local D1 order fixture exists and the order-status route is captured across the seven-theme grid; gates stay green (scan 0, build-themes --check, full suite, build)
 
-**Plans:** 4/7 plans executed
+**Plans:** 5/7 plans executed
 
 Plans:
 **Wave 1**
@@ -294,7 +294,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 08.1-04-PLAN.md — Staged effect carries the active theme so the cron drain renders it; expand-only migration (D-10, D-01 cron path)
+- [x] 08.1-04-PLAN.md — Staged effect carries the active theme so the cron drain renders it; expand-only migration (D-10, D-01 cron path)
 - [ ] 08.1-06-PLAN.md — Validator rejects duplicate token declarations, one `kebabToCamel`, resolver branch collapse (D-08)
 
 **Wave 4** *(blocked on Wave 3 completion)*
