@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 08.2
 current_phase_name: Documentation Overhaul & Agent Onboarding
 status: executing
-stopped_at: Completed 08.2-03-PLAN.md
-last_updated: "2026-09-05T23:29:19.112Z"
+stopped_at: Completed 08.2-04-PLAN.md
+last_updated: "2026-09-05T23:43:46.965Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 08.2 execution started
-state_head: d5b471aed69bffcf6bec0443f2b3e4cd7b5d6b68
+state_head: 7d6957ed7431ba579024314b693d6b2d79486193
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 44
-  completed_plans: 41
+  completed_plans: 42
   percent: 86
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-05 after Phase 8.1)
 ## Current Position
 
 Phase: 08.2 (Documentation Overhaul & Agent Onboarding) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 Status: Ready to execute
 Last activity: 2026-09-05 — Phase 08.2 execution started
 
@@ -113,6 +113,7 @@ Progress: [█████████░] 86%
 | Phase 08.2 P01 | 20min | 3 tasks | 9 files |
 | Phase 08.2 P02 | 26min | 3 tasks | 14 files |
 | Phase 08.2 P03 | 25min | 3 tasks | 10 files |
+| Phase 08.2 P04 | 15min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -208,6 +209,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 08.2]: 08.2-02: scripts/docs-lint.mjs's scan surface excludes docs/CHANGELOG-docs.md only from the dead-reference and relative-link checks; included everywhere else, per plan spec.
 - [Phase 08.2]: docs/DEPLOYMENT_SETUP.md is the single setup-and-deploy runbook; docs/STRIPE_INTEGRATION.md's unique content (test cards, test tax addresses) was absorbed and its path retired (ninth retirement).
 - [Phase 08.2]: docs/architecture.md's historical schema diagram and unverifiable security diagram were deleted, not caveated; CONTRIBUTING.md now lists the full 7-command D-11 gate order matching CI.
+- [Phase 08.2]: [Phase 08.2] 08.2-04: Corrected a wrong secret variable name inherited from 08.2-RESEARCH.md (GIFT_CARD_CODE_HMAC_KEYS_JSON, not _CURRENT_KEYS_JSON) after the claim check found it disagreed with lib/gift-cards/config.ts; AGENTS.md was written with the correct name.
+- [Phase 08.2]: [Phase 08.2] 08.2-04: docs/CLAUDE.md's gate order, environment-variable example, deployment, MCP inventory, and database-schema sections became one-sentence links to AGENTS.md and the docs that own each topic, cutting the file from 655 to 236 lines; its project-overview paragraph was rewritten to match AGENTS.md's themeable-storefront framing so the two files describing this repo to an AI assistant do not contradict each other.
 
 ### Pending Todos
 
@@ -271,8 +274,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T23:29:18.705Z
-Stopped at: Completed 08.2-03-PLAN.md
+Last session: 2026-09-05T23:43:46.588Z
+Stopped at: Completed 08.2-04-PLAN.md
 Resume file: None
 
 Next: `/gsd-plan-phase 8.2` (context exists) then execute; then `/gsd-audit-milestone` → `/gsd-complete-milestone v2` → `/gsd-cleanup`
