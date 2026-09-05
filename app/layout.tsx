@@ -95,10 +95,16 @@ const geistMono = Geist_Mono({
 // at-rule (D-02). preload stays off: a page that never renders text in
 // this face pays nothing extra; the browser only fetches it when a
 // [data-theme] block that references the variable actually renders text.
+// Weights extend the original 400/500 to 600 and 700 (Google's Cormorant
+// Garamond tops out at 700) so the storefront's font-semibold/bold/extrabold
+// headings render at a loaded weight instead of a synthesized one
+// (font-synthesis: none in app/globals.css). font-extrabold requests still
+// resolve to 700 rather than a true 800 — an acceptable nearest-match, unlike
+// the previous 500 ceiling.
 const cormorantGaramond = Cormorant_Garamond({
   variable: "--font-cormorant-garamond",
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
   preload: false,
 });
