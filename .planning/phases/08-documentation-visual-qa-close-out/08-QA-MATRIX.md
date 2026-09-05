@@ -1,6 +1,6 @@
 # Phase 8 Visual QA Matrix
 
-**Status:** in-progress
+**Status:** captured — complete (findings pending plan 08-04)
 **Captured:** 2026-09-05
 
 This is Phase 8's own visual QA coverage record — a new file, following the format
@@ -79,15 +79,15 @@ result columns are filled in as each run completes.
 | 10 | `phase-08-a-clinical` | `clinical` | `grid-3` | `minimal` | `left` | ✅ | 28 | 4 |
 | 11 | `phase-08-b-clinical` | `clinical` | `grid-2` | `split` | `top` | ✅ | 28 | 4 |
 | 12 | `phase-08-c-clinical` | `clinical` | `list` | `full-bleed` | `left` | ✅ | 28 | 4 |
-| 13 | `phase-08-a-retro` | `retro` | `grid-3` | `minimal` | `left` | | | |
-| 14 | `phase-08-b-retro` | `retro` | `grid-2` | `split` | `top` | | | |
-| 15 | `phase-08-c-retro` | `retro` | `list` | `full-bleed` | `left` | | | |
-| 16 | `phase-08-a-atelier` | `atelier` | `grid-3` | `minimal` | `left` | | | |
-| 17 | `phase-08-b-atelier` | `atelier` | `grid-2` | `split` | `top` | | | |
-| 18 | `phase-08-c-atelier` | `atelier` | `list` | `full-bleed` | `left` | | | |
-| 19 | `phase-08-a-market` | `market` | `grid-3` | `minimal` | `left` | | | |
-| 20 | `phase-08-b-market` | `market` | `grid-2` | `split` | `top` | | | |
-| 21 | `phase-08-c-market` | `market` | `list` | `full-bleed` | `left` | | | |
+| 13 | `phase-08-a-retro` | `retro` | `grid-3` | `minimal` | `left` | ✅ | 28 | 4 |
+| 14 | `phase-08-b-retro` | `retro` | `grid-2` | `split` | `top` | ✅ | 28 | 4 |
+| 15 | `phase-08-c-retro` | `retro` | `list` | `full-bleed` | `left` | ✅ | 28 | 4 |
+| 16 | `phase-08-a-atelier` | `atelier` | `grid-3` | `minimal` | `left` | ✅ | 28 | 4 |
+| 17 | `phase-08-b-atelier` | `atelier` | `grid-2` | `split` | `top` | ✅ | 28 | 4 |
+| 18 | `phase-08-c-atelier` | `atelier` | `list` | `full-bleed` | `left` | ✅ | 28 | 4 |
+| 19 | `phase-08-a-market` | `market` | `grid-3` | `minimal` | `left` | ✅ | 28 | 4 |
+| 20 | `phase-08-b-market` | `market` | `grid-2` | `split` | `top` | ✅ | 28 | 4 |
+| 21 | `phase-08-c-market` | `market` | `list` | `full-bleed` | `left` | ✅ | 28 | 4 |
 
 ## Carried-forward gaps
 
@@ -553,3 +553,361 @@ prior phase (5, 6, 6.1, 7) accepted them.
 | blog-post | 390 | resting | .screenshots/phase-08-c-clinical/blog-post__390__resting.png | 7ef2f109c0a04157d3cc25f19ea9ce2c5f8749f91c43ee4126f6405b87db2fec | - |
 | cms-page | 1280 | resting | .screenshots/phase-08-c-clinical/cms-page__1280__resting.png | 46bd3f924acf8089b4019e86941e0f922e3bbd694ce45c5d6cd70afe0070c31d | - |
 | cms-page | 390 | resting | .screenshots/phase-08-c-clinical/cms-page__390__resting.png | 4856bb88adc76b4005651aa5b809d197fc8f7d9fa7b3dbda62de135a0f724c78 | - |
+
+## Label: `phase-08-a-retro`
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| home | 1280 | resting | .screenshots/phase-08-a-retro/home__1280__resting.png | e128155c2abde06f2469cad42962e1395328510ca8249b9dd9a049e596fdfdf1 | - |
+| home | 1280 | nav-open | .screenshots/phase-08-a-retro/home__1280__nav-open.png | 802067eaf3bf812ec4408c359d0142d42f762174331088dcaf2e83032599aabd | - |
+| home | 390 | resting | .screenshots/phase-08-a-retro/home__390__resting.png | acb28aa7ac72907af8c71be4ef5ded62554bca82f9fc00b466a2a54fccbc8145 | - |
+| home | 390 | nav-open | .screenshots/phase-08-a-retro/home__390__nav-open.png | 8d1709fb8d0751c2e57de40bca4e459b3f779fb4c19283b568fb846ac93c25e9 | - |
+| category | 1280 | resting | .screenshots/phase-08-a-retro/category__1280__resting.png | af83e759e901fc6dc77495946700b76b919b74ec9af60d74b16a28f7b2e26c1e | - |
+| category | 1280 | nav-open | .screenshots/phase-08-a-retro/category__1280__nav-open.png | 266c3379c21c8b458c21ecbe15bb95806f34e4e17dc4cfd122a30ce21b9ae9ce | - |
+| category | 390 | resting | .screenshots/phase-08-a-retro/category__390__resting.png | ce68816f57a1624a48e1db64c3df64f0656d329955afb40af2c74d08a7a7674b | - |
+| category | 390 | nav-open | .screenshots/phase-08-a-retro/category__390__nav-open.png | 8d1709fb8d0751c2e57de40bca4e459b3f779fb4c19283b568fb846ac93c25e9 | - |
+| product | 1280 | resting | .screenshots/phase-08-a-retro/product__1280__resting.png | 02ee8301885d8c4cf9d24055fca70fb84230bcc7e59ede95b0ddc0c89bf3103b | - |
+| product | 1280 | nav-open | .screenshots/phase-08-a-retro/product__1280__nav-open.png | f48ea0e0a55d3f40487862b6ccbd55cdbb09c36ba723d7d95ac840df9ba05200 | - |
+| product | 390 | resting | .screenshots/phase-08-a-retro/product__390__resting.png | d9994f02fe8c020192d3f4f042062a0390382a3afd58bff47db73bbd15f43a64 | - |
+| product | 390 | nav-open | .screenshots/phase-08-a-retro/product__390__nav-open.png | 8d1709fb8d0751c2e57de40bca4e459b3f779fb4c19283b568fb846ac93c25e9 | - |
+| cart | 1280 | cart-open | .screenshots/phase-08-a-retro/cart__1280__cart-open.png | a7379a06d4ae0f92a1212768aa2756bbc9a4c21b5bae677036eac57eb72cf79e | - |
+| cart | 390 | cart-open | .screenshots/phase-08-a-retro/cart__390__cart-open.png | 7d6cff42ada2a7a39344180ad2b87eb80685ab424f6c6f19f17aae3d0c50b6e6 | - |
+| checkout | 1280 | resting | .screenshots/phase-08-a-retro/checkout__1280__resting.png | 4e77359cb889bd857921c606e0358804ead52135f2612d54c3b51ff65b695cf4 | - |
+| checkout | 1280 | nav-open | .screenshots/phase-08-a-retro/checkout__1280__nav-open.png | 508001b46e568b7f446364e09f57e48f30ec5a18a0db770866f3664e4bc2fe7c | - |
+| checkout | 390 | resting | .screenshots/phase-08-a-retro/checkout__390__resting.png | 8ba6a8409323dc6a2f008b42bba794307023ea58cd6077fed5445ac4f7657a51 | - |
+| checkout | 390 | nav-open | .screenshots/phase-08-a-retro/checkout__390__nav-open.png | 8d1709fb8d0751c2e57de40bca4e459b3f779fb4c19283b568fb846ac93c25e9 | - |
+| account | 1280 | resting | .screenshots/phase-08-a-retro/account__1280__resting.png | 1295321f6a3305f700da7fbd2c99efeac85f526e62cf0a7ef4cdc03b80fdfc56 | - |
+| account | 1280 | nav-open | .screenshots/phase-08-a-retro/account__1280__nav-open.png | 82c805f396b6f628aa9b3d437351659e43860075bfc33c78aa8d84bdc4cf8f30 | - |
+| account | 390 | resting | .screenshots/phase-08-a-retro/account__390__resting.png | d929c9c01e4e32e944574e0c8155ffc2dd19f56aa2032c9dfb75232bdc735884 | - |
+| account | 390 | nav-open | .screenshots/phase-08-a-retro/account__390__nav-open.png | 8d1709fb8d0751c2e57de40bca4e459b3f779fb4c19283b568fb846ac93c25e9 | - |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| blog-index | 1280 | resting | .screenshots/phase-08-a-retro/blog-index__1280__resting.png | 0f37f0462a83e591848093789acc9e10ceb3a34213b05c096e83089ef514716b | - |
+| blog-index | 390 | resting | .screenshots/phase-08-a-retro/blog-index__390__resting.png | 4205d40374cd1c2cabcd7b5e97e7483b1c2bbff0d1ec885efea1af661f02f6e8 | - |
+| blog-post | 1280 | resting | .screenshots/phase-08-a-retro/blog-post__1280__resting.png | d9dba3dcf43bfd050be4c347f0a1d364454de74163d5f98b334c60a8cc50e3ad | - |
+| blog-post | 390 | resting | .screenshots/phase-08-a-retro/blog-post__390__resting.png | 6683adb696c3f7005e8fe2d76c5325b662ab60dad0fdcd0ab4512c7523de8d3f | - |
+| cms-page | 1280 | resting | .screenshots/phase-08-a-retro/cms-page__1280__resting.png | a647025f739c2a4f788071bbfacff50534a5c7efd2453628ff5048fe1555facb | - |
+| cms-page | 390 | resting | .screenshots/phase-08-a-retro/cms-page__390__resting.png | d70bbfe50a3446c7d54bad8b8fb2502602389bd034a3790f840359f028baf231 | - |
+
+## Label: `phase-08-b-retro`
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| home | 1280 | resting | .screenshots/phase-08-b-retro/home__1280__resting.png | 1e6b9d28240073fca5d5f38460b8384e1c833c5e511dece10574f4423e63ad87 | - |
+| home | 1280 | nav-open | .screenshots/phase-08-b-retro/home__1280__nav-open.png | f514607a48cd6594f7d129c69fa5d2804034b2913c1a37029a120b953a81e0c3 | - |
+| home | 390 | resting | .screenshots/phase-08-b-retro/home__390__resting.png | 2e9a38de0a62b1d32b5a02d09c5ce630037d87c9f4260dea098ddcc757e75855 | - |
+| home | 390 | nav-open | .screenshots/phase-08-b-retro/home__390__nav-open.png | 8d1709fb8d0751c2e57de40bca4e459b3f779fb4c19283b568fb846ac93c25e9 | - |
+| category | 1280 | resting | .screenshots/phase-08-b-retro/category__1280__resting.png | ae1dfe2d6139d6d3e0a4f3f5c6c2cba0b49dd01c52a74c530fa642b87410caf4 | - |
+| category | 1280 | nav-open | .screenshots/phase-08-b-retro/category__1280__nav-open.png | 1b3ad4cbe39c2fb2fcbf97a9f603ec77a33c78c303b39a9fa80508ee78908df8 | - |
+| category | 390 | resting | .screenshots/phase-08-b-retro/category__390__resting.png | ce68816f57a1624a48e1db64c3df64f0656d329955afb40af2c74d08a7a7674b | - |
+| category | 390 | nav-open | .screenshots/phase-08-b-retro/category__390__nav-open.png | 8d1709fb8d0751c2e57de40bca4e459b3f779fb4c19283b568fb846ac93c25e9 | - |
+| product | 1280 | resting | .screenshots/phase-08-b-retro/product__1280__resting.png | d92fadb426cbdc3e2a79a657902e7d4c4bccb1612150f9101d808b9ff23aa2b9 | - |
+| product | 1280 | nav-open | .screenshots/phase-08-b-retro/product__1280__nav-open.png | 3c1efa2ed81dede048faa9de6923ed1b0e59ce8bf56427bea17b1d6b7355127b | - |
+| product | 390 | resting | .screenshots/phase-08-b-retro/product__390__resting.png | c0aa743347a94290632857993435c9925802918926aee070e0344883cddc0521 | - |
+| product | 390 | nav-open | .screenshots/phase-08-b-retro/product__390__nav-open.png | 8d1709fb8d0751c2e57de40bca4e459b3f779fb4c19283b568fb846ac93c25e9 | - |
+| cart | 1280 | cart-open | .screenshots/phase-08-b-retro/cart__1280__cart-open.png | 06295b99ce25d0b0d5b7dbf79d072748226dba24ed0318177bbed68bf24b3458 | - |
+| cart | 390 | cart-open | .screenshots/phase-08-b-retro/cart__390__cart-open.png | 7d6cff42ada2a7a39344180ad2b87eb80685ab424f6c6f19f17aae3d0c50b6e6 | - |
+| checkout | 1280 | resting | .screenshots/phase-08-b-retro/checkout__1280__resting.png | 4e77359cb889bd857921c606e0358804ead52135f2612d54c3b51ff65b695cf4 | - |
+| checkout | 1280 | nav-open | .screenshots/phase-08-b-retro/checkout__1280__nav-open.png | 508001b46e568b7f446364e09f57e48f30ec5a18a0db770866f3664e4bc2fe7c | - |
+| checkout | 390 | resting | .screenshots/phase-08-b-retro/checkout__390__resting.png | 8ba6a8409323dc6a2f008b42bba794307023ea58cd6077fed5445ac4f7657a51 | - |
+| checkout | 390 | nav-open | .screenshots/phase-08-b-retro/checkout__390__nav-open.png | 8d1709fb8d0751c2e57de40bca4e459b3f779fb4c19283b568fb846ac93c25e9 | - |
+| account | 1280 | resting | .screenshots/phase-08-b-retro/account__1280__resting.png | 1295321f6a3305f700da7fbd2c99efeac85f526e62cf0a7ef4cdc03b80fdfc56 | - |
+| account | 1280 | nav-open | .screenshots/phase-08-b-retro/account__1280__nav-open.png | 82c805f396b6f628aa9b3d437351659e43860075bfc33c78aa8d84bdc4cf8f30 | - |
+| account | 390 | resting | .screenshots/phase-08-b-retro/account__390__resting.png | d929c9c01e4e32e944574e0c8155ffc2dd19f56aa2032c9dfb75232bdc735884 | - |
+| account | 390 | nav-open | .screenshots/phase-08-b-retro/account__390__nav-open.png | 8d1709fb8d0751c2e57de40bca4e459b3f779fb4c19283b568fb846ac93c25e9 | - |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| blog-index | 1280 | resting | .screenshots/phase-08-b-retro/blog-index__1280__resting.png | 0f37f0462a83e591848093789acc9e10ceb3a34213b05c096e83089ef514716b | - |
+| blog-index | 390 | resting | .screenshots/phase-08-b-retro/blog-index__390__resting.png | 4205d40374cd1c2cabcd7b5e97e7483b1c2bbff0d1ec885efea1af661f02f6e8 | - |
+| blog-post | 1280 | resting | .screenshots/phase-08-b-retro/blog-post__1280__resting.png | d9dba3dcf43bfd050be4c347f0a1d364454de74163d5f98b334c60a8cc50e3ad | - |
+| blog-post | 390 | resting | .screenshots/phase-08-b-retro/blog-post__390__resting.png | 6683adb696c3f7005e8fe2d76c5325b662ab60dad0fdcd0ab4512c7523de8d3f | - |
+| cms-page | 1280 | resting | .screenshots/phase-08-b-retro/cms-page__1280__resting.png | a647025f739c2a4f788071bbfacff50534a5c7efd2453628ff5048fe1555facb | - |
+| cms-page | 390 | resting | .screenshots/phase-08-b-retro/cms-page__390__resting.png | d70bbfe50a3446c7d54bad8b8fb2502602389bd034a3790f840359f028baf231 | - |
+
+## Label: `phase-08-c-retro`
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| home | 1280 | resting | .screenshots/phase-08-c-retro/home__1280__resting.png | 09e948b9df0bdc10cf2be76bb24535787b74e9d9a7b6668a16e709ec92fc8f8f | - |
+| home | 1280 | nav-open | .screenshots/phase-08-c-retro/home__1280__nav-open.png | bf7de956caf0c8248646f4aa2de4650a4f7d319d5a9705ed2a77b7b7e56ea993 | - |
+| home | 390 | resting | .screenshots/phase-08-c-retro/home__390__resting.png | 983b01ce3c8c9447b603aaf1ec9f14a559e9a961fdaab5647221741a2b7b3f61 | - |
+| home | 390 | nav-open | .screenshots/phase-08-c-retro/home__390__nav-open.png | 8d1709fb8d0751c2e57de40bca4e459b3f779fb4c19283b568fb846ac93c25e9 | - |
+| category | 1280 | resting | .screenshots/phase-08-c-retro/category__1280__resting.png | 0eda16c8876b942ef1b40e1876fef7377fd5c6838278086f4d19197b4f5e480d | - |
+| category | 1280 | nav-open | .screenshots/phase-08-c-retro/category__1280__nav-open.png | 3c7761abcee37f13c9eea7c63e63fe6f8b95672a3890b44bd0551ad9f1367006 | - |
+| category | 390 | resting | .screenshots/phase-08-c-retro/category__390__resting.png | 3626265db6c8fc26cdded0db177ef51fda21ede91de6e67252c8c1fed4df7e22 | - |
+| category | 390 | nav-open | .screenshots/phase-08-c-retro/category__390__nav-open.png | 8d1709fb8d0751c2e57de40bca4e459b3f779fb4c19283b568fb846ac93c25e9 | - |
+| product | 1280 | resting | .screenshots/phase-08-c-retro/product__1280__resting.png | 02ee8301885d8c4cf9d24055fca70fb84230bcc7e59ede95b0ddc0c89bf3103b | - |
+| product | 1280 | nav-open | .screenshots/phase-08-c-retro/product__1280__nav-open.png | f48ea0e0a55d3f40487862b6ccbd55cdbb09c36ba723d7d95ac840df9ba05200 | - |
+| product | 390 | resting | .screenshots/phase-08-c-retro/product__390__resting.png | d9994f02fe8c020192d3f4f042062a0390382a3afd58bff47db73bbd15f43a64 | - |
+| product | 390 | nav-open | .screenshots/phase-08-c-retro/product__390__nav-open.png | 8d1709fb8d0751c2e57de40bca4e459b3f779fb4c19283b568fb846ac93c25e9 | - |
+| cart | 1280 | cart-open | .screenshots/phase-08-c-retro/cart__1280__cart-open.png | da0848a567d8a1c19dc2d73ba0f5022661adc67a1efaa95c99ca2b212a063c3c | - |
+| cart | 390 | cart-open | .screenshots/phase-08-c-retro/cart__390__cart-open.png | 7d6cff42ada2a7a39344180ad2b87eb80685ab424f6c6f19f17aae3d0c50b6e6 | - |
+| checkout | 1280 | resting | .screenshots/phase-08-c-retro/checkout__1280__resting.png | 4e77359cb889bd857921c606e0358804ead52135f2612d54c3b51ff65b695cf4 | - |
+| checkout | 1280 | nav-open | .screenshots/phase-08-c-retro/checkout__1280__nav-open.png | 508001b46e568b7f446364e09f57e48f30ec5a18a0db770866f3664e4bc2fe7c | - |
+| checkout | 390 | resting | .screenshots/phase-08-c-retro/checkout__390__resting.png | 8ba6a8409323dc6a2f008b42bba794307023ea58cd6077fed5445ac4f7657a51 | - |
+| checkout | 390 | nav-open | .screenshots/phase-08-c-retro/checkout__390__nav-open.png | 8d1709fb8d0751c2e57de40bca4e459b3f779fb4c19283b568fb846ac93c25e9 | - |
+| account | 1280 | resting | .screenshots/phase-08-c-retro/account__1280__resting.png | 1295321f6a3305f700da7fbd2c99efeac85f526e62cf0a7ef4cdc03b80fdfc56 | - |
+| account | 1280 | nav-open | .screenshots/phase-08-c-retro/account__1280__nav-open.png | 82c805f396b6f628aa9b3d437351659e43860075bfc33c78aa8d84bdc4cf8f30 | - |
+| account | 390 | resting | .screenshots/phase-08-c-retro/account__390__resting.png | d929c9c01e4e32e944574e0c8155ffc2dd19f56aa2032c9dfb75232bdc735884 | - |
+| account | 390 | nav-open | .screenshots/phase-08-c-retro/account__390__nav-open.png | 8d1709fb8d0751c2e57de40bca4e459b3f779fb4c19283b568fb846ac93c25e9 | - |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| blog-index | 1280 | resting | .screenshots/phase-08-c-retro/blog-index__1280__resting.png | 0f37f0462a83e591848093789acc9e10ceb3a34213b05c096e83089ef514716b | - |
+| blog-index | 390 | resting | .screenshots/phase-08-c-retro/blog-index__390__resting.png | 4205d40374cd1c2cabcd7b5e97e7483b1c2bbff0d1ec885efea1af661f02f6e8 | - |
+| blog-post | 1280 | resting | .screenshots/phase-08-c-retro/blog-post__1280__resting.png | d9dba3dcf43bfd050be4c347f0a1d364454de74163d5f98b334c60a8cc50e3ad | - |
+| blog-post | 390 | resting | .screenshots/phase-08-c-retro/blog-post__390__resting.png | 6683adb696c3f7005e8fe2d76c5325b662ab60dad0fdcd0ab4512c7523de8d3f | - |
+| cms-page | 1280 | resting | .screenshots/phase-08-c-retro/cms-page__1280__resting.png | a647025f739c2a4f788071bbfacff50534a5c7efd2453628ff5048fe1555facb | - |
+| cms-page | 390 | resting | .screenshots/phase-08-c-retro/cms-page__390__resting.png | d70bbfe50a3446c7d54bad8b8fb2502602389bd034a3790f840359f028baf231 | - |
+
+## Label: `phase-08-a-atelier`
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| home | 1280 | resting | .screenshots/phase-08-a-atelier/home__1280__resting.png | 35695e4b7ab9febccb33a0bad05259897a2a645e2b316df5cf4d622c7ffaa17a | - |
+| home | 1280 | nav-open | .screenshots/phase-08-a-atelier/home__1280__nav-open.png | c08ffd7f4b06b4fcde1b2870e7123d362f57d6715bb09d4cf673f6300775109d | - |
+| home | 390 | resting | .screenshots/phase-08-a-atelier/home__390__resting.png | 1f799d814c5e4fe79309c68dbeee50b815e893c5205e053e3e02eb943150b39c | - |
+| home | 390 | nav-open | .screenshots/phase-08-a-atelier/home__390__nav-open.png | 3f6ca72326b76d3475f92f30c1fcbe89440d4af5f88612c5e448900548ed548f | - |
+| category | 1280 | resting | .screenshots/phase-08-a-atelier/category__1280__resting.png | 653cd2dde7dd00c0435f11a1fc3c7f1bb63c8ce0de0003b9ec8a54c15dca2bf3 | - |
+| category | 1280 | nav-open | .screenshots/phase-08-a-atelier/category__1280__nav-open.png | 4ebe3778abe5cca2c0be44356ca1f373f7d7708ecf7a942768215206f6bdb019 | - |
+| category | 390 | resting | .screenshots/phase-08-a-atelier/category__390__resting.png | 28a3232b95707dddf420e48742e641f59dd32c4e7ff9f5c1f9dd14fb51de0610 | - |
+| category | 390 | nav-open | .screenshots/phase-08-a-atelier/category__390__nav-open.png | 3f6ca72326b76d3475f92f30c1fcbe89440d4af5f88612c5e448900548ed548f | - |
+| product | 1280 | resting | .screenshots/phase-08-a-atelier/product__1280__resting.png | 8312b377f9aafc00178ffe9012409b59125c993dcb119943644e8ba4d9e1ace2 | - |
+| product | 1280 | nav-open | .screenshots/phase-08-a-atelier/product__1280__nav-open.png | 2cd1526d5e196dd7611b79a0ba934d6c6cb4a2df2d5f5e86d9fcead870583904 | - |
+| product | 390 | resting | .screenshots/phase-08-a-atelier/product__390__resting.png | 00f7ddedc5b1035944bc34fafb02b9f34ec406db7549511f3c348b1e13cfe438 | - |
+| product | 390 | nav-open | .screenshots/phase-08-a-atelier/product__390__nav-open.png | 3f6ca72326b76d3475f92f30c1fcbe89440d4af5f88612c5e448900548ed548f | - |
+| cart | 1280 | cart-open | .screenshots/phase-08-a-atelier/cart__1280__cart-open.png | 08713145cbbca57ea5131fc2e6250742c19b0a8b930ca3171eeb6d1e71272a55 | - |
+| cart | 390 | cart-open | .screenshots/phase-08-a-atelier/cart__390__cart-open.png | 65484c0aaa8fec07a79bf72e22416c4ec3c4fc1ca7602bfee8d647e4d6fb1ff0 | - |
+| checkout | 1280 | resting | .screenshots/phase-08-a-atelier/checkout__1280__resting.png | e22c9ceb4eb803759459753d0176ef7fb827b2e200613f5af8db728a523e8cc8 | - |
+| checkout | 1280 | nav-open | .screenshots/phase-08-a-atelier/checkout__1280__nav-open.png | 9277bb9b80605355ee0366c4a411c4ab0f3451c001147061aaf683ec4a4d924a | - |
+| checkout | 390 | resting | .screenshots/phase-08-a-atelier/checkout__390__resting.png | e0811304ba34422fc18f746aede07131a3e5b3aaf3b10624e5def62048ffacde | - |
+| checkout | 390 | nav-open | .screenshots/phase-08-a-atelier/checkout__390__nav-open.png | 3f6ca72326b76d3475f92f30c1fcbe89440d4af5f88612c5e448900548ed548f | - |
+| account | 1280 | resting | .screenshots/phase-08-a-atelier/account__1280__resting.png | ce283b77eb188354c670d8c63a51c30a441c97259cb91d9db930b436f796b52e | - |
+| account | 1280 | nav-open | .screenshots/phase-08-a-atelier/account__1280__nav-open.png | b196a43dc588d47477fa796e4f195111c5dd7206f5026011d42af6b6fa84887a | - |
+| account | 390 | resting | .screenshots/phase-08-a-atelier/account__390__resting.png | 8751c2895cb67cefe46324535ccb632decd428cb6bffbbdd3e9e61fbf62984a5 | - |
+| account | 390 | nav-open | .screenshots/phase-08-a-atelier/account__390__nav-open.png | 3f6ca72326b76d3475f92f30c1fcbe89440d4af5f88612c5e448900548ed548f | - |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| blog-index | 1280 | resting | .screenshots/phase-08-a-atelier/blog-index__1280__resting.png | dd2825532289df5056a028e8530ef99c00b3a0999fb64cc8589c6e61d880d922 | - |
+| blog-index | 390 | resting | .screenshots/phase-08-a-atelier/blog-index__390__resting.png | 6b598feb7a90ca73fefb1ffa15c8c7d84b5c6122b58e9b338e94e14791b656c4 | - |
+| blog-post | 1280 | resting | .screenshots/phase-08-a-atelier/blog-post__1280__resting.png | fe870a6d432a6745a9fa6227bd781cde92723d8a78e82290171172cc30f808f7 | - |
+| blog-post | 390 | resting | .screenshots/phase-08-a-atelier/blog-post__390__resting.png | c76cce2433c8ec4aa6f68ffe91746ca2296bb23a67516ae9d66b42e58a321dc4 | - |
+| cms-page | 1280 | resting | .screenshots/phase-08-a-atelier/cms-page__1280__resting.png | 7a92155e1262ac251c560d562f782cd0c94f47a355076cd476cecc340313fe37 | - |
+| cms-page | 390 | resting | .screenshots/phase-08-a-atelier/cms-page__390__resting.png | 4dd84df3fffdeb57831c67f2e429af5a8710a9f5fc1c2021c6e9afae4a65fdaa | - |
+
+## Label: `phase-08-b-atelier`
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| home | 1280 | resting | .screenshots/phase-08-b-atelier/home__1280__resting.png | ec1a71f0e37eae965086b20e7546461c0bfd682a14e40512d55d5b1dcb8ffa98 | - |
+| home | 1280 | nav-open | .screenshots/phase-08-b-atelier/home__1280__nav-open.png | c3c61819271d83b3d6ebca33b84a4a4df648dfdd9d489626d8cd1b79802ae6d3 | - |
+| home | 390 | resting | .screenshots/phase-08-b-atelier/home__390__resting.png | 56a8dcdb7a79862e9a84ab225ea830d4af93eaef34563e3e2fc460643dad5b63 | - |
+| home | 390 | nav-open | .screenshots/phase-08-b-atelier/home__390__nav-open.png | 3f6ca72326b76d3475f92f30c1fcbe89440d4af5f88612c5e448900548ed548f | - |
+| category | 1280 | resting | .screenshots/phase-08-b-atelier/category__1280__resting.png | 4248b0431a48bc02badd84d49c25e4882a8de7a885fa6d03cfc0d01040a75af5 | - |
+| category | 1280 | nav-open | .screenshots/phase-08-b-atelier/category__1280__nav-open.png | 61908715b1e2faadf9944a547baa7d55a9cc648ea6a91c0b62a2904d4429ffd3 | - |
+| category | 390 | resting | .screenshots/phase-08-b-atelier/category__390__resting.png | 28a3232b95707dddf420e48742e641f59dd32c4e7ff9f5c1f9dd14fb51de0610 | - |
+| category | 390 | nav-open | .screenshots/phase-08-b-atelier/category__390__nav-open.png | 3f6ca72326b76d3475f92f30c1fcbe89440d4af5f88612c5e448900548ed548f | - |
+| product | 1280 | resting | .screenshots/phase-08-b-atelier/product__1280__resting.png | d511bf2701c6be9a8fbbac33f17c6ecd8a5c22736d68a4c701c8ba674fda526f | - |
+| product | 1280 | nav-open | .screenshots/phase-08-b-atelier/product__1280__nav-open.png | bd5a7466e66171dce24317959c6ae8677c8c4a7c3702fb39867d193bfafa9c19 | - |
+| product | 390 | resting | .screenshots/phase-08-b-atelier/product__390__resting.png | 8839715f38516b37b375a56abf8667958beabfe97c660c7b91a0f9ae26b6f4f9 | - |
+| product | 390 | nav-open | .screenshots/phase-08-b-atelier/product__390__nav-open.png | 3f6ca72326b76d3475f92f30c1fcbe89440d4af5f88612c5e448900548ed548f | - |
+| cart | 1280 | cart-open | .screenshots/phase-08-b-atelier/cart__1280__cart-open.png | 1e3f683eb0954173af5777ae14c01f12063b18c72ffcaf73f1e3f98a1c80b0d9 | - |
+| cart | 390 | cart-open | .screenshots/phase-08-b-atelier/cart__390__cart-open.png | 65484c0aaa8fec07a79bf72e22416c4ec3c4fc1ca7602bfee8d647e4d6fb1ff0 | - |
+| checkout | 1280 | resting | .screenshots/phase-08-b-atelier/checkout__1280__resting.png | e22c9ceb4eb803759459753d0176ef7fb827b2e200613f5af8db728a523e8cc8 | - |
+| checkout | 1280 | nav-open | .screenshots/phase-08-b-atelier/checkout__1280__nav-open.png | 9277bb9b80605355ee0366c4a411c4ab0f3451c001147061aaf683ec4a4d924a | - |
+| checkout | 390 | resting | .screenshots/phase-08-b-atelier/checkout__390__resting.png | e0811304ba34422fc18f746aede07131a3e5b3aaf3b10624e5def62048ffacde | - |
+| checkout | 390 | nav-open | .screenshots/phase-08-b-atelier/checkout__390__nav-open.png | 3f6ca72326b76d3475f92f30c1fcbe89440d4af5f88612c5e448900548ed548f | - |
+| account | 1280 | resting | .screenshots/phase-08-b-atelier/account__1280__resting.png | ce283b77eb188354c670d8c63a51c30a441c97259cb91d9db930b436f796b52e | - |
+| account | 1280 | nav-open | .screenshots/phase-08-b-atelier/account__1280__nav-open.png | b196a43dc588d47477fa796e4f195111c5dd7206f5026011d42af6b6fa84887a | - |
+| account | 390 | resting | .screenshots/phase-08-b-atelier/account__390__resting.png | 8751c2895cb67cefe46324535ccb632decd428cb6bffbbdd3e9e61fbf62984a5 | - |
+| account | 390 | nav-open | .screenshots/phase-08-b-atelier/account__390__nav-open.png | 3f6ca72326b76d3475f92f30c1fcbe89440d4af5f88612c5e448900548ed548f | - |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| blog-index | 1280 | resting | .screenshots/phase-08-b-atelier/blog-index__1280__resting.png | dd2825532289df5056a028e8530ef99c00b3a0999fb64cc8589c6e61d880d922 | - |
+| blog-index | 390 | resting | .screenshots/phase-08-b-atelier/blog-index__390__resting.png | 6b598feb7a90ca73fefb1ffa15c8c7d84b5c6122b58e9b338e94e14791b656c4 | - |
+| blog-post | 1280 | resting | .screenshots/phase-08-b-atelier/blog-post__1280__resting.png | fe870a6d432a6745a9fa6227bd781cde92723d8a78e82290171172cc30f808f7 | - |
+| blog-post | 390 | resting | .screenshots/phase-08-b-atelier/blog-post__390__resting.png | c76cce2433c8ec4aa6f68ffe91746ca2296bb23a67516ae9d66b42e58a321dc4 | - |
+| cms-page | 1280 | resting | .screenshots/phase-08-b-atelier/cms-page__1280__resting.png | 7a92155e1262ac251c560d562f782cd0c94f47a355076cd476cecc340313fe37 | - |
+| cms-page | 390 | resting | .screenshots/phase-08-b-atelier/cms-page__390__resting.png | 4dd84df3fffdeb57831c67f2e429af5a8710a9f5fc1c2021c6e9afae4a65fdaa | - |
+
+## Label: `phase-08-c-atelier`
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| home | 1280 | resting | .screenshots/phase-08-c-atelier/home__1280__resting.png | 21288a9351bc664c8fbae08994b6bd578bccbf6ba081572c16789b5d377eee4d | - |
+| home | 1280 | nav-open | .screenshots/phase-08-c-atelier/home__1280__nav-open.png | 6e203ceba5175e6200ef177b11918171fb6dd85d6fe1b476e03ba3505218f6d5 | - |
+| home | 390 | resting | .screenshots/phase-08-c-atelier/home__390__resting.png | 675b027df2442de1679bd1282b2e63bc0ec022e1f2da1ade2e177212e5d10a31 | - |
+| home | 390 | nav-open | .screenshots/phase-08-c-atelier/home__390__nav-open.png | 3f6ca72326b76d3475f92f30c1fcbe89440d4af5f88612c5e448900548ed548f | - |
+| category | 1280 | resting | .screenshots/phase-08-c-atelier/category__1280__resting.png | 013cbb93f5c8ba8111e36089f6dd5afd5cd477a108dfa047420d06ebb5e85de8 | - |
+| category | 1280 | nav-open | .screenshots/phase-08-c-atelier/category__1280__nav-open.png | c07817f937080f44adda2da7c19192da5c3e4c33d17d53c9d709ca80d5c3c6c5 | - |
+| category | 390 | resting | .screenshots/phase-08-c-atelier/category__390__resting.png | 5e73adf27a7189fbaebf869c04c06cf9475cdf44a855cfc9f38e8a11a7d62c45 | - |
+| category | 390 | nav-open | .screenshots/phase-08-c-atelier/category__390__nav-open.png | 3f6ca72326b76d3475f92f30c1fcbe89440d4af5f88612c5e448900548ed548f | - |
+| product | 1280 | resting | .screenshots/phase-08-c-atelier/product__1280__resting.png | 8312b377f9aafc00178ffe9012409b59125c993dcb119943644e8ba4d9e1ace2 | - |
+| product | 1280 | nav-open | .screenshots/phase-08-c-atelier/product__1280__nav-open.png | 425a34a736db80b064edea1e86ed63ee78b9533b4d84d104e262003c5175d102 | - |
+| product | 390 | resting | .screenshots/phase-08-c-atelier/product__390__resting.png | 00f7ddedc5b1035944bc34fafb02b9f34ec406db7549511f3c348b1e13cfe438 | - |
+| product | 390 | nav-open | .screenshots/phase-08-c-atelier/product__390__nav-open.png | 3f6ca72326b76d3475f92f30c1fcbe89440d4af5f88612c5e448900548ed548f | - |
+| cart | 1280 | cart-open | .screenshots/phase-08-c-atelier/cart__1280__cart-open.png | 964b21f1ac8780a35699aba9ba27ee390b715905cce9d85aa7363882a919285d | - |
+| cart | 390 | cart-open | .screenshots/phase-08-c-atelier/cart__390__cart-open.png | 65484c0aaa8fec07a79bf72e22416c4ec3c4fc1ca7602bfee8d647e4d6fb1ff0 | - |
+| checkout | 1280 | resting | .screenshots/phase-08-c-atelier/checkout__1280__resting.png | e22c9ceb4eb803759459753d0176ef7fb827b2e200613f5af8db728a523e8cc8 | - |
+| checkout | 1280 | nav-open | .screenshots/phase-08-c-atelier/checkout__1280__nav-open.png | 9277bb9b80605355ee0366c4a411c4ab0f3451c001147061aaf683ec4a4d924a | - |
+| checkout | 390 | resting | .screenshots/phase-08-c-atelier/checkout__390__resting.png | e0811304ba34422fc18f746aede07131a3e5b3aaf3b10624e5def62048ffacde | - |
+| checkout | 390 | nav-open | .screenshots/phase-08-c-atelier/checkout__390__nav-open.png | 3f6ca72326b76d3475f92f30c1fcbe89440d4af5f88612c5e448900548ed548f | - |
+| account | 1280 | resting | .screenshots/phase-08-c-atelier/account__1280__resting.png | ce283b77eb188354c670d8c63a51c30a441c97259cb91d9db930b436f796b52e | - |
+| account | 1280 | nav-open | .screenshots/phase-08-c-atelier/account__1280__nav-open.png | b196a43dc588d47477fa796e4f195111c5dd7206f5026011d42af6b6fa84887a | - |
+| account | 390 | resting | .screenshots/phase-08-c-atelier/account__390__resting.png | 8751c2895cb67cefe46324535ccb632decd428cb6bffbbdd3e9e61fbf62984a5 | - |
+| account | 390 | nav-open | .screenshots/phase-08-c-atelier/account__390__nav-open.png | 3f6ca72326b76d3475f92f30c1fcbe89440d4af5f88612c5e448900548ed548f | - |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| blog-index | 1280 | resting | .screenshots/phase-08-c-atelier/blog-index__1280__resting.png | dd2825532289df5056a028e8530ef99c00b3a0999fb64cc8589c6e61d880d922 | - |
+| blog-index | 390 | resting | .screenshots/phase-08-c-atelier/blog-index__390__resting.png | 6b598feb7a90ca73fefb1ffa15c8c7d84b5c6122b58e9b338e94e14791b656c4 | - |
+| blog-post | 1280 | resting | .screenshots/phase-08-c-atelier/blog-post__1280__resting.png | fe870a6d432a6745a9fa6227bd781cde92723d8a78e82290171172cc30f808f7 | - |
+| blog-post | 390 | resting | .screenshots/phase-08-c-atelier/blog-post__390__resting.png | c76cce2433c8ec4aa6f68ffe91746ca2296bb23a67516ae9d66b42e58a321dc4 | - |
+| cms-page | 1280 | resting | .screenshots/phase-08-c-atelier/cms-page__1280__resting.png | 7a92155e1262ac251c560d562f782cd0c94f47a355076cd476cecc340313fe37 | - |
+| cms-page | 390 | resting | .screenshots/phase-08-c-atelier/cms-page__390__resting.png | 4dd84df3fffdeb57831c67f2e429af5a8710a9f5fc1c2021c6e9afae4a65fdaa | - |
+
+## Label: `phase-08-a-market`
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| home | 1280 | resting | .screenshots/phase-08-a-market/home__1280__resting.png | 15b3916ee7d2e0d540770c0da8ef33f47273db7d3500d97fcf7cd1ada0cabedb | - |
+| home | 1280 | nav-open | .screenshots/phase-08-a-market/home__1280__nav-open.png | a6a64a8f8c77e1c51b706c4f3bc476c424ed33e57fe6cfb0fef051747a2c2fd3 | - |
+| home | 390 | resting | .screenshots/phase-08-a-market/home__390__resting.png | 0d0eae38603c188586e109f70c6d3183a01f658b1c44ecde52a306cb5fe4092d | - |
+| home | 390 | nav-open | .screenshots/phase-08-a-market/home__390__nav-open.png | 2a56399812984b981343a9d0cf3ca20e0c6bfb43e4950488c178a2720314c150 | - |
+| category | 1280 | resting | .screenshots/phase-08-a-market/category__1280__resting.png | 004cee85b5079a01b2648a2ff5165abe8d7a073cf8b25f60c8d41759ab217001 | - |
+| category | 1280 | nav-open | .screenshots/phase-08-a-market/category__1280__nav-open.png | d5c44aeaa86044002506a27495164472557dccfac20e3be662b14acafd9d4e0a | - |
+| category | 390 | resting | .screenshots/phase-08-a-market/category__390__resting.png | d31e2a7e5fb32b2be28850ec1a439b15ebea01e65fe9155dfc8a9831814dd530 | - |
+| category | 390 | nav-open | .screenshots/phase-08-a-market/category__390__nav-open.png | 2a56399812984b981343a9d0cf3ca20e0c6bfb43e4950488c178a2720314c150 | - |
+| product | 1280 | resting | .screenshots/phase-08-a-market/product__1280__resting.png | 8cc72f49a48c6bd8257baad37a61b3bc75e4d6cd8039d4a1f22beff7fa2c58b3 | - |
+| product | 1280 | nav-open | .screenshots/phase-08-a-market/product__1280__nav-open.png | e67bffa7d6de057004ef1a99432bb0fd970e06190a3e6a1d19d25c122cdb38b2 | - |
+| product | 390 | resting | .screenshots/phase-08-a-market/product__390__resting.png | 67eccc7553fd58a54c6bb3e039ea1a41e454490bffaa6d4a2426f3b831dcab70 | - |
+| product | 390 | nav-open | .screenshots/phase-08-a-market/product__390__nav-open.png | 2a56399812984b981343a9d0cf3ca20e0c6bfb43e4950488c178a2720314c150 | - |
+| cart | 1280 | cart-open | .screenshots/phase-08-a-market/cart__1280__cart-open.png | 0d0f1bcac239d19d3d6b2b124f5f7ba67617c42047bd6238e2abe34d65b8b2ac | - |
+| cart | 390 | cart-open | .screenshots/phase-08-a-market/cart__390__cart-open.png | 8db8ef8815691bba465c940126da0ee24f7656a814cae32567bf9282b7607149 | - |
+| checkout | 1280 | resting | .screenshots/phase-08-a-market/checkout__1280__resting.png | 15b673516ed16364734a227ecb153a181b8f160de3fadb1ea09ec88f4b2608e1 | - |
+| checkout | 1280 | nav-open | .screenshots/phase-08-a-market/checkout__1280__nav-open.png | 36ebfd0f96c7100a54f3e0fde308da5650d6689cbfe3e91fb8aa4e9eabea61a8 | - |
+| checkout | 390 | resting | .screenshots/phase-08-a-market/checkout__390__resting.png | a7f9e84278432ef817c716fc740164fd9564d964136903ddb24a609decb2e288 | - |
+| checkout | 390 | nav-open | .screenshots/phase-08-a-market/checkout__390__nav-open.png | 2a56399812984b981343a9d0cf3ca20e0c6bfb43e4950488c178a2720314c150 | - |
+| account | 1280 | resting | .screenshots/phase-08-a-market/account__1280__resting.png | e3f4fd6518bab08c7ec2936999497baaf88850bc04b994798b09cf3893fad7b9 | - |
+| account | 1280 | nav-open | .screenshots/phase-08-a-market/account__1280__nav-open.png | 69788975f487b628a1a00f0ae654a8148dd507bc69efeb0a6f598e1d0e176862 | - |
+| account | 390 | resting | .screenshots/phase-08-a-market/account__390__resting.png | 2098dda817638731005fadd92a00d769f4054e20e6e6e9523b487198c72938b9 | - |
+| account | 390 | nav-open | .screenshots/phase-08-a-market/account__390__nav-open.png | 2a56399812984b981343a9d0cf3ca20e0c6bfb43e4950488c178a2720314c150 | - |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| blog-index | 1280 | resting | .screenshots/phase-08-a-market/blog-index__1280__resting.png | 02b4f1ed5827aaa56df45bcf4dd6129a0e14b709331a56f8c642c00a9271d574 | - |
+| blog-index | 390 | resting | .screenshots/phase-08-a-market/blog-index__390__resting.png | d1235f069e0eae9e79fc4cc9f6aa5d880810536794b863779ca4f19ddc090f4a | - |
+| blog-post | 1280 | resting | .screenshots/phase-08-a-market/blog-post__1280__resting.png | b1130d1b275b4920b8463ecc276e6df2ff0cb2970951da97ac5fe25587bd40bc | - |
+| blog-post | 390 | resting | .screenshots/phase-08-a-market/blog-post__390__resting.png | c4cf82fb305e93cb68d45634c1831557af46a4821b816979536de59e1eb11cae | - |
+| cms-page | 1280 | resting | .screenshots/phase-08-a-market/cms-page__1280__resting.png | 12d805a02d38dd139e256ce5f4f5473217c8b433243d3ef38034e553dd2cd918 | - |
+| cms-page | 390 | resting | .screenshots/phase-08-a-market/cms-page__390__resting.png | 3d6b2510cd82e1b8318b51fde49ccf73dcc857c1892a69338b0e9c1376c6bf34 | - |
+
+## Label: `phase-08-b-market`
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| home | 1280 | resting | .screenshots/phase-08-b-market/home__1280__resting.png | e3c3a563ef15cb3b3aab69fc726b7527949c818a1e71bdfcec11c705d4f042f3 | - |
+| home | 1280 | nav-open | .screenshots/phase-08-b-market/home__1280__nav-open.png | 9ff22ebb3117a0826f1e162e9481bde183d07a7e7a0ea43f5539c460a9e96604 | - |
+| home | 390 | resting | .screenshots/phase-08-b-market/home__390__resting.png | eb7279b5b3a13974c2ac015a23cb4e50025342ada066330cfa0b90e1997f7497 | - |
+| home | 390 | nav-open | .screenshots/phase-08-b-market/home__390__nav-open.png | 2a56399812984b981343a9d0cf3ca20e0c6bfb43e4950488c178a2720314c150 | - |
+| category | 1280 | resting | .screenshots/phase-08-b-market/category__1280__resting.png | be2fa97f96d8d87cb4e7306d7b3b7209db7d2a0897b4ff11eb533140656d8178 | - |
+| category | 1280 | nav-open | .screenshots/phase-08-b-market/category__1280__nav-open.png | f41ca6f23a0c392814dc36db317aa24700d15185d5d55db404aaa9c701aacc46 | - |
+| category | 390 | resting | .screenshots/phase-08-b-market/category__390__resting.png | d31e2a7e5fb32b2be28850ec1a439b15ebea01e65fe9155dfc8a9831814dd530 | - |
+| category | 390 | nav-open | .screenshots/phase-08-b-market/category__390__nav-open.png | 2a56399812984b981343a9d0cf3ca20e0c6bfb43e4950488c178a2720314c150 | - |
+| product | 1280 | resting | .screenshots/phase-08-b-market/product__1280__resting.png | b04b7fbcaa96da1cf6f056d02d297615bdf747f09f0e2423fb2144dc2c16b5b1 | - |
+| product | 1280 | nav-open | .screenshots/phase-08-b-market/product__1280__nav-open.png | ccc2c1f55dfb1888e46887351954b2053b91a28c635cade19a4e7965bbf23a24 | - |
+| product | 390 | resting | .screenshots/phase-08-b-market/product__390__resting.png | ae817d377c49e0d181609148e90a08f918121149b01e709dfa3b5f0d7efc0ea9 | - |
+| product | 390 | nav-open | .screenshots/phase-08-b-market/product__390__nav-open.png | 2a56399812984b981343a9d0cf3ca20e0c6bfb43e4950488c178a2720314c150 | - |
+| cart | 1280 | cart-open | .screenshots/phase-08-b-market/cart__1280__cart-open.png | 8eb90ea56e44340d32389c8d0a2aff5e85daeddcd97276e9b97cfaf33001f871 | - |
+| cart | 390 | cart-open | .screenshots/phase-08-b-market/cart__390__cart-open.png | 8db8ef8815691bba465c940126da0ee24f7656a814cae32567bf9282b7607149 | - |
+| checkout | 1280 | resting | .screenshots/phase-08-b-market/checkout__1280__resting.png | 15b673516ed16364734a227ecb153a181b8f160de3fadb1ea09ec88f4b2608e1 | - |
+| checkout | 1280 | nav-open | .screenshots/phase-08-b-market/checkout__1280__nav-open.png | 36ebfd0f96c7100a54f3e0fde308da5650d6689cbfe3e91fb8aa4e9eabea61a8 | - |
+| checkout | 390 | resting | .screenshots/phase-08-b-market/checkout__390__resting.png | a7f9e84278432ef817c716fc740164fd9564d964136903ddb24a609decb2e288 | - |
+| checkout | 390 | nav-open | .screenshots/phase-08-b-market/checkout__390__nav-open.png | 2a56399812984b981343a9d0cf3ca20e0c6bfb43e4950488c178a2720314c150 | - |
+| account | 1280 | resting | .screenshots/phase-08-b-market/account__1280__resting.png | e3f4fd6518bab08c7ec2936999497baaf88850bc04b994798b09cf3893fad7b9 | - |
+| account | 1280 | nav-open | .screenshots/phase-08-b-market/account__1280__nav-open.png | 69788975f487b628a1a00f0ae654a8148dd507bc69efeb0a6f598e1d0e176862 | - |
+| account | 390 | resting | .screenshots/phase-08-b-market/account__390__resting.png | 2098dda817638731005fadd92a00d769f4054e20e6e6e9523b487198c72938b9 | - |
+| account | 390 | nav-open | .screenshots/phase-08-b-market/account__390__nav-open.png | 2a56399812984b981343a9d0cf3ca20e0c6bfb43e4950488c178a2720314c150 | - |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| blog-index | 1280 | resting | .screenshots/phase-08-b-market/blog-index__1280__resting.png | 02b4f1ed5827aaa56df45bcf4dd6129a0e14b709331a56f8c642c00a9271d574 | - |
+| blog-index | 390 | resting | .screenshots/phase-08-b-market/blog-index__390__resting.png | d1235f069e0eae9e79fc4cc9f6aa5d880810536794b863779ca4f19ddc090f4a | - |
+| blog-post | 1280 | resting | .screenshots/phase-08-b-market/blog-post__1280__resting.png | b1130d1b275b4920b8463ecc276e6df2ff0cb2970951da97ac5fe25587bd40bc | - |
+| blog-post | 390 | resting | .screenshots/phase-08-b-market/blog-post__390__resting.png | c4cf82fb305e93cb68d45634c1831557af46a4821b816979536de59e1eb11cae | - |
+| cms-page | 1280 | resting | .screenshots/phase-08-b-market/cms-page__1280__resting.png | 12d805a02d38dd139e256ce5f4f5473217c8b433243d3ef38034e553dd2cd918 | - |
+| cms-page | 390 | resting | .screenshots/phase-08-b-market/cms-page__390__resting.png | 3d6b2510cd82e1b8318b51fde49ccf73dcc857c1892a69338b0e9c1376c6bf34 | - |
+
+## Label: `phase-08-c-market`
+
+| Route | Viewport | State | Path | Hash | Notes |
+|---|---|---|---|---|---|
+| home | 1280 | resting | .screenshots/phase-08-c-market/home__1280__resting.png | 2f8373d8adaed6e7a289e9e5ac47f4fc3c1a6e47c2851d5ff1b4898c56e506f3 | - |
+| home | 1280 | nav-open | .screenshots/phase-08-c-market/home__1280__nav-open.png | 033e6df3680b3f7a66869ba9f0f0335f7ec6ad61be93a3be46b8da0f417aa6d3 | - |
+| home | 390 | resting | .screenshots/phase-08-c-market/home__390__resting.png | 3b0a8a19a5733c9ea4b1a59ec30f82abd334f9503b4a8ac43cf736f0fc65017d | - |
+| home | 390 | nav-open | .screenshots/phase-08-c-market/home__390__nav-open.png | 2a56399812984b981343a9d0cf3ca20e0c6bfb43e4950488c178a2720314c150 | - |
+| category | 1280 | resting | .screenshots/phase-08-c-market/category__1280__resting.png | 5df749ffa63bfe19c384270fee57f907b1e7c188a9b8199b96eaa01d3821bced | - |
+| category | 1280 | nav-open | .screenshots/phase-08-c-market/category__1280__nav-open.png | 4f8f0dfa96e23d2546dbedaf6092cd0d4d851ea8a6204c15448bc55d862e39fa | - |
+| category | 390 | resting | .screenshots/phase-08-c-market/category__390__resting.png | e1fa05800bb19fb1ca230eaa66427ce480bf0310139d1855581c25954a338701 | - |
+| category | 390 | nav-open | .screenshots/phase-08-c-market/category__390__nav-open.png | 2a56399812984b981343a9d0cf3ca20e0c6bfb43e4950488c178a2720314c150 | - |
+| product | 1280 | resting | .screenshots/phase-08-c-market/product__1280__resting.png | 8cc72f49a48c6bd8257baad37a61b3bc75e4d6cd8039d4a1f22beff7fa2c58b3 | - |
+| product | 1280 | nav-open | .screenshots/phase-08-c-market/product__1280__nav-open.png | e67bffa7d6de057004ef1a99432bb0fd970e06190a3e6a1d19d25c122cdb38b2 | - |
+| product | 390 | resting | .screenshots/phase-08-c-market/product__390__resting.png | 67eccc7553fd58a54c6bb3e039ea1a41e454490bffaa6d4a2426f3b831dcab70 | - |
+| product | 390 | nav-open | .screenshots/phase-08-c-market/product__390__nav-open.png | 2a56399812984b981343a9d0cf3ca20e0c6bfb43e4950488c178a2720314c150 | - |
+| cart | 1280 | cart-open | .screenshots/phase-08-c-market/cart__1280__cart-open.png | e06bc43a5a1de7b489719423a147dee4ce85cb32a1a9bb13e580ef01a4c02313 | - |
+| cart | 390 | cart-open | .screenshots/phase-08-c-market/cart__390__cart-open.png | 8db8ef8815691bba465c940126da0ee24f7656a814cae32567bf9282b7607149 | - |
+| checkout | 1280 | resting | .screenshots/phase-08-c-market/checkout__1280__resting.png | 15b673516ed16364734a227ecb153a181b8f160de3fadb1ea09ec88f4b2608e1 | - |
+| checkout | 1280 | nav-open | .screenshots/phase-08-c-market/checkout__1280__nav-open.png | 36ebfd0f96c7100a54f3e0fde308da5650d6689cbfe3e91fb8aa4e9eabea61a8 | - |
+| checkout | 390 | resting | .screenshots/phase-08-c-market/checkout__390__resting.png | a7f9e84278432ef817c716fc740164fd9564d964136903ddb24a609decb2e288 | - |
+| checkout | 390 | nav-open | .screenshots/phase-08-c-market/checkout__390__nav-open.png | 2a56399812984b981343a9d0cf3ca20e0c6bfb43e4950488c178a2720314c150 | - |
+| account | 1280 | resting | .screenshots/phase-08-c-market/account__1280__resting.png | e3f4fd6518bab08c7ec2936999497baaf88850bc04b994798b09cf3893fad7b9 | - |
+| account | 1280 | nav-open | .screenshots/phase-08-c-market/account__1280__nav-open.png | 69788975f487b628a1a00f0ae654a8148dd507bc69efeb0a6f598e1d0e176862 | - |
+| account | 390 | resting | .screenshots/phase-08-c-market/account__390__resting.png | 2098dda817638731005fadd92a00d769f4054e20e6e6e9523b487198c72938b9 | - |
+| account | 390 | nav-open | .screenshots/phase-08-c-market/account__390__nav-open.png | 2a56399812984b981343a9d0cf3ca20e0c6bfb43e4950488c178a2720314c150 | - |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 1280 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| order-status | 390 | MISSING | - | - | no order id available (pass --order-id, or local D1 seed has no orders) |
+| blog-index | 1280 | resting | .screenshots/phase-08-c-market/blog-index__1280__resting.png | 02b4f1ed5827aaa56df45bcf4dd6129a0e14b709331a56f8c642c00a9271d574 | - |
+| blog-index | 390 | resting | .screenshots/phase-08-c-market/blog-index__390__resting.png | d1235f069e0eae9e79fc4cc9f6aa5d880810536794b863779ca4f19ddc090f4a | - |
+| blog-post | 1280 | resting | .screenshots/phase-08-c-market/blog-post__1280__resting.png | b1130d1b275b4920b8463ecc276e6df2ff0cb2970951da97ac5fe25587bd40bc | - |
+| blog-post | 390 | resting | .screenshots/phase-08-c-market/blog-post__390__resting.png | c4cf82fb305e93cb68d45634c1831557af46a4821b816979536de59e1eb11cae | - |
+| cms-page | 1280 | resting | .screenshots/phase-08-c-market/cms-page__1280__resting.png | 12d805a02d38dd139e256ce5f4f5473217c8b433243d3ef38034e553dd2cd918 | - |
+| cms-page | 390 | resting | .screenshots/phase-08-c-market/cms-page__390__resting.png | 3d6b2510cd82e1b8318b51fde49ccf73dcc857c1892a69338b0e9c1376c6bf34 | - |
+
+## Capture session closed
+
+Captured 2026-09-05, 16:01–16:26 UTC (~25 minutes wall-clock for all 21 runs, well under the
+~45–85 minute estimate `08-RESEARCH.md` flagged — average ~70 seconds per run rather than the
+2–4 minute per-run estimate).
+
+**Measured results (not predicted):** 21 label subsections, 21 distinct labels, all seven presets
+across all three combinations. Every run produced an identical grid of **32 cells attempted per
+run** (26 base seven-route grid + 6 `--include-content` cells), **28 captured** and **4 MISSING**
+(`order-status`, no seeded order in the local fixture) per run — **672 total rows, 588 captured,
+84 MISSING** across the whole matrix. This reconciles with `08-RESEARCH.md`'s corrected
+cell-count math (26 base + 6 content = 32) and its ~84-MISSING estimate for the whole matrix.
+
+All four appearance keys were restored to their defaults (`volt-dark` / `grid-3` / `minimal` /
+`left`), confirmed via a read-back of the `appearance` category and a fetch of the storefront
+root's rendered `data-theme` attribute, and the restore was run twice to confirm it is idempotent
+(both runs produced the identical stored state). The dev server was then stopped and port 3000
+was confirmed free.
+
+Phase 5's screenshot manifest (`05-SCREENSHOTS.md`) was never touched — every one of the 21
+invocations passed `--manifest` explicitly, pointed at this file.
+
+No findings table is written here — plan 08-04 inspects the captured evidence against the six
+per-cell pass criteria in `08-UI-SPEC.md` and records judgements there.
