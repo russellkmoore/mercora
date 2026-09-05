@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 08.1
 current_phase_name: v2 Tech-Debt Closure
 status: executing
-stopped_at: Completed 08.1-04-PLAN.md
-last_updated: "2026-09-05T21:38:47.398Z"
+stopped_at: Completed 08.1-06-PLAN.md
+last_updated: "2026-09-05T21:45:56.847Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 08.1 execution started
-state_head: 5ab84bd15eb9265d017644b9a4fa78493d3d2971
+state_head: 53ced9ff39b6f78c94d0da369f873b4968ac8a72
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 38
-  completed_plans: 36
+  completed_plans: 37
   percent: 71
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-05 after Phase 8)
 ## Current Position
 
 Phase: 08.1 (v2 Tech-Debt Closure) — EXECUTING
-Plan: 6 of 7
+Plan: 7 of 7
 Status: Ready to execute
 Last activity: 2026-09-05 — Phase 08.1 execution started
 
@@ -107,6 +107,7 @@ Progress: [███████░░░] 71%
 | Phase 08.1 P02 | 16min | 3 tasks | 12 files |
 | Phase 08.1 P05 | 20min | 2 tasks | 7 files |
 | Phase 08.1 P04 | 12min | 3 tasks | 10 files |
+| Phase 08.1 P06 | 10min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -192,6 +193,9 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 08.1]: D-08 (07-REVIEW IN-01) closed: productGallery is now a required prop on ProductDisplay with no default; the sole caller already always supplied it.
 - [Phase 08.1]: [Phase 08.1] [08.1-04] emailThemeForStagedPayload() does its own manifest-membership check rather than delegating to getThemeTokens()'s built-in fallback, so it can distinguish an absent payload (no telemetry, normal pre-migration-row state) from a present-but-unknown theme name (telemetry required).
 - [Phase 08.1]: [Phase 08.1] [08.1-04] stagePaidOrderEffects is the only call site in lib/services/order-effects.ts allowed to call getActiveTheme() (enforced by the plan's occurrence-count gate); invoice-service.ts's two preparePaidOrderEffectStatements call sites resolve the theme themselves since both are already async and request-scoped.
+- [Phase 08.1]: [Phase 08.1] [08.1-06] Duplicate-token fixture declares --store-primary three times, not twice, so one fixture file proves both the duplicate-caught and one-error-not-two behaviors without a second fixture.
+- [Phase 08.1]: [Phase 08.1] [08.1-06] active-theme.ts's two unknown-value branches collapse by natural fallthrough (no isKnownString variable) to one shared telemetry/return tail, satisfying the review's suggestion by outcome.
+- [Phase 08.1]: [Phase 08.1] [08.1-06] 06-REVIEW IN-03 closed by recorded resolution only, per the review's own conclusion that no code change is required beyond the already-applied WR-01 fix.
 
 ### Pending Todos
 
@@ -257,8 +261,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T21:38:47.082Z
-Stopped at: Completed 08.1-04-PLAN.md
+Last session: 2026-09-05T21:45:56.491Z
+Stopped at: Completed 08.1-06-PLAN.md
 Resume file: None
 
 Next: review `.planning/v2-MILESTONE-AUDIT.md`, optionally `/gsd-phase --insert 8 "Address v2 tech debt"`, then `/gsd-complete-milestone v2` → `/gsd-cleanup`
