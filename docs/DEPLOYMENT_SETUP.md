@@ -52,7 +52,7 @@ Mercora runs on Cloudflare's edge infrastructure with integrated services:
 npx wrangler d1 create mercora-db
 
 # Note the database ID from output
-# Example: c1ea0c17-14ae-48cc-ade8-4433e9130594
+# Example: your-d1-database-id-here
 ```
 
 #### **R2 Bucket**
