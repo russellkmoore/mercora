@@ -3,6 +3,7 @@ import { join } from "node:path";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { HOME_HEROES } from "@/lib/layout/variants";
 
 /**
  * Home hero variant tests (Phase 7, Plan 02).
@@ -167,6 +168,57 @@ describe.each(NEW_HERO_VARIANTS)("$name home hero variant", ({ name, Component, 
     expect(src).not.toMatch(/lib\/themes\/active-theme/);
     expect(src).not.toMatch(/StoreConfig/);
     expect(src).not.toMatch(/dangerouslySetInnerHTML/);
+  });
+});
+
+// --- Task 3: HOME_HERO_MAP and the app/page.tsx source contract -----------
+
+const { HOME_HERO_MAP } = await import("@/components/layout/home/home-hero-map");
+const HOME_PAGE_PATH = "app/page.tsx";
+
+describe("HOME_HERO_MAP", () => {
+  it("has exactly the hero enum's members as keys, in order, with no duplicates", () => {
+    expect(Object.keys(HOME_HERO_MAP)).toEqual([...HOME_HEROES]);
+  });
+
+  it("resolves every enum member to a component that renders non-empty markup with a featured product and with null", () => {
+    for (const hero of HOME_HEROES) {
+      const Variant = HOME_HERO_MAP[hero];
+      const withProduct = renderToStaticMarkup(
+        React.createElement(Variant, { featuredProduct: productWithImage() }),
+      );
+      const withoutProduct = renderToStaticMarkup(
+        React.createElement(Variant, { featuredProduct: null }),
+      );
+      expect(withProduct.length).toBeGreaterThan(0);
+      expect(withoutProduct.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("app/page.tsx source contract (LAYOUT-04 anti-genericity)", () => {
+  it("awaits the resolver directly in the page body, above the returned tree, not inside a Suspense child", () => {
+    const page = source(HOME_PAGE_PATH);
+    expect(page).toContain("await getLayoutSettings()");
+    expect(page).not.toMatch(/<Suspense[^>]*>[\s\S]*getLayoutSettings/);
+  });
+
+  it("contains no comparison of a resolved value against any hero member name literal", () => {
+    const page = source(HOME_PAGE_PATH);
+    for (const hero of HOME_HEROES) {
+      const comparisonPattern = new RegExp(`(===|switch\\s*\\()[^\\n]*["']${hero}["']`);
+      expect(page).not.toMatch(comparisonPattern);
+    }
+    expect(page).not.toMatch(/if\s*\(\s*homeHero/);
+    expect(page).not.toMatch(/switch\s*\(\s*homeHero/);
+  });
+
+  it("leaves the featured-products grid's markup, ordering, and priority flag on the first card unchanged", () => {
+    const page = source(HOME_PAGE_PATH);
+    expect(page).toContain(
+      "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10 mb-12 sm:mb-16",
+    );
+    expect(page).toContain("priority={index === 0}");
   });
 });
 
