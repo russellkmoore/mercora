@@ -44,6 +44,7 @@ import Breadcrumbs from "@/components/Breadcrumbs";
 import { toPublicProduct } from "@/lib/models/mach/product-serializer";
 import { notFound } from "next/navigation";
 import type { Product } from "@/lib/types";
+import { getLayoutSettings } from "@/lib/layout/settings";
 
 /**
  * Category page component that displays products for a specific category
@@ -62,6 +63,8 @@ export default async function CategoryPage({
   if (!category) {
     notFound();
   }
+
+  const { categoryLayout } = await getLayoutSettings();
 
   let products: Product[] = [];
   let error: string | null = null;
@@ -168,7 +171,7 @@ export default async function CategoryPage({
 
       {/* Products Grid with Sorting */}
       {!error && (
-        <CategoryDisplay products={products} />
+        <CategoryDisplay products={products} categoryLayout={categoryLayout} />
       )}
       </div>
     </div>
