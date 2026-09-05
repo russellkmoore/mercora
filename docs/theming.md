@@ -293,16 +293,15 @@ about what it deliberately did not look at. A polarity-neutral literal (one that
 under both light and dark presets) gets an explicit sentinel-comment pair with a written reason,
 rather than a blanket exception.
 
-**`npm run scan:tokens` is not wired into CI today.** It is a local gate every phase of this
-milestone has run by convention before committing, not an automated CI check. Wiring it into CI is
-recorded as a recommended follow-up, not done in this phase.
+**`npm run scan:tokens` runs in CI**, as the step named "Scan for raw token usage", immediately
+after the manifest-freshness step below.
 
 ```bash
 node scripts/build-themes.mjs --check
 ```
 The theme-manifest freshness gate — see "What the validator rejects" above for what it enforces and
-exactly how it fails. **This one does run in CI**, as the step named "Check theme manifest
-freshness".
+exactly how it fails. This one runs in CI too, as the step named "Check theme manifest freshness" —
+both gates are automated, not conventions.
 
 ```bash
 mise exec -- npm run screenshot:routes -- --label <name> --manifest <path> --allow-missing [--include-content]
@@ -350,5 +349,3 @@ clean, so there is no QA-sourced item to add to this table beyond the items alre
 | The admin Appearance page (theme grid + layout switches) has never been walked through in a real browser with a real Clerk admin session | `.planning/WINDOWS.md` #2 | A manual pass signed in as an admin, clicking through both sections, confirming ring/badge/toast behaviour and keyboard arrow-key selection |
 | Six of the seven presets carry design-direction properties (shadow, border-width, image-aspect, some `accent-2` values, font-mono, letter-spacing, and several per-theme layout behaviours) that this milestone's tokens-only architecture deliberately does not carry | `.planning/todos/pending/theme-contract-dropped-properties.md` (luxe/midnight), `.planning/todos/pending/theme-direction-doc-backlog-06.1.md` (clinical/retro/atelier/market) | A new contract-widening milestone with its own token sweep — not an incremental addition to the frozen 23-token contract |
 | Two image-URL resolvers coexist: `components/layout/product/gallery-media-url.ts` and `lib/utils/product-image.ts` | `.planning/STATE.md` Blockers/Concerns (carried from Phase 7) | Consolidate into one resolver the next time the product display is touched |
-| Pre-extraction parity tests self-write a missing baseline snapshot instead of failing | `.planning/STATE.md` Blockers/Concerns (carried from Phase 7) | Snapshots are committed today, but a deleted snapshot would silently regenerate rather than fail the test — worth a hard failure instead |
-| `npm run scan:tokens` is not wired into CI | This document, "The two gates" above | Add a step to `.github/workflows/ci.yml` running `npm run scan:tokens`, alongside the existing "Check theme manifest freshness" step |
