@@ -2,19 +2,20 @@
 gsd_state_version: 1.0
 milestone: v2
 milestone_name: Themeable Storefront
-current_phase: 08
+current_phase: 08.1
+current_phase_name: v2 Tech-Debt Closure
 status: completed
 stopped_at: "Milestone v2: all 5 phases complete and verified; audit status tech_debt; Russell chose to address debt before /gsd-complete-milestone v2"
-last_updated: "2026-09-05T19:11:15.057Z"
+last_updated: "2026-09-05T19:58:26.108Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 08 complete
-state_head: 2355735d20d43445595c4d3c1c6a8877c73f20a9
+state_head: 21903d0439fbd4122f0ae046273e455d9282b0f1
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 31
+  total_plans: 38
   completed_plans: 31
-  percent: 83
+  percent: 82
 ---
 
 # Project State
@@ -28,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-09-05 after Phase 8)
 
 ## Current Position
 
-Phase: 08
+Phase: 08.1 (v2 Tech-Debt Closure) — READY TO EXECUTE
 Plan: Not started
 Status: All phases complete
 Last activity: 2026-09-05 — Phase 08 complete

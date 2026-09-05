@@ -267,13 +267,23 @@ Plans:
 **Plans:** 7 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 08.1-01-PLAN.md — Tracer: shared request-scoped appearance read, public `GET /api/theme`, and the crash page following the active theme (D-02, D-04)
-- [ ] 08.1-02-PLAN.md — Transactional email builders take tokens; senders resolve the active theme once at send time (D-01)
 - [ ] 08.1-03-PLAN.md — `scan:tokens` in CI, parity baselines fail loudly on a missing snapshot, settings seed fallback logs (D-03, D-06, D-07)
-- [ ] 08.1-04-PLAN.md — Staged effect carries the active theme so the cron drain renders it; expand-only migration (D-10, D-01 cron path)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 08.1-02-PLAN.md — Transactional email builders take tokens; senders resolve the active theme once at send time (D-01)
 - [ ] 08.1-05-PLAN.md — One product-image resolver for both gallery variants; `productGallery` becomes required (D-05, D-11, D-08)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 08.1-04-PLAN.md — Staged effect carries the active theme so the cron drain renders it; expand-only migration (D-10, D-01 cron path)
 - [ ] 08.1-06-PLAN.md — Validator rejects duplicate token declarations, one `kebabToCamel`, resolver branch collapse (D-08)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 08.1-07-PLAN.md — Local guest order fixture, order-status captured across seven presets, audit close-out (D-09, D-11 proof)
 
 **UI hint**: yes
-
