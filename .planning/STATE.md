@@ -2,37 +2,37 @@
 gsd_state_version: 1.0
 milestone: v2
 milestone_name: Themeable Storefront
-current_phase: 07
-current_phase_name: Layout Switches
-status: verifying
-stopped_at: Completed 07-05-PLAN.md
-last_updated: "2026-09-05T09:17:26.021Z"
+current_phase: 8
+current_phase_name: Documentation & Visual QA Close-out
+status: planning
+stopped_at: Phase 07 complete, ready to plan Phase 8
+last_updated: "2026-09-05T15:09:36.210Z"
 last_activity: 2026-09-05
-last_activity_desc: Phase 07 execution started
-state_head: 7a1dea43ebc128b93dfa09eaca2de349a1b1a6e2
+last_activity_desc: Phase 07 complete, transitioned to Phase 8
+state_head: 9e090f1dbefc86a1a368c67d82aa344debe1381a
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 26
   completed_plans: 26
-  percent: 60
+  percent: 80
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-05 after Phase 6.1)
+See: .planning/PROJECT.md (updated 2026-09-05 after Phase 7)
 
 **Core value:** A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** Phase 07 — Layout Switches
+**Current focus:** Phase 8 — Documentation & Visual QA Close-out
 
 ## Current Position
 
-Phase: 07 (Layout Switches) — EXECUTING
-Plan: 5 of 5
-Status: Phase complete — ready for verification
-Last activity: 2026-09-05 — Phase 07 execution started
+Phase: 8 — Documentation & Visual QA Close-out
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-09-05 — Phase 07 complete, transitioned to Phase 8
 
 Progress: [██████░░░░] 60%
 
@@ -40,7 +40,7 @@ Progress: [██████░░░░] 60%
 
 **Velocity:**
 
-- Total plans completed: 38 (all v1)
+- Total plans completed: 43 (all v1)
 - Average duration: 56 min/plan (Phase 5, 12 plans)
 - Total execution time: ~11.3 hours (v2)
 
@@ -58,6 +58,7 @@ Progress: [██████░░░░] 60%
 | 5 (v2) | 12 | ~11.3h | 56min |
 | 06 | 5 | - | - |
 | 06.1 | 4 | - | - |
+| 07 | 5 | - | - |
 
 **Recent Trend:**
 
@@ -199,6 +200,12 @@ Carried out of Phase 6 (see `.planning/WINDOWS.md`):
 
 - Phase 06.1 inserted after Phase 6: Remaining presets from the theme direction doc (Clinical, Retro, Atelier, Market) — Russell asked for all six during autonomous run (URGENT)
 
+Carried out of Phase 7 (see `.planning/WINDOWS.md`):
+
+- [Phase 7] Admin Layout section and Appearance theme grid have not had a real-browser Clerk-session walkthrough; both verified by dev-bypass probes and render tests only
+- [Phase 7] Two image-URL resolvers coexist (`gallery-media-url.ts` verbatim from ProductDisplay vs `lib/utils/product-image.ts`); consolidate when the product display is next touched
+- [Phase 7] Pre-extraction parity tests self-write a missing baseline snapshot; snapshots are committed today, but a deleted snapshot would silently regenerate
+
 ## Deferred Items
 
 Items acknowledged and deferred at milestone close, most recent first:
@@ -209,8 +216,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T09:17:25.851Z
-Stopped at: Completed 07-05-PLAN.md
+Last session: 2026-09-05T15:09:36Z
+Stopped at: Phase 07 complete, ready to plan Phase 8
 Resume file: None
 
-Next: `/gsd-discuss-phase 7` (or `/gsd-plan-phase 7` directly) to start Layout Switches
+Next: `/gsd-discuss-phase 8` (or `/gsd-plan-phase 8` directly) to start Documentation & Visual QA Close-out

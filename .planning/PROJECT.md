@@ -104,13 +104,13 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 - ✓ Admin Appearance page with manifest-driven swatch-preview cards (industry + synopsis metadata), Active badge, explicit Save through the existing settings API — Phase 6
 - ✓ Three presets ship (`volt-dark`, `luxe` light, `midnight` dark); light-preset scrim QA fixed three shadcn overlays — Phase 6
 - ✓ All six direction-doc presets ship (`luxe`, `midnight`, `clinical`, `retro`, `atelier`, `market`) plus `volt-dark`; both type tokens wired site-wide so each preset's display face renders — Phase 6.1
+- ✓ Admin Appearance page: three layout switches (category layout, home hero, product gallery) as segmented controls, saved through the settings API — Phase 7
+- ✓ Category, home hero and product gallery render as enumerated, server-chosen named variants (8 components, typed lookup maps, repo-wide contract test) — Phase 7
 
 ### Active
 
 <!-- v2 Themeable Storefront — defined by /gsd-new-milestone 2026-09-02. REQ-IDs assigned in .planning/REQUIREMENTS.md. -->
 
-- [ ] Admin "Appearance" section: the three layout switches (theme selection with swatch previews shipped in Phase 6)
-- [ ] Category, home hero, and product gallery render as enumerated server-chosen variants with one render test each
 - [ ] `docs/theming.md` documents the token contract, theme duplication, and build validation
 
 ### Out of Scope
@@ -230,6 +230,10 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 | Display faces load via `next/font` with `preload: false` and the weights headings actually use; `font-synthesis: none` means an unloaded weight renders at the nearest loaded one, so weight arrays must match usage (Phase 6.1, code-review CR-01) | Cormorant shipped with 400/500 only and Luxe's bold headings silently thinned | ✓ Good |
 | Page-level `focus:bg-*` overrides on `SelectItem` are removed rather than layered; the primitive owns its highlight (Phase 6.1) | `twMerge` last-wins let a page override reintroduce the invisible-highlight bug the phase had just fixed | ✓ Good |
 
+| Layout switches: enum names in `lib/layout/variants.ts` are the primary identity; `getLayoutSettings()` reads `appearance.*` per request (accepted second D1 read, no cache); server pages resolve the enum and pass the typed value into client displays, which do one typed map lookup to a named component (Phase 7) | React Server Components cannot serialize a component reference across the client boundary; a typed enum + typed map keeps LAYOUT-04's "no generic layout prop" guarantee, enforced by a repo-wide contract test | ✓ Good |
+| Default variants (`grid-3`, `minimal`, `left`) are verbatim extractions proven by pre-extraction snapshots and volt-dark screenshot parity; non-default variants are new captures, not diffs (Phase 7) | Extraction must not move pixels; new layouts have no baseline | ✓ Good — one 2-pixel headless-rendering residual accepted as S-07-01 |
+| Admin `LayoutSwitches` POSTs only changed keys and shares `nextRovingIndex` with `ThemePresetGrid` via `components/admin/roving-index.ts` (Phase 7 code review) | Rewriting all three keys risked lost updates between concurrent admins; a copied helper drifts | ✓ Good |
+
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
@@ -248,4 +252,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-05 after Phase 6.1 (Remaining Presets)*
+*Last updated: 2026-09-05 after Phase 7 (Layout Switches)*
