@@ -8,7 +8,7 @@ export default function SectionCard({ section, product }: { section: PageSection
     <section id={section.id} className="mb-5 scroll-mt-24 rounded-xl border border-border bg-surface-elevated p-6">
       <div className={product ? "grid gap-7 sm:grid-cols-[1fr_168px]" : ""}>
         <div>
-          <h2 className="text-2xl font-semibold text-foreground">{section.heading}</h2>
+          <h2 className="text-2xl font-semibold text-foreground font-display">{section.heading}</h2>
           {section.specs.length > 0 && (
             <ul className="my-4 flex list-none flex-wrap gap-2 p-0">
               {section.specs.map((spec) => (

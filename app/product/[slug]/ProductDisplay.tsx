@@ -185,7 +185,7 @@ export default function ProductDisplay({
 
         {/* Product Information Section */}
         <div className="mt-6 lg:mt-0">
-          <h1 className="text-2xl font-extrabold sm:text-3xl lg:text-4xl">
+          <h1 className="text-2xl font-extrabold sm:text-3xl lg:text-4xl font-display">
             {typeof product.name === "string" ? product.name : ""}
           </h1>
 

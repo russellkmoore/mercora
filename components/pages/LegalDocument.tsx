@@ -11,7 +11,7 @@ export default function LegalDocument({
       {lead && <div className="prose prose-invert prose-orange max-w-none" dangerouslySetInnerHTML={{ __html: lead }} />}
       {sections.map((section, index) => (
         <section key={section.id} id={section.id} className={`scroll-mt-24 ${index || lead ? "mt-7 border-t border-border pt-5" : ""}`}>
-          <h2 className="text-xl font-semibold text-foreground">{section.heading}</h2>
+          <h2 className="text-xl font-semibold text-foreground font-display">{section.heading}</h2>
           <div className="prose prose-invert prose-orange mt-2 max-w-none" dangerouslySetInnerHTML={{ __html: section.html }} />
         </section>
       ))}

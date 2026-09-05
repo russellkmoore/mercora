@@ -5,7 +5,7 @@ export default function PageCta({ config }: { config: PageCtaConfig }) {
   return (
     <section className="mt-8 border-t border-border bg-surface-elevated">
       <div className="mx-auto max-w-5xl px-4 py-10 text-center sm:px-6">
-        <h2 className="text-2xl font-semibold text-foreground">{config.heading}</h2>
+        <h2 className="text-2xl font-semibold text-foreground font-display">{config.heading}</h2>
         {config.body && <p className="mt-2 text-muted-foreground">{config.body}</p>}
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           {config.actions.map((action) => (

@@ -70,7 +70,7 @@ export default async function BlogPostPage({ params }: Props) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: structured }} />
       <Link href="/blog" className="text-sm text-primary hover:text-primary/90">← Blog</Link>
       <header className="mt-6">
-        <h1 className="text-4xl font-bold text-foreground sm:text-5xl">{post.title}</h1>
+        <h1 className="text-4xl font-bold text-foreground sm:text-5xl font-display">{post.title}</h1>
         <p className="mt-4 text-muted-foreground">By {post.author} · {formatCmsTimestamp(post.publishedAt)} · {post.readingTime} min read</p>
         {post.excerpt && <p className="mt-5 text-xl leading-relaxed text-muted-foreground">{post.excerpt}</p>}
       </header>

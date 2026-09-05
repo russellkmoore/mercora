@@ -65,7 +65,7 @@ export default async function GuestOrderStatusPage({
     <div className="min-h-screen px-4 py-12">
       <div className="mx-auto w-full max-w-2xl">
         <p className="text-sm text-muted-foreground">{`${store.identity.name} order status`}</p>
-        <h1 className="mt-1 break-all text-2xl font-bold text-foreground">
+        <h1 className="mt-1 break-all text-2xl font-bold text-foreground font-display">
           Order {view.orderNumber}
         </h1>
         {view.placedAt && (
