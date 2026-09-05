@@ -63,9 +63,13 @@ export async function GET(request: NextRequest) {
       console.log('Initializing default settings...');
       try {
         await db.insert(admin_settings).values(missingDefaults).onConflictDoNothing();
-      } catch {
+      } catch (err) {
         // Another concurrent request may have already seeded these rows;
-        // re-read below regardless.
+        // re-read below regardless. Log in case this is a real failure, not
+        // a race — onConflictDoNothing() already absorbs the PK-conflict
+        // race this catch was originally written for, so anything reaching
+        // this arm is more likely a genuine insert failure worth knowing about.
+        console.error('Seed insert failed (may be a benign concurrent race):', err);
       }
     }
 
