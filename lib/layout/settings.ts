@@ -11,25 +11,25 @@
  * Server-only. Never import this from a client component — it reads the
  * D1-backed settings helper.
  *
- * === Two D1 reads per request (flagged planner decision) ===
- * The root layout's `getActiveTheme()` already reads the `appearance`
- * category once, but `getSettings()` is a plain, non-memoised `async
- * function` (only the D1 *connection* is memoised via React's request-scoped
- * cache helper, not the query) — so calling this resolver from a page issues
- * a second, small category-scoped read. That is an accepted cost, matching the per-request
- * D1 read the project already accepts for theme resolution (RESEARCH
- * Pitfall 1); it keeps this module fully independent of `getActiveTheme()`'s
- * internals and its own frozen test suite.
+ * === One shared appearance read per request (D-04) ===
+ * The `appearance` category is now read exactly once per request and
+ * shared with the theme resolver: both this function and
+ * `getActiveTheme()` (`lib/themes/active-theme.ts`) call
+ * `readAppearanceSettings()` (`lib/themes/appearance-read.ts`), the single
+ * module that owns this read. This resolver stays fully independent of
+ * `getActiveTheme()`'s own internals and its own frozen test suite — it
+ * only shares the read, not the resolution logic.
  *
  * === Caching ===
  * Deliberately holds no state between requests: no module-scope variable,
- * no cross-request memoisation helper, no framework-level memoisation
- * wrapper anywhere in this file. A Cloudflare Workers isolate is reused
- * across requests, so any additional caching here would risk serving a
- * stale layout after an admin save (same posture as `getActiveTheme()`).
+ * no cross-request memoisation helper, no top-level mutable binding
+ * anywhere in this file. The one framework-level memoisation wrapper in
+ * this path lives in `readAppearanceSettings()` itself — a request-scoped
+ * `React.cache()`, not an isolate-scoped cache — so a Cloudflare Workers
+ * isolate reused across requests can never be served a stale layout after
+ * an admin save (same posture as `getActiveTheme()`).
  */
 
-import { getSettings } from "@/lib/utils/settings";
 import { recordTelemetry } from "@/lib/observability/telemetry";
 import {
   CATEGORY_LAYOUTS,
@@ -40,7 +40,7 @@ import {
   type HomeHero,
   type ProductGallery,
 } from "@/lib/layout/variants";
-import { APPEARANCE_SETTINGS_CATEGORY } from "@/lib/themes/active-theme";
+import { readAppearanceSettings } from "@/lib/themes/appearance-read";
 
 export const LAYOUT_SETTING_KEYS = {
   categoryLayout: "appearance.category_layout",
@@ -97,13 +97,10 @@ export async function getLayoutSettings(): Promise<{
   homeHero: HomeHero;
   productGallery: ProductGallery;
 }> {
-  let settings: Record<string, unknown> = {};
-  try {
-    settings = await getSettings(APPEARANCE_SETTINGS_CATEGORY);
-  } catch {
-    // A DB hiccup degrades to the three defaults, not a broken route — same
-    // posture as getActiveTheme().
-  }
+  // readAppearanceSettings() already degrades a database hiccup to `{}`;
+  // that alone resolves every switch below to its default, same posture as
+  // getActiveTheme().
+  const settings = await readAppearanceSettings();
 
   return {
     categoryLayout: resolveLayoutEnum(
