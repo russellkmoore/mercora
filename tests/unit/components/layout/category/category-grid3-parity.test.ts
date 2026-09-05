@@ -1,23 +1,20 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { readParitySnapshot } from "../../../helpers/parity-snapshot";
 import { categoryProductsFixture } from "./fixtures";
 
 /**
  * Pre/post-extraction parity for CategoryDisplay's products section.
  *
- * Task 1 (this run): CategoryGrid3 does not exist yet. This test renders
- * today's CategoryDisplay, strips the (not-yet-existing) per-switch evidence
- * attribute Task 3 adds, and — because the snapshot file does not exist yet
- * either — writes it once. That write IS the frozen recording; committing it
- * is the whole point of this task, not a build artefact to .gitignore.
- *
- * Task 3: CategoryGrid3.tsx is a verbatim extraction of the same JSX. This
- * same test then finds the snapshot already on disk and asserts the new
- * render is byte-identical to it once the evidence attribute is stripped —
- * proving the extraction changed nothing but the one permitted attribute.
+ * The committed snapshot at SNAPSHOT_PATH is the frozen recording made when
+ * this suite was first written; CategoryGrid3.tsx is a verbatim extraction
+ * of the same JSX. This test renders CategoryDisplay, strips the per-switch
+ * evidence attribute, and asserts the render is byte-identical to the
+ * recording — proving the extraction changed nothing but that one permitted
+ * attribute. The baseline read goes through readParitySnapshot (D-06): a
+ * missing baseline fails loudly rather than silently regenerating.
  */
 
 vi.mock("next/link", () => ({
@@ -62,12 +59,7 @@ describe("CategoryDisplay products section — pre/post-extraction parity", () =
     );
     const { stripped, occurrences } = stripLayoutAttribute(html);
 
-    if (!existsSync(SNAPSHOT_PATH)) {
-      mkdirSync(dirname(SNAPSHOT_PATH), { recursive: true });
-      writeFileSync(SNAPSHOT_PATH, stripped, "utf8");
-    }
-
-    const recorded = readFileSync(SNAPSHOT_PATH, "utf8");
+    const recorded = readParitySnapshot(SNAPSHOT_PATH, stripped);
     expect(stripped).toBe(recorded);
     expect(occurrences).toBe(1);
   });

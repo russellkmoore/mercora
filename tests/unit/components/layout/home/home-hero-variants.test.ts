@@ -4,6 +4,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { HOME_HEROES } from "@/lib/layout/variants";
+import { readParitySnapshot } from "../../../helpers/parity-snapshot";
 
 /**
  * Home hero variant tests (Phase 7, Plan 02).
@@ -33,7 +34,7 @@ const MINIMAL_COMPONENT_PATH = "components/layout/home/HomeHeroMinimal.tsx";
 const { default: HomeHeroMinimal } = await import("@/components/layout/home/HomeHeroMinimal");
 
 describe("HomeHeroMinimal — pre-extraction source parity", () => {
-  const recording = source(RECORDING_PATH);
+  const recording = readParitySnapshot(RECORDING_PATH);
   const componentSource = source(MINIMAL_COMPONENT_PATH);
 
   it("the recording file is non-empty", () => {
