@@ -911,3 +911,82 @@ invocations passed `--manifest` explicitly, pointed at this file.
 
 No findings table is written here — plan 08-04 inspects the captured evidence against the six
 per-cell pass criteria in `08-UI-SPEC.md` and records judgements there.
+
+## Judgement Design
+
+Stated here before any cell is judged, per D-04's own instruction: a findings row with no design
+behind it is worse than an absent one.
+
+**Criterion 1** (renders without error) is judged mechanically across every captured cell in all 21
+runs, independent of preset or combination: a captured cell passes when its file exists on disk
+with non-zero size and the manifest carries no error annotation; a `MISSING` cell is exempt from
+this criterion and is judged only against its own recorded reason string. This is a whole-matrix
+count, not a sample — see finding F1.
+
+**Criteria 2 and 6** (overflow/clipping, and layout matching its variant's anatomy) vary with the
+*layout combination*, not the preset. `CategoryGrid3`/`CategoryGrid2`/`CategoryList`,
+`HomeHeroMinimal`/`HomeHeroSplit`/`HomeHeroFullBleed`, and `ProductGalleryLeft`/`ProductGalleryTop`
+are rendered by the same component regardless of which of the seven presets supplies the theme's
+colour tokens — none of the eight variant components reads a theme token to decide its own
+geometry, and no preset file contains any markup or layout rule. So Task 1 inspects these two
+criteria across all three packed combinations (A, B, C) at one preset only (`volt-dark`, the
+reference preset `06-UI-SPEC.md` already specifies in full) — thirteen specific cells (see
+findings F2-F14), not all 21 runs, because a second, third, ... seventh preset would be re-judging
+the identical DOM/CSS-class output a second time, not observing a new fact.
+
+**Criteria 3, 4 and 5** (legibility, scrim darkness, display face) vary with the *preset*, not the
+combination — no layout-variant component reads a different token set depending on which of the
+three combinations is active. So Task 2 inspects these three criteria across all seven presets at
+one combination only (A, the defaults), plus a targeted cross-check where the two axes genuinely
+interact: `HomeHeroFullBleed`'s literal `bg-black/50` scrim (a fenced exception, not a token) sits
+directly over each light preset's own light surface only under combination C (the one combination
+that selects `full-bleed`) — that specific interaction is checked separately for the four light
+presets, at combination C, in Task 2.
+
+This factorisation — combination-axis criteria checked once across combinations at a fixed preset,
+preset-axis criteria checked once across presets at a fixed combination, plus one named cross-term
+— is a **planner assumption** about how the six criteria decompose, not a proven property of the
+codebase. A reader who disagrees with it should read every row below as answering "why was this
+cell chosen, and not some other one", not as a claim that every one of the 672 rows in the matrix
+was independently inspected. Every layout-variant component read this session takes preset-derived
+values only through CSS custom properties it never branches on, and every theme file changes only
+token values, never markup or component logic — nothing contradicted the assumption — but that
+reading was not an exhaustive trace of every rendering path in the tree.
+
+A **screen-reader pass over the rendered cells themselves** — an accessibility-tree check, not a
+visual legibility-by-inspection check — is explicitly **not** attempted in this phase.
+`08-UI-SPEC.md`'s six criteria all name visual properties (contrast, overflow, presence of a font,
+anatomy match); none of them is "reachable and correctly labelled by assistive technology". Phase 6
+and Phase 6.1 both flagged the identical gap in their own `## UI Considerations` tables and
+deferred it (⚠ unresolved, per `08-UI-SPEC.md`'s own carry-forward); this phase inherits the same
+open question rather than closing it either way, and rather than silently skipping past it as
+though it were already closed.
+
+## Findings
+
+Column set reused verbatim from `06.1-SCREENSHOTS.md`; judgement values are exactly **"Leave it"**
+and **"Fixed"** (optionally suffixed), per `08-UI-SPEC.md`'s Copywriting Contract. A row that reads
+"Leave it" after inspection is as much a finding as a row that reads "Fixed" — this table is not
+change-only.
+
+| # | Site | File:line | Class in play | What it looks like under the preset | Judgement | Reason |
+|---|---|---|---|---|---|---|
+| F1 | Criterion 1 (renders without error) — mechanical pass, all 21 runs, 672 rows | n/a | n/a | 588/588 non-`MISSING` rows have a captured PNG on disk with non-zero size (`test -s` over every unique path in the manifest, one command, whole file); 84/672 rows are `MISSING`, each carrying the harness's own reason string (`order-status`, no seeded order in the local fixture); zero rows anywhere in the manifest carry an error annotation — the only two matches for the word "error" in this file are in the Carried-forward-gaps prose ("review-form error state"), never a row note | Leave it | Mechanical count, not a judgement call — matches `08-03-SUMMARY.md`'s own measured 588-captured/84-`MISSING` totals exactly; no cell needs re-inspection for this criterion |
+| F2 | Combination A (`grid-3`/`minimal`/`left`), `volt-dark` — home, 1280 | `components/layout/home/HomeHeroMinimal.tsx:27` | `max-w-6xl mx-auto text-center mb-16 sm:mb-20` | Centered hero, no image slot; heading, subhead and CTA all sit inside the max-width container, nothing touches the viewport edge (`phase-08-a-volt-dark/home__1280__resting.png`) | Leave it | Matches `07-UI-SPEC.md`'s `HomeHeroMinimal` anatomy verbatim; no overflow at 1280 |
+| F3 | Combination A, `volt-dark` — category, 1280 | `components/layout/category/CategoryGrid3.tsx:23` | `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10` | Grid container renders correctly; the local fixture's single product means the 3-column breakpoint can't be visually distinguished from fewer columns in this capture, but the container class and card markup are unchanged from the verbatim Phase-5-extraction baseline (`phase-08-a-volt-dark/category__1280__resting.png`) | Leave it | Container class matches `07-UI-SPEC.md`'s `CategoryGrid3` row exactly; single-product fixture is a pre-existing limitation (05-SCREENSHOTS.md), not a new gap this plan introduces |
+| F4 | Combination A, `volt-dark` — product, 1280 | `components/layout/product/ProductGalleryLeft.tsx:40-41` | `data-product-gallery="left"`; `relative aspect-3/4 w-full overflow-hidden rounded bg-surface-elevated` inside the left column of the two-column grid | Main image left, thumbnail strip below it still in the left column, info column (title/rating/tabs/price/CTA) right — matches `ProductGalleryLeft`'s anatomy exactly (`phase-08-a-volt-dark/product__1280__resting.png`) | Leave it | Matches `07-UI-SPEC.md`'s default gallery anatomy; no overflow at 1280 |
+| F5 | Combination A, `volt-dark` — category, 390 (narrow) | `components/layout/category/CategoryGrid3.tsx:23` | same container class, collapsed to its `grid-cols-1` breakpoint | Single-column card, no horizontal scrollbar, card contents (image/name/price/availability/CTA) fully contained (`phase-08-a-volt-dark/category__390__resting.png`) | Leave it | Responsive collapse matches the container's own breakpoint classes; no overflow observed |
+| F6 | Combination B (`grid-2`/`split`/`top`), `volt-dark` — home, 1280 | `components/layout/home/HomeHeroSplit.tsx:44-45` | `data-home-hero="split"`; `max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center` | Text column first (`text-left`, headline/subhead/CTA), image column second (broken-image icon — the fixture's product has no working image URL, a pre-existing fixture limitation, not a layout defect); at 1280 both columns sit side by side with no overflow (`phase-08-b-volt-dark/home__1280__resting.png`) | Leave it | Matches `07-UI-SPEC.md`'s `HomeHeroSplit` anatomy exactly (text left / image right at `lg`); broken image is `resolveProductImageSrc`'s fixture-data gap, unrelated to the split layout itself |
+| F7 | Combination B, `volt-dark` — category, 1280 | `components/layout/category/CategoryGrid2.tsx:20` | `grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-10 lg:gap-12` | Container capped at 2 columns per its own class (never a 3rd, even past `lg`); single-product fixture can't show the 2nd column, but the container class is correctly `grid-2`, distinct from combination A's `grid-3` container (`phase-08-b-volt-dark/category__1280__resting.png`) | Leave it | Confirms the `categoryLayout` setting actually swaps the rendered component (not just a label) — different container class present between F3 and F7 for the identical fixture data |
+| F8 | Combination B, `volt-dark` — product, 1280 | `components/layout/product/ProductGalleryTop.tsx:39-40` | `data-product-gallery="top"`; `relative w-full aspect-video overflow-hidden rounded bg-surface-elevated` spanning the full content width, thumbnail strip directly below, info block `mt-8 lg:mt-10 max-w-2xl` beneath that | Main image spans the full width above a horizontal thumbnail strip, info column stacked below and capped at `max-w-2xl` rather than stretched full-bleed — matches `ProductGalleryTop`'s anatomy exactly, distinct from F4's left/right split for the same product (`phase-08-b-volt-dark/product__1280__resting.png`) | Leave it | Matches `07-UI-SPEC.md`'s `ProductGalleryTop` row; no overflow at 1280 |
+| F9 | Combination B, `volt-dark` — category, 390 (narrow) | `components/layout/category/CategoryGrid2.tsx:20` | same container, collapsed to `grid-cols-1` | Single-column card, no overflow, same collapse behavior as F5 (`phase-08-b-volt-dark/category__390__resting.png`) | Leave it | Consistent with F5; `grid-2`'s narrow-viewport behavior is identical to `grid-3`'s, as expected since both share the same `grid-cols-1` mobile base class |
+| F10 | Combination C (`list`/`full-bleed`/`left`), `volt-dark` — home, 1280 | `components/layout/home/HomeHeroFullBleed.tsx:55-56,69` | `data-home-hero="full-bleed"`; `relative w-full h-64 sm:h-80 lg:h-96 -mx-4 sm:-mx-6 lg:-mx-12 overflow-hidden`; scrim `absolute inset-0 bg-black/50` | Full-bleed band escapes the page's horizontal padding as designed; the featured-product image itself renders as a broken-image icon (same fixture-data gap as F6 — `resolveProductImageSrc` has no working URL for this product, not the category-hero image RESEARCH Pitfall 4 names, but the identical class of "no photo in this fixture" limitation applied to a different image slot); the dark scrim panel is visible as a distinct darker rectangle behind the heading/subhead/CTA even composited over the placeholder grey, and the white heading/CTA text stays legible on it (`phase-08-c-volt-dark/home__1280__resting.png`) | Leave it | Anatomy matches `07-UI-SPEC.md`'s `HomeHeroFullBleed` row; per RESEARCH Pitfall 4's own guidance, this row states the fixture limitation rather than judging photo-behind-text legibility as though a real photo were present — the scrim's own presence and the text's own legibility over it are still real, judgeable facts independent of the missing photo |
+| F11 | Combination C, `volt-dark` — category, 1280 | `components/layout/category/CategoryList.tsx:27,76` | `flex flex-col gap-4 sm:gap-6`; row `flex flex-col sm:flex-row gap-4 sm:gap-6 rounded-lg bg-surface-elevated p-4 sm:p-6` | Image left, name/description/rating top of info column, price/availability/CTA row at the bottom, all inside one rounded row card — matches `CategoryList`'s anatomy exactly (`phase-08-c-volt-dark/category__1280__resting.png`) | Leave it | Matches `07-UI-SPEC.md`'s `CategoryList` row; no overflow at 1280 |
+| F12 | Combination C, `volt-dark` — product, 1280 | `components/layout/product/ProductGalleryLeft.tsx:40-41` | identical class to F4 (`productGallery` is `left` for both combination A and combination C) | Renders identically to F4's left/right split anatomy — confirms the gallery variant is driven purely by the `productGallery` setting, independent of which category/hero combination is active (`phase-08-c-volt-dark/product__1280__resting.png`) | Leave it | Cross-check: combination A and combination C intentionally share the same gallery variant per the combination table; identical rendered anatomy confirms no cross-talk between the three layout keys |
+| F13 | Combination C, `volt-dark` — category, 390 (narrow) | `components/layout/category/CategoryList.tsx:27,39,109` | `flex-col sm:flex-row` row collapses to stacked (image top, info below) below the `sm` breakpoint; price/availability/CTA row is `flex flex-wrap items-center justify-between gap-2` | Image-top/info-below stacked row, no horizontal scrollbar; price ("$79.99"), "In Stock" and "Learn more →" all remain on one line at 390 for this fixture's short product name (`phase-08-c-volt-dark/category__390__resting.png`) | Leave it (lower-confidence evidence) | This is `07-UI-SPEC.md`'s own flagged 🧪 backstop row (a genuinely long product name could still squeeze the price/CTA row off-edge); the local fixture's one product ("Vivid Mission Pack") is too short to exercise that risk, so this row confirms no regression for the data present, not that the flagged risk is resolved — same inherited, untested edge every prior phase left open |
+| F14 | Combination C, `volt-dark` — home, 390 (narrow) | `components/layout/home/HomeHeroFullBleed.tsx:55-56,69` | same classes as F10, collapsed to the `h-64` narrow-viewport band height | Band, scrim and overlaid heading/subhead/CTA all stay contained within the narrower band height at 390, no horizontal overflow; same broken-image fixture limitation as F10 | Leave it | Matches `07-UI-SPEC.md`'s anatomy at the narrow viewport; no overflow |
+
+**Task 1 total:** 14 rows recorded (1 mechanical criterion-1 pass + 13 combination-axis
+inspections across all three packed combinations at `volt-dark`). Zero defects found; nothing
+fixed. `scan:tokens`, lint, and typecheck all re-run clean after this task (no file besides this
+record was touched).
