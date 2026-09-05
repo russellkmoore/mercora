@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 08.1
 current_phase_name: v2 Tech-Debt Closure
 status: executing
-stopped_at: Completed 08.1-02-PLAN.md
-last_updated: "2026-09-05T20:40:35.898Z"
+stopped_at: Completed 08.1-05-PLAN.md
+last_updated: "2026-09-05T21:25:20.037Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 08.1 execution started
-state_head: 1a800815005207e6e1aa22fb1a0dd1b47267f72b
+state_head: ed76ef5b60bf061a1c8b48ffb692520ab98a17d5
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 38
-  completed_plans: 34
+  completed_plans: 35
   percent: 71
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-05 after Phase 8)
 ## Current Position
 
 Phase: 08.1 (v2 Tech-Debt Closure) — EXECUTING
-Plan: 4 of 7
+Plan: 5 of 7
 Status: Ready to execute
 Last activity: 2026-09-05 — Phase 08.1 execution started
 
@@ -105,6 +105,7 @@ Progress: [███████░░░] 71%
 | Phase 08.1 P01 | 55min | 3 tasks | 9 files |
 | Phase 08.1 P03 | 24min | 3 tasks | 9 files |
 | Phase 08.1 P02 | 16min | 3 tasks | 12 files |
+| Phase 08.1 P05 | 20min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -185,6 +186,9 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 08.1]: Shared appearance-read helper lives in lib/themes/appearance-read.ts (not inlined in active-theme.ts) to avoid a circular import while lib/layout/settings.ts imports it directly.
 - [Phase 08.1]: readParitySnapshot resolves its path with path.resolve(process.cwd(), relativePath) rather than join(), so its own test can pass absolute temp-dir paths while the three real parity suites keep passing their existing repo-relative constants unchanged.
 - [Phase 08.1]: [Phase 08.1] [08.1-02] lib/email/footer.ts's tokens parameter uses a minimal local FooterTokens type instead of importing ThemeTokens — The task's own verify command greps the whole file for the literal string themes/tokens and fails on any import from that module, including a type-only one; a minimal structural type satisfies every real caller.
+- [Phase 08.1]: D-05 closed: gallery-media-url.ts retired in favor of resolveProductImageSrc for both gallery variants; explicit placeholder argument preserves the exact fallback filename.
+- [Phase 08.1]: D-11 accepted: bare relative image paths gain a leading slash; every other input shape stays byte-identical.
+- [Phase 08.1]: D-08 (07-REVIEW IN-01) closed: productGallery is now a required prop on ProductDisplay with no default; the sole caller already always supplied it.
 
 ### Pending Todos
 
@@ -250,8 +254,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T20:40:35.577Z
-Stopped at: Completed 08.1-02-PLAN.md
+Last session: 2026-09-05T21:25:19.717Z
+Stopped at: Completed 08.1-05-PLAN.md
 Resume file: None
 
 Next: review `.planning/v2-MILESTONE-AUDIT.md`, optionally `/gsd-phase --insert 8 "Address v2 tech debt"`, then `/gsd-complete-milestone v2` → `/gsd-cleanup`
