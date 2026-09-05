@@ -94,3 +94,102 @@ describe("HomeHeroMinimal render", () => {
     expect(withProduct).toBe(withoutProduct);
   });
 });
+
+// --- Task 2: HomeHeroSplit / HomeHeroFullBleed ------------------------------
+
+const { default: HomeHeroSplit } = await import("@/components/layout/home/HomeHeroSplit");
+const { default: HomeHeroFullBleed } = await import(
+  "@/components/layout/home/HomeHeroFullBleed"
+);
+
+const SPLIT_COMPONENT_PATH = "components/layout/home/HomeHeroSplit.tsx";
+const FULL_BLEED_COMPONENT_PATH = "components/layout/home/HomeHeroFullBleed.tsx";
+
+function productWithImage() {
+  return {
+    id: "featured-1",
+    name: "Volt Trail Jacket",
+    primary_image: { url: "products/volt-trail-jacket.jpg" },
+    media: [],
+  } as never;
+}
+
+function productWithNoImageData() {
+  return {
+    id: "featured-2",
+    name: "Volt Base Layer",
+  } as never;
+}
+
+const NEW_HERO_VARIANTS = [
+  { name: "split" as const, Component: HomeHeroSplit, path: SPLIT_COMPONENT_PATH },
+  {
+    name: "full-bleed" as const,
+    Component: HomeHeroFullBleed,
+    path: FULL_BLEED_COMPONENT_PATH,
+  },
+];
+
+describe.each(NEW_HERO_VARIANTS)("$name home hero variant", ({ name, Component, path }) => {
+  it("handed a featured product, renders the copy, an image from the shared resolver, the CTA, and its own data attribute", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(Component, { featuredProduct: productWithImage() }),
+    );
+    expect(html).toContain("This Gear Powers Your Next Escape");
+    expect(html).toContain(
+      "High-performance electric gear, rugged and designed for the edge of",
+    );
+    expect(html).toContain("Shop Featured Gear");
+    expect(html).toContain('src="/products/volt-trail-jacket.jpg"');
+    expect(html.match(new RegExp(`data-home-hero="${name}"`, "g"))).toHaveLength(1);
+  });
+
+  it("handed null, delegates to HomeHeroMinimal — the served markup carries the centred variant's attribute value and copy", () => {
+    const html = renderToStaticMarkup(React.createElement(Component, { featuredProduct: null }));
+    const minimalHtml = renderToStaticMarkup(
+      React.createElement(HomeHeroMinimal, { featuredProduct: null }),
+    );
+    expect(html).toBe(minimalHtml);
+    expect(html.match(/data-home-hero="minimal"/g)).toHaveLength(1);
+    expect(html).not.toContain(`data-home-hero="${name}"`);
+  });
+
+  it("handed a product with no image data, still renders an image element with the shared resolver's placeholder path", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(Component, { featuredProduct: productWithNoImageData() }),
+    );
+    expect(html).toContain('src="/products/placeholder.png"');
+  });
+
+  it("source contract: never references the settings/layout-settings modules or a store-config field, and uses no raw-HTML sink", () => {
+    const src = source(path);
+    expect(src).not.toMatch(/lib\/layout\/settings/);
+    expect(src).not.toMatch(/lib\/themes\/active-theme/);
+    expect(src).not.toMatch(/StoreConfig/);
+    expect(src).not.toMatch(/dangerouslySetInnerHTML/);
+  });
+});
+
+describe("HomeHeroFullBleed scrim sentinel", () => {
+  it("carries exactly one region-start and one region-end sentinel, with a written reason on the start line", () => {
+    const src = source(FULL_BLEED_COMPONENT_PATH);
+    const startMatches = src.match(/gsd:scan-ignore-start/g) ?? [];
+    const endMatches = src.match(/gsd:scan-ignore-end/g) ?? [];
+    expect(startMatches).toHaveLength(1);
+    expect(endMatches).toHaveLength(1);
+    const startLine = src.split("\n").find((line) => line.includes("gsd:scan-ignore-start"));
+    expect(startLine).toBeTruthy();
+    // A written reason means more than just the sentinel token on the line.
+    expect(startLine!.replace(/[{}/*-]/g, "").replace("gsd:scan-ignore-start", "").trim().length).toBeGreaterThan(20);
+  });
+
+  it("keeps the CTA button outside the sentinel region, still on token classes", () => {
+    const src = source(FULL_BLEED_COMPONENT_PATH);
+    const startIdx = src.indexOf("gsd:scan-ignore-start");
+    const endIdx = src.indexOf("gsd:scan-ignore-end");
+    const ctaIdx = src.indexOf("Shop Featured Gear");
+    expect(ctaIdx).toBeGreaterThan(endIdx);
+    expect(endIdx).toBeGreaterThan(startIdx);
+    expect(src).toContain("bg-primary text-on-primary");
+  });
+});
