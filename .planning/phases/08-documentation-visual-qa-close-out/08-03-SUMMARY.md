@@ -199,3 +199,14 @@ None - no external service configuration required.
 ---
 *Phase: 08-documentation-visual-qa-close-out*
 *Completed: 2026-09-05*
+
+## Self-Check: PASSED
+
+- FOUND: .planning/phases/08-documentation-visual-qa-close-out/08-QA-MATRIX.md
+- FOUND commit: b438035 (task 1)
+- FOUND commit: ea8e631 (task 2)
+- FOUND commit: 5da8f01 (SUMMARY)
+- Re-ran plan-level verification: 21 distinct `## Label:` subsections, all 21
+  preset-by-combination pairs present, 672/21 = 32 rows per run (identical across
+  all runs), 21 capture directories with images, `05-SCREENSHOTS.md` unmodified,
+  appearance settings confirmed at defaults, port 3000 confirmed free.
