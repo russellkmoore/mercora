@@ -107,7 +107,16 @@ function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "focus:bg-surface-elevated focus:text-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
+        // 06.1-04 Task 2 fix (Rule 1 - bug): focus:bg-surface-elevated was byte-identical
+        // to SelectContent's own bg-surface-elevated (line ~63), so the item's own
+        // "highlight" background composited to zero visible contrast against its
+        // always-solid parent, on every shipped preset -- confirmed live via the
+        // checkout country Select (hovered/focused option bg === listbox parent bg,
+        // byte for byte). Swapped to a primary-tinted highlight (same direction as
+        // CategoryDisplay's own hover:bg-primary/20 sort-toggle pattern), fully
+        // token-driven (no literal colour, no sentinel needed) so the highlighted row
+        // stays visually distinct from its own popover on every theme.
+        "focus:bg-primary/10 focus:text-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
         className
       )}
       {...props}
