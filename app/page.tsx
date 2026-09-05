@@ -35,14 +35,15 @@
  * @returns JSX element with complete home page layout
  */
 
-import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
 import { getProductsByCategory } from "@/lib/models/mach/products";
 import { toPublicProduct } from "@/lib/models/mach/product-serializer";
+import { getLayoutSettings } from "@/lib/layout/settings";
+import { HOME_HERO_MAP } from "@/components/layout/home/home-hero-map";
 
 /**
  * Home page component - main landing page for the application
- * 
+ *
  * @returns Server-rendered home page with hero section and featured products
  */
 export default async function HomePage() {
@@ -52,23 +53,15 @@ export default async function HomePage() {
     .map(toPublicProduct)
     .slice(0, 3);
 
+  // Resolved server-side, per request, never Suspense-wrapped — a streamed
+  // hero choice would paint the wrong layout first (Phase 6 precedent).
+  const { homeHero } = await getLayoutSettings();
+  const HeroVariant = HOME_HERO_MAP[homeHero];
+
   return (
     <div className="bg-surface-elevated text-foreground px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
-      {/* Hero Section */}
-      <section className="max-w-6xl mx-auto text-center mb-16 sm:mb-20">
-        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight uppercase mb-4 sm:mb-6 leading-tight font-display">
-          This Gear Powers Your Next Escape
-        </h1>
-        <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto mb-6 sm:mb-8 px-4">
-          High-performance electric gear, rugged and designed for the edge of
-          the map. Modular. Adaptable. Voltique.
-        </p>
-        <Link href="/category/featured" className="inline-block">
-          <button className="px-4 sm:px-6 py-2 sm:py-3 text-base sm:text-lg font-semibold border border-primary text-primary hover:bg-primary hover:text-on-primary transition rounded">
-            Shop Featured Gear
-          </button>
-        </Link>
-      </section>
+      {/* Hero Section — resolved variant (Phase 7, LAYOUT-02) */}
+      <HeroVariant featuredProduct={featuredProducts[0] ?? null} />
 
       {/* Featured Products Grid */}
       <section className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10 mb-12 sm:mb-16">
