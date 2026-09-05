@@ -252,6 +252,21 @@ Plans:
 *v1 archived: 2026-09-02*
 *v2 roadmap added: 2026-09-02 — 4 phases (5-8), 16/16 requirements mapped*
 
+### Phase 08.2: Documentation Overhaul & Agent Onboarding (INSERTED)
+
+**Goal**: The repository's documentation reads like a product-neutral reference storefront, not an outdoor-gear shop: a rewritten README, a pruned and consolidated `docs/` set in direct language that covers everything a developer needs and nothing twice, and an `AGENTS.md` at the repo root that lets a coding assistant walk a new user through setup end to end.
+**Depends on**: Phase 8.1 — documents the final state of the theming, layout and settings code.
+**Requirements**: DOCS-04, DOCS-05
+**Success Criteria** (what must be TRUE):
+
+  1. `README.md` is rewritten: product-neutral framing (a themeable reference storefront that renders any catalogue; the outdoor-gear demo data is one of seven presets), a short quick start, the seven presets and three layout switches with screenshots, and a docs index that links only living documents
+  2. Every file under `docs/` is classified keep / merge / retire in a recorded inventory; merged and retired files are removed (with redirects or a changelog note where linked), and no remaining doc contradicts the code (claim check per Phase 8 method)
+  3. Remaining docs follow one style contract: direct second-person language, short sentences, one idea per section, commands in fenced blocks, no duplicated content across files, and a consistent header (title, one-line purpose, status)
+  4. `AGENTS.md` at the repo root gives a coding assistant an ordered setup path (prerequisites, accounts, secrets, local run, gates, deploy) with the exact commands, the files it must not edit, and links into the docs; `CLAUDE.md` points to it and a Claude Code session started from a fresh clone can follow it without asking for facts the repo already holds
+
+**Plans**: TBD
+**UI hint**: no
+
 ### Phase 08.1: v2 Tech-Debt Closure (INSERTED)
 
 **Goal**: Close the milestone's recorded tech debt that code can close: transactional emails and the global-error page follow the admin-selected theme; `scan:tokens` runs in CI; the appearance settings are read once per request; the duplicated image resolver, silent seed catch, self-writing parity snapshots and review Info items are fixed; order-status gets a seeded local order so its screenshots exist.
