@@ -25,4 +25,9 @@
 - Retired `docs/migration-reservations.md` — its own ledger claimed the next free number was
   `0023`, but migration `0023` was already applied for unrelated work, contradicting the ledger's
   own promise; the multi-branch coordination need it served has concluded.
+- Retired `docs/STRIPE_INTEGRATION.md` — its unique content (the account-creation and API-key
+  steps, tax enablement, the test-card table, and the test tax addresses) moved into
+  `docs/DEPLOYMENT_SETUP.md`; its webhook event list is owned by
+  `docs/webhooks-refunds-inventory.md` and its payment/finalization behavior by
+  `docs/checkout-trust-boundary.md`.
 </content>

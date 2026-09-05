@@ -2,7 +2,7 @@
 
 The complete setup-and-deploy runbook: Cloudflare, Clerk, and Stripe accounts, resource creation, environment configuration, migrations, build variables, and going live.
 
-**Status:** Active — this is Mercora's single deployment runbook; `docs/STRIPE_INTEGRATION.md` is retired into it.
+**Status:** Active — this is Mercora's single deployment runbook; the former Stripe setup guide is retired into it.
 
 ## Infrastructure Overview
 
@@ -238,6 +238,20 @@ Update `wrangler.jsonc` vars:
   }
 }
 ```
+
+### **Step 6: Test Payments and Tax**
+Use Stripe's published test values during development. These are documentation
+values, not credentials.
+
+**Test cards:**
+- **Successful payment**: `4242424242424242`
+- **Declined payment**: `4000000000000002`
+- **3D Secure**: `4000002500003155`
+
+**Test tax addresses** (US, for Stripe Tax):
+- **California**: High tax rate (~10%)
+- **Montana**: No state sales tax
+- **New York**: Moderate tax rate (~8%)
 
 ---
 
