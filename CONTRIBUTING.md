@@ -25,6 +25,10 @@ merchants are welcome.
    ```bash
    npm run lint
    npm run typecheck
+   npm run scan:tokens
+   npm run build:themes:check
+   npm test
+   npm run test:workers
    npm run build
    ```
 
