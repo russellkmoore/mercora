@@ -4,17 +4,17 @@ milestone: v2
 milestone_name: Themeable Storefront
 current_phase: 08
 current_phase_name: Documentation & Visual QA Close-out
-status: executing
-stopped_at: Completed 08-04-PLAN.md
-last_updated: "2026-09-05T16:58:14.459Z"
+status: verifying
+stopped_at: Completed 08-05-PLAN.md
+last_updated: "2026-09-05T17:09:41.563Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 08 execution started
-state_head: b35460cc4988ade1bf3e0846154caac3d4cec708
+state_head: 6dbbb5b1b5932b5a45af6beff902581fbfa3d874
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 31
-  completed_plans: 30
+  completed_plans: 31
   percent: 80
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-09-05 after Phase 7)
 
 Phase: 08 (Documentation & Visual QA Close-out) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-05 — Phase 08 execution started
 
 Progress: [████████░░] 80%
@@ -100,6 +100,7 @@ Progress: [████████░░] 80%
 | Phase 08 P03 | 45min | 2 tasks | 1 files |
 | Phase 08 P02 | 15min | 3 tasks | 4 files |
 | Phase 08 P04 | 55min | 3 tasks | 3 files |
+| Phase 08 P05 | 45min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -175,6 +176,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 08]: [Phase 08] [08-02] Added a new scripts/ entry to docs/CLAUDE.md's structure tree (none existed to splice the three theme/QA scripts under), matching the tree's existing glyph/comment-alignment convention.
 - [Phase 08]: [Phase 08] [08-04] Combination-dependent QA criteria (overflow/anatomy) judged once at volt-dark across all three packed layouts, not re-judged per preset -- no layout-variant component reads a theme token to decide its own geometry, so re-judging under a second preset would not be a new fact. Recorded as an explicit planner assumption in the Judgement Design, not a silent shortcut.
 - [Phase 08]: [Phase 08] [08-04] Zero defects found across 46 findings rows judging all seven presets and three packed layout combinations; the settings-GET empty-category bug (WINDOWS #3) was marked fixed via gsd-tools windows fixed 3, citing plan 08-01 as the closing plan.
+- [Phase 08]: [Phase 08] [08-05] Codebase-docs refresh (ARCHITECTURE/STRUCTURE/CONVENTIONS/TESTING) was pure splice into named sections; only TESTING.md's stale unit-test count (233/1701) was an actual correction, replaced with a number measured this session (260/2136), not carried forward.
+- [Phase 08]: [Phase 08] [08-05] Milestone close-out: all three requirements (DOCS-01/02/03) Complete, full gate suite green (lint, typecheck, scan:tokens 0/2, build:themes:check fresh, 260 files/2136 tests, production build) in one pass, closing v2 Themeable Storefront.
 
 ### Pending Todos
 
@@ -238,8 +241,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T16:58:14.224Z
-Stopped at: Completed 08-04-PLAN.md
+Last session: 2026-09-05T17:09:41.335Z
+Stopped at: Completed 08-05-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 8` (or `/gsd-plan-phase 8` directly) to start Documentation & Visual QA Close-out
