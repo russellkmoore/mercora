@@ -161,7 +161,7 @@ shipped themes (the ones already in the manifest) is instant — no deploy neede
 
 **A converted preset should be re-checked, not assumed to pass.** Six of this repo's seven shipped
 presets (`luxe`, `midnight`, `clinical`, `retro`, `atelier`, `market`) were converted from
-`docs/voltique-theme-direction.md`'s own oklch design values onto this 23-token hex contract
+the retired theme-direction spec (removed 2026-09-05; its per-theme values live in each `themes/*.css` header)'s own oklch design values onto this 23-token hex contract
 (`volt-dark` predates that document — it's the store's original look, relocated verbatim, not a
 conversion). Of those six converted presets, **five carry a deliberate contrast correction** away
 from the direction document's literal values, because a direct oklch-to-hex transcription measured

@@ -7,7 +7,7 @@ source: 06.1-UI-SPEC.md (Phase 6.1 plan 04), extends .planning/todos/pending/the
 
 # What `clinical`, `retro`, `atelier`, and `market` deliberately do not implement
 
-`docs/voltique-theme-direction.md`'s four remaining preset specs each name visual properties and
+the retired theme-direction spec (removed 2026-09-05; its per-theme values live in each `themes/*.css` header)'s four remaining preset specs each name visual properties and
 per-theme layout behaviours beyond the frozen 23-token contract
 (`.planning/phases/05-token-contract-component-sweep/05-TOKEN-MAP.md` §1, one-way frozen per Phase
 5 D-01) and beyond this milestone's tokens-only, no-per-theme-markup architecture (PROJECT.md Key
@@ -41,7 +41,7 @@ shared list Phase 6 already recorded (border-width, image-aspect, font-mono, let
   carry, not a gap this phase created.
 - **Decorative hero background** — a CSS `repeating-linear-gradient` perspective grid with an
   optional scanline overlay. Component markup/decorative CSS, not a token; out of scope per
-  Phase 6.1's CONTEXT (`docs/voltique-theme-direction.md`'s non-contract properties are explicitly
+  Phase 6.1's CONTEXT (the retired theme-direction spec (removed 2026-09-05; its per-theme values live in each `themes/*.css` header)'s non-contract properties are explicitly
   excluded).
 
 ## Atelier

@@ -3,7 +3,7 @@
  *
  * The light preset: warm linen surfaces, a clay accent, a sage secondary,
  * and soft serif headlines — feels like a maker's studio page. Converted
- * from `docs/voltique-theme-direction.md` section 5 onto the 23-token
+ * from the retired theme-direction spec (removed 2026-09-05; its per-theme values live in each `themes/*.css` header) section 5 onto the 23-token
  * contract per 06.1-UI-SPEC.md "Preset Token Contracts"
  * (D-01, D-03, D-05..D-07).
  *

@@ -7,7 +7,7 @@ source: user note during Phase 5 execution
 
 # Theme metadata: target industry + synopsis, shown in admin
 
-Russell wrote `docs/voltique-theme-direction.md` — six go-live preset themes (Luxe, …),
+Russell wrote the retired theme-direction spec (removed 2026-09-05; its per-theme values live in each `themes/*.css` header) — six go-live preset themes (Luxe, …),
 each with a target industry, a short synopsis, design direction, and a full oklch
 color/token spec. He wants the industry and synopsis visible in the admin Appearance
 section next to each theme's swatch card.
@@ -29,4 +29,4 @@ section next to each theme's swatch card.
   needs a rename mapping when turning these specs into theme files. Fonts, radius,
   shadow, and image-aspect are not part of the Phase 5 colour contract — decide in
   Phase 6 whether they extend the contract or stay out of scope.
-- `docs/voltique-theme-direction.md` is currently untracked; commit it when Phase 6 planning starts.
+- the retired theme-direction spec (removed 2026-09-05; its per-theme values live in each `themes/*.css` header) is currently untracked; commit it when Phase 6 planning starts.

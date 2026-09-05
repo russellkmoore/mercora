@@ -3,7 +3,7 @@
  *
  * The light preset: off-white surfaces, forest-green text, a produce-green
  * accent, and big radius rounded sans — feels like a good neighborhood
- * grocer's app. Converted from `docs/voltique-theme-direction.md` section
+ * grocer's app. Converted from the retired theme-direction spec (removed 2026-09-05; its per-theme values live in each `themes/*.css` header) section
  * 6 onto the 23-token contract per 06.1-UI-SPEC.md "Preset Token
  * Contracts" (D-01, D-03, D-05..D-07).
  *
