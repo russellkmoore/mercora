@@ -81,6 +81,17 @@ describe('observability Tail Worker parser and renderer', () => {
     expect(TAIL_CRITICAL_EVENTS).not.toContain('theme.unknown_selection');
   });
 
+  it('registers layout.unknown_selection at warning severity outside the tail critical list', () => {
+    // D-03 / RESEARCH: a second warning-severity, non-payment event,
+    // structurally absent from the critical-only list — same reasoning as
+    // theme.unknown_selection immediately above.
+    expect(TELEMETRY_EVENTS['layout.unknown_selection']).toEqual({
+      severity: 'warning',
+      sampleRate: 1,
+    });
+    expect(TAIL_CRITICAL_EVENTS).not.toContain('layout.unknown_selection');
+  });
+
   it('keeps documented telemetry paths inside the closed route contract', () => {
     const documentation = readFileSync(join(process.cwd(), 'docs/observability.md'), 'utf8');
     const documentedPaths = [...documentation.matchAll(/path:\s*`?"([^"]+)"/g)]
