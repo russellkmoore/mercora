@@ -4,11 +4,11 @@ milestone: v2
 milestone_name: Themeable Storefront
 current_phase: 08
 status: completed
-stopped_at: Phase 08 complete — all phases complete
-last_updated: "2026-09-05T17:24:12.013Z"
+stopped_at: "Milestone v2: all 5 phases complete and verified; audit status tech_debt; Russell chose to address debt before /gsd-complete-milestone v2"
+last_updated: "2026-09-05T18:16:48.489Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 08 complete
-state_head: 18376ca197f201fce0ef46995787b614a96433f2
+state_head: a03b7a9ee4bb323e45e117d1e04d73740da57bfd
 progress:
   total_phases: 5
   completed_phases: 5
@@ -241,8 +241,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T17:24:12Z
-Stopped at: Phase 08 complete — all phases complete
-Resume file: None
+Last session: 2026-09-05T18:16:48.028Z
+Stopped at: Milestone v2: all 5 phases complete and verified; audit status tech_debt; Russell chose to address debt before /gsd-complete-milestone v2
+Resume file: .planning/v2-MILESTONE-AUDIT.md
 
-Next: `/gsd-audit-milestone` → `/gsd-complete-milestone v2` → `/gsd-cleanup`
+Next: review `.planning/v2-MILESTONE-AUDIT.md`, optionally `/gsd-phase --insert 8 "Address v2 tech debt"`, then `/gsd-complete-milestone v2` → `/gsd-cleanup`
