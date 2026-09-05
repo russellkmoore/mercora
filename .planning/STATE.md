@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 07
 current_phase_name: Layout Switches
 status: executing
-stopped_at: Completed 07-03-PLAN.md
-last_updated: "2026-09-05T08:37:12.292Z"
+stopped_at: Completed 07-04-PLAN.md
+last_updated: "2026-09-05T08:50:05.047Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 07 execution started
-state_head: d461dd9b0c764606793449410c1a1ff079568f6a
+state_head: 27f4ff476db446bb283f802f72876ca92e237be2
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 26
-  completed_plans: 24
+  completed_plans: 25
   percent: 60
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-05 after Phase 6.1)
 ## Current Position
 
 Phase: 07 (Layout Switches) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-09-05 — Phase 07 execution started
 
@@ -93,6 +93,7 @@ Progress: [██████░░░░] 60%
 | Phase 07 P01 | 35min | 3 tasks | 17 files |
 | Phase 07 P02 | 25min | 3 tasks | 7 files |
 | Phase 07 P03 | 13min | 3 tasks | 7 files |
+| Phase 07 P04 | 25min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -157,6 +158,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 07]: Added components/layout/home/home-hero-map.ts, a small module not enumerated in 07-02's files_modified list — Mirrors category-layout-map.ts's precedent from 07-01 so the map's key/enum equality and every-member-renders invariants are directly testable
 - [Phase 07]: [Phase 07] [07-03] PRODUCT_GALLERY_MAP and a sibling PRODUCT_GALLERY_LAYOUT map both live inside ProductDisplay.tsx (not a separate module) — both plain object lookups keyed by the gallery enum, never a comparison against a member name literal, giving each variant its own outer container/info-column geometry without a generic layout prop.
 - [Phase 07]: [Phase 07] [07-03] productGallery declared optional on ProductDisplayProps with a DEFAULT_LAYOUTS fallback rather than required, because the plan's task/file split puts app/product/[slug]/page.tsx's wiring in Task 3 while the prop is introduced in Task 2, whose own typecheck gate had to stay green immediately after that commit.
+- [Phase 07]: [Phase 07] [07-04] Icon substitution: used lucide-react's primary export names TextAlignCenter/SquareSplitHorizontal in place of the now-deprecated-alias names AlignCenter/SplitSquareHorizontal the UI-SPEC table listed, verified against the installed package's own type declarations.
+- [Phase 07]: [Phase 07] [07-04] The whole Layout admin section (heading, subtitle, three radiogroups, Save button) lives inside components/admin/LayoutSwitches.tsx itself, not split with the page -- app/admin/settings/appearance/page.tsx's change is a two-line import+render addition, keeping ThemePresetGrid.tsx byte-for-byte unchanged.
 
 ### Pending Todos
 
@@ -203,8 +206,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T08:37:12.122Z
-Stopped at: Completed 07-03-PLAN.md
+Last session: 2026-09-05T08:49:57.550Z
+Stopped at: Completed 07-04-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 7` (or `/gsd-plan-phase 7` directly) to start Layout Switches
