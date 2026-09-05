@@ -38,8 +38,8 @@ docs:
     type: SPEC         # public CMS/Blog API
   - path: docs/runtime-configuration.md
     type: SPEC         # store-config override variable contract
-  - path: docs/api-architecture.md
-    type: SPEC
+  - path: docs/theming.md
+    type: SPEC         # frozen token contract; validator strings are load-bearing, keep verbatim
 
   # --- PRD: scope and plans ---
   - path: docs/ROADMAP.md
@@ -76,3 +76,7 @@ docs:
     type: DOC          # docs index
   - path: docs/CLAUDE.md
     type: DOC          # AI-assistant reference, 23K
+  - path: docs/mobile-lighthouse-baseline.md
+    type: DOC          # measured Lighthouse baseline, supersedes retired mobile assessments
+  - path: docs/CHANGELOG-docs.md
+    type: DOC          # running log of doc retirements and merges

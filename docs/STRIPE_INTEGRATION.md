@@ -111,8 +111,7 @@ STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
 │   ├── OrderSummary.tsx          # Order totals and summary
 │   └── ... other checkout components
 └── docs/
-    ├── STRIPE_INTEGRATION.md     # This documentation
-    └── api-architecture.md       # Clean API architecture
+    └── STRIPE_INTEGRATION.md     # This documentation
 ```
 
 ## API Endpoints
