@@ -315,6 +315,15 @@ phase's file** (`.planning/phases/05-token-contract-component-sweep/05-SCREENSHO
 Phase 5's manifest and had to be moved out by hand. Always pass `--manifest` explicitly, pointed at
 the file you actually want rows appended to.
 
+**Capturing `/order-status/<id>` locally:** the local D1 fixture inserts one guest order at the
+fixed id `dev-order-001` (`data/d1/seed-dev.sql`), applied automatically by `predev`. The page
+itself is gated by a signed bearer token, so two local-only environment variables must also be set
+in `.env.local` before the route responds with anything but a 404:
+`ORDER_STATUS_GUEST_LINKS_ENABLED` (the literal value `true`) and `ORDER_STATUS_SECRET` (32+
+random characters, e.g. `openssl rand -hex 32`). Neither variable's value is ever written down
+here or in any manifest — mint a token at capture time with `createOrderStatusToken(orderId)` and
+pass `"dev-order-001?token=<minted token>"` as `--order-id`.
+
 ### Phase 8 visual QA summary
 
 Seven presets by three packed layout combinations, copied verbatim from
