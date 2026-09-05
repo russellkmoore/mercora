@@ -1,6 +1,8 @@
 "use client";
 
-import { getThemeTokens } from "@/lib/themes/tokens";
+import { useEffect, useState } from "react";
+import { getThemeTokens, type ThemeTokens } from "@/lib/themes/tokens";
+import { parseThemeResponse } from "@/lib/themes/theme-response";
 
 interface GlobalErrorProps {
   error: Error & { digest?: string };
@@ -10,12 +12,46 @@ interface GlobalErrorProps {
 /**
  * Root fallback rendered in place of the normal layout. It deliberately uses
  * no application provider, router component, stylesheet, or error detail.
- * Because it renders with no stylesheet, its colors come from getThemeTokens()
- * directly rather than the client theme-token hook, which throws outside the
- * provider this page is, by definition, rendered without.
+ * Because it renders with no stylesheet, its colors come from
+ * `getThemeTokens()` directly rather than the client theme-token hook,
+ * which throws outside the provider this page is, by definition, rendered
+ * without.
+ *
+ * Two-paint sequence (D-02): the first paint (server render, and the
+ * client's own initial render before any effect runs) always uses the
+ * manifest default with no async gate, so there is no flash of unstyled
+ * content. After mount, one `useEffect` fetches `/api/theme` and, only on
+ * success, repaints with the admin-selected theme's tokens via
+ * `parseThemeResponse`. Every failure path — a rejected fetch, a non-ok
+ * status, unparseable JSON, or a body naming a theme this bundle doesn't
+ * recognise — is swallowed with no state change and no rendered error: a
+ * theming failure must never clutter the crash-recovery UI the user is
+ * actually looking at.
  */
 export default function GlobalError({ reset }: GlobalErrorProps) {
-  const tokens = getThemeTokens();
+  const [tokens, setTokens] = useState<ThemeTokens>(() => getThemeTokens());
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/api/theme")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        if (cancelled) return;
+        const parsed = parseThemeResponse(body);
+        if (parsed) {
+          setTokens(parsed);
+        }
+      })
+      .catch(() => {
+        // Swallow every failure path — see docstring above.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <html lang="en">
       <head>

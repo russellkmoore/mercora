@@ -12,19 +12,24 @@
  *
  * === Caching ===
  * Deliberately holds no state between requests: no module-scope variable
- * and no cross-request memoisation helper anywhere in this file.
- * `getSettings()`'s own request-scoped read caching (inside the shared
- * database helper) is the only caching anywhere in this path — a
- * Cloudflare Workers isolate can be reused across requests, so any
- * additional caching here would risk serving a stale theme after an admin
- * save (RESEARCH Pitfall 2).
+ * and no cross-request memoisation helper anywhere in this file. The read
+ * itself goes through `readAppearanceSettings()`
+ * (`lib/themes/appearance-read.ts`), the one request-scoped mechanism in
+ * this path (D-04) — shared with `getLayoutSettings()` so the two
+ * resolvers issue one D1 read per request between them, not two. That
+ * helper's own `React.cache()` wrapper is per-render, not per-isolate, so
+ * a Cloudflare Workers isolate reused across requests can never be served
+ * a stale theme (RESEARCH Pitfall 4).
  */
 
-import { getSettings } from "@/lib/utils/settings";
 import { recordTelemetry } from "@/lib/observability/telemetry";
 import { DEFAULT_THEME_NAME, THEME_MANIFEST } from "@/lib/themes/manifest.generated";
+import {
+  APPEARANCE_SETTINGS_CATEGORY,
+  readAppearanceSettings,
+} from "@/lib/themes/appearance-read";
 
-export const APPEARANCE_SETTINGS_CATEGORY = "appearance";
+export { APPEARANCE_SETTINGS_CATEGORY };
 export const APPEARANCE_THEME_SETTING_KEY = "appearance.theme";
 
 /**
@@ -46,15 +51,11 @@ function resolveEnvOrManifestDefault(manifestNames: ReadonlySet<string>): string
 export async function getActiveTheme(): Promise<string> {
   const manifestNames = new Set(THEME_MANIFEST.map((theme) => theme.name));
 
-  let stored: unknown;
-  try {
-    const settings = await getSettings(APPEARANCE_SETTINGS_CATEGORY);
-    stored = settings[APPEARANCE_THEME_SETTING_KEY];
-  } catch {
-    // This function runs in the root layout on every request; a database
-    // hiccup must degrade to the default theme, not take down every route.
-    return resolveEnvOrManifestDefault(manifestNames);
-  }
+  // readAppearanceSettings() already degrades a database hiccup to `{}`;
+  // this function runs in the root layout on every request, so an absent
+  // key here falls through the same default chain as a genuine D1 error.
+  const settings = await readAppearanceSettings();
+  const stored: unknown = settings[APPEARANCE_THEME_SETTING_KEY];
 
   // Absent, or explicitly null: the normal first-load state (no admin
   // selection has ever been saved), not an anomaly. No telemetry
