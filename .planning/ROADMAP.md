@@ -164,7 +164,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3)*
 
-- [ ] 06.1-04-PLAN.md — Canonical capture grids for all four presets, light-preset acid tests with every judgement recorded, per-preset backlog, phase-close roll-up, THEME-05 marked complete
+- [x] 06.1-04-PLAN.md — Canonical capture grids for all four presets, light-preset acid tests with every judgement recorded, per-preset backlog, phase-close roll-up, THEME-05 marked complete
 
 **UI hint**: yes
 
