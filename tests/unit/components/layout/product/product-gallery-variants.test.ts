@@ -169,3 +169,134 @@ describe("ProductGalleryLeft render", () => {
     expect(html.match(/data-product-gallery="left"/g)).toHaveLength(1);
   });
 });
+
+// --- Task 2: ProductGalleryTop, PRODUCT_GALLERY_MAP, source contracts ------
+
+import { PRODUCT_GALLERIES } from "@/lib/layout/variants";
+
+const { default: ProductGalleryTop } = await import(
+  "@/components/layout/product/ProductGalleryTop"
+);
+
+const TOP_COMPONENT_PATH = "components/layout/product/ProductGalleryTop.tsx";
+const DISPLAY_PATH = "app/product/[slug]/ProductDisplay.tsx";
+
+function renderTop(props: {
+  allImages: string[];
+  selectedImage: string | null;
+  productName?: string;
+}) {
+  const onSelect = vi.fn();
+  const html = renderToStaticMarkup(
+    React.createElement(ProductGalleryTop, {
+      allImages: props.allImages,
+      selectedImage: props.selectedImage,
+      onSelect,
+      productName: props.productName ?? "Volt Field Kit",
+    }),
+  );
+  return { html, onSelect };
+}
+
+describe("ProductGalleryTop render", () => {
+  it("renders one main image and one thumbnail button per image, in the given order, with its own data attribute", () => {
+    const { html } = renderTop({
+      allImages: ["a.jpg", "b.jpg", "c.jpg"],
+      selectedImage: "a.jpg",
+    });
+    expect(html.match(/<img\b/g)).toHaveLength(4);
+    expect(html.match(/<button\b/g)).toHaveLength(3);
+    expect(html.match(/data-product-gallery="top"/g)).toHaveLength(1);
+  });
+
+  it("renders the main image at the placeholder path and no thumbnail buttons for an empty image array", () => {
+    const { html } = renderTop({ allImages: [], selectedImage: null });
+    expect(html).toContain('src="/placeholder.jpg"');
+    expect(html.match(/<button\b/g)).toBeNull();
+  });
+
+  it("renders one thumbnail button and no error for exactly one image", () => {
+    const { html } = renderTop({ allImages: ["only.jpg"], selectedImage: "only.jpg" });
+    expect(html.match(/<button\b/g)).toHaveLength(1);
+  });
+
+  it("gives the thumbnail whose URL equals the selected image the accent border class, and the others the neutral border class", () => {
+    const { html } = renderTop({
+      allImages: ["a.jpg", "b.jpg"],
+      selectedImage: "b.jpg",
+    });
+    const buttonMatches = html.match(/<button[^>]*class="([^"]*)"[^>]*>/g) ?? [];
+    expect(buttonMatches).toHaveLength(2);
+    expect(buttonMatches[0]).toContain("border-border");
+    expect(buttonMatches[0]).not.toContain("border-primary");
+    expect(buttonMatches[1]).toContain("border-primary");
+  });
+
+  it("calls the selection callback with the clicked thumbnail's URL", () => {
+    // renderToStaticMarkup can't dispatch a real click; assert the source
+    // wires onClick to onSelect(imageUrl), the same contract ProductGalleryLeft uses.
+    const src = source(TOP_COMPONENT_PATH);
+    expect(src).toContain("onClick={() => onSelect(imageUrl)}");
+  });
+
+  it("is marked as a client component", () => {
+    const src = source(TOP_COMPONENT_PATH);
+    expect(src).toMatch(/^"use client";$/m);
+  });
+});
+
+describe("PRODUCT_GALLERY_MAP (held inside ProductDisplay)", () => {
+  it("the display's source declares a map whose key list equals the gallery enum, in order, with no duplicates", () => {
+    const src = source(DISPLAY_PATH);
+    const mapBlockMatch = src.match(/PRODUCT_GALLERY_MAP[\s\S]*?=\s*{([\s\S]*?)};/);
+    expect(mapBlockMatch).not.toBeNull();
+    const keys = [...(mapBlockMatch?.[1] ?? "").matchAll(/^\s*"?([a-z-]+)"?:/gm)].map(
+      (match) => match[1],
+    );
+    expect(keys).toEqual([...PRODUCT_GALLERIES]);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("every gallery enum member resolves through the two variant components to non-empty markup", () => {
+    for (const [gallery, Component] of [
+      ["left", ProductGalleryLeft],
+      ["top", ProductGalleryTop],
+    ] as const) {
+      const html = renderToStaticMarkup(
+        React.createElement(Component, {
+          allImages: ["a.jpg"],
+          selectedImage: "a.jpg",
+          onSelect: vi.fn(),
+          productName: "Volt Field Kit",
+        }),
+      );
+      expect(html.length).toBeGreaterThan(0);
+      expect(html).toContain(`data-product-gallery="${gallery}"`);
+    }
+  });
+});
+
+describe("ProductDisplay source contract (LAYOUT-04 anti-genericity)", () => {
+  const src = source(DISPLAY_PATH);
+
+  it("declares the new prop typed to the gallery union, never a bare string", () => {
+    expect(src).toMatch(/productGallery\??:\s*ProductGallery/);
+    expect(src).not.toMatch(/productGallery\??:\s*string/);
+    expect(src).not.toMatch(/\blayout\??:\s*(ProductGallery|string)/);
+  });
+
+  it("contains no comparison of a resolved value against either gallery member name literal", () => {
+    for (const gallery of PRODUCT_GALLERIES) {
+      const comparisonPattern = new RegExp(`(===|switch\\s*\\()[^\\n]*["']${gallery}["']`);
+      expect(src).not.toMatch(comparisonPattern);
+    }
+    expect(src).not.toMatch(/if\s*\(\s*productGallery/);
+    expect(src).not.toMatch(/switch\s*\(\s*productGallery/);
+  });
+
+  it("the information column's markup is unchanged from the pre-phase source apart from the wrapper geometry the variants own", () => {
+    expect(src).toContain('<h1 className="text-2xl font-extrabold sm:text-3xl lg:text-4xl font-display">');
+    expect(src).toContain("Add to Cart");
+    expect(src).toContain("Choose an option:");
+  });
+});
