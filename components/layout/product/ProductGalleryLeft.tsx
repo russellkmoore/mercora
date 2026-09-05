@@ -21,7 +21,7 @@
 "use client";
 
 import Image from "next/image";
-import { getMediaUrl } from "./gallery-media-url";
+import { resolveProductImageSrc } from "@/lib/utils/product-image";
 
 interface ProductGalleryLeftProps {
   allImages: string[];
@@ -40,7 +40,7 @@ export default function ProductGalleryLeft({
     <div data-product-gallery="left">
       <div className="relative aspect-3/4 w-full overflow-hidden rounded bg-surface-elevated">
         <Image
-          src={getMediaUrl(selectedImage)}
+          src={resolveProductImageSrc(selectedImage, undefined, "/placeholder.jpg")}
           alt={productName}
           fill
           sizes="(min-width: 1024px) 50vw, 100vw"
@@ -60,7 +60,7 @@ export default function ProductGalleryLeft({
             }`}
           >
             <Image
-              src={getMediaUrl(imageUrl)}
+              src={resolveProductImageSrc(imageUrl, undefined, "/placeholder.jpg")}
               alt={`Thumbnail ${index + 1}`}
               fill
               style={{ objectFit: "cover" }}

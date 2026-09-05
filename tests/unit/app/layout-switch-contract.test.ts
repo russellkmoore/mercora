@@ -242,7 +242,6 @@ const PHASE_COMPONENT_FILES = [
   "components/layout/home/home-hero-map.ts",
   "components/layout/product/ProductGalleryLeft.tsx",
   "components/layout/product/ProductGalleryTop.tsx",
-  "components/layout/product/gallery-media-url.ts",
   "components/admin/LayoutSwitches.tsx",
 ];
 

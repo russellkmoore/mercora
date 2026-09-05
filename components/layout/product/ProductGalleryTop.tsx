@@ -20,7 +20,7 @@
 "use client";
 
 import Image from "next/image";
-import { getMediaUrl } from "./gallery-media-url";
+import { resolveProductImageSrc } from "@/lib/utils/product-image";
 
 interface ProductGalleryTopProps {
   allImages: string[];
@@ -39,7 +39,7 @@ export default function ProductGalleryTop({
     <div data-product-gallery="top">
       <div className="relative w-full aspect-video overflow-hidden rounded bg-surface-elevated">
         <Image
-          src={getMediaUrl(selectedImage)}
+          src={resolveProductImageSrc(selectedImage, undefined, "/placeholder.jpg")}
           alt={productName}
           fill
           sizes="100vw"
@@ -59,7 +59,7 @@ export default function ProductGalleryTop({
             }`}
           >
             <Image
-              src={getMediaUrl(imageUrl)}
+              src={resolveProductImageSrc(imageUrl, undefined, "/placeholder.jpg")}
               alt={`Thumbnail ${index + 1}`}
               fill
               style={{ objectFit: "cover" }}

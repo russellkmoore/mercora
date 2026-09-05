@@ -25,27 +25,36 @@ const RECORDING_PATH =
   "tests/unit/components/layout/product/__snapshots__/product-gallery-left-preextraction.txt";
 const LEFT_COMPONENT_PATH = "components/layout/product/ProductGalleryLeft.tsx";
 
-// --- Task 1: gallery-media-url helper --------------------------------------
+// --- Task 1: resolveProductImageSrc, the one resolver both gallery variants
+// call, through the exact three-argument call shape they use (D-05, D-11) --
 
-const { getMediaUrl } = await import("@/components/layout/product/gallery-media-url");
+const { resolveProductImageSrc } = await import("@/lib/utils/product-image");
 
-describe("getMediaUrl (moved verbatim from ProductDisplay's local helper)", () => {
-  it("returns the placeholder path for a null or undefined input", () => {
-    expect(getMediaUrl(null)).toBe("/placeholder.jpg");
-    expect(getMediaUrl(undefined)).toBe("/placeholder.jpg");
+describe("resolveProductImageSrc (the one resolver both gallery variants call, three-argument shape)", () => {
+  it("passes an absolute http(s) URL through unchanged", () => {
+    expect(
+      resolveProductImageSrc("https://cdn.example.com/products/x.jpg", undefined, "/placeholder.jpg"),
+    ).toBe("https://cdn.example.com/products/x.jpg");
   });
 
-  it("returns a string input unchanged", () => {
-    expect(getMediaUrl("products/x.jpg")).toBe("products/x.jpg");
+  it("passes a path that already starts with a slash through unchanged", () => {
+    expect(resolveProductImageSrc("/products/x.jpg", undefined, "/placeholder.jpg")).toBe(
+      "/products/x.jpg",
+    );
   });
 
-  it("returns the nested file URL for an object input", () => {
-    expect(getMediaUrl({ file: { url: "products/y.jpg" } })).toBe("products/y.jpg");
+  it("adds a leading slash to a bare relative path — the one accepted output change (D-11)", () => {
+    expect(resolveProductImageSrc("products/x.jpg", undefined, "/placeholder.jpg")).toBe(
+      "/products/x.jpg",
+    );
   });
 
-  it("returns the placeholder path for an object with no usable URL", () => {
-    expect(getMediaUrl({ file: {} })).toBe("/placeholder.jpg");
-    expect(getMediaUrl({})).toBe("/placeholder.jpg");
+  it("returns the placeholder path for a null, undefined, or otherwise unusable input", () => {
+    expect(resolveProductImageSrc(null, undefined, "/placeholder.jpg")).toBe("/placeholder.jpg");
+    expect(resolveProductImageSrc(undefined, undefined, "/placeholder.jpg")).toBe(
+      "/placeholder.jpg",
+    );
+    expect(resolveProductImageSrc({}, undefined, "/placeholder.jpg")).toBe("/placeholder.jpg");
   });
 });
 
@@ -59,15 +68,20 @@ describe("ProductGalleryLeft — pre-extraction source parity", () => {
     expect(recording.trim().length).toBeGreaterThan(0);
   });
 
-  it("every recorded line, normalised, appears in the extracted component's source in order — the outer <div>'s remainder matches character for character, and the two closure-to-prop lines (alt text, thumbnail onClick) are the only other permitted substitutions; everything else matches exactly", () => {
+  it("every recorded line, normalised, appears in the extracted component's source in order — the outer <div>'s remainder matches character for character, and four permitted substitutions (the two closure-to-prop lines for alt text and thumbnail onClick, plus the two resolver-swap src lines) are the only ones allowed; everything else matches exactly", () => {
     const recordedLines = recording.split("\n").filter((line) => line.trim() !== "");
     const componentLines = componentSource.split("\n");
 
-    // The two lines the action text explicitly calls out as replacing a
-    // closure reference with its prop, rather than surviving verbatim.
+    // The two closure-to-prop lines the action text explicitly calls out,
+    // plus the two src lines changed by the D-05 resolver consolidation
+    // (retiring `getMediaUrl` in favour of the shared `resolveProductImageSrc`).
     const KNOWN_SUBSTITUTIONS: Record<string, string> = {
       'alt={typeof product.name === "string" ? product.name : ""}': "alt={productName}",
       "onClick={() => setSelectedImage(imageUrl)}": "onClick={() => onSelect(imageUrl)}",
+      "src={getMediaUrl(selectedImage)}":
+        'src={resolveProductImageSrc(selectedImage, undefined, "/placeholder.jpg")}',
+      "src={getMediaUrl(imageUrl)}":
+        'src={resolveProductImageSrc(imageUrl, undefined, "/placeholder.jpg")}',
     };
 
     let searchFrom = 0;
@@ -133,9 +147,9 @@ describe("ProductGalleryLeft render", () => {
       selectedImage: "a.jpg",
     });
     expect(html.match(/<img\b/g)).toHaveLength(4); // 1 main + 3 thumbnails
-    const aIdx = html.indexOf('src="a.jpg"');
-    const bIdx = html.indexOf('src="b.jpg"');
-    const cIdx = html.indexOf('src="c.jpg"');
+    const aIdx = html.indexOf('src="/a.jpg"');
+    const bIdx = html.indexOf('src="/b.jpg"');
+    const cIdx = html.indexOf('src="/c.jpg"');
     expect(aIdx).toBeGreaterThan(-1);
     expect(bIdx).toBeGreaterThan(aIdx);
     expect(cIdx).toBeGreaterThan(bIdx);
