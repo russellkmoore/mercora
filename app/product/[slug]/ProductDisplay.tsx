@@ -54,7 +54,7 @@ import {
 import SubscriptionAcquisitionPanel from "@/components/subscriptions/SubscriptionAcquisitionPanel";
 import ProductGalleryLeft from "@/components/layout/product/ProductGalleryLeft";
 import ProductGalleryTop from "@/components/layout/product/ProductGalleryTop";
-import { DEFAULT_LAYOUTS, type ProductGallery } from "@/lib/layout/variants";
+import type { ProductGallery } from "@/lib/layout/variants";
 
 /**
  * Typed lookup map from the resolved product-gallery enum to its named
@@ -108,12 +108,11 @@ interface ProductDisplayProps {
     termsUrl: string;
   };
   /**
-   * Resolved server-side via getLayoutSettings() (D-08). Optional with a
-   * DEFAULT_LAYOUTS fallback only because app/product/[slug]/page.tsx's own
-   * wiring is Task 3's job in this plan; every real call site passes it.
-   * Still the frozen union, never a bare string (LAYOUT-04).
+   * Resolved server-side via getLayoutSettings() (D-08). Required — the only
+   * caller, app/product/[slug]/page.tsx, always supplies it. Still the frozen
+   * union, never a bare string (LAYOUT-04).
    */
-  productGallery?: ProductGallery;
+  productGallery: ProductGallery;
 }
 
 function stringifyDescription(description: Product["description"]): string {
@@ -136,7 +135,7 @@ export default function ProductDisplay({
   reviews,
   reviewEligibility,
   subscription,
-  productGallery = DEFAULT_LAYOUTS.productGallery,
+  productGallery,
 }: ProductDisplayProps) {
   const allImages = useMemo(() => {
     try {
