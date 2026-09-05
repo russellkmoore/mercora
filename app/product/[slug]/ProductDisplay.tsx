@@ -33,8 +33,7 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
-import Image from "next/image";
+import { useMemo, useState, type ComponentType } from "react";
 import ProductRecommendations from "@/components/ProductRecommendations";
 import { StarRating } from "@/components/reviews/StarRating";
 import { ProductReviewsSection } from "@/components/reviews/ProductReviewsSection";
@@ -53,7 +52,50 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import SubscriptionAcquisitionPanel from "@/components/subscriptions/SubscriptionAcquisitionPanel";
-import { getMediaUrl } from "@/components/layout/product/gallery-media-url";
+import ProductGalleryLeft from "@/components/layout/product/ProductGalleryLeft";
+import ProductGalleryTop from "@/components/layout/product/ProductGalleryTop";
+import { DEFAULT_LAYOUTS, type ProductGallery } from "@/lib/layout/variants";
+
+/**
+ * Typed lookup map from the resolved product-gallery enum to its named
+ * component (LAYOUT-04's anti-genericity control). Held inside this client
+ * component per the plan's own interfaces block, rather than a separate
+ * module — the category/home switches extracted their maps to enable
+ * testing without pulling in a server page's data-fetching dependencies;
+ * that constraint doesn't apply here since this map is already inside the
+ * client component every test that needs it imports directly.
+ */
+const PRODUCT_GALLERY_MAP: Record<ProductGallery, ComponentType<GalleryProps>> = {
+  left: ProductGalleryLeft,
+  top: ProductGalleryTop,
+};
+
+/**
+ * The outer wrapper geometry each gallery variant owns (D-08/UI-SPEC): the
+ * two-column default sits the gallery in the left half of a two-column
+ * grid with the info column unchanged to its right; the full-width variant
+ * collapses to a single stacked column with the info column capped at
+ * max-w-2xl below it. A second map keyed by the same enum — an index
+ * operation, not a comparison against a member name literal — so the
+ * display never branches on which gallery is resolved.
+ */
+const PRODUCT_GALLERY_LAYOUT: Record<ProductGallery, { container: string; info: string }> = {
+  left: {
+    container: "grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12",
+    info: "mt-6 lg:mt-0",
+  },
+  top: {
+    container: "flex flex-col",
+    info: "mt-8 lg:mt-10 max-w-2xl",
+  },
+};
+
+interface GalleryProps {
+  allImages: string[];
+  selectedImage: string | null;
+  onSelect: (url: string) => void;
+  productName: string;
+}
 
 interface ProductDisplayProps {
   product: Product;
@@ -65,6 +107,13 @@ interface ProductDisplayProps {
     termsVersion?: string;
     termsUrl: string;
   };
+  /**
+   * Resolved server-side via getLayoutSettings() (D-08). Optional with a
+   * DEFAULT_LAYOUTS fallback only because app/product/[slug]/page.tsx's own
+   * wiring is Task 3's job in this plan; every real call site passes it.
+   * Still the frozen union, never a bare string (LAYOUT-04).
+   */
+  productGallery?: ProductGallery;
 }
 
 function stringifyDescription(description: Product["description"]): string {
@@ -87,6 +136,7 @@ export default function ProductDisplay({
   reviews,
   reviewEligibility,
   subscription,
+  productGallery = DEFAULT_LAYOUTS.productGallery,
 }: ProductDisplayProps) {
   const allImages = useMemo(() => {
     try {
@@ -140,46 +190,23 @@ export default function ProductDisplay({
     return "Reviews";
   }, [ratingSummary, reviews.length]);
 
+  const GalleryVariant = PRODUCT_GALLERY_MAP[productGallery];
+  const galleryLayout = PRODUCT_GALLERY_LAYOUT[productGallery];
+
   return (
     <>
       {/* Main Product Display Grid */}
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12">
+      <div className={galleryLayout.container}>
         {/* Image Gallery Section */}
-        <div>
-          <div className="relative aspect-3/4 w-full overflow-hidden rounded bg-surface-elevated">
-            <Image
-              src={getMediaUrl(selectedImage)}
-              alt={typeof product.name === "string" ? product.name : ""}
-              fill
-              sizes="(min-width: 1024px) 50vw, 100vw"
-              style={{ objectFit: "cover" }}
-              className="object-cover"
-            />
-          </div>
-
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-2 sm:mt-4 sm:gap-3">
-            {allImages.map((imageUrl, index) => (
-              <button
-                type="button"
-                key={`thumb-${index}`}
-                onClick={() => setSelectedImage(imageUrl)}
-                className={`relative h-16 w-16 shrink-0 overflow-hidden rounded border sm:h-20 sm:w-20 ${
-                  selectedImage === imageUrl ? "border-primary" : "border-border"
-                }`}
-              >
-                <Image
-                  src={getMediaUrl(imageUrl)}
-                  alt={`Thumbnail ${index + 1}`}
-                  fill
-                  style={{ objectFit: "cover" }}
-                />
-              </button>
-            ))}
-          </div>
-        </div>
+        <GalleryVariant
+          allImages={allImages}
+          selectedImage={selectedImage}
+          onSelect={setSelectedImage}
+          productName={typeof product.name === "string" ? product.name : ""}
+        />
 
         {/* Product Information Section */}
-        <div className="mt-6 lg:mt-0">
+        <div className={galleryLayout.info}>
           <h1 className="text-2xl font-extrabold sm:text-3xl lg:text-4xl font-display">
             {typeof product.name === "string" ? product.name : ""}
           </h1>
