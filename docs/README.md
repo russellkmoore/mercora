@@ -18,7 +18,7 @@ This directory contains comprehensive documentation for all aspects of the Merco
 
 ### 💼 **Admin & Business Features**
 - **[Admin Authentication](admin-authentication.md)** - Production-ready authentication and security
-- **[Stripe Integration](STRIPE_INTEGRATION.md)** - Payment processing and tax calculation
+- **[Stripe Setup](DEPLOYMENT_SETUP.md)** - Account setup, payment processing, and tax calculation
 
 ### 🚀 **Innovation & Future**
 - **[MCP Server Integration](mcp-server-specification.md)** - Revolutionary agentic commerce through developer tools

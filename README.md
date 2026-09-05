@@ -127,7 +127,7 @@ User Query → AI Embeddings → Vector Search → Context Retrieval → LLM Res
 
 ### **💼 Admin & Business Features**
 - **[🔐 Admin Authentication](docs/admin-authentication.md)** - Production-ready authentication and security
-- **[💳 Stripe Integration](docs/STRIPE_INTEGRATION.md)** - Payment processing and tax calculation
+- **[💳 Stripe Setup](docs/DEPLOYMENT_SETUP.md)** - Account setup, payment processing, and tax calculation
 
 ### **🚀 Innovation & Future**
 - **[🌟 MCP Server Integration](docs/mcp-server-specification.md)** - Revolutionary agentic commerce through developer tools

@@ -54,8 +54,6 @@ docs:
     type: DOC
   - path: docs/DEPLOYMENT_SETUP.md
     type: DOC
-  - path: docs/STRIPE_INTEGRATION.md
-    type: DOC
   - path: docs/README.md
     type: DOC          # docs index
   - path: docs/CLAUDE.md
