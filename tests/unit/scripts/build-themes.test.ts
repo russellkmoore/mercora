@@ -88,6 +88,22 @@ describe("build-themes: fixture-driven validator rules", () => {
     expect(result.errors[0].message).toContain("label");
   });
 
+  it("duplicate-token — a fixture that redeclares a token fails naming the token, with a positive line number", () => {
+    const { status, result } = runBuildThemes("tests/fixtures/themes/duplicate-token");
+    expect(status).not.toBe(0);
+    const dupeErrors = result.errors.filter((e) => e.message.includes("--store-primary"));
+    expect(dupeErrors).toHaveLength(1);
+    expect(dupeErrors[0].message).toContain("declared more than once");
+    expect(dupeErrors[0].file).toContain("duplicate-token");
+    expect(dupeErrors[0].line).toBeGreaterThan(0);
+  });
+
+  it("duplicate-token — a token declared three times still yields exactly one error for that token, not two", () => {
+    const { result } = runBuildThemes("tests/fixtures/themes/duplicate-token");
+    const dupeErrors = result.errors.filter((e) => e.message.includes("--store-primary"));
+    expect(dupeErrors).toHaveLength(1);
+  });
+
   it("empty file — an empty theme file fails with its own distinct message", () => {
     const { status, result } = runBuildThemes("tests/fixtures/themes/empty");
     expect(status).not.toBe(0);
