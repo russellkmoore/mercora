@@ -246,3 +246,23 @@ Blockers/Concerns — neither blocks milestone close. Suggested next step:
 ---
 *Phase: 08-documentation-visual-qa-close-out*
 *Completed: 2026-09-05*
+
+## Self-Check: PASSED
+
+- FOUND: `.planning/codebase/ARCHITECTURE.md`, `STRUCTURE.md`, `CONVENTIONS.md`, `TESTING.md`
+- FOUND: `docs/theming.md`, `.planning/STATE.md`
+- FOUND: `.planning/phases/08-documentation-visual-qa-close-out/08-05-SUMMARY.md`
+- FOUND commits: `692e527` (Task 1), `8eacb20` (Task 2), `6dbbb5b` (Task 3), `c5e3078` (plan metadata)
+- Re-ran all Task 1-3 `<verify>` blocks: architecture/structure string checks pass; out-of-scope
+  docs (STACK/INTEGRATIONS/CONCERNS) untouched; architecture deleted-line count 0 (< 40); testing
+  stale-count string gone, measured count `260 files / 2136 tests` present; known-limits and STATE
+  string checks pass; both cited backlog notes exist; per-theme token count 23 for all seven theme
+  files; layout enum members unchanged.
+- Re-ran the plan-level gate suite: `npm run lint` (0 errors), `npm run typecheck` (clean),
+  `npm run scan:tokens` (0 violations, 2 `MANUAL-REVIEW` rows), `npm run build:themes:check`
+  (fresh for 7 themes), `npm test` (260 files / 2136 tests passing), `npm run build` (succeeded,
+  all routes emitted).
+- `DOCS-01`, `DOCS-02`, `DOCS-03` all `Complete` in `.planning/REQUIREMENTS.md`.
+- Working tree clean of unintended changes: only the pre-existing, pre-session
+  `docs/voltique-theme-direction.md` modification and pre-existing untracked files remain;
+  nothing under `themes/`, `lib/layout/variants.ts`, `app/`, or `components/` was touched.
