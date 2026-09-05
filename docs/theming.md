@@ -188,6 +188,7 @@ produces it (interpolated fields shown as the script's own template placeholder)
 | Selector doesn't match filename | `selector "${primaryRule.selector}" must equal "${expectedSelector}" (the filename stem)` |
 | Declaration isn't a `--store-*` property | `non-token declaration "${decl.prop}"` |
 | Colour token isn't 6-digit hex | `token "${decl.prop}" must be a 6-digit hex colour, got "${decl.value.trim()}"` |
+| Token declared more than once in the rule | `token "${token}" is declared more than once in the rule` |
 | Required token absent | `missing required token "${token}"` |
 | Declared property isn't one of the 23 | `unknown token "${token}" is not part of the frozen 23-token contract` |
 | No `@theme` header, or no `label` field | `missing required @theme header label (e.g. /* @theme label: My Theme */)` |

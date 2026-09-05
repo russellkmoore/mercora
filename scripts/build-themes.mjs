@@ -173,14 +173,23 @@ export function validateThemeFile(filePath, cssSource) {
       });
     }
 
-    const declared = new Set();
+    // Counts declarations per token (not just membership) so a copy-paste
+    // duplicate can be flagged below — CSS's own cascade means the second
+    // declaration silently wins, so this must be an error, not a warning.
+    const declared = new Map();
     primaryRule.walkDecls((decl) => {
       const line = decl.source?.start?.line ?? 1;
       if (!decl.prop.startsWith("--store-")) {
         errors.push({ file: filePath, line, message: `non-token declaration "${decl.prop}"` });
         return;
       }
-      declared.add(decl.prop);
+      const seen = declared.get(decl.prop);
+      if (seen) {
+        seen.count += 1;
+        if (seen.count === 2) seen.secondLine = line;
+      } else {
+        declared.set(decl.prop, { count: 1, secondLine: null });
+      }
       if (COLOUR_TOKENS.has(decl.prop) && !HEX_RE.test(decl.value.trim())) {
         errors.push({
           file: filePath,
@@ -199,12 +208,19 @@ export function validateThemeFile(filePath, cssSource) {
         });
       }
     }
-    for (const token of declared) {
+    for (const [token, info] of declared) {
       if (!REQUIRED_TOKENS.includes(token)) {
         errors.push({
           file: filePath,
           line: primaryRule.source?.start?.line ?? 1,
           message: `unknown token "${token}" is not part of the frozen 23-token contract`,
+        });
+      }
+      if (info.count > 1) {
+        errors.push({
+          file: filePath,
+          line: info.secondLine ?? primaryRule.source?.start?.line ?? 1,
+          message: `token "${token}" is declared more than once in the rule`,
         });
       }
     }
