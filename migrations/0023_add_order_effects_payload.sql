@@ -1,0 +1,14 @@
+-- The confirmation_email and merchant_notification effect types are drained
+-- both inline (inside the request that staged them) and from the every-five-
+-- minutes recovery sweep, which runs in a Cloudflare `scheduled()` handler
+-- with no request-scoped context. That handler cannot re-resolve the active
+-- theme the way a request can, so the theme active when an effect is staged
+-- is captured then and carried on the row instead, in this new column.
+--
+-- This is expand-only: one nullable column, no default, no backfill. A row
+-- staged before this migration keeps its existing payload value of NULL,
+-- which the reading code treats identically to "no theme recorded" today —
+-- it falls back to the manifest default. A deploy applies migrations before
+-- the new Worker is live, so the previous code must keep running unchanged
+-- against this schema; it never selects the new column, so it is unaffected.
+ALTER TABLE order_effects ADD COLUMN payload TEXT;
