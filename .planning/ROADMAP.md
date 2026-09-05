@@ -264,8 +264,34 @@ Plans:
   3. Remaining docs follow one style contract: direct second-person language, short sentences, one idea per section, commands in fenced blocks, no duplicated content across files, and a consistent header (title, one-line purpose, status)
   4. `AGENTS.md` at the repo root gives a coding assistant an ordered setup path (prerequisites, accounts, secrets, local run, gates, deploy) with the exact commands, the files it must not edit, and links into the docs; `CLAUDE.md` points to it and a Claude Code session started from a fresh clone can follow it without asking for facts the repo already holds
 
-**Plans**: TBD
+**Plans:** 6 plans
 **UI hint**: no
+
+Plans:
+
+**Wave 1**
+
+- [ ] 08.2-01-PLAN.md — Tracer: docs inventory record, one retirement carried through every layer, manifest reconciled both ways, resource identifiers replaced with placeholders (D-01, D-03, D-10)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 08.2-02-PLAN.md — Seven remaining retirements with links, manifest and changelog in one commit; `scripts/docs-lint.mjs` and `npm run docs:lint` (D-03, D-04, D-05)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 08.2-03-PLAN.md — Setup-and-deploy consolidation with trim-and-link, Stripe guide merged then retired, architecture trim, CONTRIBUTING gate list (D-04, D-10, D-11)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 08.2-04-PLAN.md — `AGENTS.md` written and tracked with the managed block preserved, root `CLAUDE.md` tracked, `docs/CLAUDE.md` trimmed (D-07, D-08, D-12)
+
+**Wave 5** *(blocked on Wave 4)*
+
+- [ ] 08.2-05-PLAN.md — Seven optimised preset images, README rewritten product-neutral in the fixed section order, docs index regenerated (D-01, D-02, D-09, D-13)
+
+**Wave 6** *(blocked on Wave 5)*
+
+- [ ] 08.2-06-PLAN.md — Style contract across the surviving set, whole-set claim check, validation record filled, DOCS-04/05 closed (D-05, D-06)
 
 ### Phase 08.1: v2 Tech-Debt Closure (INSERTED)
 
