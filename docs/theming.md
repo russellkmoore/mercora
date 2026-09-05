@@ -339,6 +339,10 @@ Every other mark cites the specific findings row(s) it rests on. Zero defects we
 
 ## Known limits and backlog
 
+The Phase 8 visual QA pass above found zero unresolved findings — all 46 findings rows in
+[`08-QA-MATRIX.md`](../.planning/phases/08-documentation-visual-qa-close-out/08-QA-MATRIX.md) are
+clean, so there is no QA-sourced item to add to this table beyond the items already tracked below.
+
 | Item | Tracked in | What closing it would take |
 |---|---|---|
 | `NEXT_PUBLIC_THEME_DEFAULT` still needs to be added as a Cloudflare Workers Build variable | `.planning/STATE.md` Blockers/Concerns | Add the variable in the Cloudflare Dashboard's Workers Builds settings and redeploy — `wrangler.jsonc`'s own `vars` entry is a local/preview default only, not a substitute for the dashboard-side Build variable |
