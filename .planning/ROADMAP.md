@@ -264,7 +264,7 @@ Plans:
   3. Remaining docs follow one style contract: direct second-person language, short sentences, one idea per section, commands in fenced blocks, no duplicated content across files, and a consistent header (title, one-line purpose, status)
   4. `AGENTS.md` at the repo root gives a coding assistant an ordered setup path (prerequisites, accounts, secrets, local run, gates, deploy) with the exact commands, the files it must not edit, and links into the docs; `CLAUDE.md` points to it and a Claude Code session started from a fresh clone can follow it without asking for facts the repo already holds
 
-**Plans:** 1/6 plans executed
+**Plans:** 2/6 plans executed
 **UI hint**: no
 
 Plans:
@@ -275,7 +275,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 08.2-02-PLAN.md — Seven remaining retirements with links, manifest and changelog in one commit; `scripts/docs-lint.mjs` and `npm run docs:lint` (D-03, D-04, D-05)
+- [x] 08.2-02-PLAN.md — Seven remaining retirements with links, manifest and changelog in one commit; `scripts/docs-lint.mjs` and `npm run docs:lint` (D-03, D-04, D-05)
 
 **Wave 3** *(blocked on Wave 2)*
 

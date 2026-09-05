@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 08.2
 current_phase_name: Documentation Overhaul & Agent Onboarding
 status: executing
-stopped_at: Completed 08.2-01-PLAN.md
-last_updated: "2026-09-05T23:06:34.139Z"
+stopped_at: Completed 08.2-02-PLAN.md
+last_updated: "2026-09-05T23:18:35.213Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 08.2 execution started
-state_head: 5cd0a2e3ab11bf3df67f85e5988b98d3fdfc9cb8
+state_head: 206101edbb1e859cab21eec42ace0fe44586f636
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 44
-  completed_plans: 39
+  completed_plans: 40
   percent: 86
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-05 after Phase 8.1)
 ## Current Position
 
 Phase: 08.2 (Documentation Overhaul & Agent Onboarding) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-09-05 — Phase 08.2 execution started
 
@@ -111,6 +111,7 @@ Progress: [█████████░] 86%
 | Phase 08.1 P06 | 10min | 3 tasks | 6 files |
 | Phase 08.1 P07 | 22min | 3 tasks | 8 files |
 | Phase 08.2 P01 | 20min | 3 tasks | 9 files |
+| Phase 08.2 P02 | 26min | 3 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -202,6 +203,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 08.1]: [Phase 08.1] [08.1-07] D-11's visual proof used a direct hash comparison against Phase 8's recorded volt-dark product capture rather than a fresh pixel-diff — the hashes matched exactly, stronger evidence than a visual diff.
 - [Phase 08.1]: [Phase 08.1] [08.1-07] v2-MILESTONE-AUDIT.md's front-matter status left as tech_debt: two non-deferred items (three Phase 5 screenshot gaps, border-inverse dual-use) remain open and are outside 08.1-CONTEXT.md's named deferred scope.
 - [Phase 08.2]: Copied verdicts/reasons from 08.2-RESEARCH.md verbatim rather than re-deriving any; DEPLOYMENT_SETUP.md classified KEEP-TRIM as plan 03's merge target; gift cards owned by checkout-trust-boundary.md's Optional capabilities section. — Executor_notes instruction plus the retiring o07-gift-cards-plan.md's living facts already moved there
+- [Phase 08.2]: 08.2-02: Fixed docs/ROADMAP.md's two dead cross-references inside task 1's commit even though ROADMAP.md is itself retired in task 2 — no commit in the plan leaves a live document pointing at a deleted path.
+- [Phase 08.2]: 08.2-02: scripts/docs-lint.mjs's scan surface excludes docs/CHANGELOG-docs.md only from the dead-reference and relative-link checks; included everywhere else, per plan spec.
 
 ### Pending Todos
 
@@ -265,8 +268,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T23:06:33.724Z
-Stopped at: Completed 08.2-01-PLAN.md
+Last session: 2026-09-05T23:18:34.805Z
+Stopped at: Completed 08.2-02-PLAN.md
 Resume file: None
 
 Next: `/gsd-plan-phase 8.2` (context exists) then execute; then `/gsd-audit-milestone` → `/gsd-complete-milestone v2` → `/gsd-cleanup`
