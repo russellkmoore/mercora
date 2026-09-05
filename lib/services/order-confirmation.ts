@@ -11,6 +11,7 @@ import { getDbAsync } from '@/lib/db';
 import { products } from '@/lib/db/schema/products';
 import { inArray } from 'drizzle-orm';
 import { getStoreConfig } from '@/lib/store-config';
+import type { ThemeTokens } from '@/lib/themes/tokens';
 
 const MAX_IMAGE_PRODUCT_IDS = 100;
 
@@ -136,22 +137,26 @@ export async function buildMerchantOrderEmailData(order: Order): Promise<Merchan
 
 export async function sendOrderConfirmation(
   order: Order,
-  idempotencyKey: string
+  idempotencyKey: string,
+  tokens?: ThemeTokens,
 ): Promise<EmailResult> {
   const data = await buildOrderEmailData(order);
-  return data ? sendOrderConfirmationEmail(data, { idempotencyKey }) : { success: true, skipped: true };
+  return data
+    ? sendOrderConfirmationEmail(data, { idempotencyKey, tokens })
+    : { success: true, skipped: true };
 }
 
 export async function sendMerchantOrderNotification(
   order: Order,
   idempotencyKey: string,
+  tokens?: ThemeTokens,
 ): Promise<EmailResult> {
   if (!getStoreConfig().contact.merchantNotificationEmail) {
     return { success: true, skipped: true };
   }
   const data = await buildMerchantOrderEmailData(order);
   return data
-    ? sendNewOrderMerchantNotification(data, { idempotencyKey })
+    ? sendNewOrderMerchantNotification(data, { idempotencyKey, tokens })
     : {
         success: false,
         error: 'Merchant notification requires a valid order id and line items',

@@ -19,6 +19,8 @@ import { runPaidOrderInventoryEffect } from '@/lib/services/inventory-adjustment
 import { recordTelemetry } from '@/lib/observability/telemetry';
 import { subscriptionAcquisitionIdFromOrder } from '@/lib/commerce/capabilities';
 import { fulfillPaidGiftCards } from '@/lib/services/gift-card-fulfillment';
+import { getActiveTheme } from '@/lib/themes/active-theme';
+import { emailThemeForStagedPayload } from '@/lib/email/theme';
 
 const EFFECT_LEASE_MS = 5 * 60 * 1000;
 const MAX_EFFECT_ERROR = 2_000;
@@ -37,6 +39,7 @@ export interface ClaimedOrderEffect {
   effect_type: OrderEffectType;
   attempt_count: number;
   claim_token: string;
+  payload: string | null;
 }
 
 interface EffectDefinition {
@@ -70,6 +73,14 @@ export interface StagePaidOrderEffectOptions {
   /** Renewal invoice orders suppress this to avoid recursive acquisition. */
   includeSubscription?: boolean;
   now?: Date;
+  /**
+   * The theme to stage onto the confirmation/merchant-notification effect
+   * rows (D-10). Callers reached only from a request context may resolve the
+   * active theme themselves and pass it here; when omitted,
+   * `stagePaidOrderEffects` resolves it via `getActiveTheme()` — the only
+   * place in this file allowed to do so (see the comment beside that call).
+   */
+  themeName?: string;
 }
 
 class EffectNeedsReviewError extends Error {}
@@ -142,7 +153,16 @@ export async function stagePaidOrderEffects(
   options: StagePaidOrderEffectOptions & { database?: D1Database } = {}
 ): Promise<void> {
   const database = await resolveDatabase(options.database);
-  await database.batch(preparePaidOrderEffectStatements(database, order, options));
+  // This is the one place in this file that may touch the active-theme
+  // resolver: stagePaidOrderEffects is only ever reached from a request
+  // context (the paid-order finalization path), never from the scheduled
+  // recovery sweep, which has no request context to resolve a theme from
+  // (D-10, RESEARCH Pitfall 1). Nothing downstream of this call — including
+  // executeEffect and the drain loop — may repeat this resolution.
+  const themeName = options.themeName ?? await getActiveTheme();
+  await database.batch(
+    preparePaidOrderEffectStatements(database, order, { ...options, themeName })
+  );
 }
 
 /** Build effect inserts for callers that must compose them into a larger D1 batch. */
@@ -153,21 +173,25 @@ export function preparePaidOrderEffectStatements(
 ): D1PreparedStatement[] {
   if (!order.id) throw new Error('Cannot stage effects for an order without an id');
   const now = (options.now ?? new Date()).toISOString();
+  const emailPayload = options.themeName
+    ? JSON.stringify({ themeName: options.themeName })
+    : null;
   return effectDefinitions(
     order,
     options.includeEmail !== false,
     options.includeSubscription !== false,
     options.includeGiftCard !== false,
-  ).map(({ key, type }) =>
-    database.prepare(`
+  ).map(({ key, type }) => {
+    const isEmailEffect = type === 'confirmation_email' || type === 'merchant_notification';
+    return database.prepare(`
 INSERT INTO order_effects (
   effect_key, order_id, effect_type, status, attempt_count,
   claim_token, lease_expires_at, next_attempt_at, last_error, result,
-  created_at, updated_at, completed_at
-) VALUES (?, ?, ?, 'pending', 0, NULL, NULL, NULL, NULL, NULL, ?, ?, NULL)
+  payload, created_at, updated_at, completed_at
+) VALUES (?, ?, ?, 'pending', 0, NULL, NULL, NULL, NULL, NULL, ?, ?, ?, NULL)
 ON CONFLICT(effect_key) DO NOTHING
-`).bind(key, order.id!, type, now, now)
-  );
+`).bind(key, order.id!, type, isEmailEffect ? emailPayload : null, now, now);
+  });
 }
 
 const CLAIM_SQL = `
@@ -193,7 +217,7 @@ WHERE effect_key = (
   ORDER BY oe.created_at, oe.effect_key
   LIMIT 1
 )
-RETURNING effect_key, order_id, effect_type, attempt_count, claim_token
+RETURNING effect_key, order_id, effect_type, attempt_count, claim_token, payload
 `;
 
 export async function claimNextOrderEffect(
@@ -281,14 +305,16 @@ async function executeEffect(
       return { applied: true };
     case 'confirmation_email': {
       const send = runtime.sendConfirmation ?? sendOrderConfirmation;
-      const result = await send(order, `order-confirmation/${order.id}/v1`);
+      const tokens = emailThemeForStagedPayload(effect.payload);
+      const result = await send(order, `order-confirmation/${order.id}/v1`, tokens);
       if (result.needsReview) throw new EffectNeedsReviewError(result.error || 'Confirmation email requires review');
       if (!result.success) throw new Error(result.error || 'Confirmation email failed');
       return { providerId: result.id ?? null, skipped: result.skipped === true };
     }
     case 'merchant_notification': {
       const send = runtime.sendMerchantNotification ?? sendMerchantOrderNotification;
-      const result = await send(order, `merchant-notification/${order.id}/v1`);
+      const tokens = emailThemeForStagedPayload(effect.payload);
+      const result = await send(order, `merchant-notification/${order.id}/v1`, tokens);
       if (result.needsReview) throw new EffectNeedsReviewError(result.error || 'Merchant notification requires review');
       if (!result.success) throw new Error(result.error || 'Merchant notification failed');
       return { providerId: result.id ?? null, skipped: result.skipped === true };
