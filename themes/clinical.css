@@ -1,0 +1,65 @@
+/**
+ * clinical theme — the frozen 23-token contract (05-TOKEN-MAP.md §1).
+ *
+ * The light preset: pure-white surfaces, cool graphite text, and a single
+ * sea-teal accent — a trustworthy, regulated look for skincare, wellness,
+ * supplements, pharmacy and dental storefronts. Converted from
+ * `docs/voltique-theme-direction.md` section 3 onto the 23-token contract
+ * per 06.1-UI-SPEC.md "Preset Token Contracts" (D-01, D-03, D-05..D-07).
+ *
+ * One value is a deliberate correction rather than a direct oklch->hex
+ * transcription of the direction document: the literal sea-teal accent on
+ * the doc's own white accent-ink measures only ~3.38:1, below the 4.5:1
+ * WCAG AA threshold for a solid button's text label. The `primary` token
+ * below is darkened along the same hue/chroma (doc `oklch(62% .12 200)` ->
+ * corrected `oklch(54% .12 200)`) to ~4.61:1; `ring` carries the same
+ * corrected value.
+ *
+ * Because this theme's main surfaces are light, its five inverse tokens
+ * (drawers, Stripe host, email templates) go dark — the opposite polarity
+ * from every dark theme, per Phase 5 D-06 and Phase 6 D-04, mirroring
+ * `luxe`'s precedent rather than copying a dark theme's light inverse set.
+ *
+ * Per D-02, every token is required and declares a literal value. No token
+ * resolves through a second token as a fallback default. This file declares
+ * no font-loading at-rule: both font tokens carry the existing Geist stack
+ * because the direction document names Geist itself as an acceptable face
+ * for this preset (Inter or Geist 500) — no new `next/font` variable needed.
+ */
+/* @theme label: Clinical | industry: skincare, wellness, supplements, pharmacy, dental | synopsis: Trustworthy and regulated — pure white surfaces, cool graphite text, one sea-teal accent, and a lot of air. Reads like a well-designed pharmacy label. */
+[data-theme="clinical"] {
+  /* Main colours */
+  --store-primary: #00828a;
+  --store-on-primary: #ffffff;
+  --store-surface: #ffffff;
+  --store-surface-elevated: #f3f8f9;
+  --store-foreground: #202a32;
+  --store-muted-foreground: #67737c;
+  --store-border: #d7e0e3;
+  --store-ring: #00828a;
+  --store-success: #06915f;
+  --store-warning: #ce871b;
+  --store-danger: #be222a;
+  --store-info: #0e84b7;
+
+  /* Inverse colours (dark panels on a light app: drawers, Stripe, emails) */
+  --store-surface-inverse: #030a11;
+  --store-surface-inverse-elevated: #0a151d;
+  --store-on-inverse: #ffffff;
+  --store-muted-on-inverse: #7c8891;
+  --store-border-inverse: #1b252d;
+
+  /* Shape — the doc's single 0.5rem figure lands exactly on volt-dark's own
+     radius-lg step, so that step takes the doc's literal value and the
+     surrounding three steps reuse volt-dark's stock progression rather than
+     inventing a new scale */
+  --store-radius-sm: 0.25rem;
+  --store-radius-md: 0.375rem;
+  --store-radius-lg: 0.5rem;
+  --store-radius-xl: 0.75rem;
+
+  /* Type — both tokens are the Geist stack because the doc names Geist
+     directly, matching the midnight precedent of not introducing a face */
+  --store-font-sans: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --store-font-display: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
