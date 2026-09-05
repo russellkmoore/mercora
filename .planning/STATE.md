@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 07
 current_phase_name: Layout Switches
 status: executing
-stopped_at: Completed 07-01-PLAN.md
-last_updated: "2026-09-05T08:09:19.909Z"
+stopped_at: Completed 07-02-PLAN.md
+last_updated: "2026-09-05T08:21:59.922Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 07 execution started
-state_head: 83ac368d5b04a24a1f015bd9854883a0a4ec9b20
+state_head: e4e07b10162dce1d75149699319ed36be969090d
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 26
-  completed_plans: 21
+  completed_plans: 23
   percent: 60
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-05 after Phase 6.1)
 ## Current Position
 
 Phase: 07 (Layout Switches) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-09-05 — Phase 07 execution started
 
@@ -91,6 +91,7 @@ Progress: [██████░░░░] 60%
 | Phase 06.1 P03 | 20min | 3 tasks | 26 files |
 | Phase 06.1 P04 | 45min | 3 tasks | 5 files |
 | Phase 07 P01 | 35min | 3 tasks | 17 files |
+| Phase 07 P02 | 25min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -151,6 +152,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 06.1]: [06.1-04] Atelier's ProductCard fill is kept even though the direction doc wants 'no card fills' -- per-theme component/markup overrides are rejected on principle. — A borderless-card variant scoped to Atelier alone would violate the milestone's tokens+enumerated-variants architecture; recorded as an accepted, reasoned leave-it, not a silent gap.
 - [Phase 07]: Passing a resolved variant COMPONENT from the server category page into the client CategoryDisplay does not work (RSC cannot serialize a function/component prop); fixed by passing the resolved enum value (typed CategoryLayout) and doing the CATEGORY_LAYOUT_MAP lookup inside CategoryDisplay itself, still a single map access with no branching.
 - [Phase 07]: Accepted two D1 reads per request for getLayoutSettings() (RESEARCH Pitfall 1) rather than sharing a memoised readAppearance() helper with getActiveTheme() -- keeps the new resolver fully independent of the frozen theme-resolver test suite.
+- [Phase 07]: Home hero's split/full-bleed variants delegate fully to HomeHeroMinimal (not a placeholder image) when there is no featured product — Supersedes RESEARCH assumption A1 per the UI-SPEC's explicit decision
+- [Phase 07]: Added components/layout/home/home-hero-map.ts, a small module not enumerated in 07-02's files_modified list — Mirrors category-layout-map.ts's precedent from 07-01 so the map's key/enum equality and every-member-renders invariants are directly testable
 
 ### Pending Todos
 
@@ -197,8 +200,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T08:09:19.742Z
-Stopped at: Completed 07-01-PLAN.md
+Last session: 2026-09-05T08:21:59.746Z
+Stopped at: Completed 07-02-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 7` (or `/gsd-plan-phase 7` directly) to start Layout Switches
