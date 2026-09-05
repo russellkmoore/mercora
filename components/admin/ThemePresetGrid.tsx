@@ -11,6 +11,7 @@ import {
   APPEARANCE_SETTINGS_CATEGORY,
   APPEARANCE_THEME_SETTING_KEY,
 } from "@/lib/themes/active-theme";
+import { nextRovingIndex } from "./roving-index";
 
 // Fixed chip order per 06-UI-SPEC.md's card anatomy (D-14).
 const CHIP_ORDER: Array<keyof (typeof THEME_MANIFEST)[number]["tokens"]> = [
@@ -46,13 +47,11 @@ export function extractThemeName(rows: SettingRow[]): string {
 }
 
 /** Computes the next roving-tabindex index for an arrow-key press on the radiogroup,
- * wrapping at both ends. Exported and unit-tested directly (06-REVIEW WR-03) rather than
- * only reachable through a simulated DOM keydown, which this test suite has no jsdom/DOM
- * testing library available to drive. */
-export function nextRovingIndex(currentIndex: number, key: string, length: number): number {
-  const delta = key === "ArrowRight" || key === "ArrowDown" ? 1 : -1;
-  return (currentIndex + delta + length) % length;
-}
+ * wrapping at both ends. Re-exported from the shared roving-index module (07-REVIEW
+ * WR-02) so this file keeps its existing export for callers/tests that import
+ * nextRovingIndex from ThemePresetGrid directly, while LayoutSwitches's identical
+ * keyboard math shares this same implementation instead of a verbatim copy. */
+export { nextRovingIndex };
 
 export type ThemePresetGridContentProps = {
   status: "loading" | "loaded" | "error";
