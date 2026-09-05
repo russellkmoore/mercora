@@ -8,12 +8,6 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
   
-  /* Progressive font enhancement */
-  .font-sans {
-    font-family: var(--store-font-sans);
-    font-display: swap;
-  }
-  
   /* Only load mono font when actually needed */
   .font-mono {
     font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, 'SF Mono', Monaco, Inconsolata, 'Roboto Mono', monospace;
