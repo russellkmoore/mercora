@@ -33,7 +33,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Close-out
 
-- [ ] **DOCS-01**: `docs/theming.md` documents the token contract, how to duplicate a theme file, and how build validation fails; `docs/CLAUDE.md` is updated
+- [x] **DOCS-01**: `docs/theming.md` documents the token contract, how to duplicate a theme file, and how build validation fails; `docs/CLAUDE.md` is updated
 - [ ] **DOCS-02**: A visual QA pass of presets × layout variants is recorded
 - [ ] **DOCS-03**: `.planning/codebase/` structure/architecture docs get a targeted refresh reflecting the sweep (full remap not needed)
 
@@ -81,7 +81,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LAYOUT-02 | Phase 7 | Complete |
 | LAYOUT-03 | Phase 7 | Complete |
 | LAYOUT-04 | Phase 7 | Complete |
-| DOCS-01 | Phase 8 | Pending |
+| DOCS-01 | Phase 8 | Complete |
 | DOCS-02 | Phase 8 | Pending |
 | DOCS-03 | Phase 8 | Pending |
 
