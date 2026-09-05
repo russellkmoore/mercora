@@ -209,3 +209,118 @@ the way a plain `node scripts/build-themes.mjs` invocation would — non-zero ex
 - **The pre-dev hook** (`predev` in `package.json`): `node scripts/build-themes.mjs && node scripts/db-local-ensure.mjs` — a broken theme file blocks `npm run dev` from starting at all.
 - **The worker build** (`build:worker` in `package.json`): `node scripts/build-themes.mjs && node scripts/build-with-public-env.mjs ./node_modules/.bin/opennextjs-cloudflare build` — a broken theme file blocks the Cloudflare Workers build.
 - **The CI step** named **"Check theme manifest freshness"** (`.github/workflows/ci.yml`), which runs `npm run build:themes:check` — this catches both an invalid theme file and a committed `lib/themes/manifest.generated.ts` / `themes/index.generated.css` that is stale relative to the `themes/*.css` sources.
+
+## Resolution order
+
+`getActiveTheme()` (`lib/themes/active-theme.ts`) resolves the storefront's active theme in this
+order, on every request:
+
+1. **The database read.** `getSettings("appearance")` reads the `appearance.theme` row. An absent
+   or empty stored value falls through silently to step 2 — that's the normal first-load state
+   before any admin selection has ever been saved, not an anomaly, so it carries no telemetry.
+2. **The deploy-time environment default**, `NEXT_PUBLIC_THEME_DEFAULT` — used only if it is itself
+   a manifest theme name.
+3. **The manifest default**, `DEFAULT_THEME_NAME` (`volt-dark`) — the final fallback.
+
+A present stored value that is **not** a manifest theme name is a genuinely unknown selection: the
+resolver emits exactly one telemetry signal, `theme.unknown_selection`, carrying only
+`{ outcome: "invalid" }` — never the stored string itself — and then falls through to step 2. A
+database read failure degrades straight to step 2 as well, rather than taking down every route.
+
+There is no cache anywhere in this path — no module-scope variable, no cross-request memoisation.
+The module's own header comment states why: a Cloudflare Workers isolate can be reused across
+requests, so any caching here risks serving a stale look after an admin save.
+
+The layout resolver (`getLayoutSettings()` in `lib/layout/settings.ts`) has the same shape and reads
+the same `appearance` category, but is deliberately a second, independent D1 read rather than
+sharing a memoised helper with `getActiveTheme()` — its own header comment gives the reason: it
+keeps this module fully independent of the theme resolver's internals and its own frozen test
+suite. Each of the three layout switches resolves against its own enum array the same way: absent
+or empty falls through silently to that switch's default; a present value outside the enum emits
+exactly one `layout.unknown_selection` signal, again carrying only `{ outcome: "invalid" }`, then
+falls through to the default.
+
+## The admin surface
+
+Go to **Admin → Settings → Appearance** (`/admin/settings/appearance`). The theme grid
+(`components/admin/ThemePresetGrid.tsx`) shows one card per manifest entry — colour chips, a mini
+mock, the label, an industry line and a synopsis when present, and an **Active** badge on whichever
+theme is currently saved — with its own **Save Changes** button. Below it, the layout section
+(`components/admin/LayoutSwitches.tsx`) shows three independent radiogroups (category layout, home
+hero, product gallery), each option rendered as an icon-labelled card, with its own separate
+**Save**.
+
+The admin dashboard keeps its own fixed palette and does not change with the storefront theme —
+deliberate, not a bug, and the reason `scripts/scan-hardcoded-colors.mjs` excludes any path
+containing an `admin` directory segment outright. Section 0 above already covers how to switch a
+theme or layout from this page; this section only names what the page shows.
+
+## The layout switches
+
+`lib/layout/variants.ts` is the single source of truth for the three layout switches. Their setting
+keys, read from and written to the same `appearance` settings category as the theme:
+
+- `appearance.category_layout` — enum `grid-3` | `grid-2` | `list` (default `grid-3`)
+- `appearance.home_hero` — enum `full-bleed` | `split` | `minimal` (default `minimal`)
+- `appearance.product_gallery` — enum `left` | `top` (default `left`)
+
+All four appearance keys — the theme key and these three switches — live in the same `appearance`
+settings category, which is why a single admin save can change a whole look at once.
+
+Each enum member renders through a typed lookup map, never a generic layout prop:
+
+- `categoryLayout`: `grid-3` → `CategoryGrid3`, `grid-2` → `CategoryGrid2`, `list` → `CategoryList` (`components/layout/category/category-layout-map.ts`)
+- `homeHero`: `full-bleed` → `HomeHeroFullBleed`, `split` → `HomeHeroSplit`, `minimal` → `HomeHeroMinimal` (`components/layout/home/home-hero-map.ts`)
+- `productGallery`: `left` → `ProductGalleryLeft`, `top` → `ProductGalleryTop` (`components/layout/product/`)
+
+## The two gates and the screenshot harness
+
+Two build-time gates enforce the token contract; neither touches a running server.
+
+```bash
+npm run scan:tokens
+```
+Runs `scripts/scan-hardcoded-colors.mjs` — a whole-tree scan for hardcoded palette values (hex
+literals, `rgb()`/`hsl()` functions, and raw Tailwind/shadcn palette utility classes) across `app/`,
+`components/`, `lib/`, `themes/`, and `tailwind.config.ts`. Any path segment named `admin` is
+excluded outright (the admin surface keeps its own fixed palette, by design). `themes/` itself and
+`lib/themes/tokens.ts` / `lib/themes/manifest.generated.ts` are excluded as the theme source of
+truth — hex literals there are the contract, not a violation. A short, fixed list of named files is
+excluded outright too, each with a written reason printed on every run (e.g. a base64 data URI, or a
+merchant-authored fixture colour that a theme must not override) — a clean run can never be silent
+about what it deliberately did not look at. A polarity-neutral literal (one that reads correctly
+under both light and dark presets) gets an explicit sentinel-comment pair with a written reason,
+rather than a blanket exception.
+
+**`npm run scan:tokens` is not wired into CI today.** It is a local gate every phase of this
+milestone has run by convention before committing, not an automated CI check. Wiring it into CI is
+recorded as a recommended follow-up, not done in this phase.
+
+```bash
+node scripts/build-themes.mjs --check
+```
+The theme-manifest freshness gate — see "What the validator rejects" above for what it enforces and
+exactly how it fails. **This one does run in CI**, as the step named "Check theme manifest
+freshness".
+
+```bash
+mise exec -- npm run screenshot:routes -- --label <name> --manifest <path> --allow-missing [--include-content]
+```
+The screenshot harness (`scripts/screenshot-routes.mjs`) captures deterministic, multi-viewport,
+multi-state screenshots of the storefront's route grid and appends a coverage table to the manifest
+file at `<path>`. `--label` is required. **The `--manifest` flag silently defaults to an earlier
+phase's file** (`.planning/phases/05-token-contract-component-sweep/05-SCREENSHOTS.md`) when omitted
+— this has already caused one real cross-phase mistake, where a later phase's captures landed in
+Phase 5's manifest and had to be moved out by hand. Always pass `--manifest` explicitly, pointed at
+the file you actually want rows appended to.
+
+## Known limits and backlog
+
+| Item | Tracked in | What closing it would take |
+|---|---|---|
+| `NEXT_PUBLIC_THEME_DEFAULT` still needs to be added as a Cloudflare Workers Build variable | `.planning/STATE.md` Blockers/Concerns | Add the variable in the Cloudflare Dashboard's Workers Builds settings and redeploy — `wrangler.jsonc`'s own `vars` entry is a local/preview default only, not a substitute for the dashboard-side Build variable |
+| The admin Appearance page (theme grid + layout switches) has never been walked through in a real browser with a real Clerk admin session | `.planning/WINDOWS.md` #2 | A manual pass signed in as an admin, clicking through both sections, confirming ring/badge/toast behaviour and keyboard arrow-key selection |
+| Six of the seven presets carry design-direction properties (shadow, border-width, image-aspect, some `accent-2` values, font-mono, letter-spacing, and several per-theme layout behaviours) that this milestone's tokens-only architecture deliberately does not carry | `.planning/todos/pending/theme-contract-dropped-properties.md` (luxe/midnight), `.planning/todos/pending/theme-direction-doc-backlog-06.1.md` (clinical/retro/atelier/market) | A new contract-widening milestone with its own token sweep — not an incremental addition to the frozen 23-token contract |
+| Two image-URL resolvers coexist: `components/layout/product/gallery-media-url.ts` and `lib/utils/product-image.ts` | `.planning/STATE.md` Blockers/Concerns (carried from Phase 7) | Consolidate into one resolver the next time the product display is touched |
+| Pre-extraction parity tests self-write a missing baseline snapshot instead of failing | `.planning/STATE.md` Blockers/Concerns (carried from Phase 7) | Snapshots are committed today, but a deleted snapshot would silently regenerate rather than fail the test — worth a hard failure instead |
+| `npm run scan:tokens` is not wired into CI | This document, "The two gates" above | Add a step to `.github/workflows/ci.yml` running `npm run scan:tokens`, alongside the existing "Check theme manifest freshness" step |
