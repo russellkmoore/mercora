@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 08
 current_phase_name: Documentation & Visual QA Close-out
 status: executing
-stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-09-05T16:40:16.255Z"
+stopped_at: Completed 08-04-PLAN.md
+last_updated: "2026-09-05T16:58:14.459Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 08 execution started
-state_head: 48c632479747f1ae2b3801498c7d1f20f68e6d3f
+state_head: b35460cc4988ade1bf3e0846154caac3d4cec708
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 31
-  completed_plans: 29
+  completed_plans: 30
   percent: 80
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-05 after Phase 7)
 ## Current Position
 
 Phase: 08 (Documentation & Visual QA Close-out) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-09-05 — Phase 08 execution started
 
@@ -99,6 +99,7 @@ Progress: [████████░░] 80%
 | Phase 08 P01 | 6min | 2 tasks | 3 files |
 | Phase 08 P03 | 45min | 2 tasks | 1 files |
 | Phase 08 P02 | 15min | 3 tasks | 4 files |
+| Phase 08 P04 | 55min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -172,6 +173,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 08]: QA matrix: labels use phase-08-<combo>-<theme>, one settings POST per run, four carried-forward screenshot gaps accepted (not fought) — Matches RESEARCH.md's suggested naming; matches every prior phase's posture on order-status/Stripe/account/review-form gaps
 - [Phase 08]: [Phase 08] [08-02] docs/theming.md's five-of-seven-corrections callout scopes to the six presets actually converted from docs/voltique-theme-direction.md (volt-dark predates it, relocated verbatim); retro is named as the one converted preset needing no correction.
 - [Phase 08]: [Phase 08] [08-02] Added a new scripts/ entry to docs/CLAUDE.md's structure tree (none existed to splice the three theme/QA scripts under), matching the tree's existing glyph/comment-alignment convention.
+- [Phase 08]: [Phase 08] [08-04] Combination-dependent QA criteria (overflow/anatomy) judged once at volt-dark across all three packed layouts, not re-judged per preset -- no layout-variant component reads a theme token to decide its own geometry, so re-judging under a second preset would not be a new fact. Recorded as an explicit planner assumption in the Judgement Design, not a silent shortcut.
+- [Phase 08]: [Phase 08] [08-04] Zero defects found across 46 findings rows judging all seven presets and three packed layout combinations; the settings-GET empty-category bug (WINDOWS #3) was marked fixed via gsd-tools windows fixed 3, citing plan 08-01 as the closing plan.
 
 ### Pending Todos
 
@@ -224,8 +227,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T16:40:16.030Z
-Stopped at: Completed 08-02-PLAN.md
+Last session: 2026-09-05T16:58:14.224Z
+Stopped at: Completed 08-04-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 8` (or `/gsd-plan-phase 8` directly) to start Documentation & Visual QA Close-out
