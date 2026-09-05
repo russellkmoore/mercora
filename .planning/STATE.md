@@ -5,11 +5,11 @@ milestone_name: Themeable Storefront
 current_phase: 07
 current_phase_name: Layout Switches
 status: executing
-stopped_at: Phase 06.1 complete, ready to plan Phase 7
-last_updated: "2026-09-05T07:50:31.634Z"
+stopped_at: Completed 07-01-PLAN.md
+last_updated: "2026-09-05T08:09:19.909Z"
 last_activity: 2026-09-05
-last_activity_desc: Phase 06.1 complete, transitioned to Phase 7
-state_head: 7c35fbfbf328e6c83c391932c27562ce030f7002
+last_activity_desc: Phase 07 execution started
+state_head: 83ac368d5b04a24a1f015bd9854883a0a4ec9b20
 progress:
   total_phases: 5
   completed_phases: 3
@@ -25,16 +25,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-05 after Phase 6.1)
 
 **Core value:** A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** Phase 7 — Layout Switches
+**Current focus:** Phase 07 — Layout Switches
 
 ## Current Position
 
-Phase: 07 (Layout Switches) — READY TO EXECUTE
-Plan: Not started
+Phase: 07 (Layout Switches) — EXECUTING
+Plan: 2 of 5
 Status: Ready to execute
-Last activity: 2026-09-05 — Phase 06.1 complete, transitioned to Phase 7
+Last activity: 2026-09-05 — Phase 07 execution started
 
-Progress: [████░░░░░░] 40%
+Progress: [██████░░░░] 60%
 
 ## Performance Metrics
 
@@ -90,6 +90,7 @@ Progress: [████░░░░░░] 40%
 | Phase 06.1 P02 | 27min | 3 tasks | 6 files |
 | Phase 06.1 P03 | 20min | 3 tasks | 26 files |
 | Phase 06.1 P04 | 45min | 3 tasks | 5 files |
+| Phase 07 P01 | 35min | 3 tasks | 17 files |
 
 ## Accumulated Context
 
@@ -148,6 +149,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 06.1]: [Phase 06.1] [06.1-03] document.fonts.check() must query at the heading's own live rendered font-weight, not the default 400 -- Orbitron/Fraunces/Nunito load no 400 cut, so a weight-naive check would have false-negatived three of the four new display faces.
 - [Phase 06.1]: [06.1-04] SelectItem's focus highlight (focus:bg-surface-elevated) was byte-identical to its own SelectContent container background, invisible on every theme not just clinical; fixed to focus:bg-primary/10. — Discovered live via the checkout country Select while inspecting D-07's 'dropdown items' checklist item for Clinical's acid test; the fix is token-driven and needs no sentinel.
 - [Phase 06.1]: [06.1-04] Atelier's ProductCard fill is kept even though the direction doc wants 'no card fills' -- per-theme component/markup overrides are rejected on principle. — A borderless-card variant scoped to Atelier alone would violate the milestone's tokens+enumerated-variants architecture; recorded as an accepted, reasoned leave-it, not a silent gap.
+- [Phase 07]: Passing a resolved variant COMPONENT from the server category page into the client CategoryDisplay does not work (RSC cannot serialize a function/component prop); fixed by passing the resolved enum value (typed CategoryLayout) and doing the CATEGORY_LAYOUT_MAP lookup inside CategoryDisplay itself, still a single map access with no branching.
+- [Phase 07]: Accepted two D1 reads per request for getLayoutSettings() (RESEARCH Pitfall 1) rather than sharing a memoised readAppearance() helper with getActiveTheme() -- keeps the new resolver fully independent of the frozen theme-resolver test suite.
 
 ### Pending Todos
 
@@ -194,8 +197,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T07:09:57Z
-Stopped at: Phase 06.1 complete, ready to plan Phase 7
+Last session: 2026-09-05T08:09:19.742Z
+Stopped at: Completed 07-01-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 7` (or `/gsd-plan-phase 7` directly) to start Layout Switches
