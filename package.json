@@ -23,6 +23,7 @@
     "deploy:ci": "node scripts/d1-migrate.mjs --target production --apply --confirm-production && opennextjs-cloudflare deploy",
     "check:migrations": "node scripts/check-migration-safety.mjs",
     "scan:tokens": "node scripts/scan-hardcoded-colors.mjs",
+    "docs:lint": "node scripts/docs-lint.mjs",
     "screenshot:routes": "node scripts/screenshot-routes.mjs",
     "build:themes": "node scripts/build-themes.mjs",
     "build:themes:check": "node scripts/build-themes.mjs --check",
