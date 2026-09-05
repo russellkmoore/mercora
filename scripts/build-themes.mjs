@@ -67,7 +67,7 @@ const NAME_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 /** Maps a `--store-kebab-name` CSS custom property (prefix stripped) to camelCase. */
-function kebabToCamel(kebab) {
+export function kebabToCamel(kebab) {
   return kebab.replace(/-([a-z])/g, (_match, letter) => letter.toUpperCase());
 }
 

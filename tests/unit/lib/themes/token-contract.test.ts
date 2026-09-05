@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { getThemeTokens } from "@/lib/themes/tokens";
 import { DEFAULT_THEME_NAME } from "@/lib/themes/manifest.generated";
+import { kebabToCamel } from "../../../../scripts/build-themes.mjs";
 
 /**
  * Contract test: getThemeTokens() must never silently drift from the theme
@@ -41,11 +42,6 @@ const EXPECTED_KEYS = [
   "fontSans",
   "fontDisplay",
 ];
-
-/** Maps a `--store-kebab-name` CSS custom property to its camelCase key. */
-function kebabToCamel(kebab: string): string {
-  return kebab.replace(/-([a-z])/g, (_match, letter: string) => letter.toUpperCase());
-}
 
 /** Parses `--store-*` custom-property declarations out of the theme CSS. */
 function parseThemeCssProperties(cssSource: string): Record<string, string> {
