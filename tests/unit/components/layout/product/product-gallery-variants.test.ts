@@ -300,3 +300,27 @@ describe("ProductDisplay source contract (LAYOUT-04 anti-genericity)", () => {
     expect(src).toContain("Choose an option:");
   });
 });
+
+// --- Task 3: app/product/[slug]/page.tsx source contract -------------------
+
+const PRODUCT_PAGE_PATH = "app/product/[slug]/page.tsx";
+
+describe("app/product/[slug]/page.tsx source contract (LAYOUT-04 anti-genericity)", () => {
+  const page = source(PRODUCT_PAGE_PATH);
+
+  it("awaits the resolver directly in the page body, above the returned tree, not inside a Suspense child", () => {
+    expect(page).toContain("await getLayoutSettings()");
+    expect(page).not.toMatch(/<Suspense[^>]*>[\s\S]*getLayoutSettings/);
+  });
+
+  it("passes the resolved value into the display under the switch's own prop name", () => {
+    expect(page).toMatch(/productGallery=\{productGallery\}/);
+  });
+
+  it("leaves the existing parallel data fetches and the revalidation export unchanged", () => {
+    expect(page).toContain("export const revalidate = 0;");
+    expect(page).toContain("Promise.all([");
+    expect(page).toContain("getProductReviews({");
+    expect(page).toContain("getProductReviewEligibility({");
+  });
+});

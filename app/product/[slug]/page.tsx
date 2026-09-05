@@ -48,6 +48,7 @@ import { toPublicProduct } from "@/lib/models/mach/product-serializer";
 import { getRecommendationsForProduct } from "@/lib/recommendations";
 import { buildServerUserContext } from "@/lib/recommendations/user-context.server";
 import { getStoreConfig } from "@/lib/store-config";
+import { getLayoutSettings } from "@/lib/layout/settings";
 
 export const revalidate = 0;
 
@@ -66,6 +67,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const store = getStoreConfig();
   const commerce = store.commerce;
   const userContextPromise = buildServerUserContext(userId);
+  const { productGallery } = await getLayoutSettings();
 
   const [reviews, reviewEligibility, recommendations] = await Promise.all([
     getProductReviews({
@@ -92,6 +94,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           recommendations={recommendations}
           reviews={reviews}
           reviewEligibility={reviewEligibility}
+          productGallery={productGallery}
           subscription={{
             enabled: commerce.features.subscriptionAcquisition
               && commerce.features.subscriptionReconciliation
