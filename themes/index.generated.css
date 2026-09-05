@@ -1,4 +1,5 @@
 /* GENERATED FILE — DO NOT EDIT. Produced by scripts/build-themes.mjs from themes/*.css. */
+@import './clinical.css';
 @import './luxe.css';
 @import './midnight.css';
 @import './volt-dark.css';
