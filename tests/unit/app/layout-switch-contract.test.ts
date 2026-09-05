@@ -272,11 +272,13 @@ function listFilesRecursive(dir: string): string[] {
   return files;
 }
 
-describe("No cross-request memoisation helper or module-scope mutable declaration in the layout tree or the resolver", () => {
+describe("No cross-request memoisation helper or module-scope mutable declaration in the layout tree or the resolver (lib/themes/appearance-read.ts is a named, deliberate exception — see the dedicated it() below)", () => {
   const layoutTreeFiles = listFilesRecursive(join(process.cwd(), "components", "layout"));
   const resolverFiles = [
     join(process.cwd(), "lib", "layout", "settings.ts"),
     join(process.cwd(), "lib", "layout", "variants.ts"),
+    join(process.cwd(), "lib", "themes", "appearance-read.ts"),
+    join(process.cwd(), "lib", "themes", "active-theme.ts"),
   ];
   const allFiles = [...layoutTreeFiles, ...resolverFiles];
 
@@ -289,6 +291,12 @@ describe("No cross-request memoisation helper or module-scope mutable declaratio
       expect(src).not.toMatch(/globalThis\./);
     },
   );
+
+  it("lib/themes/appearance-read.ts is the one granted exception: it imports React's request-scoped cache helper and explains why in a comment", () => {
+    const src = source(join("lib", "themes", "appearance-read.ts"));
+    expect(src).toMatch(/import\s*\{[^}]*\bcache\b[^}]*\}\s*from\s*["']react["']/);
+    expect(src).toMatch(/request-scoped/i);
+  });
 });
 
 // --- Neither image-bearing hero reads its image from settings/store-config -
