@@ -39,18 +39,29 @@ export async function GET(request: NextRequest) {
     const db = await getDbAsync();
     
     // Load settings from database
-    const settings = category 
+    const settings = category
       ? await db.select().from(admin_settings).where(eq(admin_settings.category, category))
       : await db.select().from(admin_settings);
-    
-    // If no settings exist, initialize with defaults
+
+    // If no settings exist for the requested scope, seed defaults for that
+    // scope only. A category with no defaults at all (e.g. `appearance`) is
+    // legitimate and must not trigger a full-table re-seed (WINDOWS #3).
     if (settings.length === 0) {
-      console.log('Initializing default settings...');
-      await db.insert(admin_settings).values(defaultSettings);
-      const newSettings = await db.select().from(admin_settings);
+      const seedRows = category
+        ? defaultSettings.filter((setting) => setting.category === category)
+        : defaultSettings;
+
+      if (seedRows.length > 0) {
+        console.log('Initializing default settings...');
+        await db.insert(admin_settings).values(seedRows);
+      }
+
+      const newSettings = category
+        ? await db.select().from(admin_settings).where(eq(admin_settings.category, category))
+        : await db.select().from(admin_settings);
       return NextResponse.json({ settings: newSettings });
     }
-    
+
     return NextResponse.json({ settings });
 
   } catch (error) {
