@@ -2,13 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   checkAdminPermissions: vi.fn(),
-  isSuperAdminActor: vi.fn(),
   getDbAsync: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/admin-middleware", () => ({
   checkAdminPermissions: mocks.checkAdminPermissions,
-  isSuperAdminActor: mocks.isSuperAdminActor,
 }));
 vi.mock("@/lib/db", () => ({ getDbAsync: mocks.getDbAsync }));
 
@@ -53,7 +51,6 @@ describe("GET /api/admin/settings — category-scoped seeding", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.checkAdminPermissions.mockResolvedValue({ success: true, userId: "admin_1" });
-    mocks.isSuperAdminActor.mockResolvedValue(false);
   });
 
   it("returns an empty list for a category with no defaults, on a partially-seeded table, without inserting", async () => {
@@ -211,5 +208,30 @@ describe("GET /api/admin/settings — category-scoped seeding", () => {
 
     expect(response.status).toBe(200);
     expect(db.onConflictDoNothing).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs a rejecting seed insert once with the stable prefix and still returns the normal successful response", async () => {
+    const db = buildDb();
+    const seedError = new Error("D1_ERROR: insert denied");
+    db.onConflictDoNothing.mockRejectedValueOnce(seedError);
+    db.unfilteredMock.mockResolvedValue([]);
+    const systemDefaults = defaultSettings.filter((s) => s.category === "system");
+    db.whereMock.mockResolvedValueOnce([]).mockResolvedValueOnce(systemDefaults);
+    mocks.getDbAsync.mockResolvedValue(db);
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const response = await GET(request("system"));
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ settings: systemDefaults });
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Seed insert failed (may be a benign concurrent race):",
+        seedError,
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 });
