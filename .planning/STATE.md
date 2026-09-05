@@ -4,17 +4,17 @@ milestone: v2
 milestone_name: Themeable Storefront
 current_phase: 06.1
 current_phase_name: "Remaining Presets: Clinical, Retro, Atelier, Market"
-status: executing
-stopped_at: Completed 06.1-03-PLAN.md
-last_updated: "2026-09-05T06:16:54.345Z"
+status: verifying
+stopped_at: Completed 06.1-04-PLAN.md — Phase 06.1 complete, THEME-05 marked complete
+last_updated: "2026-09-05T06:53:38.515Z"
 last_activity: 2026-09-04
 last_activity_desc: Phase 06.1 execution started
-state_head: a58b9a1b84ea7407d74b897dac87b8b7ec388751
+state_head: cec0b79f3bcddd92bacea58c1d48da8422eb7c20
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 21
-  completed_plans: 20
+  completed_plans: 21
   percent: 40
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-09-04 after Phase 6)
 
 Phase: 06.1 (Remaining Presets: Clinical, Retro, Atelier, Market) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-04 — Phase 06.1 execution started
 
 Progress: [████░░░░░░] 40%
@@ -88,6 +88,7 @@ Progress: [████░░░░░░] 40%
 | Phase 06.1 P01 | 20min | 2 tasks | 4 files |
 | Phase 06.1 P02 | 27min | 3 tasks | 6 files |
 | Phase 06.1 P03 | 20min | 3 tasks | 26 files |
+| Phase 06.1 P04 | 45min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -144,6 +145,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 06.1]: [Phase 06.1] [06.1-02] Market's success token deliberately keeps the direction doc's literal, uncorrected value even though primary (same hue family) needed a contrast correction -- success renders as tinted text/panel backgrounds, not solid white-on-green button text, so the AA failure forcing primary's correction doesn't apply.
 - [Phase 06.1]: [Phase 06.1] [06.1-03] Fixed a real CSS scoping bug beyond the plan's design: a custom property whose value nests a var() reference resolves at the element that DECLARES it ([data-theme] on <html>), not the element that CONSUMES it (<body>'s font-family) -- applied the six next/font variable classes to <html> as well as <body>.
 - [Phase 06.1]: [Phase 06.1] [06.1-03] document.fonts.check() must query at the heading's own live rendered font-weight, not the default 400 -- Orbitron/Fraunces/Nunito load no 400 cut, so a weight-naive check would have false-negatived three of the four new display faces.
+- [Phase 06.1]: [06.1-04] SelectItem's focus highlight (focus:bg-surface-elevated) was byte-identical to its own SelectContent container background, invisible on every theme not just clinical; fixed to focus:bg-primary/10. — Discovered live via the checkout country Select while inspecting D-07's 'dropdown items' checklist item for Clinical's acid test; the fix is token-driven and needs no sentinel.
+- [Phase 06.1]: [06.1-04] Atelier's ProductCard fill is kept even though the direction doc wants 'no card fills' -- per-theme component/markup overrides are rejected on principle. — A borderless-card variant scoped to Atelier alone would violate the milestone's tokens+enumerated-variants architecture; recorded as an accepted, reasoned leave-it, not a silent gap.
 
 ### Pending Todos
 
@@ -170,10 +173,10 @@ Carried out of Phase 5:
 Carried out of Phase 6 (see `.planning/WINDOWS.md`):
 
 - [Needs Russell] Add `NEXT_PUBLIC_THEME_DEFAULT=volt-dark` as a Cloudflare Workers Build variable before the next deploy
-- [Phase 6] `--store-font-display` is wired end to end but no component applies the `font-display` class, so Luxe's serif headings never render; wire it onto heading elements (no visual change under volt-dark) — Phase 7 or 8
-- [Phase 6] `app/api/admin/settings/route.ts` GET re-inserts the entire `defaultSettings` array when a category filter returns no rows; would 500 a fresh install's first Appearance-page load. Pre-existing, out of scope so far
-- [Phase 6] Admin Appearance page has not been walked through in a real browser with a Clerk admin session; Dialog/AlertDialog scrims under `luxe` verified by compositing test only
-- [Phase 6] Four more preset specs (Clinical, Retro, Atelier, Market) and the direction doc's extra properties are backlog
+- [Phase 6] `--store-font-display` is wired end to end but no component applies the `font-display` class, so Luxe's serif headings never render — **closed at 06.1-03**: `font-display` is applied to all 23 storefront headings, the `volt-dark` change is registered as intentional snap `S-TYPE-01`, and WINDOWS #1 is marked fixed
+- [Phase 6] `app/api/admin/settings/route.ts` GET re-inserts the entire `defaultSettings` array when a category filter returns no rows; would 500 a fresh install's first Appearance-page load. Pre-existing, out of scope so far (WINDOWS #3)
+- [Phase 6] Admin Appearance page has not been walked through in a real browser with a Clerk admin session; Dialog/AlertDialog scrims under `luxe` verified by compositing test only (WINDOWS #2)
+- [Phase 6] Four more preset specs (Clinical, Retro, Atelier, Market) — **shipped at Phase 6.1** (06.1-01 through 06.1-04); the direction doc's extra properties (shadow, border-width, image-aspect, some `accent-2` values, font-mono, letter-spacing) remain backlog, recorded per preset in `.planning/todos/pending/theme-contract-dropped-properties.md` (luxe/midnight) and `.planning/todos/pending/theme-direction-doc-backlog-06.1.md` (clinical/retro/atelier/market)
 - [Phase 06-04] app/api/admin/settings/route.ts's GET ?category=X inserts the full defaultSettings array (all categories) when the filtered result is empty; appearance has no defaults, so a fresh DB with other categories already populated would 500 on the Appearance page's own load. Out of scope for 06-04 (interfaces explicitly forbid touching this file); logged in WINDOWS.md #3.
 
 ### Roadmap Evolution
@@ -190,8 +193,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T06:16:54.214Z
-Stopped at: Completed 06.1-03-PLAN.md
+Last session: 2026-09-05T06:53:38.393Z
+Stopped at: Completed 06.1-04-PLAN.md — Phase 06.1 complete, THEME-05 marked complete
 Resume file: None
 
 Next: `/gsd-discuss-phase 7` (or `/gsd-plan-phase 7` directly) to start Layout Switches
