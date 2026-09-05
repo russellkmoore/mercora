@@ -9,7 +9,6 @@ This directory contains comprehensive documentation for all aspects of the Merco
 ### 🚀 **Getting Started**
 - **[Main README](../README.md)** - Project overview, features, and quick start
 - **[Deployment Guide](DEPLOYMENT_SETUP.md)** - Complete production deployment instructions
-- **[Development Roadmap](ROADMAP.md)** - Current status and future plans
 
 ### 🏗️ **Technical Architecture**
 - **[System Architecture](architecture.md)** - Complete system design with Mermaid diagrams
@@ -33,7 +32,6 @@ All four carry a dated Accepted status and are locked in `gsd-ingest-manifest.ya
 
 ### 🛠️ **Operations and runbooks**
 - **[Dependency Security Baseline](dependency-security.md)** - Production dependency audit baseline, owned exceptions, and the CI audit gate
-- **[Migration Reservations](migration-reservations.md)** - Assigns migration numbers from the current ledger so parallel branches don't reuse one
 - **[Shopify Migration Toolkit](shopify-migration.md)** - Operator-only import of catalog, content, media, customers, and historical orders, defaulting to a dry run
 - **[Runtime Configuration](runtime-configuration.md)** - Override public, non-secret storefront defaults from `lib/store-config.ts` without editing components
 
@@ -41,7 +39,6 @@ All four carry a dated Accepted status and are locked in `gsd-ingest-manifest.ya
 - **[Commerce Observability](observability.md)** - A versioned, bounded, best-effort telemetry envelope for actionable commerce failures
 - **[Content Publishing](content-publishing.md)** - Store-neutral CMS pages and Blog publishing, added without seeding merchant content
 - **[Customer Accounts and Communications](customer-communications.md)** - Authenticated account navigation, order history, saved addresses, and profile settings
-- **[Gift Cards](o07-gift-cards-plan.md)** - Generic stored-value gift cards with a security and ledger foundation, shipped and stacked on subscriptions
 
 ### 📈 **Assessments, baselines, and proposals**
 - **[Mobile Lighthouse Baseline](mobile-lighthouse-baseline.md)** - Lighthouse scores recorded for four routes against the PRD performance target
@@ -75,7 +72,7 @@ All four carry a dated Accepted status and are locked in `gsd-ingest-manifest.ya
 
 ### For Business Users
 - Review [admin-authentication.md](admin-authentication.md) for admin capabilities; the project's planning record tracks current admin scope
-- Check [ROADMAP.md](ROADMAP.md) for current status and future plans
+- Check the project's planning record for current status and future plans
 
 ### For DevOps/Deployment
 - Follow [DEPLOYMENT_SETUP.md](DEPLOYMENT_SETUP.md) for complete setup
