@@ -477,7 +477,7 @@ npx wrangler deploy               # Deploy to Cloudflare Workers
 ### Cloudflare Configuration (wrangler.jsonc)
 ```json
 {
-  "d1_databases": [{"binding": "DB", "database_id": "c1ea0c17-14ae-48cc-ade8-4433e9130594"}],
+  "d1_databases": [{"binding": "DB", "database_id": "your-d1-database-id-here"}],
   "r2_buckets": [{"binding": "MEDIA", "bucket_name": "voltique-images"}],
   "vectorize": [{"binding": "VECTORIZE", "index_name": "voltique-index"}],
   "ai": {"binding": "AI"}
