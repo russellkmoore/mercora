@@ -39,6 +39,9 @@ jobs:
       - name: Check theme manifest freshness
         run: npm run build:themes:check
 
+      - name: Scan for raw token usage
+        run: npm run scan:tokens
+
       - name: Lint
         run: npm run lint
 
