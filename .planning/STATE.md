@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 08.2
 current_phase_name: Documentation Overhaul & Agent Onboarding
 status: executing
-stopped_at: Phase 08.1 complete, ready to plan Phase 08.2
-last_updated: "2026-09-05T22:59:05.023Z"
+stopped_at: Completed 08.2-01-PLAN.md
+last_updated: "2026-09-05T23:06:34.139Z"
 last_activity: 2026-09-05
-last_activity_desc: Phase 08.1 complete, transitioned to Phase 08.2
-state_head: f6e45781060a4b518f808b8410cc9fcfc7ee3dd3
+last_activity_desc: Phase 08.2 execution started
+state_head: 5cd0a2e3ab11bf3df67f85e5988b98d3fdfc9cb8
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 44
-  completed_plans: 38
+  completed_plans: 39
   percent: 86
 ---
 
@@ -25,16 +25,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-05 after Phase 8.1)
 
 **Core value:** A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** Phase 8.2 — Documentation Overhaul & Agent Onboarding
+**Current focus:** Phase 08.2 — Documentation Overhaul & Agent Onboarding
 
 ## Current Position
 
-Phase: 08.2 (Documentation Overhaul & Agent Onboarding) — READY TO EXECUTE
-Plan: Not started
+Phase: 08.2 (Documentation Overhaul & Agent Onboarding) — EXECUTING
+Plan: 2 of 6
 Status: Ready to execute
-Last activity: 2026-09-05 — Phase 08.1 complete, transitioned to Phase 08.2
+Last activity: 2026-09-05 — Phase 08.2 execution started
 
-Progress: [███████░░░] 71%
+Progress: [█████████░] 86%
 
 ## Performance Metrics
 
@@ -110,6 +110,7 @@ Progress: [███████░░░] 71%
 | Phase 08.1 P04 | 12min | 3 tasks | 10 files |
 | Phase 08.1 P06 | 10min | 3 tasks | 6 files |
 | Phase 08.1 P07 | 22min | 3 tasks | 8 files |
+| Phase 08.2 P01 | 20min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -200,6 +201,7 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 08.1]: [Phase 08.1] [08.1-06] 06-REVIEW IN-03 closed by recorded resolution only, per the review's own conclusion that no code change is required beyond the already-applied WR-01 fix.
 - [Phase 08.1]: [Phase 08.1] [08.1-07] D-11's visual proof used a direct hash comparison against Phase 8's recorded volt-dark product capture rather than a fresh pixel-diff — the hashes matched exactly, stronger evidence than a visual diff.
 - [Phase 08.1]: [Phase 08.1] [08.1-07] v2-MILESTONE-AUDIT.md's front-matter status left as tech_debt: two non-deferred items (three Phase 5 screenshot gaps, border-inverse dual-use) remain open and are outside 08.1-CONTEXT.md's named deferred scope.
+- [Phase 08.2]: Copied verdicts/reasons from 08.2-RESEARCH.md verbatim rather than re-deriving any; DEPLOYMENT_SETUP.md classified KEEP-TRIM as plan 03's merge target; gift cards owned by checkout-trust-boundary.md's Optional capabilities section. — Executor_notes instruction plus the retiring o07-gift-cards-plan.md's living facts already moved there
 
 ### Pending Todos
 
@@ -263,8 +265,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T22:20:18Z
-Stopped at: Phase 08.1 complete, ready to plan Phase 08.2
+Last session: 2026-09-05T23:06:33.724Z
+Stopped at: Completed 08.2-01-PLAN.md
 Resume file: None
 
 Next: `/gsd-plan-phase 8.2` (context exists) then execute; then `/gsd-audit-milestone` → `/gsd-complete-milestone v2` → `/gsd-cleanup`

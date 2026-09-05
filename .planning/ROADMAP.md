@@ -264,14 +264,14 @@ Plans:
   3. Remaining docs follow one style contract: direct second-person language, short sentences, one idea per section, commands in fenced blocks, no duplicated content across files, and a consistent header (title, one-line purpose, status)
   4. `AGENTS.md` at the repo root gives a coding assistant an ordered setup path (prerequisites, accounts, secrets, local run, gates, deploy) with the exact commands, the files it must not edit, and links into the docs; `CLAUDE.md` points to it and a Claude Code session started from a fresh clone can follow it without asking for facts the repo already holds
 
-**Plans:** 6 plans
+**Plans:** 1/6 plans executed
 **UI hint**: no
 
 Plans:
 
 **Wave 1**
 
-- [ ] 08.2-01-PLAN.md — Tracer: docs inventory record, one retirement carried through every layer, manifest reconciled both ways, resource identifiers replaced with placeholders (D-01, D-03, D-10)
+- [x] 08.2-01-PLAN.md — Tracer: docs inventory record, one retirement carried through every layer, manifest reconciled both ways, resource identifiers replaced with placeholders (D-01, D-03, D-10)
 
 **Wave 2** *(blocked on Wave 1)*
 
