@@ -962,6 +962,27 @@ deferred it (⚠ unresolved, per `08-UI-SPEC.md`'s own carry-forward); this phas
 open question rather than closing it either way, and rather than silently skipping past it as
 though it were already closed.
 
+## Visual QA Summary
+
+Seven presets by three packed layout combinations. This is the grid a reader scans — the findings
+table below it is the full evidence every mark here points back to.
+
+| Preset | A (`grid-3`/`minimal`/`left`) | B (`grid-2`/`split`/`top`) | C (`list`/`full-bleed`/`left`) |
+|---|---|---|---|
+| `volt-dark` | ✓ Pass — F2, F15-F18 | ✓ Pass — F6-F9 | ✓ Pass — F10-F14 |
+| `luxe` | ✓ Pass — F19-F22 | ✓ Pass (by design — combination-axis criteria are checked once, at `volt-dark`; see Judgement Design) | ✓ Pass — F43 (scrim cross-check); anatomy by design |
+| `midnight` | ✓ Pass — F23-F26 | ✓ Pass (by design) | ✓ Pass (by design) |
+| `clinical` | ✓ Pass — F27-F30 | ✓ Pass (by design) | ✓ Pass — F44 (scrim cross-check); anatomy by design |
+| `retro` | ✓ Pass — F31-F34 | ✓ Pass (by design) | ✓ Pass (by design) |
+| `atelier` | ✓ Pass — F35-F38 | ✓ Pass (by design) | ✓ Pass — F45 (scrim cross-check); anatomy by design |
+| `market` | ✓ Pass — F39-F42 | ✓ Pass (by design) | ✓ Pass — F46 (scrim cross-check); anatomy by design |
+
+"By design" cells are not independently inspected — they rest on the Judgement Design's stated
+factorisation (layout-anatomy criteria don't vary by preset; legibility/scrim/display-face criteria
+don't vary by combination), which is itself flagged as a planner assumption, not a proven property.
+Every other mark cites the specific findings row(s) it rests on. Zero defects were found across all
+46 findings; nothing required a fix.
+
 ## Findings
 
 Column set reused verbatim from `06.1-SCREENSHOTS.md`; judgement values are exactly **"Leave it"**
@@ -1026,3 +1047,29 @@ record was touched).
 **Task 2 total:** 32 rows recorded (28 preset-axis inspections — legibility, scrim, and display face
 for all seven presets at combination A — plus 4 light-preset cross-checks at combination C). Zero
 defects found; nothing fixed. Cumulative findings after tasks 1 and 2: 46.
+
+## Close-out rollup
+
+Items this phase either closed or is handing onward, each with why it is still open and where to
+pick it up next. Ledger shape reused from `06.1-SCREENSHOTS.md`'s own "Carried forward" table.
+
+| Item | Status | Where to pick up |
+|---|---|---|
+| `GET /api/admin/settings?category=X` inserted the full `defaultSettings` array when the filtered result was empty, not scoped to `X` (Phase 6, WINDOWS #3) | **Closed this phase**, at plan 08-01: a category-scoped seed guard now computes the requested category's own default set and only inserts when it is non-empty, with the post-seed re-select scoped identically; pinned by `tests/unit/app/api/admin-settings-empty-category.test.ts` (6 cases). Marked fixed in `.planning/WINDOWS.md` via `gsd-tools windows fixed 3` | Closed at 08-01; no further action |
+| Admin Appearance page human-observable walkthrough never run — no Clerk session in this environment (Phase 6, WINDOWS #2) | Still open, unchanged this phase | Whoever next has a real Clerk-authenticated browser session against this environment |
+| Defaults-parity screenshot diff: `product\|390\|resting` differs from baseline by 2 pixels at ±1/255 intensity, attributed to headless-Chromium rendering variance and registered as snap S-07-01 (Phase 7, WINDOWS #4) | Still open, unchanged this phase | Not blocking; re-evaluate only if a future capture shows the same cell drifting further |
+| Phase 5 screenshot coverage gaps: `order-status` (no seeded order), Stripe payment step (payment-intent 400 locally), authenticated account dashboard (no Clerk session), review-form error state | Still open — every one of this phase's 21 capture runs hit the same four missing cells for the same environmental reasons, recorded in the Coverage grid and every label subsection | Whoever next seeds an order and establishes a Clerk session in whatever environment runs the QA matrix |
+| Screen-reader / accessibility-tree pass over the rendered storefront cells | Still open — flagged as an inherited, explicitly unresolved question in this plan's own Judgement Design, matching the identical gap Phase 6 and Phase 6.1 both flagged and deferred | Whoever next scopes an accessibility-focused QA pass; not closed silently either way by this phase |
+| `07-UI-SPEC.md`'s flagged narrow-viewport overflow risk for `CategoryList`/`CategoryGrid` (a genuinely long product name squeezing the price/CTA row off-edge) | Still open, lower-confidence evidence (F13) — the local fixture's one product name is too short to exercise it | Worth a real check once a product with a long name exists in whatever environment tests it |
+| Category hero / featured-product image renders as a broken-image icon across every preset and combination (RESEARCH Pitfall 4 and its broader instance noted at F10) | Still open, unchanged since Phase 5/6 — the local D1 fixture has no working image URL for its one product | Worth a real look once the fixture (or a future environment) has a working image URL |
+| Dropped direction-doc properties for all seven presets (`shadow`, `border-width`, `image-aspect`, `accent-2` where not folded, `font-mono`, `letter-spacing`, per-theme layout behaviours) | Backlog, not blocking | `.planning/todos/pending/theme-contract-dropped-properties.md` (luxe/midnight), `.planning/todos/pending/theme-direction-doc-backlog-06.1.md` (clinical/retro/atelier/market) |
+| Two image-URL resolvers coexist (`components/layout/product/gallery-media-url.ts`, `lib/utils/product-image.ts`) | Still open, carried from Phase 7 | Consolidate the next time the product display is touched |
+| Pre-extraction parity tests self-write a missing baseline snapshot instead of failing | Still open, carried from Phase 7 | Worth a hard failure instead, next time the parity-test harness is touched |
+| `NEXT_PUBLIC_SITE_URL` / `NEXT_PUBLIC_THEME_DEFAULT` Workers Build variables | Still outstanding, carried from v1/Phase 6 | Cloudflare Dashboard → Workers & Pages → the Voltique Worker → Settings → Build → Variables and Secrets |
+
+No cell in this record is marked covered without either a captured hash or an explicitly named
+substitute-evidence trail, matching the convention `05-SCREENSHOTS.md`, `06-SCREENSHOTS.md`, and
+`06.1-SCREENSHOTS.md` all established. Zero findings from tasks 1 or 2 required flagging as an
+unresolved-for-a-future-milestone contract change — every inspected cell was a clean "Leave it";
+nothing in this phase's own QA pass needed a fix that a token, theme-file, or variant-enum change
+would have been required for.
