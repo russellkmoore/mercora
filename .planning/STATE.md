@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 08.1
 current_phase_name: v2 Tech-Debt Closure
 status: executing
-stopped_at: Completed 08.1-01-PLAN.md
-last_updated: "2026-09-05T20:14:46.066Z"
+stopped_at: Completed 08.1-03-PLAN.md
+last_updated: "2026-09-05T20:23:05.653Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 08.1 execution started
-state_head: 580cbcca2aac8a34f5cef4ce68c99fc0b3f15bc7
+state_head: dd16c2bc0a01923db0728b80a0fe014b721193f1
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 38
-  completed_plans: 32
+  completed_plans: 33
   percent: 71
 ---
 
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-09-05 after Phase 8)
 ## Current Position
 
 Phase: 08.1 (v2 Tech-Debt Closure) — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
 Status: Ready to execute
 Last activity: 2026-09-05 — Phase 08.1 execution started
 
-Progress: [████████░░] 83%
+Progress: [███████░░░] 71%
 
 ## Performance Metrics
 
@@ -103,6 +103,7 @@ Progress: [████████░░] 83%
 | Phase 08 P04 | 55min | 3 tasks | 3 files |
 | Phase 08 P05 | 45min | 3 tasks | 7 files |
 | Phase 08.1 P01 | 55min | 3 tasks | 9 files |
+| Phase 08.1 P03 | 24min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -181,6 +182,7 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 08]: [Phase 08] [08-05] Codebase-docs refresh (ARCHITECTURE/STRUCTURE/CONVENTIONS/TESTING) was pure splice into named sections; only TESTING.md's stale unit-test count (233/1701) was an actual correction, replaced with a number measured this session (260/2136), not carried forward.
 - [Phase 08]: [Phase 08] [08-05] Milestone close-out: all three requirements (DOCS-01/02/03) Complete, full gate suite green (lint, typecheck, scan:tokens 0/2, build:themes:check fresh, 260 files/2136 tests, production build) in one pass, closing v2 Themeable Storefront.
 - [Phase 08.1]: Shared appearance-read helper lives in lib/themes/appearance-read.ts (not inlined in active-theme.ts) to avoid a circular import while lib/layout/settings.ts imports it directly.
+- [Phase 08.1]: readParitySnapshot resolves its path with path.resolve(process.cwd(), relativePath) rather than join(), so its own test can pass absolute temp-dir paths while the three real parity suites keep passing their existing repo-relative constants unchanged.
 
 ### Pending Todos
 
@@ -246,8 +248,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T20:09:23.622Z
-Stopped at: Completed 08.1-01-PLAN.md
+Last session: 2026-09-05T20:23:05.340Z
+Stopped at: Completed 08.1-03-PLAN.md
 Resume file: None
 
 Next: review `.planning/v2-MILESTONE-AUDIT.md`, optionally `/gsd-phase --insert 8 "Address v2 tech debt"`, then `/gsd-complete-milestone v2` → `/gsd-cleanup`
