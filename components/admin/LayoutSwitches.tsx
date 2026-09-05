@@ -334,22 +334,26 @@ export function LayoutSwitches() {
   }
 
   async function save() {
-    const isDirty = SWITCH_GROUPS.some(
+    // Only the groups the admin actually touched go in the request — not all
+    // three unconditionally. Bundling untouched groups' saved.[group.id]
+    // fallback into every save (07-REVIEW WR-01) meant one admin's save
+    // could silently revert another admin's concurrent change to a field
+    // this session never touched or saw change; the settings endpoint is
+    // last-write-wins per-key, so only sending changed keys removes that
+    // exposure entirely, matching ThemePresetGrid's own single-key POST.
+    const dirtyGroups = SWITCH_GROUPS.filter(
       (group) => pending[group.id] !== undefined && pending[group.id] !== saved?.[group.id],
     );
-    if (!isDirty) return;
+    if (dirtyGroups.length === 0) return;
 
     setSaving(true);
     try {
-      const updates = SWITCH_GROUPS.map((group) => {
-        const value = pending[group.id] ?? saved?.[group.id] ?? DEFAULT_LAYOUTS[group.id];
-        return {
-          key: group.key,
-          value,
-          category: APPEARANCE_SETTINGS_CATEGORY,
-          data_type: "string",
-        };
-      });
+      const updates = dirtyGroups.map((group) => ({
+        key: group.key,
+        value: pending[group.id]!,
+        category: APPEARANCE_SETTINGS_CATEGORY,
+        data_type: "string",
+      }));
 
       // Re-check each pending value against its own enum before posting — a
       // cheap first line of defense; getLayoutSettings()'s own allow-list at
@@ -367,13 +371,35 @@ export function LayoutSwitches() {
       });
       if (!response.ok) throw new Error("Save failed");
 
-      // Re-read the confirmed values from the endpoint's own response body
-      // rather than the optimistic pending state — the settings endpoint is
-      // last-write-wins, so a concurrent admin save must not leave this
-      // island's highlight claiming a layout that isn't actually stored.
+      // The endpoint's response body only echoes back the keys THIS request
+      // sent (its own inArray(admin_settings.key, updatedKeys) read) — so a
+      // partial save's response can't be fed straight into
+      // extractLayoutSelections and used to replace all three fields, which
+      // would fall the two untouched groups back to their defaults. Merge
+      // the confirmed value for each dirty group into the existing saved
+      // state instead, leaving every untouched group exactly as it was.
       const body = (await response.json()) as SettingsResponse;
-      setSaved(extractLayoutSelections(body.settings));
-      setPending({});
+      const confirmed = extractLayoutSelections(body.settings);
+      const dirtyIds = new Set(dirtyGroups.map((group) => group.id));
+      setSaved((previous) => {
+        const base = previous ?? DEFAULT_LAYOUTS;
+        return {
+          categoryLayout: dirtyIds.has("categoryLayout")
+            ? confirmed.categoryLayout
+            : base.categoryLayout,
+          homeHero: dirtyIds.has("homeHero") ? confirmed.homeHero : base.homeHero,
+          productGallery: dirtyIds.has("productGallery")
+            ? confirmed.productGallery
+            : base.productGallery,
+        };
+      });
+      setPending((previous) => {
+        const next = { ...previous };
+        for (const id of dirtyIds) {
+          delete next[id];
+        }
+        return next;
+      });
       toast.success("Layout saved.");
     } catch {
       toast.error("Couldn't save your layout changes. Try again.");

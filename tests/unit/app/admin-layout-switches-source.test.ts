@@ -232,16 +232,23 @@ describe("LayoutSwitches source wiring (source-level checks)", () => {
     expect(grid).toContain('fetch(`/api/admin/settings?category=');
   });
 
-  it("sends exactly three updates in one request under the appearance category", () => {
+  it("sends only the groups the admin actually changed, not all three unconditionally (07-REVIEW WR-01)", () => {
     const grid = source("components/admin/LayoutSwitches.tsx");
-    expect(grid).toContain("const updates = SWITCH_GROUPS.map(");
+    expect(grid).toContain(
+      "const dirtyGroups = SWITCH_GROUPS.filter(\n      (group) => pending[group.id] !== undefined && pending[group.id] !== saved?.[group.id],\n    );",
+    );
+    expect(grid).toContain("const updates = dirtyGroups.map((group) => ({");
     expect(grid).toContain("category: APPEARANCE_SETTINGS_CATEGORY,");
     expect(grid).toContain("body: JSON.stringify({ updates })");
   });
 
-  it("reads the confirmed values back from the response body, not the pending state", () => {
+  it("merges the confirmed response back for only the changed groups, leaving untouched groups as-is", () => {
     const grid = source("components/admin/LayoutSwitches.tsx");
-    expect(grid).toContain("setSaved(extractLayoutSelections(body.settings))");
+    expect(grid).toContain("const confirmed = extractLayoutSelections(body.settings)");
+    expect(grid).toContain("const dirtyIds = new Set(dirtyGroups.map((group) => group.id))");
+    expect(grid).toContain('dirtyIds.has("categoryLayout")');
+    expect(grid).toContain('dirtyIds.has("homeHero")');
+    expect(grid).toContain('dirtyIds.has("productGallery")');
   });
 
   it("uses the exact toast, heading and subtitle copywriting-contract literals", () => {
