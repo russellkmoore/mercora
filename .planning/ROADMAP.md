@@ -226,7 +226,7 @@ Plans:
 | 4. Reference Documentation Refresh | v1 | 5/5 | Complete | 2026-09-02 |
 | 5. Token Contract & Component Sweep | v2 | 12/12 | Complete    | 2026-09-04 |
 | 6. Theme File Mechanism & Presets | v2 | 5/5 | Complete    | 2026-09-04 |
-| 7. Layout Switches | v2 | 4/5 | In Progress|  |
+| 7. Layout Switches | v2 | 5/5 | In Progress|  |
 | 8. Documentation & Visual QA Close-out | v2 | 0/TBD | Not started | - |
 
 ---
