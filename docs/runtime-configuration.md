@@ -26,6 +26,11 @@ time.
 secrets, Clerk secrets, Cloudflare API tokens) belong in `.dev.vars` locally or
 Cloudflare secrets remotely, never in this file or `wrangler.jsonc`.
 
+`NEXT_PUBLIC_*` values are inlined at **build** time. `build:worker` injects them from
+`wrangler.jsonc` `vars` via `scripts/build-with-public-env.mjs`, and that copy overrides a
+Cloudflare Dashboard Build variable of the same name; see `docs/DEPLOYMENT_SETUP.md`
+§6 Step 1b for the full precedence and checklist.
+
 Storefront colours no longer come from an environment variable. The active
 look is selected by the `data-theme` attribute on `<html>` and resolves
 through the matching `themes/*.css` file in the CSS cascade.

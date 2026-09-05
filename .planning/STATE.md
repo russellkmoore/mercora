@@ -203,7 +203,7 @@ Carried out of Phase 5:
 
 Carried out of Phase 6 (see `.planning/WINDOWS.md`):
 
-- [Needs Russell] Add `NEXT_PUBLIC_THEME_DEFAULT=volt-dark` as a Cloudflare Workers Build variable before the next deploy
+- [Closed 2026-09-05] `NEXT_PUBLIC_THEME_DEFAULT=volt-dark` added as a Dashboard Build variable by Russell; precedence documented in `docs/DEPLOYMENT_SETUP.md` §6 Step 1b (`wrangler.jsonc` vars win via `build-with-public-env.mjs`)
 - [Phase 6] `--store-font-display` is wired end to end but no component applies the `font-display` class, so Luxe's serif headings never render — **closed at 06.1-03**: `font-display` is applied to all 23 storefront headings, the `volt-dark` change is registered as intentional snap `S-TYPE-01`, and WINDOWS #1 is marked fixed
 - [Phase 6] `app/api/admin/settings/route.ts` GET re-inserts the entire `defaultSettings` array when a category filter returns no rows; would 500 a fresh install's first Appearance-page load. Pre-existing, out of scope so far (WINDOWS #3) — **closed at Phase 8 (08-01)**: the seed set is computed and guarded per category before any insert runs; WINDOWS #3 is marked fixed
 - [Phase 6] Admin Appearance page has not been walked through in a real browser with a Clerk admin session; Dialog/AlertDialog scrims under `luxe` verified by compositing test only (WINDOWS #2)
