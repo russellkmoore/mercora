@@ -6,4 +6,14 @@
 
 - Retired `api-architecture.md` — stale endpoint inventory (~9 documented vs 88 real routes) and a
   "security layers" diagram duplicated with `architecture.md`'s own closing diagram.
+- Retired `docs/admin-dashboard-specification.md` — design doc for modules that were never built;
+  superseded by `docs/admin-authentication.md` for admin capability and the project's live planning
+  record for current admin scope.
+- Retired `docs/mobile-improvements-actionable.md` — its recommendations are already implemented in
+  the code; current mobile status is owned by `docs/mobile-lighthouse-baseline.md`.
+- Retired `docs/mobile-testing-automation.md` — its own historical banner says the Lighthouse
+  CI/Playwright suites it describes are not implemented, confirmed absent from `package.json`; the
+  one-time measurement it proposed automating is `docs/mobile-lighthouse-baseline.md`.
+- Retired `docs/mobile-ux-assessment.md` — its own historical banner says it is superseded by
+  `docs/mobile-lighthouse-baseline.md`.
 </content>

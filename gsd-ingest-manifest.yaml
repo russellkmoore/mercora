@@ -30,8 +30,6 @@ docs:
   # --- SPEC: contracts and interfaces ---
   - path: docs/mcp-server-specification.md
     type: SPEC
-  - path: docs/admin-dashboard-specification.md
-    type: SPEC
   - path: docs/observability.md
     type: SPEC         # commerce.telemetry.v1 data contract
   - path: docs/content-publishing.md
@@ -45,8 +43,6 @@ docs:
   - path: docs/ROADMAP.md
     type: PRD
   - path: docs/o07-gift-cards-plan.md
-    type: PRD
-  - path: docs/mobile-improvements-actionable.md
     type: PRD
 
   # --- DOC: guides, references, assessments ---
@@ -63,10 +59,6 @@ docs:
   - path: docs/migration-reservations.md
     type: DOC
   - path: docs/shopify-migration.md
-    type: DOC
-  - path: docs/mobile-testing-automation.md
-    type: DOC
-  - path: docs/mobile-ux-assessment.md
     type: DOC
   - path: docs/DEPLOYMENT_SETUP.md
     type: DOC

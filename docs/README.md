@@ -18,7 +18,6 @@ This directory contains comprehensive documentation for all aspects of the Merco
 - **[Development Context](CLAUDE.md)** - Essential context for developers and AI assistants
 
 ### 💼 **Admin & Business Features**
-- **[Admin Dashboard Specification](admin-dashboard-specification.md)** - Complete admin interface specification
 - **[Admin Authentication](admin-authentication.md)** - Production-ready authentication and security
 - **[Stripe Integration](STRIPE_INTEGRATION.md)** - Payment processing and tax calculation
 
@@ -45,9 +44,6 @@ All four carry a dated Accepted status and are locked in `gsd-ingest-manifest.ya
 - **[Gift Cards](o07-gift-cards-plan.md)** - Generic stored-value gift cards with a security and ledger foundation, shipped and stacked on subscriptions
 
 ### 📈 **Assessments, baselines, and proposals**
-- **[Mobile UX Assessment](mobile-ux-assessment.md)** - A September 2025 snapshot of the platform's mobile user experience
-- **[Mobile Testing Automation Setup](mobile-testing-automation.md)** - A September 2025 proposal for automated mobile testing and performance monitoring
-- **[Mobile UX Improvements - Actionable Guide](mobile-improvements-actionable.md)** - Implementation guide for touch targets, performance, and user flow
 - **[Mobile Lighthouse Baseline](mobile-lighthouse-baseline.md)** - Lighthouse scores recorded for four routes against the PRD performance target
 
 ## 📋 **Quick Reference**
@@ -78,7 +74,7 @@ All four carry a dated Accepted status and are locked in `gsd-ingest-manifest.ya
 - Check the owning ADR or SPEC for the API behavior you need (e.g. [checkout-trust-boundary.md](checkout-trust-boundary.md), [webhooks-refunds-inventory.md](webhooks-refunds-inventory.md)) — endpoint counts change too often for a static list to stay accurate
 
 ### For Business Users
-- Review [admin-dashboard-specification.md](admin-dashboard-specification.md) for admin capabilities
+- Review [admin-authentication.md](admin-authentication.md) for admin capabilities; the project's planning record tracks current admin scope
 - Check [ROADMAP.md](ROADMAP.md) for current status and future plans
 
 ### For DevOps/Deployment

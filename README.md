@@ -127,7 +127,6 @@ User Query → AI Embeddings → Vector Search → Context Retrieval → LLM Res
 - **[🎨 Theming System](docs/theming.md)** - Token contract, presets, and layout switches
 
 ### **💼 Admin & Business Features**
-- **[👨‍💼 Admin Dashboard](docs/admin-dashboard-specification.md)** - Complete admin interface specification
 - **[🔐 Admin Authentication](docs/admin-authentication.md)** - Production-ready authentication and security
 - **[💳 Stripe Integration](docs/STRIPE_INTEGRATION.md)** - Payment processing and tax calculation
 
