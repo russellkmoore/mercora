@@ -214,7 +214,23 @@ export default async function RootLayout({
         },
       }}
     >
-      <html lang="en" data-theme={activeTheme} suppressHydrationWarning>
+      <html
+        lang="en"
+        data-theme={activeTheme}
+        // D-10 / Rule-3 fix: the next/font variable classes must also be present
+        // on the document element, not only on <body>. --store-font-sans and
+        // --store-font-display are declared by [data-theme="..."], which
+        // matches <html>; their nested var(--font-geist-sans) (etc.) reference
+        // is resolved once at the element that DECLARES the custom property,
+        // not lazily at the element that later consumes it in font-family. If
+        // the referenced next/font variable isn't also in scope at <html>, the
+        // token resolves to invalid there and that invalidity is what
+        // inherits down to <body> — the font-family declaration on body alone
+        // is not sufficient. Confirmed by a standalone minimal repro outside
+        // this app before applying here.
+        className={`${geistSans.variable} ${geistMono.variable} ${cormorantGaramond.variable} ${orbitron.variable} ${fraunces.variable} ${nunito.variable}`}
+        suppressHydrationWarning
+      >
         <head>
           {/* MCP discovery links complement the metadata emitted by generateMetadata. */}
           <link rel="mcp-server" href="/api/mcp" type="application/json" />

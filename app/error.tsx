@@ -14,7 +14,7 @@ export default function RouteError({ reset }: RouteErrorProps) {
       role="alert"
       className="flex min-h-[50vh] flex-col items-center justify-center px-6 py-20 text-center"
     >
-      <h1 className="text-2xl font-semibold text-foreground">Something went wrong</h1>
+      <h1 className="text-2xl font-semibold text-foreground font-display">Something went wrong</h1>
       <p className="mt-3 max-w-md text-muted-foreground">
         This page could not be loaded. Please try again.
       </p>

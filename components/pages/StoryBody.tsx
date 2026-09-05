@@ -8,7 +8,7 @@ export default function StoryBody({ lead, sections }: { lead: string; sections: 
       {lead && <div className={PROSE} dangerouslySetInnerHTML={{ __html: lead }} />}
       {sections.map((section) => (
         <section key={section.id} id={section.id} className="mx-auto mt-8 max-w-3xl scroll-mt-24">
-          <h2 className="mb-3 text-2xl font-semibold text-foreground">{section.heading}</h2>
+          <h2 className="mb-3 text-2xl font-semibold text-foreground font-display">{section.heading}</h2>
           <div className={PROSE} dangerouslySetInnerHTML={{ __html: section.html }} />
         </section>
       ))}

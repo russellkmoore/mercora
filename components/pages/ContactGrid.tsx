@@ -18,7 +18,7 @@ export default function ContactGrid({ sections, lead }: { sections: PageSection[
           return (
             <section key={section.id} id={section.id} className={`scroll-mt-24 rounded-xl border border-border bg-surface-elevated p-6 ${wide ? "sm:col-span-2" : ""}`}>
               <Icon aria-hidden className="mb-3 h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold text-foreground">{section.heading}</h2>
+              <h2 className="text-lg font-semibold text-foreground font-display">{section.heading}</h2>
               <div className="prose prose-invert prose-orange mt-2 max-w-none text-sm" dangerouslySetInnerHTML={{ __html: section.html }} />
             </section>
           );

@@ -132,7 +132,7 @@ export default async function CategoryPage({
           />
           <div className="absolute inset-0 bg-surface/40 flex items-end">
             <div className="p-6 sm:p-8 text-foreground">
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2 font-display">
                 {typeof category.name === 'string' ? category.name : (category.name?.en || 'Category')}
               </h1>
               {category.description && (
@@ -148,7 +148,7 @@ export default async function CategoryPage({
       {/* Category Header (fallback if no image) */}
       {!categoryImageUrl && (
         <div className="mb-8 text-center">
-          <h1 className="text-3xl sm:text-4xl font-bold mb-4">
+          <h1 className="text-3xl sm:text-4xl font-bold mb-4 font-display">
             {typeof category.name === 'string' ? category.name : (category.name?.en || 'Category')}
           </h1>
           {category.description && (

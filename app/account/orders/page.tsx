@@ -22,5 +22,5 @@ export default async function AccountOrdersPage() {
     } satisfies OrderCardOrder,
     shipment: buildShipmentView(order, registry),
   }));
-  return <div><h1 className="text-3xl font-bold">Order history</h1>{cards.length === 0 ? <p className="mt-6 text-muted-foreground">You haven&rsquo;t placed any orders yet.</p> : <div className="mt-6 space-y-5">{cards.map(({ order, shipment }) => <OrderCard key={order.id} order={order} shipment={shipment} />)}</div>}</div>;
+  return <div><h1 className="text-3xl font-bold font-display">Order history</h1>{cards.length === 0 ? <p className="mt-6 text-muted-foreground">You haven&rsquo;t placed any orders yet.</p> : <div className="mt-6 space-y-5">{cards.map(({ order, shipment }) => <OrderCard key={order.id} order={order} shipment={shipment} />)}</div>}</div>;
 }
