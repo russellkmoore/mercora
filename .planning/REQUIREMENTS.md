@@ -26,10 +26,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Layout Switches
 
-- [ ] **LAYOUT-01**: Admin can set `appearance.category_layout` (`grid-3 | grid-2 | list`); the category page renders the chosen named variant component server-side
-- [ ] **LAYOUT-02**: Admin can set `appearance.home_hero` (`full-bleed | split | minimal`); the home page renders the chosen named variant component server-side
-- [ ] **LAYOUT-03**: Admin can set `appearance.product_gallery` (`left | top`); the product page renders the chosen named variant component server-side
-- [ ] **LAYOUT-04**: Every layout variant has one render test; variants are enumerated union types and named components, never a generic `layout` prop
+- [x] **LAYOUT-01**: Admin can set `appearance.category_layout` (`grid-3 | grid-2 | list`); the category page renders the chosen named variant component server-side
+- [x] **LAYOUT-02**: Admin can set `appearance.home_hero` (`full-bleed | split | minimal`); the home page renders the chosen named variant component server-side
+- [x] **LAYOUT-03**: Admin can set `appearance.product_gallery` (`left | top`); the product page renders the chosen named variant component server-side
+- [x] **LAYOUT-04**: Every layout variant has one render test; variants are enumerated union types and named components, never a generic `layout` prop
 
 ### Close-out
 
@@ -77,10 +77,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | THEME-03 | Phase 6 | Complete |
 | THEME-04 | Phase 6 | Complete |
 | THEME-05 | Phase 6.1 | Complete |
-| LAYOUT-01 | Phase 7 | Pending |
-| LAYOUT-02 | Phase 7 | Pending |
-| LAYOUT-03 | Phase 7 | Pending |
-| LAYOUT-04 | Phase 7 | Pending |
+| LAYOUT-01 | Phase 7 | Complete |
+| LAYOUT-02 | Phase 7 | Complete |
+| LAYOUT-03 | Phase 7 | Complete |
+| LAYOUT-04 | Phase 7 | Complete |
 | DOCS-01 | Phase 8 | Pending |
 | DOCS-02 | Phase 8 | Pending |
 | DOCS-03 | Phase 8 | Pending |

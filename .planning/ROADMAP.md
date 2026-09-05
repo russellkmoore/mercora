@@ -27,7 +27,7 @@ Full phase details, success criteria, and plan lists: `milestones/v1-ROADMAP.md`
 
 - [x] **Phase 5: Token Contract & Component Sweep** - Freeze the ~18-token contract, relocate the current look verbatim to `themes/volt-dark.css`, and sweep every storefront component/template to token classes (admin excluded) (completed 2026-09-04)
 - [x] **Phase 6: Theme File Mechanism & Presets** - Build the prebuild theme scanner/validator, `getActiveTheme()` server resolution, the admin Appearance swatch picker, and ship 2-3 preset themes including one light (completed 2026-09-04)
-- [ ] **Phase 7: Layout Switches** - Add three enumerated, server-chosen layout variants (category grid/list, home hero, product gallery) wired into the Appearance admin section
+- [x] **Phase 7: Layout Switches** - Add three enumerated, server-chosen layout variants (category grid/list, home hero, product gallery) wired into the Appearance admin section (completed 2026-09-05)
 - [ ] **Phase 8: Documentation & Visual QA Close-out** - Document the theming system, record a visual QA pass across presets x layout variants, and refresh the affected `.planning/codebase/` docs
 
 **Phase Numbering:** continues from v1 (which ended at Phase 4). Decimal phases (5.1, 5.2, ...) are urgent insertions.
@@ -180,7 +180,7 @@ Plans:
   3. Admin can set `appearance.product_gallery` to `left` or `top`, and the product page renders the matching named server component
   4. Every layout variant component has a passing render test, and none of the three switches is implemented as a generic `layout` prop
 
-**Plans**: 4/5 plans executed
+**Plans**: 5/5 plans executed
 
 Plans:
 
@@ -196,7 +196,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 07-05-PLAN.md — Repo-wide LAYOUT-04 contract test, all eight variants captured under both presets, defaults-parity hash diff against the pre-extraction baseline, requirement register and phase-close roll-up
+- [x] 07-05-PLAN.md — Repo-wide LAYOUT-04 contract test, all eight variants captured under both presets, defaults-parity hash diff against the pre-extraction baseline, requirement register and phase-close roll-up
 
 **UI hint**: yes
 
