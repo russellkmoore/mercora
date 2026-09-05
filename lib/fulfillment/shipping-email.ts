@@ -14,7 +14,8 @@ import { latestOrderEvent, recordEmailEvent } from "./service";
 import { buildShipmentView, type ShipmentView } from "./shipment-view";
 import type { Actor, OrderEventType } from "./types";
 import { postalFooterHtml, postalFooterText } from "@/lib/email/footer";
-import { getThemeTokens } from "@/lib/themes/tokens";
+import { resolveEmailTheme } from "@/lib/email/theme";
+import type { ThemeTokens } from "@/lib/themes/tokens";
 
 export const SHIPPING_EMAIL_TEMPLATE_VERSION = 1;
 export const CONCURRENT_EMAIL_SEND_ERROR = "concurrent_idempotent_requests";
@@ -148,8 +149,7 @@ interface PreparedEmail {
   replyTo?: string;
 }
 
-function prepareShippingEmail(data: ShippingConfirmationData): PreparedEmail {
-  const tokens = getThemeTokens();
+function prepareShippingEmail(data: ShippingConfirmationData, tokens: ThemeTokens): PreparedEmail {
   const storeName = escapeHtmlText(data.store.name);
   const tagline = escapeHtmlText(data.store.tagline);
   const orderNumber = escapeHtmlText(data.orderNumber);
@@ -182,7 +182,7 @@ function prepareShippingEmail(data: ShippingConfirmationData): PreparedEmail {
     ? `<div style="padding:0 32px 8px"><h3 style="color:${tokens.onInverse};font-size:16px;margin:0 0 8px">In this shipment</h3><table style="border-collapse:collapse;width:100%;margin:0 0 8px">${itemRows}</table></div>`
     : "";
 
-  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Your order has shipped - ${storeName}</title></head><body style="margin:0;padding:0;background:${tokens.surfaceInverse};font-family:Arial,sans-serif"><div style="background:${tokens.surfaceInverseElevated};margin:0 auto;padding:20px 0 48px;max-width:600px"><div style="text-align:center;padding:32px 0;border-bottom:1px solid ${tokens.borderInverse}"><h1 style="color:${tokens.primary};font-size:32px;margin:0">${storeName}</h1><p style="color:${tokens.mutedOnInverse};font-size:14px;margin:8px 0 0">${tagline}</p></div><div style="padding:24px 32px"><h2 style="color:${tokens.onInverse};font-size:24px;margin:0 0 16px">Your order has shipped</h2><p style="color:${tokens.mutedOnInverse};font-size:16px;line-height:24px;margin:0 0 16px">Hi ${greeting},</p><p style="color:${tokens.mutedOnInverse};font-size:16px;line-height:24px;margin:0">Good news &mdash; order <strong>#${orderNumber}</strong> is on its way.</p></div>${trackingBlock}${trackingButton}${statusButton}${itemsBlock}<div style="text-align:center;padding:32px 32px 0;border-top:1px solid ${tokens.borderInverse};margin-top:24px"><p style="color:${tokens.mutedOnInverse};font-size:12px;line-height:16px;margin:0 0 8px">Questions about your delivery? Contact ${supportEmail}.</p><p style="color:${tokens.mutedOnInverse};font-size:12px;line-height:16px;margin:0">Thank you for choosing ${storeName}.</p>${postalFooterHtml()}</div></div></body></html>`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Your order has shipped - ${storeName}</title></head><body style="margin:0;padding:0;background:${tokens.surfaceInverse};font-family:Arial,sans-serif"><div style="background:${tokens.surfaceInverseElevated};margin:0 auto;padding:20px 0 48px;max-width:600px"><div style="text-align:center;padding:32px 0;border-bottom:1px solid ${tokens.borderInverse}"><h1 style="color:${tokens.primary};font-size:32px;margin:0">${storeName}</h1><p style="color:${tokens.mutedOnInverse};font-size:14px;margin:8px 0 0">${tagline}</p></div><div style="padding:24px 32px"><h2 style="color:${tokens.onInverse};font-size:24px;margin:0 0 16px">Your order has shipped</h2><p style="color:${tokens.mutedOnInverse};font-size:16px;line-height:24px;margin:0 0 16px">Hi ${greeting},</p><p style="color:${tokens.mutedOnInverse};font-size:16px;line-height:24px;margin:0">Good news &mdash; order <strong>#${orderNumber}</strong> is on its way.</p></div>${trackingBlock}${trackingButton}${statusButton}${itemsBlock}<div style="text-align:center;padding:32px 32px 0;border-top:1px solid ${tokens.borderInverse};margin-top:24px"><p style="color:${tokens.mutedOnInverse};font-size:12px;line-height:16px;margin:0 0 8px">Questions about your delivery? Contact ${supportEmail}.</p><p style="color:${tokens.mutedOnInverse};font-size:12px;line-height:16px;margin:0">Thank you for choosing ${storeName}.</p>${postalFooterHtml(tokens)}</div></div></body></html>`;
 
   const textLines = [
     `${data.store.name}: Your order has shipped`,
@@ -220,7 +220,8 @@ export async function sendShippingConfirmationEmail(
   idempotencyKey: string,
 ): Promise<ShippingEmailResult> {
   try {
-    const result = await sendEmail(prepareShippingEmail(data), { idempotencyKey });
+    const tokens = await resolveEmailTheme();
+    const result = await sendEmail(prepareShippingEmail(data, tokens), { idempotencyKey });
     return {
       success: result.success,
       ...(result.provider ? { provider: result.provider } : {}),

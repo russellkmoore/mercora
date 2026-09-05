@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateOrderConfirmationHTML } from '@/lib/utils/email';
+import { getThemeTokens } from '@/lib/themes/tokens';
 
 describe('order confirmation HTML', () => {
   it('escapes customer, catalog, address, order, and image attribute data', () => {
@@ -26,7 +27,7 @@ describe('order confirmation HTML', () => {
         zipCode: '<80202>',
         country: 'US&CA',
       },
-    });
+    }, getThemeTokens());
 
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(html).toContain('&lt;b&gt;1 Main&lt;/b&gt;');

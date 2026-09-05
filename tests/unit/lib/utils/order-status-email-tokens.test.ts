@@ -23,8 +23,9 @@ const base = {
 
 describe('order status update HTML token colours', () => {
   it('never emits an unevaluated ${tokens.*} placeholder', () => {
+    const tokens = getThemeTokens();
     for (const status of ['processing', 'shipped', 'delivered', 'cancelled', 'refunded', 'unknown']) {
-      const html = generateOrderStatusUpdateHTML({ ...base, status });
+      const html = generateOrderStatusUpdateHTML({ ...base, status }, tokens);
       expect(html, `status=${status}`).not.toContain('${');
     }
   });
@@ -37,7 +38,7 @@ describe('order status update HTML token colours', () => {
       ['cancelled', tokens.danger],
     ];
     for (const [status, colour] of cases) {
-      const html = generateOrderStatusUpdateHTML({ ...base, status });
+      const html = generateOrderStatusUpdateHTML({ ...base, status }, tokens);
       expect(html, `status=${status}`).toContain(`<h2 style="color: ${colour};`);
     }
   });

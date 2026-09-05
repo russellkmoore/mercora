@@ -5,7 +5,8 @@ import {
 } from '@/lib/email/sender';
 import { getStoreConfig } from '@/lib/store-config';
 import { escapeHtmlText } from '@/lib/utils/maintenance-html';
-import { getThemeTokens } from '@/lib/themes/tokens';
+import { resolveEmailTheme } from '@/lib/email/theme';
+import type { ThemeTokens } from '@/lib/themes/tokens';
 
 export const SUBSCRIPTION_LIFECYCLE_EMAIL_TEMPLATE_VERSION = 1;
 
@@ -214,9 +215,9 @@ function prepareEmail(
   identity: CustomerIdentity,
   row: CustomerNotificationRow,
   kind: SubscriptionLifecycleNotificationKind,
+  tokens: ThemeTokens,
 ): OutboundEmail {
   const store = getStoreConfig();
-  const tokens = getThemeTokens();
   const copy = notificationCopy(kind, formatEffectiveDate(row, store.commerce.locale));
   const accountUrl = safeAccountUrl(store.urls.site);
   const greeting = identity.name ? `Hi ${identity.name},` : 'Hello,';
@@ -278,7 +279,8 @@ export async function sendSubscriptionLifecycleEmail(
   const row = await findCustomerNotificationRow(input.database, input.subscriptionId);
   const identity = row ? customerIdentity(row) : undefined;
   if (!row || !identity) return { status: 'skipped' };
-  const result = await sender(prepareEmail(identity, row, input.kind), {
+  const tokens = await resolveEmailTheme();
+  const result = await sender(prepareEmail(identity, row, input.kind, tokens), {
     idempotencyKey: await subscriptionLifecycleEmailKey(input.deliveryScope, input.kind),
     database: input.database,
   });
