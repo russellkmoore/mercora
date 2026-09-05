@@ -123,7 +123,6 @@ User Query → AI Embeddings → Vector Search → Context Retrieval → LLM Res
 ### **🔧 Technical Documentation**  
 - **[🏗️ System Architecture](docs/architecture.md)** - Complete system design with diagrams
 - **[🤖 AI Processing Pipeline](docs/ai-pipeline.md)** - Deep dive into AI workflows and anti-hallucination
-- **[🔌 API Architecture](docs/api-architecture.md)** - RESTful API specifications and flows
 - **[🔧 Development Context](docs/CLAUDE.md)** - Essential context for developers and AI assistants
 - **[🎨 Theming System](docs/theming.md)** - Token contract, presets, and layout switches
 

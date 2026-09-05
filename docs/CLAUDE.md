@@ -628,7 +628,6 @@ const response = await fetch('/api/mcp', {
 - `docs/architecture.md` - System architecture diagrams
 - `docs/ai-pipeline.md` - AI implementation details
 - `docs/STRIPE_INTEGRATION.md` - Stripe payment setup guide
-- `docs/api-architecture.md` - RESTful API specifications and flows
 - `docs/mcp-server-specification.md` - **MCP Server documentation and planning**
 - `docs/theming.md` - Theme/token contract, duplication recipe, resolution order, and layout switches
 - `lib/types/mach/` - MACH Alliance type definitions

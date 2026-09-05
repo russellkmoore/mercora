@@ -13,7 +13,6 @@ This directory contains comprehensive documentation for all aspects of the Merco
 
 ### 🏗️ **Technical Architecture**
 - **[System Architecture](architecture.md)** - Complete system design with Mermaid diagrams
-- **[API Architecture](api-architecture.md)** - RESTful API specifications and flows
 - **[Order and Checkout Trust Boundary](checkout-trust-boundary.md)** - Server-owned pricing, pending orders, and verified finalization
 - **[AI Processing Pipeline](ai-pipeline.md)** - Deep dive into AI workflows and anti-hallucination
 - **[Development Context](CLAUDE.md)** - Essential context for developers and AI assistants
@@ -76,7 +75,7 @@ All four carry a dated Accepted status and are locked in `gsd-ingest-manifest.ya
 ### For Developers
 - Start with [CLAUDE.md](CLAUDE.md) for development context
 - Review [architecture.md](architecture.md) for system understanding
-- Check [api-architecture.md](api-architecture.md) for API specifications
+- Check the owning ADR or SPEC for the API behavior you need (e.g. [checkout-trust-boundary.md](checkout-trust-boundary.md), [webhooks-refunds-inventory.md](webhooks-refunds-inventory.md)) — endpoint counts change too often for a static list to stay accurate
 
 ### For Business Users
 - Review [admin-dashboard-specification.md](admin-dashboard-specification.md) for admin capabilities
