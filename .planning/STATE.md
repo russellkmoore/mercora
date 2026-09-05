@@ -6,16 +6,16 @@ current_phase: 08.1
 current_phase_name: v2 Tech-Debt Closure
 status: executing
 stopped_at: Completed 08.1-01-PLAN.md
-last_updated: "2026-09-05T20:09:27.632Z"
+last_updated: "2026-09-05T20:14:46.066Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 08.1 execution started
-state_head: 16d22427941e89795f02e70c7428ca947bcef003
+state_head: 580cbcca2aac8a34f5cef4ce68c99fc0b3f15bc7
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 5
   total_plans: 38
   completed_plans: 32
-  percent: 83
+  percent: 71
 ---
 
 # Project State
@@ -234,6 +234,7 @@ Carried out of Phase 8 (milestone close-out; see `.planning/WINDOWS.md` and `doc
 - [Phase 8] The settings-GET empty-category bug (WINDOWS #3) is now **closed**, fixed at plan 08-01 — see the Phase 6 entry above
 - [Phase 8] Visual QA (08-QA-MATRIX.md, 46 findings across all seven presets and three packed layout combinations) found zero unresolved defects — no new item to carry from that pass
 - Phase 08.1 inserted after Phase 8: v2 tech-debt closure after milestone audit: active-theme emails and crash page (Russell), CI scan gate, request-scoped read, hygiene, order-status evidence (URGENT)
+- Phase 08.2 inserted after Phase 8: Documentation overhaul (README product-neutral, docs pruned/merged, style contract) and AGENTS.md agent onboarding — Russell during 8.1; demos deferred (URGENT)
 
 ## Deferred Items
 
