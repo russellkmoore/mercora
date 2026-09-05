@@ -834,7 +834,7 @@ flags and body shape documented above.
 
 **If this table is empty:** N/A — see rows above.
 
-## Open Questions
+## Open Questions (RESOLVED — Q1: Option B category-scoped seed, plan 08-01; Q2: the four screenshot gaps stay carried forward with reasons, plan 08-03)
 
 1. **Should the settings-GET fix use Option A (whole-table check) or Option B (category-scoped insert)?**
    - What we know: both satisfy D-07's own wording; both are expand-only, no schema change.
