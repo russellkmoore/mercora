@@ -1,9 +1,10 @@
 # Theming
 
-**Status:** In progress — this section covers switching presets from the admin and the frozen
-23-token contract. Theme-file anatomy, duplicating a theme, the validator, resolution order, the
-admin Appearance page, the layout switches, the build gates, and known limits land in later Phase 8
-plans; this file gains sections, it is never rewritten out from under them.
+**Status:** Complete (2026-09-05, milestone v2 Phase 8). This document covers switching presets and
+layouts from the admin, the frozen 23-token contract, theme-file anatomy, duplicating a theme, what
+the validator rejects, resolution order, the admin Appearance page, the layout switches, the build
+gates, the Phase 8 visual QA summary, and known limits. It is the reference for adding a theme
+without re-deriving the mechanism.
 
 ## Switching themes and layouts in the admin
 
