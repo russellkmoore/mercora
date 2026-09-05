@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 06.1
 current_phase_name: "Remaining Presets: Clinical, Retro, Atelier, Market"
 status: executing
-stopped_at: Phase 06 complete, ready to plan Phase 7
-last_updated: "2026-09-05T05:30:46.373Z"
+stopped_at: Completed 06.1-01-PLAN.md
+last_updated: "2026-09-05T05:39:27.760Z"
 last_activity: 2026-09-04
-last_activity_desc: Phase 06 complete, transitioned to Phase 7
-state_head: 2bf2457f9c143201ac8d113d943d27d2f83622d9
+last_activity_desc: Phase 06.1 execution started
+state_head: f8a4cb8b67bb2cf3cfc2d194c436bb7bfc083965
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 21
-  completed_plans: 17
+  completed_plans: 18
   percent: 40
 ---
 
@@ -25,16 +25,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-04 after Phase 6)
 
 **Core value:** A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** Phase 06 — Theme File Mechanism & Presets
+**Current focus:** Phase 06.1 — Remaining Presets: Clinical, Retro, Atelier, Market
 
 ## Current Position
 
-Phase: 06.1 (Remaining Presets: Clinical, Retro, Atelier, Market) — READY TO EXECUTE
-Plan: Not started
+Phase: 06.1 (Remaining Presets: Clinical, Retro, Atelier, Market) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-09-04 — Phase 06 complete, transitioned to Phase 7
+Last activity: 2026-09-04 — Phase 06.1 execution started
 
-Progress: [███░░░░░░░] 25%
+Progress: [████░░░░░░] 40%
 
 ## Performance Metrics
 
@@ -85,6 +85,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 06 P03 | 20min | 3 tasks | 6 files |
 | Phase 06 P04 | 16min | 3 tasks | 4 files |
 | Phase 06 P05 | 35min | 3 tasks | 4 files |
+| Phase 06.1 P01 | 20min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -135,6 +136,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 06]: [Phase 06-04] Imported the appearance setting constants directly from lib/themes/active-theme.ts into the client ThemePresetGrid component per the plan's interface contract, verified via a real npm run build that this does not break the client bundle.
 - [Phase 06]: [Phase 06-04] Settings hub tabs array gained a kind: "state" | "route" discriminant so the new Appearance entry navigates via next/link while the seven existing entries keep setActiveTab, with correct TS narrowing on tab.id.
 - [Phase 06]: [Phase 06-05] Three of four light-preset scrim sites (Dialog, AlertDialog, Sheet) fixed to literal dark-alpha via the scanner's sentinel; category hero overlay accepted as-is after evidence-based inspection. — bg-surface/NN composited to near-invisible near-white under luxe for the modal/drawer backdrops (verified live and via compositing tests); the category hero's different job and weaker opacity supported a genuinely different outcome, not a blanket fix.
+- [Phase 06.1]: [Phase 06.1] [06.1-01] Every clinical token value copied verbatim from 06.1-UI-SPEC.md's pre-computed table, including its one flagged deviation (primary/ring darkened to #00828a, 4.61:1) -- no oklch value re-derived by hand.
+- [Phase 06.1]: [Phase 06.1] [06.1-01] Clinical ships no new font dependency -- both font tokens stay the existing Geist stack byte-identical to volt-dark.css, proving the pipeline's thinnest possible slice with zero app/layout.tsx involvement.
 
 ### Pending Todos
 
@@ -181,8 +184,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T21:20:20Z
-Stopped at: Phase 06 complete, ready to plan Phase 7
+Last session: 2026-09-05T05:39:11.066Z
+Stopped at: Completed 06.1-01-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 7` (or `/gsd-plan-phase 7` directly) to start Layout Switches

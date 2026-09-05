@@ -146,13 +146,13 @@ Plans:
   3. Each preset is captured across the seven-route grid; the three light presets (clinical, atelier, market) have their overlays and shadows inspected with every judgement recorded, fixes made only where something reads wrong
   4. The admin Appearance page shows all seven cards with industry and synopsis; selecting any of the four new presets switches the storefront on the next request; `scan:tokens` stays at 0 and the 23-token contract is unchanged
 
-**Plans**: 4 plans
+**Plans**: 1/4 plans executed
 
 Plans:
 
 **Wave 1**
 
-- [ ] 06.1-01-PLAN.md — Tracer: `clinical` end to end — theme file, validator, regenerated manifest, served `data-theme`, first capture grid; opens `06.1-SCREENSHOTS.md`
+- [x] 06.1-01-PLAN.md — Tracer: `clinical` end to end — theme file, validator, regenerated manifest, served `data-theme`, first capture grid; opens `06.1-SCREENSHOTS.md`
 
 **Wave 2** *(blocked on Wave 1)*
 
