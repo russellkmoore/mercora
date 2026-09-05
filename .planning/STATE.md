@@ -4,12 +4,12 @@ milestone: v2
 milestone_name: Themeable Storefront
 current_phase: 08.1
 current_phase_name: v2 Tech-Debt Closure
-status: completed
+status: executing
 stopped_at: "Milestone v2: all 5 phases complete and verified; audit status tech_debt; Russell chose to address debt before /gsd-complete-milestone v2"
-last_updated: "2026-09-05T19:58:26.108Z"
+last_updated: "2026-09-05T19:58:27.368Z"
 last_activity: 2026-09-05
-last_activity_desc: Phase 08 complete
-state_head: 21903d0439fbd4122f0ae046273e455d9282b0f1
+last_activity_desc: Phase 08.1 execution started
+state_head: c3d460b006b2a6c79b1ef9e2dcb4b1aa16fbef36
 progress:
   total_phases: 6
   completed_phases: 5
@@ -25,14 +25,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-05 after Phase 8)
 
 **Core value:** A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** Milestone v2 complete — audit, complete, cleanup
+**Current focus:** Phase 08.1 — v2 Tech-Debt Closure
 
 ## Current Position
 
-Phase: 08.1 (v2 Tech-Debt Closure) — READY TO EXECUTE
-Plan: Not started
-Status: All phases complete
-Last activity: 2026-09-05 — Phase 08 complete
+Phase: 08.1 (v2 Tech-Debt Closure) — EXECUTING
+Plan: 1 of 7
+Status: Executing Phase 08.1
+Last activity: 2026-09-05 — Phase 08.1 execution started
 
 Progress: [████████░░] 80%
 
