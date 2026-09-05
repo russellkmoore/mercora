@@ -12,6 +12,7 @@ import type { Order } from '@/lib/types/order';
 import { Money } from '@/lib/money';
 import { applyTestMigrations } from '../../helpers/d1';
 import { SUBSCRIPTION_ACQUISITION_EXTENSION } from '@/lib/commerce/capabilities';
+import { getThemeTokens } from '@/lib/themes/tokens';
 
 const start = new Date('2026-08-05T18:00:00.000Z');
 
@@ -287,11 +288,13 @@ SET status = 'processing', attempt_count = 99, claim_token = 'owner-old',
     expect(orderPaid).toHaveBeenCalledOnce();
     expect(sendConfirmation).toHaveBeenCalledWith(
       paid,
-      'order-confirmation/WEB-RECOVERY-1/v1'
+      'order-confirmation/WEB-RECOVERY-1/v1',
+      getThemeTokens(),
     );
     expect(sendMerchantNotification).toHaveBeenCalledWith(
       paid,
-      'merchant-notification/WEB-RECOVERY-1/v1'
+      'merchant-notification/WEB-RECOVERY-1/v1',
+      getThemeTokens(),
     );
     const statuses = await env.DB.prepare('SELECT DISTINCT status FROM order_effects')
       .all<{ status: string }>();
@@ -419,11 +422,126 @@ SELECT status, result FROM inventory_adjustments WHERE order_id = ?
     expect(sendMerchantNotification).toHaveBeenCalledWith(
       paid,
       'merchant-notification/WEB-RECOVERY-1/v1',
+      getThemeTokens(),
     );
     await expect(env.DB.prepare(`SELECT status, result FROM order_effects`).first())
       .resolves.toMatchObject({
         status: 'succeeded',
         result: JSON.stringify({ providerId: 'merchant-email-1', skipped: false }),
       });
+  });
+
+  it('stages the theme name onto the confirmation and merchant rows only, and never rewrites it on re-stage', async () => {
+    const pending = order();
+    await insertOrder(pending);
+
+    await stagePaidOrderEffects(pending, { database: env.DB, now: start, themeName: 'luxe' });
+    const rows = await env.DB.prepare(`
+SELECT effect_type, payload FROM order_effects ORDER BY effect_type
+`).all<{ effect_type: string; payload: string | null }>();
+    const byType = Object.fromEntries(rows.results.map((row) => [row.effect_type, row.payload]));
+    expect(byType.confirmation_email).toBe(JSON.stringify({ themeName: 'luxe' }));
+    expect(byType.merchant_notification).toBe(JSON.stringify({ themeName: 'luxe' }));
+    expect(byType.inventory).toBeNull();
+    expect(byType.coupon).toBeNull();
+    expect(byType.gift_card).toBeNull();
+    expect(byType.subscription).toBeNull();
+
+    // Re-stage with a different theme: the ON CONFLICT DO NOTHING clause must
+    // leave the already-staged confirmation row's payload untouched.
+    await stagePaidOrderEffects(pending, { database: env.DB, now: start, themeName: 'midnight' });
+    const restaged = await env.DB.prepare(`
+SELECT payload FROM order_effects WHERE effect_type = 'confirmation_email'
+`).first<{ payload: string | null }>();
+    expect(restaged?.payload).toBe(JSON.stringify({ themeName: 'luxe' }));
+  });
+
+  it('drains a confirmation effect whose payload names a non-default theme and hands its tokens to the send function', async () => {
+    const paid = order('paid');
+    await insertOrder(paid);
+    await stagePaidOrderEffects(paid, { database: env.DB, now: start, themeName: 'luxe' });
+    await keepOnly('confirmation_email');
+
+    const sendConfirmation = vi.fn(async () => ({ success: true, id: 'themed-1' }));
+    await expect(drainOrderEffects({
+      database: env.DB,
+      getOrder: vi.fn(async () => paid),
+      sendConfirmation,
+      now: () => start,
+    })).resolves.toEqual({ claimed: 1, succeeded: 1, failed: 0 });
+
+    expect(sendConfirmation).toHaveBeenCalledWith(
+      paid,
+      'order-confirmation/WEB-RECOVERY-1/v1',
+      getThemeTokens('luxe'),
+    );
+  });
+
+  it('drains a confirmation effect whose payload is null (a row staged before this migration) and hands the manifest default tokens', async () => {
+    const paid = order('paid');
+    await insertOrder(paid);
+    // Insert directly rather than through stagePaidOrderEffects, reproducing
+    // the exact shape of a row staged before this phase's payload column
+    // existed: no payload at all.
+    await env.DB.prepare(`
+INSERT INTO order_effects (
+  effect_key, order_id, effect_type, status, attempt_count,
+  claim_token, lease_expires_at, next_attempt_at, last_error, result,
+  payload, created_at, updated_at, completed_at
+) VALUES (?, ?, 'confirmation_email', 'pending', 0, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?, NULL)
+`).bind(
+      'paid:WEB-RECOVERY-1:confirmation-email:v1',
+      paid.id,
+      start.toISOString(),
+      start.toISOString(),
+    ).run();
+
+    const sendConfirmation = vi.fn(async () => ({ success: true, id: 'null-payload-1' }));
+    await expect(drainOrderEffects({
+      database: env.DB,
+      getOrder: vi.fn(async () => paid),
+      sendConfirmation,
+      now: () => start,
+    })).resolves.toEqual({ claimed: 1, succeeded: 1, failed: 0 });
+
+    expect(sendConfirmation).toHaveBeenCalledWith(
+      paid,
+      'order-confirmation/WEB-RECOVERY-1/v1',
+      getThemeTokens(),
+    );
+  });
+
+  it('drains a confirmation effect whose payload names a theme absent from the manifest, hands the default tokens, and still completes', async () => {
+    const paid = order('paid');
+    await insertOrder(paid);
+    await env.DB.prepare(`
+INSERT INTO order_effects (
+  effect_key, order_id, effect_type, status, attempt_count,
+  claim_token, lease_expires_at, next_attempt_at, last_error, result,
+  payload, created_at, updated_at, completed_at
+) VALUES (?, ?, 'confirmation_email', 'pending', 0, NULL, NULL, NULL, NULL, NULL, ?, ?, ?, NULL)
+`).bind(
+      'paid:WEB-RECOVERY-1:confirmation-email:v1',
+      paid.id,
+      JSON.stringify({ themeName: 'not-a-real-theme' }),
+      start.toISOString(),
+      start.toISOString(),
+    ).run();
+
+    const sendConfirmation = vi.fn(async () => ({ success: true, id: 'unknown-theme-1' }));
+    await expect(drainOrderEffects({
+      database: env.DB,
+      getOrder: vi.fn(async () => paid),
+      sendConfirmation,
+      now: () => start,
+    })).resolves.toEqual({ claimed: 1, succeeded: 1, failed: 0 });
+
+    expect(sendConfirmation).toHaveBeenCalledWith(
+      paid,
+      'order-confirmation/WEB-RECOVERY-1/v1',
+      getThemeTokens(),
+    );
+    const row = await env.DB.prepare('SELECT status FROM order_effects').first<{ status: string }>();
+    expect(row).toEqual({ status: 'succeeded' });
   });
 });
