@@ -279,7 +279,7 @@ Plans:
   3. One image-URL resolver serves both the product gallery variants and cards; parity tests fail loudly when a baseline snapshot is missing; the settings seed fallback logs instead of swallowing; the Phase 6/7/8 review Info items are closed
   4. A local D1 order fixture exists and the order-status route is captured across the seven-theme grid; gates stay green (scan 0, build-themes --check, full suite, build)
 
-**Plans:** 6/7 plans executed
+**Plans:** 7/7 plans executed
 
 Plans:
 **Wave 1**
@@ -299,6 +299,6 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 08.1-07-PLAN.md — Local guest order fixture, order-status captured across seven presets, audit close-out (D-09, D-11 proof)
+- [x] 08.1-07-PLAN.md — Local guest order fixture, order-status captured across seven presets, audit close-out (D-09, D-11 proof)
 
 **UI hint**: yes
