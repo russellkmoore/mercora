@@ -264,12 +264,12 @@ Plans:
   3. One image-URL resolver serves both the product gallery variants and cards; parity tests fail loudly when a baseline snapshot is missing; the settings seed fallback logs instead of swallowing; the Phase 6/7/8 review Info items are closed
   4. A local D1 order fixture exists and the order-status route is captured across the seven-theme grid; gates stay green (scan 0, build-themes --check, full suite, build)
 
-**Plans:** 7 plans
+**Plans:** 1/7 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 08.1-01-PLAN.md — Tracer: shared request-scoped appearance read, public `GET /api/theme`, and the crash page following the active theme (D-02, D-04)
+- [x] 08.1-01-PLAN.md — Tracer: shared request-scoped appearance read, public `GET /api/theme`, and the crash page following the active theme (D-02, D-04)
 - [ ] 08.1-03-PLAN.md — `scan:tokens` in CI, parity baselines fail loudly on a missing snapshot, settings seed fallback logs (D-03, D-06, D-07)
 
 **Wave 2** *(blocked on Wave 1 completion)*
