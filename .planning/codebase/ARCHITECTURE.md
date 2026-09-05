@@ -119,6 +119,8 @@
 | Order Queries | Order hydration and lifecycle state management | `lib/models/mach/orders.ts` |
 | Database Connection | Drizzle ORM instance with request-level caching | `lib/db.ts` |
 | MCP API | Agent-facing commerce API | `app/api/mcp/route.ts` |
+| Admin Appearance Surface | Two islands: the theme grid (writes `appearance.theme`) and the layout switches (writes the three layout keys), both via `POST /api/admin/settings` | `components/admin/ThemePresetGrid.tsx`, `components/admin/LayoutSwitches.tsx` |
+| Storefront Variant Components | Enumerated category/hero/gallery layout variants, each resolved through a typed lookup map keyed by its enum member, never a generic layout prop | `components/layout/` |
 
 ## Pattern Overview
 
@@ -176,6 +178,13 @@
 - Contains: API client wrappers, token management, webhook handlers
 - Depends on: Environment secrets, external provider SDKs
 - Used by: Services, API routes
+
+**Theme & Layout Resolution Layer:**
+- Purpose: Resolves the storefront's active theme and its three layout switches for the current request — server-side and blocking, inside the root layout and the page components, never behind a Suspense boundary
+- Location: `lib/themes/active-theme.ts` (`getActiveTheme()`), `lib/layout/settings.ts` (`getLayoutSettings()`)
+- Contains: Two independent resolvers that both read the same `appearance` settings category from D1 (two separate reads, by deliberate design — not a shared memoised helper); each resolves through its own three-tier fallback per value: the D1-stored admin selection, then a deploy-time environment default, then a manifest/enum default. Never caches — no module-scope variable, no cross-request memoisation — because a Cloudflare Workers isolate can be reused across requests and any caching risks serving a stale look after an admin save.
+- Depends on: `lib/utils/settings.ts` (D1-backed `getSettings()`), `lib/themes/manifest.generated.ts` (theme names), `lib/layout/variants.ts` (layout enums)
+- Used by: `app/layout.tsx` stamps the resolved theme name as the `data-theme` attribute on `<html>` before any HTML is returned; the same 23 resolved token values (via `getThemeTokens()`) are also handed directly to the four consumers that cannot read a CSS custom property — Stripe Elements' `appearance` config, Clerk's `appearance.variables`, `app/global-error.tsx` (renders without `globals.css`), and the transactional email builders. Full resolution order and token table: `docs/theming.md`.
 
 ## Data Flow
 
@@ -296,6 +305,16 @@
 - Purpose: Domain-driven data models aligned with MACH Alliance standards
 - Examples: `lib/models/mach/products.ts`, `lib/models/mach/orders.ts`
 - Pattern: Query-specific shapes (e.g., product hydration), serializers for API responses
+
+**Token Contract:**
+- Purpose: A frozen set of 23 CSS custom properties (`--store-*`) that every storefront surface reads through Tailwind utility classes — never a hardcoded palette value
+- Examples: `themes/*.css` (per-theme declarations), `lib/themes/tokens.ts` (`getThemeTokens()`, camelCase server-side access), `lib/themes/manifest.generated.ts` (generated manifest)
+- Pattern: Build-time validator (`scripts/build-themes.mjs`) rejects any theme file that adds, omits, or mistypes a token; full 23-token table and validator error messages: `docs/theming.md`
+
+**Layout Variants:**
+- Purpose: Three enumerated layout switches (category grid density, home hero style, product gallery orientation), each resolved server-side against its own member array, never by object-key lookup
+- Examples: `lib/layout/variants.ts` (the three enums), `components/layout/category/category-layout-map.ts`, `components/layout/home/home-hero-map.ts`, `components/layout/product/` (typed lookup maps to named components)
+- Pattern: A stored value outside its enum falls back to that switch's default and emits one `layout.unknown_selection` telemetry signal; never resolved through an object's prototype chain
 
 ## Entry Points
 
