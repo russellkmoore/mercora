@@ -51,7 +51,7 @@
 export const dynamic = "force-dynamic";
 
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, Geist, Geist_Mono } from "next/font/google";
+import { Cormorant_Garamond, Fraunces, Geist, Geist_Mono, Nunito, Orbitron } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -99,6 +99,54 @@ const cormorantGaramond = Cormorant_Garamond({
   variable: "--font-cormorant-garamond",
   subsets: ["latin"],
   weight: ["400", "500"],
+  display: "swap",
+  preload: false,
+});
+
+// Display face for themes whose --store-font-display references it (retro).
+// Loaded once here so no theme file ever needs a font-loading at-rule
+// (D-02). preload stays off: a page that never renders text in this face
+// pays nothing extra; the browser only fetches it when a [data-theme]
+// block that references the variable actually renders text. Weights
+// extend the UI-SPEC floor (600, 700) with 800 so the storefront's
+// font-extrabold headings render at a loaded weight instead of a
+// synthesized one (font-synthesis: none in app/globals.css).
+const orbitron = Orbitron({
+  variable: "--font-orbitron",
+  subsets: ["latin"],
+  weight: ["600", "700", "800"],
+  display: "swap",
+  preload: false,
+});
+
+// Display face for themes whose --store-font-display references it
+// (atelier). Loaded once here so no theme file ever needs a font-loading
+// at-rule (D-02). preload stays off: a page that never renders text in
+// this face pays nothing extra; the browser only fetches it when a
+// [data-theme] block that references the variable actually renders text.
+// Weights extend the UI-SPEC floor (500) with 600, 700 and 800 so the
+// storefront's font-semibold/font-bold/font-extrabold headings all
+// render at a loaded weight instead of a synthesized one.
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
+  display: "swap",
+  preload: false,
+});
+
+// Display face for themes whose --store-font-display references it
+// (market). Loaded once here so no theme file ever needs a font-loading
+// at-rule (D-02). preload stays off: a page that never renders text in
+// this face pays nothing extra; the browser only fetches it when a
+// [data-theme] block that references the variable actually renders text.
+// Weights extend the UI-SPEC floor (700) with 600 and 800 so the
+// storefront's font-semibold/font-extrabold headings render at a loaded
+// weight instead of a synthesized one.
+const nunito = Nunito({
+  variable: "--font-nunito",
+  subsets: ["latin"],
+  weight: ["600", "700", "800"],
   display: "swap",
   preload: false,
 });
@@ -173,7 +221,7 @@ export default async function RootLayout({
           <link rel="mcp-schema" href="/api/mcp/schema" type="application/json" />
         </head>
         <body
-          className={`${geistSans.variable} ${geistMono.variable} ${cormorantGaramond.variable} antialiased flex flex-col min-h-screen bg-surface text-foreground`}
+          className={`${geistSans.variable} ${geistMono.variable} ${cormorantGaramond.variable} ${orbitron.variable} ${fraunces.variable} ${nunito.variable} antialiased flex flex-col min-h-screen bg-surface text-foreground`}
           suppressHydrationWarning
         >
           <StoreConfigProvider config={toPublicStoreConfig(config)} themeTokens={themeTokens}>
