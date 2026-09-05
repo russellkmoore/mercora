@@ -344,6 +344,26 @@ npx wrangler secret list
 cat wrangler.jsonc
 ```
 
+### **Step 1b: Workers Builds variables (Dashboard → Settings → Builds → Variables and secrets)**
+
+Two kinds of values matter at **build** time, and they are resolved differently:
+
+| Variable | Where it must live | Why |
+|---|---|---|
+| `NEXT_PUBLIC_*` (e.g. `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_THEME_DEFAULT`, `NEXT_PUBLIC_IMAGE_CDN`) | `wrangler.jsonc` → `vars` (source of truth). Optionally also as a Dashboard Build variable. | Next.js inlines `NEXT_PUBLIC_*` when the bundle is built. `build:worker` runs `scripts/build-with-public-env.mjs`, which copies every `NEXT_PUBLIC_*` key from `wrangler.jsonc` into the build environment and **overrides** any Dashboard Build variable with the same name. A Dashboard value is only used if the key is absent from `wrangler.jsonc`, or if a build command bypasses `build:worker`. |
+| `MERCORA_ALLOW_PRODUCTION_MIGRATIONS=1` | Dashboard Build variable only | `npm run deploy:ci` (the Workers Builds deploy command) applies production D1 migrations before upload and refuses without this gate (ADR-DBM-04). Never put it in `wrangler.jsonc`. |
+
+Checklist when adding or changing a public value:
+
+1. Set it in `wrangler.jsonc` `vars` (and the matching `env.*` block if you use environments).
+2. If you also set it in the Dashboard, keep the two identical — the `wrangler.jsonc` copy wins.
+3. Redeploy. Build-time values only change on the next build; a runtime var change alone does not re-inline them.
+
+The theme fallback specifically: `NEXT_PUBLIC_THEME_DEFAULT` must be one of the names in
+`lib/themes/manifest.generated.ts` (today: `atelier`, `clinical`, `luxe`, `market`, `midnight`,
+`retro`, `volt-dark`). It is only step 2 of the resolution order in `docs/theming.md`; an admin
+selection saved in D1 always wins over it.
+
 ### **Step 2: Build and Deploy**
 ```bash
 # Install dependencies
