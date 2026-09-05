@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 08.2
 current_phase_name: Documentation Overhaul & Agent Onboarding
 status: executing
-stopped_at: Completed 08.2-04-PLAN.md
-last_updated: "2026-09-05T23:43:46.965Z"
+stopped_at: Completed 08.2-05-PLAN.md
+last_updated: "2026-09-05T23:51:54.638Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 08.2 execution started
-state_head: 7d6957ed7431ba579024314b693d6b2d79486193
+state_head: 01c1ba468b314071e792e6a5e2bff20ce3ae7789
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 44
-  completed_plans: 42
+  completed_plans: 43
   percent: 86
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-05 after Phase 8.1)
 ## Current Position
 
 Phase: 08.2 (Documentation Overhaul & Agent Onboarding) — EXECUTING
-Plan: 5 of 6
+Plan: 6 of 6
 Status: Ready to execute
 Last activity: 2026-09-05 — Phase 08.2 execution started
 
@@ -114,6 +114,7 @@ Progress: [█████████░] 86%
 | Phase 08.2 P02 | 26min | 3 tasks | 14 files |
 | Phase 08.2 P03 | 25min | 3 tasks | 10 files |
 | Phase 08.2 P04 | 15min | 3 tasks | 4 files |
+| Phase 08.2 P05 | 35min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -211,6 +212,7 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 08.2]: docs/architecture.md's historical schema diagram and unverifiable security diagram were deleted, not caveated; CONTRIBUTING.md now lists the full 7-command D-11 gate order matching CI.
 - [Phase 08.2]: [Phase 08.2] 08.2-04: Corrected a wrong secret variable name inherited from 08.2-RESEARCH.md (GIFT_CARD_CODE_HMAC_KEYS_JSON, not _CURRENT_KEYS_JSON) after the claim check found it disagreed with lib/gift-cards/config.ts; AGENTS.md was written with the correct name.
 - [Phase 08.2]: [Phase 08.2] 08.2-04: docs/CLAUDE.md's gate order, environment-variable example, deployment, MCP inventory, and database-schema sections became one-sentence links to AGENTS.md and the docs that own each topic, cutting the file from 655 to 236 lines; its project-overview paragraph was rewritten to match AGENTS.md's themeable-storefront framing so the two files describing this repo to an AI assistant do not contradict each other.
+- [Phase 08.2]: README's docs-index section links a curated subset rather than duplicating the full 20-entry index — Plan verify only asserts six required link targets resolve; duplicating the full index would push the file toward its 250-line ceiling for no reader benefit.
 
 ### Pending Todos
 
@@ -274,8 +276,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T23:43:46.588Z
-Stopped at: Completed 08.2-04-PLAN.md
+Last session: 2026-09-05T23:51:54.255Z
+Stopped at: Completed 08.2-05-PLAN.md
 Resume file: None
 
 Next: `/gsd-plan-phase 8.2` (context exists) then execute; then `/gsd-audit-milestone` → `/gsd-complete-milestone v2` → `/gsd-cleanup`
