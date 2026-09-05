@@ -103,6 +103,7 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 - ✓ `getActiveTheme()` resolves `admin_settings` → `NEXT_PUBLIC_THEME_DEFAULT` → manifest default per request in the async root layout, with `theme.unknown_selection` telemetry — Phase 6
 - ✓ Admin Appearance page with manifest-driven swatch-preview cards (industry + synopsis metadata), Active badge, explicit Save through the existing settings API — Phase 6
 - ✓ Three presets ship (`volt-dark`, `luxe` light, `midnight` dark); light-preset scrim QA fixed three shadcn overlays — Phase 6
+- ✓ All six direction-doc presets ship (`luxe`, `midnight`, `clinical`, `retro`, `atelier`, `market`) plus `volt-dark`; both type tokens wired site-wide so each preset's display face renders — Phase 6.1
 
 ### Active
 
@@ -225,6 +226,10 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 | Presets beyond the three shipped (Clinical, Retro, Atelier, Market) and the direction doc's extra properties (shadow, border-width, image-aspect, accent-2, mono) are deferred; the 23-token contract stays frozen (Phase 6) | Contract is one-way (Phase 5 D-01); extra properties would touch the validator, every theme file and the sweep | ✓ Good — backlog |
 | Light-preset scrims: `dialog`, `alert-dialog`, `sheet` use `bg-black/NN` under the scanner sentinel; the category hero overlay was inspected and left as-is (Phase 6) | Token-driven scrims inherit theme polarity and washed out under `luxe`; a scrim must be polarity-neutral; no new token | ✓ Good |
 
+| Type tokens wired site-wide: `font-family: var(--store-font-sans)` on `body`, `font-display` on the 23 page-title headings, and the `next/font` variable classes on `<html>` as well as `<body>` (Phase 6.1, D-10) | The storefront had been rendering in `system-ui` since v1; a token declared on `<html>` cannot resolve a nested `var()` that only exists on `<body>`. volt-dark's shift to Geist is an intentional snap (S-TYPE-01) | ✓ Good — Russell accepted the visible change |
+| Display faces load via `next/font` with `preload: false` and the weights headings actually use; `font-synthesis: none` means an unloaded weight renders at the nearest loaded one, so weight arrays must match usage (Phase 6.1, code-review CR-01) | Cormorant shipped with 400/500 only and Luxe's bold headings silently thinned | ✓ Good |
+| Page-level `focus:bg-*` overrides on `SelectItem` are removed rather than layered; the primitive owns its highlight (Phase 6.1) | `twMerge` last-wins let a page override reintroduce the invisible-highlight bug the phase had just fixed | ✓ Good |
+
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
@@ -243,4 +248,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-04 after Phase 6 (Theme File Mechanism & Presets)*
+*Last updated: 2026-09-05 after Phase 6.1 (Remaining Presets)*

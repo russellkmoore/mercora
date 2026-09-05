@@ -2,37 +2,37 @@
 gsd_state_version: 1.0
 milestone: v2
 milestone_name: Themeable Storefront
-current_phase: 06.1
-current_phase_name: "Remaining Presets: Clinical, Retro, Atelier, Market"
-status: verifying
-stopped_at: Completed 06.1-04-PLAN.md — Phase 06.1 complete, THEME-05 marked complete
-last_updated: "2026-09-05T06:53:38.515Z"
-last_activity: 2026-09-04
-last_activity_desc: Phase 06.1 execution started
-state_head: cec0b79f3bcddd92bacea58c1d48da8422eb7c20
+current_phase: 7
+current_phase_name: Layout Switches
+status: planning
+stopped_at: Phase 06.1 complete, ready to plan Phase 7
+last_updated: "2026-09-05T07:09:57.560Z"
+last_activity: 2026-09-05
+last_activity_desc: Phase 06.1 complete, transitioned to Phase 7
+state_head: ea0b988c926f527b17c28b8c062d9263f9b23ddf
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 21
   completed_plans: 21
-  percent: 40
+  percent: 60
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-04 after Phase 6)
+See: .planning/PROJECT.md (updated 2026-09-05 after Phase 6.1)
 
 **Core value:** A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** Phase 06.1 — Remaining Presets: Clinical, Retro, Atelier, Market
+**Current focus:** Phase 7 — Layout Switches
 
 ## Current Position
 
-Phase: 06.1 (Remaining Presets: Clinical, Retro, Atelier, Market) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
-Last activity: 2026-09-04 — Phase 06.1 execution started
+Phase: 7 — Layout Switches
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-09-05 — Phase 06.1 complete, transitioned to Phase 7
 
 Progress: [████░░░░░░] 40%
 
@@ -40,7 +40,7 @@ Progress: [████░░░░░░] 40%
 
 **Velocity:**
 
-- Total plans completed: 34 (all v1)
+- Total plans completed: 38 (all v1)
 - Average duration: 56 min/plan (Phase 5, 12 plans)
 - Total execution time: ~11.3 hours (v2)
 
@@ -57,6 +57,7 @@ Progress: [████░░░░░░] 40%
 | 8 (v2) | - | - | - |
 | 5 (v2) | 12 | ~11.3h | 56min |
 | 06 | 5 | - | - |
+| 06.1 | 4 | - | - |
 
 **Recent Trend:**
 
@@ -193,8 +194,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T06:53:38.393Z
-Stopped at: Completed 06.1-04-PLAN.md — Phase 06.1 complete, THEME-05 marked complete
+Last session: 2026-09-05T07:09:57Z
+Stopped at: Phase 06.1 complete, ready to plan Phase 7
 Resume file: None
 
 Next: `/gsd-discuss-phase 7` (or `/gsd-plan-phase 7` directly) to start Layout Switches
