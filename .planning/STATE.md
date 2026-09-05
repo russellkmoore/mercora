@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 08.2
 current_phase_name: Documentation Overhaul & Agent Onboarding
 status: executing
-stopped_at: Completed 08.2-02-PLAN.md
-last_updated: "2026-09-05T23:18:35.213Z"
+stopped_at: Completed 08.2-03-PLAN.md
+last_updated: "2026-09-05T23:29:19.112Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 08.2 execution started
-state_head: 206101edbb1e859cab21eec42ace0fe44586f636
+state_head: d5b471aed69bffcf6bec0443f2b3e4cd7b5d6b68
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 44
-  completed_plans: 40
+  completed_plans: 41
   percent: 86
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-05 after Phase 8.1)
 ## Current Position
 
 Phase: 08.2 (Documentation Overhaul & Agent Onboarding) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Status: Ready to execute
 Last activity: 2026-09-05 — Phase 08.2 execution started
 
@@ -112,6 +112,7 @@ Progress: [█████████░] 86%
 | Phase 08.1 P07 | 22min | 3 tasks | 8 files |
 | Phase 08.2 P01 | 20min | 3 tasks | 9 files |
 | Phase 08.2 P02 | 26min | 3 tasks | 14 files |
+| Phase 08.2 P03 | 25min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -205,6 +206,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 08.2]: Copied verdicts/reasons from 08.2-RESEARCH.md verbatim rather than re-deriving any; DEPLOYMENT_SETUP.md classified KEEP-TRIM as plan 03's merge target; gift cards owned by checkout-trust-boundary.md's Optional capabilities section. — Executor_notes instruction plus the retiring o07-gift-cards-plan.md's living facts already moved there
 - [Phase 08.2]: 08.2-02: Fixed docs/ROADMAP.md's two dead cross-references inside task 1's commit even though ROADMAP.md is itself retired in task 2 — no commit in the plan leaves a live document pointing at a deleted path.
 - [Phase 08.2]: 08.2-02: scripts/docs-lint.mjs's scan surface excludes docs/CHANGELOG-docs.md only from the dead-reference and relative-link checks; included everywhere else, per plan spec.
+- [Phase 08.2]: docs/DEPLOYMENT_SETUP.md is the single setup-and-deploy runbook; docs/STRIPE_INTEGRATION.md's unique content (test cards, test tax addresses) was absorbed and its path retired (ninth retirement).
+- [Phase 08.2]: docs/architecture.md's historical schema diagram and unverifiable security diagram were deleted, not caveated; CONTRIBUTING.md now lists the full 7-command D-11 gate order matching CI.
 
 ### Pending Todos
 
@@ -268,8 +271,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T23:18:34.805Z
-Stopped at: Completed 08.2-02-PLAN.md
+Last session: 2026-09-05T23:29:18.705Z
+Stopped at: Completed 08.2-03-PLAN.md
 Resume file: None
 
 Next: `/gsd-plan-phase 8.2` (context exists) then execute; then `/gsd-audit-milestone` → `/gsd-complete-milestone v2` → `/gsd-cleanup`
