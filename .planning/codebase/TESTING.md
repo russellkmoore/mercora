@@ -21,10 +21,30 @@ npm run test:watch        # Watch mode (all unit tests)
 
 **CI Pipeline:** `.github/workflows/ci.yml` runs all three test suites, plus linting, typecheck, and cf-typecheck.
 
+## Theme and Layout Gates
+
+Two build-time gates enforce the token contract, plus a manual screenshot harness. Full detail
+(exact error messages, resolution order, admin surface): `docs/theming.md`.
+
+- **`npm run build:themes:check`** (`node scripts/build-themes.mjs --check`) — the theme-manifest
+  freshness gate. **This one runs in CI**, as the step named "Check theme manifest freshness" in
+  `.github/workflows/ci.yml`. Also runs (without `--check`, regenerating) via `predev` and
+  `build:worker`.
+- **`npm run scan:tokens`** (`scripts/scan-hardcoded-colors.mjs`) — the hardcoded-colour scanner.
+  **This one does not run in CI.** It is a local gate every phase of this milestone has run by
+  convention before committing, not an automated CI check. A testing document that implies both
+  gates are enforced automatically is worse than one that mentions neither — they are not the same
+  kind of guarantee.
+- **`mise exec -- npm run screenshot:routes -- --label <name> --manifest <path> --allow-missing`**
+  (`scripts/screenshot-routes.mjs`) — a manual capture tool, not a pass/fail gate. Requires
+  `--label` and an explicit `--manifest` path (it silently defaults to an earlier phase's file
+  otherwise). Captures land in `.screenshots/`, which is gitignored — screenshots are never
+  committed.
+
 ## Test File Organization
 
 **Locations:**
-- Unit tests: `tests/unit/**/*.test.ts` (233 files / 1701 tests)
+- Unit tests: `tests/unit/**/*.test.ts` (260 files / 2136 tests)
 - Integration tests: `tests/integration/**/*.test.ts` (D1 database tests)
 - Worker tests: `tests/workers/**/*.test.ts` (Durable Object tests)
 
@@ -33,7 +53,7 @@ npm run test:watch        # Watch mode (all unit tests)
 - Name matches the module being tested: `agent-chat-limits.ts` → `tests/unit/agent-chat-limits.test.ts`
 - Feature-based grouping: `tests/unit/lib/`, `tests/unit/api/`, `tests/unit/app/`, `tests/unit/components/`
 
-**Total Count:** 261 test files
+**Total Count:** 260 test files (measured via `npm run test`, 2026-09-05, for this refresh — not carried forward from a prior phase's summary)
 
 ## Test Structure
 
