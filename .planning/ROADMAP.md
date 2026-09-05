@@ -146,7 +146,7 @@ Plans:
   3. Each preset is captured across the seven-route grid; the three light presets (clinical, atelier, market) have their overlays and shadows inspected with every judgement recorded, fixes made only where something reads wrong
   4. The admin Appearance page shows all seven cards with industry and synopsis; selecting any of the four new presets switches the storefront on the next request; `scan:tokens` stays at 0 and the 23-token contract is unchanged
 
-**Plans**: 2/4 plans executed
+**Plans**: 3/4 plans executed
 
 Plans:
 
@@ -160,7 +160,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 06.1-03-PLAN.md — Wire both type tokens site-wide per D-10: `--store-font-sans` on the body, `font-display` on 23 storefront headings; register the `volt-dark` system-font→Geist shift as snap `S-TYPE-01` and prove every preset's display face renders
+- [x] 06.1-03-PLAN.md — Wire both type tokens site-wide per D-10: `--store-font-sans` on the body, `font-display` on 23 storefront headings; register the `volt-dark` system-font→Geist shift as snap `S-TYPE-01` and prove every preset's display face renders
 
 **Wave 4** *(blocked on Wave 3)*
 
