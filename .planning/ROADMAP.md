@@ -212,7 +212,14 @@ Plans:
   3. A visual QA pass covering every preset theme crossed with every layout variant is recorded with results
   4. `.planning/codebase/` structure/architecture docs carry a targeted refresh reflecting the token sweep and theme mechanism
 
-**Plans**: TBD
+**Plans:** 5 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — Tracer: category-scoped settings-GET seed guard with regression test, plus `docs/theming.md` with its admin switching section and the 23-token contract table
+- [ ] 08-02-PLAN.md — `docs/theming.md` sections 2-9, five targeted `docs/CLAUDE.md` edits, README and runtime-configuration links, full claim and link check
+- [ ] 08-03-PLAN.md — 21 visual QA capture runs (7 presets x 3 packed layout combinations) recorded in `08-QA-MATRIX.md`
+- [ ] 08-04-PLAN.md — Judge the matrix against the six per-cell criteria, findings table with fixes and leave-its, summary table into `docs/theming.md`
+- [ ] 08-05-PLAN.md — Targeted refresh of four `.planning/codebase/` docs, milestone close-out record, requirements marked ready, full gate suite
 
 ## Progress
 
