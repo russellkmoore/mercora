@@ -1,10 +1,10 @@
 # Mercora Production Deployment Guide
 
-> **Complete step-by-step guide for deploying Mercora to production**
+The complete setup-and-deploy runbook: Cloudflare, Clerk, and Stripe accounts, resource creation, environment configuration, migrations, build variables, and going live.
 
-This comprehensive guide covers the complete deployment process for Mercora, including all third-party services, infrastructure configuration, security setup, and admin dashboard deployment.
+**Status:** Active — this is Mercora's single deployment runbook; `docs/STRIPE_INTEGRATION.md` is retired into it.
 
-## 🏗️ Infrastructure Overview
+## Infrastructure Overview
 
 Mercora runs on Cloudflare's edge infrastructure with integrated services:
 
@@ -17,7 +17,7 @@ Mercora runs on Cloudflare's edge infrastructure with integrated services:
 - **Payments**: Stripe with Stripe Tax for global tax calculation
 - **Admin Dashboard**: Complete admin interface with AI analytics
 
-## 📋 Prerequisites
+## Prerequisites
 
 ### Required Service Accounts
 1. **Cloudflare Account** - Workers paid plan required ($5/month minimum)
@@ -37,7 +37,7 @@ Mercora runs on Cloudflare's edge infrastructure with integrated services:
 
 ---
 
-## 1️⃣ Cloudflare Setup
+## 1. Cloudflare Setup
 
 ### **Step 1: Create Cloudflare Account**
 1. Sign up at [cloudflare.com](https://cloudflare.com)
@@ -132,7 +132,7 @@ returns an error, so the request continues instead of being rejected.
 
 ---
 
-## 2️⃣ Clerk Authentication Setup
+## 2. Clerk Authentication Setup
 
 ### **Step 1: Create Clerk Application**
 1. Sign up at [clerk.com](https://clerk.com)
@@ -148,7 +148,7 @@ From your Clerk Dashboard:
 
 ### **Step 3: Configure Environment Variables**
 
-#### **Local Development (.env.local)**
+#### **Local Development (`.dev.vars`)**
 ```env
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_your_publishable_key_here
 CLERK_SECRET_KEY=sk_test_your_secret_key_here
@@ -172,6 +172,11 @@ Update `wrangler.jsonc` vars:
 }
 ```
 
+These are the only two variables this runbook lists for Clerk. Every other
+public or optional configuration value — store identity, images, email
+provider, gift cards, subscriptions, and the rest — is documented once in
+`docs/runtime-configuration.md`; this runbook does not duplicate that list.
+
 ### **Step 4: Configure Domains**
 In Clerk Dashboard:
 1. Go to **Domains**
@@ -180,7 +185,7 @@ In Clerk Dashboard:
 
 ---
 
-## 3️⃣ Stripe Payment & Tax Setup
+## 3. Stripe Payment & Tax Setup
 
 ### **Step 1: Create Stripe Account**
 1. Sign up at [stripe.com](https://stripe.com)
@@ -202,34 +207,14 @@ From Stripe Dashboard > **Developers > API Keys**:
 1. Go to **Developers > Webhooks**
 2. Click **+ Add endpoint**
 3. Set endpoint URL: `https://yourdomain.com/api/webhooks/stripe`
-4. Select events:
-   **Required** (core checkout and refunds):
-   - `payment_intent.succeeded`
-   - `payment_intent.payment_failed` (telemetry only; the subscription is deliberately retained)
-   - `charge.refunded`
-   - `refund.updated`
-   - `refund.failed`
-
-   **Subscriptions** (required once acquisition is enabled):
-   - `invoice.paid`
-   - `invoice.payment_succeeded`
-   - `invoice.payment_failed`
-   - `invoice.payment_attempt_required`
-   - `customer.subscription.created`
-   - `customer.subscription.updated`
-   - `customer.subscription.deleted`
-   - `customer.subscription.paused`
-   - `customer.subscription.resumed`
-   - `customer.subscription.pending_update_applied`
-   - `customer.subscription.pending_update_expired`
-
-   `charge.refund.updated` is accepted for compatibility with older Stripe event configurations but is not required; `refund.updated` is the preferred lifecycle event.
-   `docs/webhooks-refunds-inventory.md` is the binding source for the required set.
+4. Select the events. `docs/webhooks-refunds-inventory.md` is the binding
+   source for the required event set and the reasoning behind it — select
+   events from that document, not from memory or this runbook.
 5. Copy the **Signing secret** (starts with `whsec_`)
 
 ### **Step 5: Configure Environment Variables**
 
-#### **Local Development (.env.local)**
+#### **Local Development (`.dev.vars`)**
 ```env
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_your_publishable_key_here
 STRIPE_SECRET_KEY=sk_test_your_secret_key_here
@@ -256,9 +241,13 @@ Update `wrangler.jsonc` vars:
 
 ---
 
-## 4️⃣ Database Setup
+## 4. Database Setup
 
 ### **Step 1: Run Migrations**
+Mercora never applies remote migrations as part of a deploy — every remote
+schema change is an explicit, gated operator action. See
+`docs/database-migrations.md` for the binding policy.
+
 ```bash
 # Local (development)
 npx wrangler d1 migrations apply mercora-db --local
@@ -290,7 +279,7 @@ npx wrangler d1 execute mercora-db --command="SELECT COUNT(*) FROM products;"
 
 ---
 
-## 5️⃣ AI Content Indexing
+## 5. AI Content Indexing
 
 ### **Step 1: Content Preparation**
 Ensure your content is properly organized:
@@ -331,7 +320,7 @@ and how to recover.
 
 ---
 
-## 6️⃣ Deployment Process
+## 6. Deployment Process
 
 ### **Step 1: Final Configuration Check**
 Verify all environment variables and secrets are configured:
@@ -393,7 +382,7 @@ npm run deploy
 
 ---
 
-## 7️⃣ Post-Deployment Configuration
+## 7. Post-Deployment Configuration
 
 ### **Step 1: Update Webhook URLs**
 Update webhook endpoints in third-party services to point to production:
@@ -419,7 +408,7 @@ Consider adding:
 
 ---
 
-## 8️⃣ Going Live (Production Keys)
+## 8. Going Live (Production Keys)
 
 When ready for real payments, switch to live Stripe keys:
 
@@ -452,94 +441,4 @@ npm run deploy
 
 ---
 
-## 9️⃣ Monitoring & Maintenance
-
-### **Cloudflare Monitoring**
-- Worker analytics and logs
-- D1 database performance
-- R2 storage usage
-- AI usage and costs
-
-### **Third-Party Monitoring**
-- Stripe payment success rates
-- Clerk authentication metrics
-- Error tracking and alerts
-
-### **Regular Maintenance**
-- Update dependencies monthly
-- Review and rotate API keys quarterly
-- Monitor resource usage and costs
-- Update AI content and indexes
-
----
-
-## 🔐 Security Checklist
-
-### **Environment Security**
-- ✅ All secrets stored in Cloudflare secrets (not vars)
-- ✅ `.env.local` files are gitignored
-- ✅ No hardcoded API keys in code
-
-### **API Security**
-- ✅ Webhook signature verification enabled
-- ✅ API rate limiting configured
-- ✅ Authentication required for admin endpoints
-
-### **Content Security**
-- ✅ CSP headers configured
-- ✅ Input validation on all forms
-- ✅ SQL injection protection via Drizzle ORM
-
----
-
-## 🆘 Troubleshooting
-
-### **Common Issues**
-
-#### **Deployment Fails**
-- Check wrangler.jsonc syntax
-- Verify all required secrets are set
-- Ensure Workers paid plan is active
-
-#### **Database Connection Issues**
-- Verify D1 database ID in wrangler.jsonc
-- Check migration status
-- Ensure proper bindings
-
-#### **Authentication Issues**
-- Verify Clerk domain configuration
-- Check redirect URL settings
-- Ensure API keys are correct
-
-#### **Payment Issues**
-- Verify Stripe webhook configuration
-- Check webhook signature validation
-- Ensure tax calculation is working
-
-### **Debug Commands**
-```bash
-# View deployment logs
-npx wrangler tail
-
-# Check database status
-npx wrangler d1 info mercora-db
-
-# Test API endpoints
-curl https://yourdomain.com/api/products
-
-# Check secrets
-npx wrangler secret list
-```
-
----
-
-## 📞 Support Resources
-
-- **Cloudflare Workers**: [workers.cloudflare.com](https://workers.cloudflare.com)
-- **Clerk Documentation**: [clerk.com/docs](https://clerk.com/docs)
-- **Stripe Documentation**: [stripe.com/docs](https://stripe.com/docs)
-- **Next.js Documentation**: [nextjs.org/docs](https://nextjs.org/docs)
-
----
-
-**🎉 Your Mercora platform is now ready for production!**
+**Your Mercora platform is now ready for production.**
