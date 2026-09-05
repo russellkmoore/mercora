@@ -27,6 +27,7 @@ import {
 } from "@/lib/layout/variants";
 import { LAYOUT_SETTING_KEYS } from "@/lib/layout/settings";
 import { APPEARANCE_SETTINGS_CATEGORY } from "@/lib/themes/active-theme";
+import { nextRovingIndex } from "./roving-index";
 
 type SettingRow = { key: string; value: string };
 type SettingsResponse = { settings: SettingRow[] };
@@ -101,15 +102,12 @@ export function extractLayoutSelections(rows: SettingRow[]): LayoutSelections {
 
 /**
  * Computes the next roving-tabindex index for an arrow-key press inside one
- * segmented group, wrapping at both ends. Copied verbatim from
- * ThemePresetGrid.tsx (07-PATTERNS.md) so all three groups (and the theme
- * grid) share the exact same keyboard math, unit-tested directly since this
- * suite has no jsdom/DOM testing library to drive a real keydown.
+ * segmented group, wrapping at both ends. Re-exported from the shared
+ * roving-index module (07-REVIEW WR-02) so all three groups (and the theme
+ * grid) share the exact same keyboard math via one implementation, rather
+ * than a verbatim copy that could silently drift from ThemePresetGrid's.
  */
-export function nextRovingIndex(currentIndex: number, key: string, length: number): number {
-  const delta = key === "ArrowRight" || key === "ArrowDown" ? 1 : -1;
-  return (currentIndex + delta + length) % length;
-}
+export { nextRovingIndex };
 
 type SwitchOption = {
   value: string;
