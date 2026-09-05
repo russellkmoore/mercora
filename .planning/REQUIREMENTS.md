@@ -63,7 +63,7 @@ Explicitly excluded. Documented to prevent scope creep.
 
 ## Tech-Debt Closure (v2)
 
-- [ ] **DEBT-01**: The v2 audit's code-closable tech debt is closed: emails and the crash page follow the admin-selected theme; `scan:tokens` runs in CI; one request-scoped appearance read; one image resolver; loud parity snapshots; logged seed fallback; review Info items; order-status screenshot coverage via a seeded local order
+- [x] **DEBT-01**: The v2 audit's code-closable tech debt is closed: emails and the crash page follow the admin-selected theme; `scan:tokens` runs in CI; one request-scoped appearance read; one image resolver; loud parity snapshots; logged seed fallback; review Info items; order-status screenshot coverage via a seeded local order
 - [ ] **DOCS-04**: `README.md` rewritten product-neutral with a quick start, preset/layout showcase and living docs index; every `docs/` file classified keep/merge/retire in a recorded inventory, merges and retirements executed, remaining docs pass a claim check against the code and follow one direct-language style contract
 - [ ] **DOCS-05**: `AGENTS.md` at the repo root gives a coding assistant an ordered, command-exact setup path (prerequisites, accounts, secrets, local run, gates, deploy) with do-not-edit boundaries and links into the docs; `CLAUDE.md` points to it
 
@@ -90,7 +90,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DOCS-01 | Phase 8 | Complete |
 | DOCS-02 | Phase 8 | Complete |
 | DOCS-03 | Phase 8 | Complete |
-| DEBT-01 | Phase 8.1 | Pending |
+| DEBT-01 | Phase 8.1 | Complete |
 | DOCS-04 | Phase 8.2 | Pending |
 | DOCS-05 | Phase 8.2 | Pending |
 
