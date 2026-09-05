@@ -1,83 +1,45 @@
-# Mercora - Claude AI Assistant Reference
+# Mercora — AI Assistant Context
 
-This document provides essential context for Claude AI when working on the Mercora eCommerce platform.
+**Purpose:** Architectural, structural, and stylistic context for an AI assistant working in this
+repository. It does not cover setup.
+**Status:** Active
+
+Setup, prerequisites, environment variables, and gates live in `AGENTS.md`; this file assumes
+you've already read it.
 
 ## Project Overview
 
-Mercora is an AI-powered outdoor gear eCommerce platform featuring **Volt**, an intelligent shopping assistant. Built on Cloudflare's edge infrastructure with MACH Alliance compliant architecture and comprehensive admin dashboard.
+Mercora is a themeable commerce platform on Cloudflare's edge, fronted by **Volt**, an AI shopping
+assistant, and an MCP server that exposes commerce operations to external AI agents. The default
+storefront ships an outdoor-gear sample catalogue rendered through one of seven visual presets — see
+`docs/theming.md` for the token contract that makes that possible.
 
-**Key Features:**
-- AI shopping assistant with semantic search and personalization
-- Real-time product recommendations with anti-hallucination safeguards
-- Complete eCommerce platform with checkout and Stripe integration
-- Comprehensive admin dashboard with AI-powered analytics
-- User authentication via Clerk with admin role support
-- Advanced order management and customer insights
-- Vector-based product search with 38-item index (30 products + 8 knowledge articles)
-- **MCP (Model Context Protocol) Server** - Multi-agent commerce capabilities for AI coordination
+**Key features:**
+- AI shopping assistant (Volt) with semantic search and anti-hallucination validation
+- Checkout via Stripe, behind one idempotent payment finalizer shared by the storefront and MCP
+- Admin dashboard with AI-powered analytics
+- MCP server: 19 tools for external AI agents (search, cart, checkout, orders, agent management)
+- Reviews and ratings, gift cards, subscriptions, CMS pages and blog
 
 ## Tech Stack
 
 ### Frontend
-- **Framework**: Next.js 15 with App Router
-- **Language**: TypeScript
-- **Styling**: A 23-token CSS custom-property contract under a `--store-*` namespace; one of seven preset files (`themes/*.css`) is selected server-side by a `data-theme` attribute on the root element. See `docs/theming.md`.
-- **UI Components**: shadcn/ui + Radix UI primitives
-- **Icons**: Lucide React + React Icons
-- **State Management**: Zustand stores
+- Next.js App Router, TypeScript
+- Tailwind against a 23-token `--store-*` contract; presets in `themes/*.css` selected server-side
+  by a `data-theme` attribute — see `docs/theming.md`
+- shadcn/ui + Radix UI primitives, Lucide icons
+- Zustand for client state
 
 ### Backend & Infrastructure
-- **Runtime**: Cloudflare Workers with OpenNext
-- **Database**: Cloudflare D1 (SQLite) with Drizzle ORM
-- **Storage**: Cloudflare R2 for images
-- **AI**: Cloudflare AI (`@cf/openai/gpt-oss-20b` + BGE embeddings)
-- **Vector DB**: Cloudflare Vectorize
-- **Authentication**: Clerk
+- Cloudflare Workers via OpenNext; D1 (Drizzle ORM); R2; Vectorize; Workers AI
+  (`@cf/openai/gpt-oss-20b` + BGE embeddings); Clerk
 
-### Key Dependencies
-- `next`
-- `react`
-- `drizzle-orm`
-- `@clerk/nextjs`
-- `@opennextjs/cloudflare`
-- `zustand`
-- `@stripe/stripe-js`
-- `stripe`
+Dependency versions live in `package.json`.
 
-Versions live in `package.json`.
+## Build, environment, and deployment
 
-## Build Commands
-
-```bash
-# Development
-npm run dev                    # Start dev server with Turbo
-npm run build                  # Build for production
-npm start                      # Start production server
-npm run lint                   # Run Next.js linter
-
-# Deployment
-npm run deploy                 # Clean, build, and deploy to Cloudflare
-npm run deploy:ci              # Workers Builds path: applies production migrations, then deploys
-npm run clean                  # Remove build artifacts
-npm run preview               # Build and preview locally
-
-# Cloudflare
-npm run cf-typegen            # Generate Cloudflare types
-
-# Theming gates
-npm run scan:tokens           # Whole-tree hardcoded-palette scan (local gate)
-npm run build:themes:check    # Theme validator + generated-file freshness check
-```
-
-**Gates:** `npm run build:themes:check` runs in CI (the "Check theme manifest freshness" step).
-`npm run scan:tokens` does not — it's a local gate run by convention before committing. See
-`docs/theming.md` for what each one checks and how it fails.
-
-**Deploy paths:** `npm run deploy` builds and uploads the Worker and never applies remote migrations.
-`npm run deploy:ci` (used by Cloudflare Workers Builds) applies production migrations before upload.
-Apply migrations yourself with the guarded `db:migrate:*` scripts; `docs/database-migrations.md` is the binding source.
-
-**Important**: Always run `npm run lint` after making changes to ensure code quality.
+The gate list, environment variables, and deploy procedure are documented once — in `AGENTS.md`,
+`docs/runtime-configuration.md`, and `docs/DEPLOYMENT_SETUP.md`. This file does not restate them.
 
 ## Project Structure
 
@@ -168,488 +130,107 @@ for the full mechanism.
 
 ## Admin Dashboard
 
-### Current Status
-The admin dashboard is **fully implemented and functional** with comprehensive features:
+**Routes:** `/admin` (AI analytics home), `/admin/products`, `/admin/categories`, `/admin/orders`,
+`/admin/settings`, `/admin/gift-cards`, `/admin/promotions`, `/admin/reviews`, `/admin/blog`,
+`/admin/knowledge`, `/admin/pages`, `/admin/subscription-plans`.
 
-#### **Admin Routes**
-- `/admin` - Dashboard home with AI-powered business analytics
-- `/admin/products` - Product catalog management (CRUD operations)  
-- `/admin/categories` - Category management
-- `/admin/orders` - Order management and processing
-- `/admin/settings` - Store configuration and AI settings
+**Key components:** `AdminSidebar.tsx` (navigation), `AdminLayoutProvider.tsx` (layout context),
+`ThemePresetGrid.tsx` and `LayoutSwitches.tsx` (Appearance settings).
 
-#### **Key Components**
-- **AdminSidebar.tsx**: Navigation with collapsible design and active states
-- **AdminLayoutProvider.tsx**: Layout context for responsive admin interface
-- **AI Analytics**: Real-time business intelligence using gpt-oss-20b (`@cf/openai/gpt-oss-20b`)
+**Admin API:** `/api/admin/analytics` (AI business insights), `/api/admin/vectorize` (consolidated
+AI content indexing).
 
-#### **Admin API Endpoints**
-- `/api/admin/analytics` - AI-powered business insights and analytics
-- `/api/admin/vectorize` - Consolidated AI content indexing (products + knowledge)
-
-#### **Authentication Status**
-- **Current State**: Admin authentication is enforced in production
-- **Source of Truth**: See `docs/admin-authentication.md` for the full mechanism
-
-### Admin Features Implemented
-
-#### **Dashboard Analytics**
-- Real-time AI-powered business intelligence
-- Natural language insights using gpt-oss-20b (`@cf/openai/gpt-oss-20b`)
-- Order status distribution and product performance metrics
-- Actionable business recommendations
-
-#### **Product Management**
-- Complete CRUD operations for products
-- Bulk editing capabilities  
-- Category assignment and organization
-- Inventory tracking and management
-
-#### **Order Management**  
-- Order listing with search and filtering
-- Status updates and tracking information
-- Customer communication and notes
-- Returns management (placeholder for future development)
-
-#### **Settings Management**
-- Store configuration options
-- AI assistant settings and tuning
-- Vector index management and reindexing
-- System monitoring and health checks
+Admin authentication is enforced in production. See `docs/admin-authentication.md` for the full
+mechanism, including the deployment safety guard.
 
 ## Authentication System
 
 Two entry points enforce admin authentication: `checkAdminPermissions` in
-`lib/auth/admin-middleware.ts` and `authenticateRequest` in
-`lib/auth/unified-auth.ts`. Server-to-server calls authenticate with an
-`Authorization: Bearer` or `X-API-Key` header carrying `<ADMIN_VECTORIZE_TOKEN>`.
-Interactive access requires a Clerk session where `sessionClaims.metadata.role`
-is `admin`, or an active row in the `adminUsers` table (`isUserAdmin` in
-`lib/models/admin.ts`). Mutating requests must also match the request's own
-origin. The only bypass is the `x-dev-admin` header, honored only when
-`NODE_ENV` is `development`.
+`lib/auth/admin-middleware.ts` and `authenticateRequest` in `lib/auth/unified-auth.ts`.
+Server-to-server calls authenticate with an `Authorization: Bearer` or `X-API-Key` header carrying
+`<ADMIN_VECTORIZE_TOKEN>`. Interactive access requires a Clerk session where
+`sessionClaims.metadata.role` is `admin`, or an active row in the `adminUsers` table (`isUserAdmin`
+in `lib/models/admin.ts`). Mutating requests must also match the request's own origin. The only
+bypass is the `x-dev-admin` header, honored only when `NODE_ENV` is `development`.
 
-See `docs/admin-authentication.md` for the full mechanism, including the
-deployment safety guard.
+See `docs/admin-authentication.md` for the full mechanism, including the deployment safety guard.
 
-## Database Schema (MACH Alliance Compliant)
+## Database Schema
 
-### Core Commerce Tables
-- `products` - Product catalog with pricing and inventory
-- `categories` - Product categorization
-- `orders` - Order tracking and management
-- `addresses` - MACH Alliance address specification
-- `customers` - User profiles linked to Clerk
+Schema modules live in `lib/db/schema/`; applied migrations live in `migrations/`. See
+`docs/database-migrations.md` for the migration policy — expand-only, and never applied to a
+remote database by the normal deploy.
 
-### MCP Server Tables
-- `mcpAgents` - MCP agent registration and API keys
-- `mcpSessions` - Agent session management with cart persistence
-- `mcpRateLimits` - Rate limiting and usage tracking
-- `mcpUsage` - Agent usage analytics and monitoring
+## MCP Server
 
-**Migration Commands:**
-```bash
-# Local (development)
-npx wrangler d1 migrations apply mercora-db --local
-
-# Preview - check, then apply
-npm run db:migrate:status:preview
-npm run db:migrate:apply:preview
-
-# Production - check, then apply behind the gate
-npm run db:migrate:status:production
-MERCORA_ALLOW_PRODUCTION_MIGRATIONS=1 npm run db:migrate:apply:production
-```
-See `docs/database-migrations.md` for the binding migration policy.
-
-## API Architecture
-
-### Core eCommerce Endpoints
-- `POST /api/agent-chat` - AI chat with context
-- `GET /api/products` - Product listing with filters
-- `GET /api/orders` - Unified order management (list/create/update)
-- `POST /api/admin/analytics` - AI-powered business intelligence and insights
-- `GET /api/admin/vectorize` - Consolidated vectorization (products + knowledge)
-- `POST /api/payment-intent` - Create Stripe payment intents
-- `POST /api/webhooks/stripe` - Handle Stripe webhook events
-- `POST /api/tax` - Calculate tax with Stripe Tax
-- `POST /api/validate-discount` - Validate discount codes
-
-### MCP (Model Context Protocol) Server Endpoints
-#### **Main MCP Server**
-- `GET /api/mcp` - Server capabilities and discovery
-- `POST /api/mcp` - Tool execution endpoint
-- `GET /api/mcp/schema` - Complete API documentation
-
-#### **MCP Tools (19 total)**
-The authoritative tool list lives in `app/api/mcp/route.ts`.
-
-**Commerce Tools:**
-- `search_products` - Product search with agent context
-- `assess_request` - Multi-site fulfillment assessment
-- `get_recommendations` - AI-powered product recommendations
-
-**Cart Management:**
-- `add_to_cart` - Add single items to cart
-- `bulk_add_to_cart` - Efficient multi-item addition
-- `update_cart` - Modify quantities
-- `remove_from_cart` - Remove items
-- `clear_cart` - Reset cart
-- `get_cart` - View cart with totals
-
-**Order Processing:**
-- `create_payment_intent` - Create a Stripe payment intent for an agent's order
-- `get_shipping_options` - Calculate shipping costs and methods
-- `validate_payment` - Payment method validation and fees
-- `place_order` - Complete order placement
-- `get_order_status` - Track orders and delivery
-
-**Agent Administration:**
-- `create_agent` - Create new MCP agents
-- `list_agents` - View all agents with stats
-- `get_agent_details` - Agent analytics and performance
-- `update_agent_status` - Enable/disable agents
-- `rotate_agent_key` - Rotate an agent's API key credential
-
-#### **Individual Tool Endpoints** (also accessible via REST)
-- `POST /api/mcp/tools/cart/bulk-add` - Bulk cart operations
-- `POST /api/mcp/tools/cart/clear` - Clear cart
-- `POST /api/mcp/tools/shipping` - Shipping calculations
-- `POST /api/mcp/tools/payment/validate` - Payment validation
-- `POST /api/mcp/tools/agents/create` - Create agents
-- `GET /api/mcp/tools/agents/list` - List agents
-- `GET /api/mcp/tools/agents/[agentId]` - Agent details
-- `PATCH /api/mcp/tools/agents/[agentId]` - Update agent status
-
-### MCP Server Discovery & Authentication
-#### **Discovery Mechanisms**
-- **HTML Meta Tags**: `<meta name="mcp-server" content="/api/mcp" />`
-- **robots.txt**: MCP endpoints explicitly allowed for agent crawlers
-- **sitemap.xml**: MCP endpoints included for systematic indexing
-- **Schema Endpoint**: `/api/mcp/schema` provides complete API documentation
-
-#### **MCP Authentication**  
-- **Agent API Keys**: Secure API key authentication for MCP agents
-- **Rate Limiting**: Per-agent rate limits (100 RPM, 10 OPH default)
-- **Session Management**: Persistent agent sessions with cart state
-- **Authorization**: Role-based permissions and access control
-
-#### **Multi-Agent Commerce Architecture**
-The MCP server enables multi-agent commerce scenarios where personal shopping agents coordinate purchases across multiple retailers. Agents can:
-- Search and assess product fulfillment capabilities
-- Manage shopping carts with bulk operations
-- Calculate shipping and validate payment methods  
-- Place orders with budget validation and tracking
-- Coordinate with other agents for multi-site purchases
-
-### Vectorization
-Trigger a complete atomic rebuild of both products and knowledge articles:
-
-```bash
-curl -X POST "https://voltique.russellkmoore.me/api/admin/vectorize" \
-  -H "Authorization: Bearer <ADMIN_VECTORIZE_TOKEN>"
-```
-
-The admin token is securely managed via Cloudflare secrets in production and environment variables in development.
-
-### Authentication
-All user-specific endpoints use Clerk middleware. User context is available via `auth()` helper.
-
-### Admin Token Configuration
-All admin endpoints use the same token authentication pattern as vectorize.
-
-The admin endpoints require an `ADMIN_VECTORIZE_TOKEN` environment variable:
-
-**Local Development:**
-```bash
-# Add to .env.local
-ADMIN_VECTORIZE_TOKEN=your-secure-admin-token-here
-```
-
-**Production (Cloudflare):**
-```bash
-# Set as Cloudflare Worker secret
-npx wrangler secret put ADMIN_VECTORIZE_TOKEN
-```
-
-**Authentication Methods:**
-- Authorization header: `Authorization: Bearer <ADMIN_VECTORIZE_TOKEN>`
-- X-API-Key header: `X-API-Key: <ADMIN_VECTORIZE_TOKEN>`
-
-Credentials are read from headers only. A credential in a URL leaks through server logs, browser history, and the Referer header — see the comment at `lib/auth/admin-middleware.ts:27`.
-
-Admin UI components use Clerk authentication, while direct API access uses token authentication.
+19 tools across discovery, cart, checkout, orders, and agent management, exposed at `/api/mcp`
+(`GET` for capabilities and discovery, `POST` for tool execution, `GET /api/mcp/schema` for the
+generated API documentation). See `docs/mcp-server-specification.md` for the full tool list,
+discovery mechanism, and authentication model.
 
 ## AI System (Volt Assistant)
 
-### Architecture
 ```
 User Query → BGE Embeddings → Vector Search → Context → @cf/openai/gpt-oss-20b → Response + Products
 ```
 
-### Key Components
-- **Vector Database**: 30 products + 8 knowledge articles indexed
-- **Embedding Model**: `@cf/baai/bge-base-en-v1.5` (768 dimensions)
-- **Language Model**: `@cf/openai/gpt-oss-20b` (centrally configured in `/lib/ai/config.ts`)
-- **Personality**: Cheeky, knowledgeable outdoor gear expert
-
-### Personalization Features
-- User context integration via `useEnhancedUserContext`
-- Purchase history awareness
-- VIP customer detection
-- Personalized product recommendations
+- **Embedding model:** `@cf/baai/bge-base-en-v1.5` (768 dimensions)
+- **Language model:** `@cf/openai/gpt-oss-20b`, centrally configured in `lib/ai/config.ts`
+- **Personalization:** `useEnhancedUserContext` (purchase history, VIP detection, recommendations)
 
 ## State Management
 
-### Zustand Stores
-- `cart-store.ts` - Shopping cart state
-- `chat-store.ts` - AI chat state
-- `server-chat-store.ts` - Server-side chat context
+**Zustand stores:** `cart-store.ts`, `chat-store.ts`, `server-chat-store.ts`.
 
-### Key Hooks
-- `useEnhancedUserContext` - Comprehensive user data
-- `useCartPersistence` - Cart persistence across sessions
+**Key hooks:** `useEnhancedUserContext` (user data), `useCartPersistence` (cart persistence across
+sessions).
 
 ## Development Guidelines
 
 ### Code Style
-- **TypeScript**: Strict mode enabled
-- **Components**: Function components with TypeScript
-- **Styling**: Token-driven Tailwind classes against the `--store-*` contract, never a hardcoded palette; 4 light presets (`luxe`, `clinical`, `atelier`, `market`), 3 dark (`volt-dark`, `midnight`, `retro`)
-- **File naming**: kebab-case for files, PascalCase for components
+- TypeScript strict mode; function components with TypeScript
+- Token-driven Tailwind classes against the `--store-*` contract, never a hardcoded palette; 4
+  light presets (`luxe`, `clinical`, `atelier`, `market`), 3 dark (`volt-dark`, `midnight`, `retro`)
+- kebab-case for files, PascalCase for components
 
 ### Key Patterns
 - Server/Client component separation
-- Zustand for client state
-- Drizzle for database queries
+- Zustand for client state, Drizzle for database queries
 - MACH Alliance data models for commerce entities
-
-### Environment Variables
-```env
-# Development (.env.local)
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
-
-# Stripe Configuration
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-
-# Production (Cloudflare bindings)
-# DB, MEDIA, AI, VECTORIZE handled via wrangler.jsonc
-```
 
 ## Testing
 
-- **Unit tests**: `vitest.config.mts`, run with `npm test`. The bare `npm test` script resolves `vitest.config.mts` by Vitest's default discovery.
-- **Workers integration tests**: `vitest.workers.config.mts`, run with `npm run test:workers`.
-- **Observability Durable Object tests**: `vitest.observability.config.mts`, run with `npm run test:observability-worker`.
+- **Unit tests:** `vitest.config.mts`, run with `npm test`
+- **Workers integration tests:** `vitest.workers.config.mts`, run with `npm run test:workers`
+- **Observability Durable Object tests:** `vitest.observability.config.mts`, run with
+  `npm run test:observability-worker`
 
-CI (`.github/workflows/ci.yml`) runs these gates in order:
-
-1. Audit production dependencies
-2. Check migration safety
-3. Lint
-4. Typecheck
-5. Check Cloudflare binding types
-6. Build
-
-The three test steps run between the Cloudflare binding-types step and the build step in the real pipeline, so the suites above run inside CI, not outside it.
-
-## Deployment
-
-### Live Environment
-- **Test URL**: https://voltique.russellkmoore.me
-- **Production**: Deployed on Cloudflare Workers
-- **Admin Token**: `<ADMIN_VECTORIZE_TOKEN>` — set as a Cloudflare Worker secret, never stored in the repository
-
-### Build & Deploy Steps
-```bash
-# IMPORTANT: For new API routes or major changes, use OpenNext build
-npx opennextjs-cloudflare build   # Build with OpenNext for Cloudflare
-npx wrangler deploy               # Deploy to Cloudflare Workers
-
-# For minor changes only
-npm run build                     # Standard Next.js build  
-npx wrangler deploy               # Deploy to Cloudflare Workers
-```
-
-### Cloudflare Configuration (wrangler.jsonc)
-```json
-{
-  "d1_databases": [{"binding": "DB", "database_id": "your-d1-database-id-here"}],
-  "r2_buckets": [{"binding": "MEDIA", "bucket_name": "voltique-images"}],
-  "vectorize": [{"binding": "VECTORIZE", "index_name": "voltique-index"}],
-  "ai": {"binding": "AI"}
-}
-```
-
-### When to Use OpenNext Build
-- **New API routes**: Always use `npx opennextjs-cloudflare build`
-- **Route changes**: Modified route files or new endpoints
-- **Major changes**: Significant structural modifications
-- **Build issues**: If standard build doesn't work properly
-
-### Deployment Process
-1. `npm run clean` - Remove old builds
-2. Choose appropriate build command above
-3. `npx wrangler deploy` - Deploy to Cloudflare
-4. Test at https://voltique.russellkmoore.me
-5. Monitor via Cloudflare dashboard
-
-## Common Tasks
-
-### Adding New Products
-1. Create markdown file in `data/products_md/`
-2. Use the admin UI, or run the header-form `curl` from the Vectorization section above to index
-3. Products automatically appear in catalog and AI context
-
-### Modifying AI Behavior
-- Edit system prompt in `app/api/agent-chat/route.ts`
-- Adjust vector search parameters (topK, relevance threshold)
-- Update personality traits in prompt
-
-### Database Changes
-1. Modify schema in `lib/db/schema/`
-2. Generate migration with Drizzle
-3. Apply through the guarded scripts: `npm run db:migrate:status:preview` then
-   `npm run db:migrate:apply:preview` for preview; `npm run db:migrate:status:production` then
-   `MERCORA_ALLOW_PRODUCTION_MIGRATIONS=1 npm run db:migrate:apply:production` for production.
-   See `docs/database-migrations.md` for the binding migration policy.
-
-## Performance Notes
-
-- **Edge deployment**: Sub-100ms response times globally
-- **Vector search**: ~50ms semantic queries
-- **AI generation**: ~2-3s for contextual responses
-- **Image optimization**: Automatic WebP conversion via R2
-
-## Recent Fixes & Issues Resolved
-
-### ✅ **Product Variant Loading Issues (Aug 23, 2025)**
-**Problem**: Products from `getProductsByCategory` and `getProductBySlug` were showing $0 prices and "out of stock" status.
-
-**Root Cause**: 
-- Functions weren't loading variants properly
-- Seed data had inconsistent JSON formats (strings instead of proper JSON objects)
-- Parsing logic couldn't handle legacy data formats
-
-**Solution**:
-1. **Fixed `getProductsByCategory`**: Added variant loading with robust parsing helpers
-2. **Fixed `getProductBySlug`**: Applied same parsing logic for consistency  
-3. **Enhanced parsing logic**: Handles both proper JSON and legacy string formats
-4. **Backward compatibility**: Works with mixed data formats during migration
-
-**Key Files Modified**:
-- `lib/models/mach/products.ts` - Added robust variant parsing
-- `lib/db/seed.sql` - Partially fixed JSON formatting
-
-### ✅ **CartDrawer Functionality Issues (Aug 23, 2025)**
-**Problem**: Users could add items to cart but couldn't change quantities or remove items.
-
-**Root Cause**: Identifier mismatch between components and store
-- Cart store functions expect `variantId` as unique identifier
-- CartItemCard was using `item.productId` instead of `item.variantId`
-- CartDrawer was using wrong key for React reconciliation
-
-**Solution**:
-- **Updated CartItemCard.tsx**: Changed all cart operations to use `variantId`
-- **Updated CartDrawer.tsx**: Fixed React key to use `variantId`
-- **Preserved data integrity**: `productId` still used for product references
-
-**Key Files Modified**:
-- `components/cart/CartItemCard.tsx` - Fixed quantity controls and remove button
-- `components/cart/CartDrawer.tsx` - Fixed React keys
-
-### ✅ **Component Cleanup (Aug 23, 2025)**
-**Problem**: Duplicate components with inconsistent naming patterns.
-
-**Solution**:
-- **Refactored ProductsWithSorting → CategoryDisplay**: Maintained naming consistency with ProductDisplay
-- **Enhanced CategoryDisplay**: Ported working variant-based pricing logic
-- **Removed redundant files**: Cleaned up ProductsWithSorting.tsx
-- **Updated references**: Fixed imports in category page
-
-**Key Files Modified**:
-- `app/category/[slug]/CategoryDisplay.tsx` - Enhanced with proper variant logic
-- `app/category/[slug]/page.tsx` - Updated to use CategoryDisplay
-- Removed: `app/category/[slug]/ProductsWithSorting.tsx`
-
-## Current Git Status
-
-**Branch**: `feature/mach-alliance-implementation`  
-**Status**: Clean working directory
-**Recent work**: Product variant loading and cart functionality fixes
-
-## MCP Server Implementation Details
-
-### **Production-Ready Features**
-✅ **Complete Tool Set**: 19 MCP tools covering all commerce operations  
-✅ **Agent Management**: Create, list, monitor, and manage MCP agents  
-✅ **Session Persistence**: Cart state maintained across agent sessions  
-✅ **Rate Limiting**: Configurable per-agent limits with monitoring  
-✅ **Error Handling**: Comprehensive error system with retry guidance  
-✅ **Discovery**: HTML meta tags, robots.txt, and sitemap integration  
-✅ **Documentation**: Auto-generated schema at `/api/mcp/schema`  
-✅ **Multi-Agent Support**: Coordinate purchases across multiple sites  
-
-### **MCP Usage Example**
-```typescript
-// Agent connecting to MCP server
-const response = await fetch('/api/mcp', {
-  method: 'POST',
-  headers: {
-    'X-Agent-API-Key': 'mcp_1234567890_abcdefgh',
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    tool: 'search_products',
-    params: {
-      query: 'ultralight tent',
-      options: { category: 'camping', priceMax: 300 }
-    },
-    session_id: 'agent_session_123'
-  })
-});
-```
-
-### **Multi-Agent Commerce Workflow**
-1. **assess_request** - Determine what items Voltique can fulfill
-2. **bulk_add_to_cart** - Add all available items efficiently  
-3. **get_cart** - Validate totals against agent budget
-4. **get_shipping_options** - Compare shipping methods and costs
-5. **validate_payment** - Verify payment method and calculate fees
-6. **place_order** - Complete purchase with user address
-7. **get_order_status** - Monitor delivery progress
+See `AGENTS.md` for the full gate order these run inside.
 
 ## Important Files to Reference
 
-- `README.md` - Complete project documentation
-- `docs/architecture.md` - System architecture diagrams
-- `docs/ai-pipeline.md` - AI implementation details
-- `docs/DEPLOYMENT_SETUP.md` - Setup and deploy runbook, including Stripe account and payment setup
-- `docs/mcp-server-specification.md` - **MCP Server documentation and planning**
-- `docs/theming.md` - Theme/token contract, duplication recipe, resolution order, and layout switches
-- `lib/types/mach/` - MACH Alliance type definitions
-- `lib/mcp/` - **Complete MCP server implementation**
-- `lib/stripe.ts` - Stripe configuration and utilities
-- `wrangler.jsonc` - Cloudflare configuration
+- `AGENTS.md` — setup, prerequisites, gates, rules, do-not-edit paths
+- `docs/architecture.md` — system architecture
+- `docs/DEPLOYMENT_SETUP.md` — setup and deploy runbook
+- `docs/mcp-server-specification.md` — MCP server documentation and planning
+- `docs/theming.md` — theme/token contract, duplication recipe, resolution order, layout switches
+- `lib/types/mach/` — MACH Alliance type definitions
+- `lib/mcp/` — MCP server implementation
+- `lib/stripe.ts` — Stripe configuration and utilities
+- `wrangler.jsonc` — Cloudflare configuration
 
 ## Troubleshooting
 
-### Common Issues
-1. **Build failures**: Check TypeScript errors with `npm run lint`
-2. **Cloudflare binding errors**: Verify wrangler.jsonc configuration
-3. **AI responses**: Check vector index status and prompt formatting
-4. **Authentication**: Ensure Clerk keys are properly configured
+1. **Build failures** — check TypeScript errors with `npm run typecheck`
+2. **Cloudflare binding errors** — verify `wrangler.jsonc` configuration
+3. **AI responses** — check vector index status and prompt formatting in `lib/ai/config.ts`
+4. **Authentication** — confirm Clerk keys are set in `.dev.vars`; see `docs/admin-authentication.md`
 
-### Debug Commands
+**Debug commands:**
 ```bash
 npx wrangler d1 execute mercora-db --command "SELECT * FROM products LIMIT 5"
-npx wrangler tail  # View live logs
+npx wrangler tail
 ```
 
 ---
-
-**Last Updated**: Auto-generated for Claude AI context
-**Live Demo**: https://voltique.russellkmoore.me
+**Last Updated:** 2026-09-05, Phase 8.2 (Documentation Overhaul & Agent Onboarding)
