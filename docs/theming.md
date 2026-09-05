@@ -314,6 +314,29 @@ phase's file** (`.planning/phases/05-token-contract-component-sweep/05-SCREENSHO
 Phase 5's manifest and had to be moved out by hand. Always pass `--manifest` explicitly, pointed at
 the file you actually want rows appended to.
 
+### Phase 8 visual QA summary
+
+Seven presets by three packed layout combinations, copied verbatim from
+[`08-QA-MATRIX.md`](../.planning/phases/08-documentation-visual-qa-close-out/08-QA-MATRIX.md)'s own
+`## Visual QA Summary` section — that record is the full evidence (findings table, judgement
+design, and close-out rollup); this is the compact grid a reader scans, not a re-derivation of it.
+
+| Preset | A (`grid-3`/`minimal`/`left`) | B (`grid-2`/`split`/`top`) | C (`list`/`full-bleed`/`left`) |
+|---|---|---|---|
+| `volt-dark` | ✓ Pass — F2, F15-F18 | ✓ Pass — F6-F9 | ✓ Pass — F10-F14 |
+| `luxe` | ✓ Pass — F19-F22 | ✓ Pass (by design — combination-axis criteria are checked once, at `volt-dark`; see Judgement Design) | ✓ Pass — F43 (scrim cross-check); anatomy by design |
+| `midnight` | ✓ Pass — F23-F26 | ✓ Pass (by design) | ✓ Pass (by design) |
+| `clinical` | ✓ Pass — F27-F30 | ✓ Pass (by design) | ✓ Pass — F44 (scrim cross-check); anatomy by design |
+| `retro` | ✓ Pass — F31-F34 | ✓ Pass (by design) | ✓ Pass (by design) |
+| `atelier` | ✓ Pass — F35-F38 | ✓ Pass (by design) | ✓ Pass — F45 (scrim cross-check); anatomy by design |
+| `market` | ✓ Pass — F39-F42 | ✓ Pass (by design) | ✓ Pass — F46 (scrim cross-check); anatomy by design |
+
+"By design" cells are not independently inspected — they rest on the Judgement Design's stated
+factorisation (layout-anatomy criteria don't vary by preset; legibility/scrim/display-face criteria
+don't vary by combination), which is itself flagged as a planner assumption, not a proven property.
+Every other mark cites the specific findings row(s) it rests on. Zero defects were found across all
+46 findings; nothing required a fix.
+
 ## Known limits and backlog
 
 | Item | Tracked in | What closing it would take |
