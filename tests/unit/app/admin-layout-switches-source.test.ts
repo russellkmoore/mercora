@@ -254,3 +254,42 @@ describe("LayoutSwitches source wiring (source-level checks)", () => {
     );
   });
 });
+
+describe("Appearance page wiring (source-level checks)", () => {
+  // The page is a server component that just composes the two admin islands;
+  // rendering it would require mocking Next.js server internals for no real
+  // benefit, so this mirrors admin-appearance-source.test.ts's own page-level
+  // check: a source-text assertion that the island is imported and rendered,
+  // in the right order, without disturbing the page's existing heading.
+  it("hosts the theme grid and the layout island, in that order, below the existing heading", () => {
+    const page = source("app/admin/settings/appearance/page.tsx");
+    const themeGridIndex = page.indexOf("<ThemePresetGrid");
+    const layoutSwitchesIndex = page.indexOf("<LayoutSwitches");
+    expect(themeGridIndex).toBeGreaterThan(-1);
+    expect(layoutSwitchesIndex).toBeGreaterThan(-1);
+    expect(layoutSwitchesIndex).toBeGreaterThan(themeGridIndex);
+  });
+
+  it("leaves the page's existing heading, subtitle and metadata unchanged", () => {
+    const page = source("app/admin/settings/appearance/page.tsx");
+    expect(page).toContain('title: "Appearance"');
+    expect(page).toContain(">Appearance</h1>");
+    expect(page).toContain(
+      "Choose the storefront&apos;s look. Changes apply to the live site immediately",
+    );
+  });
+
+  it("the layout section's heading and subtitle copy come from LayoutSwitches, matching the copywriting contract verbatim", () => {
+    // The page itself renders no new copy — the Layout section's heading and
+    // subtitle live inside LayoutSwitches.tsx (asserted above); this just
+    // confirms the page actually renders that component, so the copy is
+    // reachable from this route.
+    const page = source("app/admin/settings/appearance/page.tsx");
+    expect(page).toContain("<LayoutSwitches />");
+    const layoutSwitchesSource = source("components/admin/LayoutSwitches.tsx");
+    expect(layoutSwitchesSource).toContain("Layout</h2>");
+    expect(layoutSwitchesSource).toContain(
+      "Change the structure of the category grid, home hero, and product gallery —",
+    );
+  });
+});

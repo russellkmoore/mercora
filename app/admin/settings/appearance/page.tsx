@@ -8,6 +8,8 @@
  */
 
 import { ThemePresetGrid } from "@/components/admin/ThemePresetGrid";
+import { LayoutSwitches } from "@/components/admin/LayoutSwitches";
+import { Separator } from "@/components/ui/separator";
 
 export const metadata = {
   title: "Appearance",
@@ -25,6 +27,10 @@ export default function AdminAppearancePage() {
       </div>
 
       <ThemePresetGrid />
+
+      <Separator className="bg-neutral-800" />
+
+      <LayoutSwitches />
     </div>
   );
 }
