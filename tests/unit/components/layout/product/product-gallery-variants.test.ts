@@ -3,6 +3,7 @@ import { join } from "node:path";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { readParitySnapshot } from "../../../helpers/parity-snapshot";
 
 /**
  * Product gallery variant tests (Phase 7, Plan 03).
@@ -51,7 +52,7 @@ describe("getMediaUrl (moved verbatim from ProductDisplay's local helper)", () =
 // --- Task 1: ProductGalleryLeft pre-extraction source parity ---------------
 
 describe("ProductGalleryLeft — pre-extraction source parity", () => {
-  const recording = source(RECORDING_PATH);
+  const recording = readParitySnapshot(RECORDING_PATH);
   const componentSource = source(LEFT_COMPONENT_PATH);
 
   it("the recording file is non-empty", () => {
