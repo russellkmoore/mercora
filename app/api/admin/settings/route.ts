@@ -37,25 +37,39 @@ export async function GET(request: NextRequest) {
     const category = url.searchParams.get('category');
 
     const db = await getDbAsync();
-    
+
     // Load settings from database
     const settings = category
       ? await db.select().from(admin_settings).where(eq(admin_settings.category, category))
       : await db.select().from(admin_settings);
 
-    // If no settings exist for the requested scope, seed defaults for that
-    // scope only. A category with no defaults at all (e.g. `appearance`) is
-    // legitimate and must not trigger a full-table re-seed (WINDOWS #3).
-    if (settings.length === 0) {
-      const seedRows = category
-        ? defaultSettings.filter((setting) => setting.category === category)
-        : defaultSettings;
+    // Seed any defaults that are missing for the requested scope, regardless
+    // of whether other rows already exist. Gating on "which default keys are
+    // absent" (rather than "did this query return any rows") means a
+    // category with no defaults at all (e.g. `appearance`) is still
+    // legitimate and never triggers a full-table re-seed, AND a table that's
+    // already partially seeded (e.g. only `refund.*` rows from a prior
+    // category-scoped call) still picks up other categories' missing
+    // defaults on a later unfiltered load, instead of staying empty forever.
+    const existingKeys = new Set(
+      (await db.select({ key: admin_settings.key }).from(admin_settings)).map((row) => row.key)
+    );
+    const missingDefaults = (category
+      ? defaultSettings.filter((setting) => setting.category === category)
+      : defaultSettings
+    ).filter((setting) => !existingKeys.has(setting.key));
 
-      if (seedRows.length > 0) {
-        console.log('Initializing default settings...');
-        await db.insert(admin_settings).values(seedRows);
+    if (missingDefaults.length > 0) {
+      console.log('Initializing default settings...');
+      try {
+        await db.insert(admin_settings).values(missingDefaults).onConflictDoNothing();
+      } catch {
+        // Another concurrent request may have already seeded these rows;
+        // re-read below regardless.
       }
+    }
 
+    if (missingDefaults.length > 0 || settings.length === 0) {
       const newSettings = category
         ? await db.select().from(admin_settings).where(eq(admin_settings.category, category))
         : await db.select().from(admin_settings);
