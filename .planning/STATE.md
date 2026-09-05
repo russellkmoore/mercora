@@ -5,16 +5,16 @@ milestone_name: Themeable Storefront
 current_phase: 08
 status: completed
 stopped_at: "Milestone v2: all 5 phases complete and verified; audit status tech_debt; Russell chose to address debt before /gsd-complete-milestone v2"
-last_updated: "2026-09-05T18:16:48.489Z"
+last_updated: "2026-09-05T19:11:15.057Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 08 complete
-state_head: a03b7a9ee4bb323e45e117d1e04d73740da57bfd
+state_head: 2355735d20d43445595c4d3c1c6a8877c73f20a9
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 5
   total_plans: 31
   completed_plans: 31
-  percent: 100
+  percent: 83
 ---
 
 # Project State
@@ -230,6 +230,7 @@ Carried out of Phase 8 (milestone close-out; see `.planning/WINDOWS.md` and `doc
 - [Phase 8] `npm run scan:tokens` is not wired into CI — a local gate run by convention, not an automated check
 - [Phase 8] The settings-GET empty-category bug (WINDOWS #3) is now **closed**, fixed at plan 08-01 — see the Phase 6 entry above
 - [Phase 8] Visual QA (08-QA-MATRIX.md, 46 findings across all seven presets and three packed layout combinations) found zero unresolved defects — no new item to carry from that pass
+- Phase 08.1 inserted after Phase 8: v2 tech-debt closure after milestone audit: active-theme emails and crash page (Russell), CI scan gate, request-scoped read, hygiene, order-status evidence (URGENT)
 
 ## Deferred Items
 

@@ -136,7 +136,7 @@ Plans:
 
 ### Phase 06.1: Remaining Presets: Clinical, Retro, Atelier, Market (INSERTED)
 
-**Goal**: The four remaining presets from `docs/voltique-theme-direction.md` — `clinical`, `retro`, `atelier`, `market` — ship as validated theme files on the frozen 23-token contract, each with header metadata and screenshot evidence, and the three light ones pass the same scrim/shadow QA Luxe did, so the admin Appearance page offers all six merchant looks plus volt-dark.
+**Goal**: The four remaining presets from the theme-direction spec (since retired) — `clinical`, `retro`, `atelier`, `market` — ship as validated theme files on the frozen 23-token contract, each with header metadata and screenshot evidence, and the three light ones pass the same scrim/shadow QA Luxe did, so the admin Appearance page offers all six merchant looks plus volt-dark.
 **Depends on**: Phase 6 — uses the validator, manifest, resolver, admin grid and screenshot harness exactly as shipped; no mechanism changes.
 **Requirements**: THEME-05
 **Success Criteria** (what must be TRUE):
@@ -251,3 +251,19 @@ Plans:
 *Roadmap created: 2026-09-01 from doc ingest (26 docs) and codebase map (2026-08-31)*
 *v1 archived: 2026-09-02*
 *v2 roadmap added: 2026-09-02 — 4 phases (5-8), 16/16 requirements mapped*
+
+### Phase 08.1: v2 Tech-Debt Closure (INSERTED)
+
+**Goal**: Close the milestone's recorded tech debt that code can close: transactional emails and the global-error page follow the admin-selected theme; `scan:tokens` runs in CI; the appearance settings are read once per request; the duplicated image resolver, silent seed catch, self-writing parity snapshots and review Info items are fixed; order-status gets a seeded local order so its screenshots exist.
+**Depends on**: Phase 8 — closes items the v2 audit recorded.
+**Requirements**: DEBT-01
+**Success Criteria** (what must be TRUE):
+
+  1. With a non-default theme saved in D1, every transactional email builder renders that theme's tokens (proven by a test that stubs the active theme), and `app/global-error.tsx` renders the active theme's colours after mount via a public `GET /api/theme` route, with volt-dark as the pre-fetch fallback
+  2. `.github/workflows/ci.yml` runs `npm run scan:tokens` and `docs/theming.md` says so; `getActiveTheme()` and `getLayoutSettings()` share one request-scoped read of the `appearance` category (`React.cache`), with no module/isolate cache
+  3. One image-URL resolver serves both the product gallery variants and cards; parity tests fail loudly when a baseline snapshot is missing; the settings seed fallback logs instead of swallowing; the Phase 6/7/8 review Info items are closed
+  4. A local D1 order fixture exists and the order-status route is captured across the seven-theme grid; gates stay green (scan 0, build-themes --check, full suite, build)
+
+**Plans**: TBD
+**UI hint**: yes
+

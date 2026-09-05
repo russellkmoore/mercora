@@ -61,6 +61,10 @@ Explicitly excluded. Documented to prevent scope creep.
 | Runtime theme upload (no-deploy new themes) | Decided: a new theme requires a deploy; switching shipped themes is instant via D1 |
 | Caching layer for `getActiveTheme()` | Decided: accept the per-request D1 read; revisit only if traces show it |
 
+## Tech-Debt Closure (v2)
+
+- [ ] **DEBT-01**: The v2 audit's code-closable tech debt is closed: emails and the crash page follow the admin-selected theme; `scan:tokens` runs in CI; one request-scoped appearance read; one image resolver; loud parity snapshots; logged seed fallback; review Info items; order-status screenshot coverage via a seeded local order
+
 ## Traceability
 
 Which phases cover which requirements. Updated during roadmap creation.
@@ -84,6 +88,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DOCS-01 | Phase 8 | Complete |
 | DOCS-02 | Phase 8 | Complete |
 | DOCS-03 | Phase 8 | Complete |
+| DEBT-01 | Phase 8.1 | Pending |
 
 **Coverage:**
 
