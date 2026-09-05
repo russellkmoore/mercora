@@ -16,4 +16,13 @@
   one-time measurement it proposed automating is `docs/mobile-lighthouse-baseline.md`.
 - Retired `docs/mobile-ux-assessment.md` — its own historical banner says it is superseded by
   `docs/mobile-lighthouse-baseline.md`.
+- Retired `docs/ROADMAP.md` — framed around a "Phase 1/2/3" milestone numbering that predates and
+  contradicts the live `.planning/PROJECT.md`/`.planning/STATE.md`, which fully supersedes it; the
+  planning tree is the roadmap now.
+- Retired `docs/o07-gift-cards-plan.md` — a completion/handoff record for a feature that has
+  shipped; its living facts (feature flags, rollback order) already live in
+  `docs/runtime-configuration.md` and `docs/checkout-trust-boundary.md`.
+- Retired `docs/migration-reservations.md` — its own ledger claimed the next free number was
+  `0023`, but migration `0023` was already applied for unrelated work, contradicting the ledger's
+  own promise; the multi-branch coordination need it served has concluded.
 </content>

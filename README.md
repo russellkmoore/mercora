@@ -118,7 +118,6 @@ User Query → AI Embeddings → Vector Search → Context Retrieval → LLM Res
 ### **🚀 Getting Started**
 - **[⚡ Quick Start](#-quick-start)** - Get up and running locally
 - **[🚀 Production Deployment](docs/DEPLOYMENT_SETUP.md)** - Complete deployment with all services
-- **[🗺️ Development Roadmap](docs/ROADMAP.md)** - Current status and upcoming features
 
 ### **🔧 Technical Documentation**  
 - **[🏗️ System Architecture](docs/architecture.md)** - Complete system design with diagrams

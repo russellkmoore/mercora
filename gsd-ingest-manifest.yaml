@@ -39,12 +39,6 @@ docs:
   - path: docs/theming.md
     type: SPEC         # frozen token contract; validator strings are load-bearing, keep verbatim
 
-  # --- PRD: scope and plans ---
-  - path: docs/ROADMAP.md
-    type: PRD
-  - path: docs/o07-gift-cards-plan.md
-    type: PRD
-
   # --- DOC: guides, references, assessments ---
   - path: docs/architecture.md
     type: DOC          # system diagrams; descriptive, not decisional
@@ -55,8 +49,6 @@ docs:
   - path: docs/admin-authentication.md
     type: DOC
   - path: docs/dependency-security.md
-    type: DOC
-  - path: docs/migration-reservations.md
     type: DOC
   - path: docs/shopify-migration.md
     type: DOC
