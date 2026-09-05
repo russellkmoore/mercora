@@ -53,6 +53,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import SubscriptionAcquisitionPanel from "@/components/subscriptions/SubscriptionAcquisitionPanel";
+import { getMediaUrl } from "@/components/layout/product/gallery-media-url";
 
 interface ProductDisplayProps {
   product: Product;
@@ -64,12 +65,6 @@ interface ProductDisplayProps {
     termsVersion?: string;
     termsUrl: string;
   };
-}
-
-function getMediaUrl(media: any): string {
-  if (!media) return "/placeholder.jpg";
-  if (typeof media === "string") return media;
-  return media.file?.url || "/placeholder.jpg";
 }
 
 function stringifyDescription(description: Product["description"]): string {
