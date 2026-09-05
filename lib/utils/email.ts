@@ -3,7 +3,8 @@ import { escapeHtmlText } from '@/lib/utils/maintenance-html';
 import { getStoreConfig } from '@/lib/store-config';
 import { postalFooterHtml, postalFooterText } from '@/lib/email/footer';
 import { sendEmail, type EmailResult } from '@/lib/email/sender';
-import { getThemeTokens } from '@/lib/themes/tokens';
+import { resolveEmailTheme } from '@/lib/email/theme';
+import type { ThemeTokens } from '@/lib/themes/tokens';
 
 export type { EmailResult } from '@/lib/email/sender';
 
@@ -74,15 +75,19 @@ function safeHttps(value: string | undefined): string | undefined {
 
 export async function sendOrderConfirmationEmail(
   orderData: OrderData,
-  options: { idempotencyKey?: string } = {}
+  options: { idempotencyKey?: string; tokens?: ThemeTokens } = {}
 ): Promise<EmailResult> {
   const store = getStoreConfig();
+  // Reachable from the cron recovery drain (drainOrderEffects), which has no
+  // request context: Plan 04's staged effect row supplies `tokens` there.
+  // Every request-scoped caller omits it and resolves the active theme here.
+  const tokens = options.tokens ?? await resolveEmailTheme();
   return sendEmail({
     from: store.contact.senderEmail,
     to: [orderData.customerEmail],
     ...(store.contact.replyToEmail ? { replyTo: store.contact.replyToEmail } : {}),
     subject: `Order Confirmation #${orderData.orderNumber} - ${store.identity.name}`,
-    html: generateOrderConfirmationHTML(orderData),
+    html: generateOrderConfirmationHTML(orderData, tokens),
     text: generateOrderConfirmationText(orderData),
   }, options);
 }
@@ -109,9 +114,8 @@ export function generateOrderConfirmationText(orderData: OrderData): string {
   ].join('\n\n');
 }
 
-export function generateOrderConfirmationHTML(orderData: OrderData): string {
+export function generateOrderConfirmationHTML(orderData: OrderData, tokens: ThemeTokens): string {
   const store = getStoreConfig();
-  const tokens = getThemeTokens();
   const safeStoreName = escapeHtmlText(store.identity.name);
   const safeTagline = escapeHtmlText(store.identity.tagline);
 
@@ -251,7 +255,7 @@ export function generateOrderConfirmationHTML(orderData: OrderData): string {
         <div style="text-align: center; padding: 32px 32px 0; border-top: 1px solid ${tokens.borderInverse};">
           <p style="color: ${tokens.mutedOnInverse}; font-size: 12px; line-height: 16px; margin: 0 0 8px;">Questions about your order? Reply to this email or contact our support team.</p>
           <p style="color: ${tokens.mutedOnInverse}; font-size: 12px; line-height: 16px; margin: 0 0 8px;">Thank you for choosing ${safeStoreName}!</p>
-          ${postalFooterHtml()}
+          ${postalFooterHtml(tokens)}
         </div>
 
       </div>
@@ -260,9 +264,8 @@ export function generateOrderConfirmationHTML(orderData: OrderData): string {
   `;
 }
 
-export function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData): string {
+export function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData, tokens: ThemeTokens): string {
   const store = getStoreConfig();
-  const tokens = getThemeTokens();
   // Helper function to ensure absolute URLs for images using Cloudflare Image service
   const getAbsoluteImageUrl = (imageUrl: string | undefined): string | undefined => {
     if (!imageUrl) return undefined;
@@ -442,7 +445,7 @@ export function generateOrderStatusUpdateHTML(orderData: OrderStatusUpdateData):
         <div style="text-align: center; padding: 32px 32px 0; border-top: 1px solid ${tokens.borderInverse};">
           <p style="color: ${tokens.mutedOnInverse}; font-size: 12px; line-height: 16px; margin: 0 0 8px;">Questions about your order? Reply to this email or contact our support team.</p>
           <p style="color: ${tokens.mutedOnInverse}; font-size: 12px; line-height: 16px; margin: 0 0 8px;">Thank you for choosing ${escapeHtmlText(store.identity.name)}!</p>
-          ${postalFooterHtml()}
+          ${postalFooterHtml(tokens)}
         </div>
 
       </div>
@@ -456,6 +459,7 @@ export async function sendOrderStatusUpdateEmail(
   options: { idempotencyKey?: string } = {},
 ): Promise<EmailResult> {
   const store = getStoreConfig();
+  const tokens = await resolveEmailTheme();
   const trackingUrl = safeHttps(orderData.trackingUrl);
   const subjects: Record<string, string> = {
     shipped: `Your Order Has Shipped! #${orderData.orderNumber}`,
@@ -481,7 +485,7 @@ export async function sendOrderStatusUpdateEmail(
     to: [orderData.customerEmail],
     ...(store.contact.replyToEmail ? { replyTo: store.contact.replyToEmail } : {}),
     subject: `${subjects[orderData.status] ?? `Order Update #${orderData.orderNumber}`} - ${store.identity.name}`,
-    html: generateOrderStatusUpdateHTML(orderData),
+    html: generateOrderStatusUpdateHTML(orderData, tokens),
     text,
   }, options);
 }
@@ -489,10 +493,13 @@ export async function sendOrderStatusUpdateEmail(
 /** Notify a configured merchant independently from the customer confirmation. */
 export async function sendNewOrderMerchantNotification(
   orderData: MerchantOrderData,
-  options: { idempotencyKey?: string } = {},
+  options: { idempotencyKey?: string; tokens?: ThemeTokens } = {},
 ): Promise<EmailResult> {
   const store = getStoreConfig();
-  const tokens = getThemeTokens();
+  // Reachable from the cron recovery drain, which has no request context:
+  // Plan 04's staged effect row supplies `tokens` there. Every request-scoped
+  // caller omits it and resolves the active theme here.
+  const tokens = options.tokens ?? await resolveEmailTheme();
   const recipient = store.contact.merchantNotificationEmail;
   if (!recipient) return { success: true, skipped: true };
 
@@ -527,7 +534,7 @@ export async function sendNewOrderMerchantNotification(
   const rows = orderData.items.map((item) =>
     `<tr><td style="padding:6px 0;border-bottom:1px solid ${tokens.borderInverse}"><strong>${escapeHtmlText(String(item.quantity))} &times;</strong> ${escapeHtmlText(item.name)}</td><td style="padding:6px 0;border-bottom:1px solid ${tokens.borderInverse};text-align:right">${escapeHtmlText(Money.fromStored(item.price).times(item.quantity).format())}</td></tr>`
   ).join('');
-  const html = `<div style="font-family:Arial,sans-serif;max-width:600px"><h2>New order ${escapeHtmlText(orderData.orderNumber)}</h2><p>${escapeHtmlText(Money.fromStored(orderData.total).format())}${orderData.customerEmail ? ` · ${escapeHtmlText(orderData.customerEmail)}` : ''}</p><h3>${itemHeading}</h3><table style="border-collapse:collapse;width:100%">${rows}</table>${orderData.shippingAddress ? `<h3>Ship to</h3><p style="white-space:pre-line">${escapeHtmlText(address)}</p>` : '<p>No shipping required.</p>'}<p><a href="${escapeHtmlText(adminUrl)}">Manage this order</a></p>${postalFooterHtml()}</div>`;
+  const html = `<div style="font-family:Arial,sans-serif;max-width:600px"><h2>New order ${escapeHtmlText(orderData.orderNumber)}</h2><p>${escapeHtmlText(Money.fromStored(orderData.total).format())}${orderData.customerEmail ? ` · ${escapeHtmlText(orderData.customerEmail)}` : ''}</p><h3>${itemHeading}</h3><table style="border-collapse:collapse;width:100%">${rows}</table>${orderData.shippingAddress ? `<h3>Ship to</h3><p style="white-space:pre-line">${escapeHtmlText(address)}</p>` : '<p>No shipping required.</p>'}<p><a href="${escapeHtmlText(adminUrl)}">Manage this order</a></p>${postalFooterHtml(tokens)}</div>`;
 
   return sendEmail({
     from: store.contact.senderEmail,

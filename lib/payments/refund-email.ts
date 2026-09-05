@@ -3,7 +3,7 @@ import { getStoreConfig } from '@/lib/store-config';
 import { sendEmail, type EmailResult } from '@/lib/email/sender';
 import { escapeHtmlText } from '@/lib/utils/maintenance-html';
 import { postalFooterHtml, postalFooterText } from '@/lib/email/footer';
-import { getThemeTokens } from '@/lib/themes/tokens';
+import { resolveEmailTheme } from '@/lib/email/theme';
 
 export interface RefundSettledEmailInput {
   orderId: string;
@@ -20,7 +20,7 @@ export async function sendRefundSettledEmail(
 ): Promise<EmailResult> {
   if (!input.customerEmail) return { success: true };
   const store = getStoreConfig();
-  const tokens = getThemeTokens();
+  const tokens = await resolveEmailTheme();
   const amount = Money.fromMinor(input.amount, input.currencyCode).format();
   const customerName = input.customerName || 'Customer';
   const html = `<!doctype html>
@@ -31,7 +31,7 @@ export async function sendRefundSettledEmail(
     <strong>#${escapeHtmlText(input.orderId)}</strong>.</p>
   <p>Your bank may take several business days to show the credit.</p>
   <p>Questions? Contact ${escapeHtmlText(store.contact.supportEmail)}.</p>
-  ${postalFooterHtml()}
+  ${postalFooterHtml(tokens)}
 </body></html>`;
 
   const text = [
