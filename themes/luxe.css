@@ -4,7 +4,7 @@
  * The light preset: warm ivory surfaces, a single champagne-gold accent,
  * and a serif display face — the token sweep's acid test that a light
  * theme reads correctly across every component. Converted from
- * `docs/voltique-theme-direction.md` section 1 onto the 23-token contract
+ * the retired theme-direction spec (removed 2026-09-05; its per-theme values live in each `themes/*.css` header) section 1 onto the 23-token contract
  * per 06-UI-SPEC.md "Preset Token Contracts" (D-01, D-03, D-05..D-07).
  *
  * One value is a deliberate correction rather than a direct oklch->hex

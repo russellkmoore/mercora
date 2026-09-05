@@ -3,7 +3,7 @@
  *
  * The phase's only dark preset: deep purple surfaces, a magenta accent and
  * cream text, loud on purpose but legible. Converted from
- * `docs/voltique-theme-direction.md` section 4 onto the 23-token contract
+ * the retired theme-direction spec (removed 2026-09-05; its per-theme values live in each `themes/*.css` header) section 4 onto the 23-token contract
  * per 06.1-UI-SPEC.md "Preset Token Contracts" (D-01, D-03, D-05..D-07).
  *
  * Every value is a direct transcription of the direction document — all

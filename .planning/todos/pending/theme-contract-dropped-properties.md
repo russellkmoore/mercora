@@ -5,9 +5,9 @@ resolves_phase: null
 source: 06-UI-SPEC.md D-03 (Phase 6 plan 03)
 ---
 
-# Properties `docs/voltique-theme-direction.md` wants that the contract does not carry
+# Properties the retired theme-direction spec (removed 2026-09-05; its per-theme values live in each `themes/*.css` header) wants that the contract does not carry
 
-`docs/voltique-theme-direction.md`'s six pre-packaged theme specs (Luxe, Midnight, Clinical,
+the retired theme-direction spec (removed 2026-09-05; its per-theme values live in each `themes/*.css` header)'s six pre-packaged theme specs (Luxe, Midnight, Clinical,
 Retro, Atelier, Market) each name several visual properties beyond the frozen 23-token contract
 (`.planning/phases/05-token-contract-component-sweep/05-TOKEN-MAP.md` §1, one-way frozen per
 Phase 5 D-01). Per Phase 6 D-03, none of these are added as tokens — the contract is not

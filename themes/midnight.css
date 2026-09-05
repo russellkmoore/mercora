@@ -3,7 +3,7 @@
  *
  * The second dark preset: indigo-black surfaces with a violet accent,
  * proving the theme mechanism is not volt-dark recoloured. Converted from
- * `docs/voltique-theme-direction.md` section 2 onto the 23-token contract
+ * the retired theme-direction spec (removed 2026-09-05; its per-theme values live in each `themes/*.css` header) section 2 onto the 23-token contract
  * per 06-UI-SPEC.md "Preset Token Contracts" (D-01, D-03, D-05..D-07).
  *
  * Two values are deliberate corrections rather than direct oklch->hex
