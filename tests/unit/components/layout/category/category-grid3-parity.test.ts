@@ -39,20 +39,28 @@ const SNAPSHOT_PATH = join(
 
 /**
  * The per-switch evidence attribute Task 3 adds to every category variant's
- * root element (`data-category-layout="<member>"`). It does not exist
- * anywhere in today's markup, so stripping it here is a no-op — it becomes
- * the single permitted difference once the extraction lands.
+ * root element (`data-category-layout="<member>"`). Pre-extraction it did
+ * not exist anywhere in the markup, so stripping it was a no-op; now that
+ * CategoryGrid3 exists, it is the single permitted difference from the
+ * recording, and its exactly-one occurrence is asserted below.
  */
-function stripLayoutAttribute(html: string): string {
-  return html.replace(/ data-category-layout="[^"]*"/g, "");
+function stripLayoutAttribute(html: string): { stripped: string; occurrences: number } {
+  const matches = html.match(/ data-category-layout="[^"]*"/g) ?? [];
+  return {
+    stripped: html.replace(/ data-category-layout="[^"]*"/g, ""),
+    occurrences: matches.length,
+  };
 }
 
 describe("CategoryDisplay products section — pre/post-extraction parity", () => {
-  it("matches the committed recording once the evidence attribute is stripped", () => {
+  it("matches the committed recording once the evidence attribute is stripped, with exactly one occurrence", () => {
     const html = renderToStaticMarkup(
-      React.createElement(CategoryDisplay, { products: categoryProductsFixture() }),
+      React.createElement(CategoryDisplay, {
+        products: categoryProductsFixture(),
+        categoryLayout: "grid-3",
+      }),
     );
-    const stripped = stripLayoutAttribute(html);
+    const { stripped, occurrences } = stripLayoutAttribute(html);
 
     if (!existsSync(SNAPSHOT_PATH)) {
       mkdirSync(dirname(SNAPSHOT_PATH), { recursive: true });
@@ -61,5 +69,6 @@ describe("CategoryDisplay products section — pre/post-extraction parity", () =
 
     const recorded = readFileSync(SNAPSHOT_PATH, "utf8");
     expect(stripped).toBe(recorded);
+    expect(occurrences).toBe(1);
   });
 });
