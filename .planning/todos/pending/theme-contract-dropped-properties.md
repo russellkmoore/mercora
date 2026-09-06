@@ -3,6 +3,9 @@ title: Direction-document theme properties dropped by the frozen 23-token contra
 created: 2026-09-04
 resolves_phase: null
 source: 06-UI-SPEC.md D-03 (Phase 6 plan 03)
+audit_acknowledged:
+  milestone: v2
+  at: 2026-09-06
 ---
 
 # Properties the retired theme-direction spec (removed 2026-09-05; its per-theme values live in each `themes/*.css` header) wants that the contract does not carry
