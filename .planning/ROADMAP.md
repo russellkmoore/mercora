@@ -264,7 +264,7 @@ Plans:
   3. Remaining docs follow one style contract: direct second-person language, short sentences, one idea per section, commands in fenced blocks, no duplicated content across files, and a consistent header (title, one-line purpose, status)
   4. `AGENTS.md` at the repo root gives a coding assistant an ordered setup path (prerequisites, accounts, secrets, local run, gates, deploy) with the exact commands, the files it must not edit, and links into the docs; `CLAUDE.md` points to it and a Claude Code session started from a fresh clone can follow it without asking for facts the repo already holds
 
-**Plans:** 5/6 plans executed
+**Plans:** 6/6 plans executed
 **UI hint**: no
 
 Plans:
@@ -291,7 +291,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5)*
 
-- [ ] 08.2-06-PLAN.md — Style contract across the surviving set, whole-set claim check, validation record filled, DOCS-04/05 closed (D-05, D-06)
+- [x] 08.2-06-PLAN.md — Style contract across the surviving set, whole-set claim check, validation record filled, DOCS-04/05 closed (D-05, D-06)
 
 ### Phase 08.1: v2 Tech-Debt Closure (INSERTED)
 
