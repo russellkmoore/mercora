@@ -41,3 +41,4 @@
   intentionally names as retired.
 </content>
 - 2026-09-05 (08.2 verification gap closure): added `**Status:**` lines to `ai-pipeline.md`, `content-publishing.md`, `customer-communications.md`, `runtime-configuration.md`; added the CI `check:migrations` step to the gate lists in `AGENTS.md` and `CONTRIBUTING.md`.
+- 2026-09-05 (08.2 code review fixes): `scripts/docs-lint.mjs` now binds `locked: true` to each locked ADR's own manifest entry (a moved marker used to pass), requires a `**Status:**` line in every top-level doc header, and resolves nested `docs/**` paths; `docs/CLAUDE.md` no longer calls the token scanner "not CI-wired".
