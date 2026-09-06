@@ -3,6 +3,9 @@ title: Direction-document properties and layout behaviours the four new presets 
 created: 2026-09-05
 resolves_phase: null
 source: 06.1-UI-SPEC.md (Phase 6.1 plan 04), extends .planning/todos/pending/theme-contract-dropped-properties.md
+audit_acknowledged:
+  milestone: v2
+  at: 2026-09-06
 ---
 
 # What `clinical`, `retro`, `atelier`, and `market` deliberately do not implement
