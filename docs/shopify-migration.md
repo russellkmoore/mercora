@@ -2,7 +2,7 @@
 
 The operator-only Shopify migration toolkit imports catalog, content, media, customers, historical orders, and optionally Judge.me reviews into Mercora. It defaults to a local dry run. A dry run extracts and transforms data, resolves the named Wrangler targets, and builds the complete D1 plan without constructing R2, Clerk, or D1 write adapters.
 
-The toolkit is deliberately fail-fast between phases. An apply validates and transforms the complete source before it obtains write adapters, then executes in this order:
+The toolkit is deliberately fail-fast between phases. An apply validates and transforms the complete source before it obtains write adapters, then executes in this order.
 
 1. run a read-only D1 canonical-target, schema, and migration-ledger preflight;
 2. when customers are present, read the Clerk instance and verify that the secret belongs to the confirmed instance and target environment;
@@ -11,6 +11,8 @@ The toolkit is deliberately fail-fast between phases. An apply validates and tra
 5. rebuild the identity-dependent order/review plan, revalidate D1 to prevent target/config drift, apply dependency-ordered chunks, and validate the result.
 
 It does not deploy Mercora, create Cloudflare resources, migrate schemas, obtain credentials, send email, or change Shopify/Judge.me.
+
+**Status:** Active
 
 ## Prerequisites
 
@@ -38,12 +40,11 @@ private-shopify-export/
   blogs.json
   articles.json
   redirects.json
-  customers.json             # only with sensitive import
-  orders.json                # only with sensitive import
-  judge-me-reviews.csv       # optional, sensitive
-  review-attributions.json   # optional, sensitive
-  verified-purchases.json    # optional, sensitive
 ```
+
+Add `customers.json` and `orders.json` only for a sensitive import. Add `judge-me-reviews.csv`,
+`review-attributions.json`, and `verified-purchases.json` as optional, sensitive inputs. File mode
+and API mode read the same resources.
 
 API mode reads collections, collects, products, pages, blogs/articles, redirects, and—when confirmed—customers and all order statuses. Article endpoints are read sequentially with per-blog and total bounds. For historical orders, obtain an independent exact source count, pass `--confirm-shopify-read-all-orders --expected-shopify-order-count=<count>`, and require the extracted count to match before transformation. Judge.me remains a bounded local CSV input, so API mode also needs `MIGRATION_INPUT_ROOT` when `JUDGE_ME_FILE` is set.
 
@@ -71,7 +72,7 @@ Allowed fulfillment values are `physical`, `digital`, and `service`. The unresol
 
 `MIGRATION_MEDIA_HOSTS` is an explicit allowlist, but it cannot broaden the toolkit's trust boundary. Media is accepted only from exact Shopify-owned asset hosts: `cdn.shopify.com`, or an exact `*.myshopify.com` host with a `/cdn/` path. Arbitrary custom CDNs are intentionally unsupported. Inline external images that fail this policy are removed from imported HTML.
 
-API mode additionally requires:
+API mode additionally requires these variables.
 
 ```text
 MIGRATION_SOURCE_MODE=api
@@ -80,7 +81,7 @@ SHOPIFY_ACCESS_TOKEN=private-read-token
 SHOPIFY_API_VERSION=2026-07
 ```
 
-For sensitive API extraction, also require Shopify's approved `read_all_orders` scope and provide both the explicit acknowledgement and independently established total:
+For sensitive API extraction, also require Shopify's approved `read_all_orders` scope. Provide both the explicit acknowledgement and an independently established total.
 
 ```text
 --include-sensitive --confirm-sensitive-data
@@ -105,7 +106,7 @@ Review every skipped and warning count. The detailed transform code uses one-way
 
 ## Sensitive data and Clerk
 
-Customers, orders, and Judge.me inputs require both flags:
+Customers, orders, and Judge.me inputs require both of these flags.
 
 ```sh
 npm run migrate:shopify -- --include-sensitive --confirm-sensitive-data
@@ -131,7 +132,7 @@ Judge.me is enabled with `--judge-me-file=judge-me-reviews.csv`. Add `--review-a
 
 ## Apply targets
 
-Local apply requires `--apply`. Remote targets also require an explicit target and matching confirmation:
+Local apply requires `--apply`. Remote targets also require an explicit target and matching confirmation.
 
 ```sh
 npm run migrate:shopify -- --apply --target=local
@@ -139,7 +140,7 @@ npm run migrate:shopify -- --apply --target=preview --confirm-preview
 MERCORA_ALLOW_PRODUCTION_IMPORTS=1 npm run migrate:shopify -- --apply --target=production --confirm-production
 ```
 
-Local apply never constructs remote R2 or Clerk clients. It therefore accepts only plans with no media uploads and no customer identity work; use local dry run for the full dataset and a confirmed preview target for an end-to-end apply.
+Local apply never constructs remote R2 or Clerk clients. It therefore accepts only plans with no media uploads and no customer identity work. Use local dry run for the full dataset, and a confirmed preview target for an end-to-end apply.
 
 Use `--env=<wrangler-environment>` when the reviewed bindings live in a named Wrangler environment. Production's environment variable is an additional circuit breaker, not a substitute for the target and confirmation flags.
 

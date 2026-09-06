@@ -347,7 +347,7 @@ npx wrangler secret list
 cat wrangler.jsonc
 ```
 
-### **Step 1b: Workers Builds variables (Dashboard → Settings → Builds → Variables and secrets)**
+### Step 1b: Workers Builds variables (Dashboard > Settings > Builds > Variables and secrets)
 
 Two kinds of values matter at **build** time, and they are resolved differently:
 
