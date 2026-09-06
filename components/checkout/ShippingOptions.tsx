@@ -24,7 +24,7 @@ export default function ShippingOptions({
   return (
     <div
       className={cn(
-        "bg-white text-black p-6 rounded-xl transition-opacity",
+        "bg-surface-elevated text-foreground p-6 rounded-xl transition-opacity",
         disabled && "opacity-50 pointer-events-none"
       )}
     >
@@ -32,7 +32,7 @@ export default function ShippingOptions({
 
       <div className="space-y-4">
         {options.length === 0 && (
-          <p className="text-gray-500 text-sm">
+          <p className="text-muted-foreground text-sm">
             No shipping options available.
           </p>
         )}
@@ -46,19 +46,19 @@ export default function ShippingOptions({
               className={cn(
                 "border p-4 rounded-md cursor-pointer flex justify-between items-center transition-all",
                 isSelected
-                  ? "border-orange-500 bg-orange-50"
-                  : "hover:border-orange-300"
+                  ? "border-primary bg-primary/10"
+                  : "hover:border-primary/60"
               )}
             >
               <div>
                 <div className="font-medium text-sm">{option.label}</div>
-                <div className="text-sm text-gray-500">
+                <div className="text-sm text-muted-foreground">
                   {Money.fromStored(option.cost).format()} – Estimated {option.estimatedDays}{" "}
                   days
                 </div>
               </div>
               {isSelected && (
-                <CheckCircle2 className="text-orange-500 w-6 h-6" />
+                <CheckCircle2 className="text-primary w-6 h-6" />
               )}
             </div>
           );

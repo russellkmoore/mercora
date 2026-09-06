@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { generateOrderConfirmationHTML } from '@/lib/utils/email';
+import { getThemeTokens } from '@/lib/themes/tokens';
+import { THEME_MANIFEST } from '@/lib/themes/manifest.generated';
 
 describe('order confirmation HTML', () => {
   it('escapes customer, catalog, address, order, and image attribute data', () => {
@@ -26,7 +28,7 @@ describe('order confirmation HTML', () => {
         zipCode: '<80202>',
         country: 'US&CA',
       },
-    });
+    }, getThemeTokens());
 
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(html).toContain('&lt;b&gt;1 Main&lt;/b&gt;');
@@ -35,5 +37,14 @@ describe('order confirmation HTML', () => {
     expect(html).not.toContain('<script>');
     expect(html).not.toMatch(/<img[^>]+\sonerror=/i);
     expect(html).not.toMatch(/<svg/i);
+  });
+});
+
+describe('token set completeness (UI-SPEC partial row)', () => {
+  it('every manifest preset yields a complete 23-key token set — a builder can never receive a partial set', () => {
+    for (const preset of THEME_MANIFEST) {
+      const tokens = getThemeTokens(preset.name);
+      expect(Object.keys(tokens), `preset=${preset.name}`).toHaveLength(23);
+    }
   });
 });

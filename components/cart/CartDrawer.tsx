@@ -69,9 +69,9 @@ export default function CartDrawer() {
 
   return (
     <Sheet open={isOpen} onOpenChange={setCartOpen}>
-      <SheetContent 
+      <SheetContent
         side="right"
-        className="bg-[#fdfdfb] text-black  transition-all ease-in-out px-3 w-full sm:w-[400px] max-w-[400px]! duration-600! data-[state=closed]:duration-600! data-[state=open]:duration-600! flex flex-col h-full border-neutral-800"
+        className="bg-surface-inverse text-on-inverse  transition-all ease-in-out px-3 w-full sm:w-[400px] max-w-[400px]! duration-600! data-[state=closed]:duration-600! data-[state=open]:duration-600! flex flex-col h-full border-border-inverse"
       >
         {/* Accessibility components */}
         <VisuallyHidden>
@@ -87,7 +87,7 @@ export default function CartDrawer() {
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 w-8 p-0 rounded-full bg-gray-100 hover:bg-gray-200 hover:text-gray-900 transition-colors"
+              className="h-8 w-8 p-0 rounded-full bg-surface-inverse-elevated hover:bg-surface-inverse-elevated hover:text-on-inverse transition-colors"
             >
               <X className="h-4 w-4" />
               <span className="sr-only">Close cart</span>
@@ -100,9 +100,9 @@ export default function CartDrawer() {
             <ShoppingCart className="mr-2 h-4 w-4" />
             Your Cart
           </h2>
-          
+
           {itemCount === 0 ? (
-            <div className="text-gray-400 text-center py-8">
+            <div className="text-muted-on-inverse text-center py-8">
               Your cart is empty
             </div>
           ) : (
@@ -110,15 +110,15 @@ export default function CartDrawer() {
               {items.map((item) => (
                 <CartItemCard key={item.lineId} item={item} />
               ))}
-              
-              <div className="border-t border-gray-700 pt-4">
+
+              <div className="border-t border-border-inverse pt-4">
                 <div className="flex justify-between items-center text-lg font-bold">
                   <span>Total: {total.format()}</span>
                 </div>
-                
+
                 <Button
                   asChild
-                  className="w-full bg-orange-500 hover:bg-orange-600 mt-4"
+                  className="w-full bg-primary hover:bg-primary/80 mt-4"
                 >
                   <Link href="/checkout" onClick={() => setCartOpen(false)}>
                     Proceed to Checkout
@@ -144,11 +144,11 @@ export function CartTrigger() {
       type="button"
       onClick={openCart}
       aria-label={`Cart (${count} ${count === 1 ? "item" : "items"})`}
-      className="relative text-white hover:bg-white hover:text-orange-500"
+      className="relative text-foreground hover:bg-foreground hover:text-primary"
     >
       <ShoppingCart className="h-4 w-4 sm:mr-2" />
       <span className="hidden sm:inline">Cart ({count})</span>
-      {count > 0 && <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-xs text-white">{count}</span>}
+      {count > 0 && <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-on-primary">{count}</span>}
     </Button>
   );
 }

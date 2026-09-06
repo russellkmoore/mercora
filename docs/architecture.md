@@ -1,6 +1,8 @@
 # Mercora Architecture Documentation
 
-This document contains comprehensive architecture diagrams for the Mercora AI-powered eCommerce platform.
+System design diagrams for the Mercora AI-powered eCommerce platform: request flow, the AI assistant pipeline, component structure, and the deployment pipeline.
+
+**Status:** Active — descriptive, not decisional; binding rules live in the ADRs it links.
 
 ## System Overview
 
@@ -25,7 +27,7 @@ graph TB
 
     %% AI Services Layer
     subgraph "Cloudflare AI Platform"
-        LLM[Llama 3.1 8B Instruct]
+        LLM["@cf/openai/gpt-oss-20b"]
         Embeddings[BGE Base EN v1.5]
         Vectorize[Vector Database]
     end
@@ -100,7 +102,7 @@ graph LR
     KnowledgeContext --> Prompt
     AgentAPI --> Prompt
     
-    Prompt --> LLM[🧠 Llama 3.1 8B]
+    Prompt --> LLM["🧠 @cf/openai/gpt-oss-20b"]
     LLM --> Response[💭 AI Response]
     
     %% Product Recommendations
@@ -211,114 +213,12 @@ flowchart TD
     class WebUI,Recommendations,Results ui
 ```
 
-## Database Schema Overview
+## Database Schema
 
-```mermaid
-erDiagram
-    %% Core Entities
-    PRODUCTS {
-        int id PK
-        string name
-        string slug UK
-        text shortDescription
-        text longDescription
-        string primaryImageUrl
-        boolean active
-        timestamp createdAt
-        timestamp updatedAt
-    }
-
-    %% Related Data Tables
-    PRODUCT_PRICES {
-        int id PK
-        int productId FK
-        int price "in cents"
-        timestamp effectiveDate
-    }
-
-    PRODUCT_SALE_PRICES {
-        int id PK
-        int productId FK
-        int salePrice "in cents"
-        timestamp startDate
-        timestamp endDate
-    }
-
-    PRODUCT_INVENTORY {
-        int id PK
-        int productId FK
-        int quantityInStock
-        string availability
-        timestamp lastUpdated
-    }
-
-    PRODUCT_IMAGES {
-        int id PK
-        int productId FK
-        string imageUrl
-        int sortOrder
-    }
-
-    PRODUCT_TAGS {
-        int id PK
-        int productId FK
-        string tag
-    }
-
-    PRODUCT_USE_CASES {
-        int id PK
-        int productId FK
-        string useCase
-    }
-
-    PRODUCT_ATTRIBUTES {
-        int id PK
-        int productId FK
-        string key
-        string value
-    }
-
-    %% User & Order Tables
-    ORDERS {
-        int id PK
-        string userId
-        decimal totalAmount
-        string status
-        json shippingAddress
-        json billingAddress
-        timestamp createdAt
-    }
-
-    ORDER_ITEMS {
-        int id PK
-        int orderId FK
-        int productId FK
-        int quantity
-        int pricePerItem
-        int totalPrice
-    }
-
-    %% Chat System
-    CHAT_SESSIONS {
-        int id PK
-        string userId
-        json messages
-        timestamp createdAt
-        timestamp updatedAt
-    }
-
-    %% Relationships
-    PRODUCTS ||--o{ PRODUCT_PRICES : "has prices"
-    PRODUCTS ||--o{ PRODUCT_SALE_PRICES : "has sale prices"
-    PRODUCTS ||--|| PRODUCT_INVENTORY : "has inventory"
-    PRODUCTS ||--o{ PRODUCT_IMAGES : "has images"
-    PRODUCTS ||--o{ PRODUCT_TAGS : "has tags"
-    PRODUCTS ||--o{ PRODUCT_USE_CASES : "has use cases"
-    PRODUCTS ||--o{ PRODUCT_ATTRIBUTES : "has attributes"
-    
-    ORDERS ||--o{ ORDER_ITEMS : "contains"
-    PRODUCTS ||--o{ ORDER_ITEMS : "ordered as"
-```
+The current schema lives in `lib/db/schema/`, and every applied change is a
+numbered file in `migrations/`; both are the source of truth, not a diagram
+in this document. Migrations are additive-only (expand first, contract
+later) — see `docs/database-migrations.md` for the binding rule.
 
 ## Component Architecture
 
@@ -498,96 +398,11 @@ flowchart LR
 
 ## Security Architecture
 
-```mermaid
-graph TB
-    %% External Threats
-    subgraph "External Layer"
-        Internet[🌐 Internet]
-        Bots[🤖 Bots & Crawlers]
-        Attacks[⚔️ Attack Vectors]
-    end
-
-    %% Cloudflare Security
-    subgraph "Cloudflare Security"
-        DDoS[🛡️ DDoS Protection]
-        WAF[🔥 Web Application Firewall]
-        BotManagement[🤖 Bot Management]
-        RateLimit[⏱️ Rate Limiting]
-    end
-
-    %% Application Security
-    subgraph "Application Layer"
-        AuthMiddleware[🔐 Auth Middleware]
-        CORS[🔄 CORS Policies]
-        InputValidation[✅ Input Validation]
-        APIKeys[🔑 API Key Management]
-    end
-
-    %% Authentication
-    subgraph "Identity & Access"
-        ClerkAuth[👤 Clerk Authentication]
-        JWT[🎫 JWT Tokens]
-        Sessions[📝 Session Management]
-        Permissions[🔒 Role-Based Access]
-    end
-
-    %% Data Security
-    subgraph "Data Protection"
-        Encryption[🔐 Data Encryption]
-        SecureStorage[💾 Secure Storage]
-        APISecrets[🔐 Secret Management]
-        PCI[💳 PCI Compliance]
-    end
-
-    %% Monitoring & Response
-    subgraph "Security Monitoring"
-        LogAnalysis[📊 Log Analysis]
-        ThreatDetection[🔍 Threat Detection]
-        IncidentResponse[🚨 Incident Response]
-        Compliance[📋 Compliance Monitoring]
-    end
-
-    %% Security Flow
-    Internet --> DDoS
-    Bots --> BotManagement
-    Attacks --> WAF
-
-    DDoS --> RateLimit
-    WAF --> AuthMiddleware
-    BotManagement --> AuthMiddleware
-    RateLimit --> AuthMiddleware
-
-    AuthMiddleware --> ClerkAuth
-    AuthMiddleware --> CORS
-    AuthMiddleware --> InputValidation
-
-    ClerkAuth --> JWT
-    JWT --> Sessions
-    Sessions --> Permissions
-
-    InputValidation --> Encryption
-    APIKeys --> SecureStorage
-    Permissions --> APISecrets
-
-    Encryption --> LogAnalysis
-    SecureStorage --> ThreatDetection
-    APISecrets --> IncidentResponse
-
-    %% Styling
-    classDef external fill:#ffebee
-    classDef cf fill:#e8f5e8
-    classDef app fill:#e3f2fd
-    classDef auth fill:#f3e5f5
-    classDef data fill:#fff3e0
-    classDef monitor fill:#fce4ec
-
-    class Internet,Bots,Attacks external
-    class DDoS,WAF,BotManagement,RateLimit cf
-    class AuthMiddleware,CORS,InputValidation,APIKeys app
-    class ClerkAuth,JWT,Sessions,Permissions auth
-    class Encryption,SecureStorage,APISecrets,PCI data
-    class LogAnalysis,ThreatDetection,IncidentResponse,Compliance monitor
-```
+This repository's security surfaces are code, not a diagram: `lib/security-headers.ts`
+builds the response Content-Security-Policy and other security headers applied in
+`next.config.ts`. Admin authentication and its production-deployment guard are
+documented in `docs/admin-authentication.md`. Checkout's server-owned pricing and
+payment finalization are documented in `docs/checkout-trust-boundary.md`.
 
 ---
 

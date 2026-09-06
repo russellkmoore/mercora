@@ -5,6 +5,7 @@ import { isUserAdmin } from "../models/admin";
 import { getApiTokenByHash, updateApiTokenLastUsed } from "../models/auth";
 import { sha256Hex, timingSafeEqual } from "./crypto";
 import { hasSameOrigin } from "./same-origin";
+import { assertDeploymentPosture } from "./deployment-guard";
 
 export { sha256Hex, timingSafeEqual };
 
@@ -96,6 +97,9 @@ export async function authenticateRequest(
   const { updateLastUsed = true, allowExpired = false } = options;
 
   try {
+    const posture = assertDeploymentPosture();
+    if (posture.tripped) return deny(posture.status, posture.message);
+
     const presentedToken = extractToken(request);
     if (presentedToken) {
       const serviceToken = process.env.ADMIN_VECTORIZE_TOKEN;

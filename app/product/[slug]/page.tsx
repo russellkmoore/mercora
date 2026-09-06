@@ -48,6 +48,7 @@ import { toPublicProduct } from "@/lib/models/mach/product-serializer";
 import { getRecommendationsForProduct } from "@/lib/recommendations";
 import { buildServerUserContext } from "@/lib/recommendations/user-context.server";
 import { getStoreConfig } from "@/lib/store-config";
+import { getLayoutSettings } from "@/lib/layout/settings";
 
 export const revalidate = 0;
 
@@ -57,14 +58,16 @@ export const revalidate = 0;
  * @param params - URL parameters object containing the product slug
  * @returns Server-rendered product page or 404 if product not found
  */
-export default async function ProductPage({ params }: any) {
+export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const { userId } = await auth();
-  const storedProduct = await getProductBySlug(params.slug);
+  const { slug } = await params;
+  const storedProduct = await getProductBySlug(slug);
   if (!storedProduct || storedProduct.status !== "active") return notFound();
   const product = toPublicProduct(storedProduct);
   const store = getStoreConfig();
   const commerce = store.commerce;
   const userContextPromise = buildServerUserContext(userId);
+  const { productGallery } = await getLayoutSettings();
 
   const [reviews, reviewEligibility, recommendations] = await Promise.all([
     getProductReviews({
@@ -84,13 +87,14 @@ export default async function ProductPage({ params }: any) {
   ]);
 
   return (
-    <div className="bg-neutral-900 text-white min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
+    <div className="bg-surface-elevated text-foreground min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
       <div className="max-w-5xl mx-auto">
         <ProductDisplay
           product={product}
           recommendations={recommendations}
           reviews={reviews}
           reviewEligibility={reviewEligibility}
+          productGallery={productGallery}
           subscription={{
             enabled: commerce.features.subscriptionAcquisition
               && commerce.features.subscriptionReconciliation

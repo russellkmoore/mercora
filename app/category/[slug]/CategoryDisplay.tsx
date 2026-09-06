@@ -38,23 +38,40 @@
 "use client";
 
 import { useState } from "react";
-import ProductCard from "@/components/ProductCard";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import type { Product } from "@/lib/types/";
 import { isVariantAvailable } from "@/lib/inventory/availability";
+import type { CategoryLayout } from "@/lib/layout/variants";
+import { CATEGORY_LAYOUT_MAP } from "@/components/layout/category/category-layout-map";
 
 interface CategoryDisplayProps {
   products: Product[];
+  /**
+   * The category-layout switch resolved server-side (Phase 7, LAYOUT-04),
+   * typed to the specific enum union — never a bare `string`. React Server
+   * Components cannot pass a component/function reference as a client-
+   * component prop (functions are not serializable across that boundary),
+   * and the variant must re-render on every client-side sort change, so the
+   * map lookup itself — the same shared, exhaustive
+   * `CATEGORY_LAYOUT_MAP` the server page would otherwise hold — happens
+   * here, client-side, as a single map access. This is not the "compare the
+   * enum value to a string literal" anti-pattern the map exists to avoid:
+   * there is no `if`/`switch` branch on `categoryLayout` anywhere in this
+   * file, only the one `CATEGORY_LAYOUT_MAP[categoryLayout]` access below.
+   */
+  categoryLayout: CategoryLayout;
 }
 
 /**
  * CategoryDisplay component for browsing products within a category
- * 
+ *
  * @param products - Array of products to display
+ * @param categoryLayout - The resolved category-layout enum member
  * @returns JSX element with category products and sorting controls
  */
-export default function CategoryDisplay({ products }: CategoryDisplayProps) {
+export default function CategoryDisplay({ products, categoryLayout }: CategoryDisplayProps) {
+  const Variant = CATEGORY_LAYOUT_MAP[categoryLayout];
   const [sortBy, setSortBy] = useState("featured");
 
   // Smart price extraction for sorting from product variants
@@ -97,7 +114,7 @@ export default function CategoryDisplay({ products }: CategoryDisplayProps) {
             type="single"
             value={sortBy}
             onValueChange={(val) => val && setSortBy(val)}
-            className="flex flex-wrap gap-0 leading-none border-neutral-700 scale-90 sm:scale-100"
+            className="flex flex-wrap gap-0 leading-none border-border scale-90 sm:scale-100"
           >
             <ToggleGroupItem
               value="featured"
@@ -129,18 +146,8 @@ export default function CategoryDisplay({ products }: CategoryDisplayProps) {
         </div>
       )}
 
-      {/* Products Grid */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10">
-        {sortedProducts.length > 0 ? (
-          sortedProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))
-        ) : (
-          <div className="col-span-full text-center text-gray-400 py-8">
-            No products found in this category.
-          </div>
-        )}
-      </section>
+      {/* Resolved category-layout variant */}
+      <Variant products={sortedProducts} />
     </div>
   );
 }
@@ -152,7 +159,7 @@ export default function CategoryDisplay({ products }: CategoryDisplayProps) {
  * @returns CSS class string with conditional active styling
  */
 function toggleClass(active: boolean): string {
-  return `border-neutral-700 h-auto leading-none text-xs font-semibold px-2 py-2 hover:bg-orange-400/20 transition-colors duration-200 ${
-    active ? "bg-orange-500 text-black" : ""
+  return `border-border h-auto leading-none text-xs font-semibold px-2 py-2 hover:bg-primary/20 transition-colors duration-200 ${
+    active ? "!bg-primary !text-on-primary" : ""
   }`;
 }

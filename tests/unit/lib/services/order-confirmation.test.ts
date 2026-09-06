@@ -118,3 +118,42 @@ describe('merchant order effect payload', () => {
     expect(mocks.sendMerchant).not.toHaveBeenCalled();
   });
 });
+
+describe('supplied tokens override (Plan 04, D-10)', () => {
+  const suppliedTokens = { primary: '#ff00ff' } as never;
+
+  it('forwards a supplied token set to the confirmation sender', async () => {
+    mocks.sendConfirmation.mockResolvedValue({ success: true, id: 'customer-1' });
+    const order = emailLessOrder();
+    order.extensions = { email: 'buyer@example.test' };
+
+    await sendOrderConfirmation(order, 'confirmation/MCP-EMAILLESS-1/v1', suppliedTokens);
+
+    expect(mocks.sendConfirmation).toHaveBeenCalledWith(
+      expect.any(Object),
+      { idempotencyKey: 'confirmation/MCP-EMAILLESS-1/v1', tokens: suppliedTokens },
+    );
+  });
+
+  it('forwards a supplied token set to the merchant-notification sender', async () => {
+    const order = emailLessOrder();
+
+    await sendMerchantOrderNotification(order, 'merchant/MCP-EMAILLESS-1/v1', suppliedTokens);
+
+    expect(mocks.sendMerchant).toHaveBeenCalledWith(
+      expect.any(Object),
+      { idempotencyKey: 'merchant/MCP-EMAILLESS-1/v1', tokens: suppliedTokens },
+    );
+  });
+
+  it('resolves no token set itself when one is supplied (no tokens key when omitted)', async () => {
+    mocks.sendConfirmation.mockResolvedValue({ success: true, id: 'customer-2' });
+    const order = emailLessOrder();
+    order.extensions = { email: 'buyer@example.test' };
+
+    await sendOrderConfirmation(order, 'confirmation/MCP-EMAILLESS-1/v1');
+
+    const [, options] = mocks.sendConfirmation.mock.calls.at(-1) as [unknown, { tokens?: unknown }];
+    expect(options.tokens).toBeUndefined();
+  });
+});

@@ -1,0 +1,95 @@
+/**
+ * market theme — the frozen 23-token contract (05-TOKEN-MAP.md §1).
+ *
+ * The light preset: off-white surfaces, forest-green text, a produce-green
+ * accent, and big radius rounded sans — feels like a good neighborhood
+ * grocer's app. Converted from the retired theme-direction spec (removed 2026-09-05; its per-theme values live in each `themes/*.css` header) section
+ * 6 onto the 23-token contract per 06.1-UI-SPEC.md "Preset Token
+ * Contracts" (D-01, D-03, D-05..D-07).
+ *
+ * One value is a deliberate correction rather than a direct oklch->hex
+ * transcription of the direction document: the literal produce-green
+ * accent against the doc's own white accent-ink measures only ~3.68:1,
+ * below the 4.5:1 WCAG AA threshold for a solid button's text label. The
+ * `primary` token below is darkened along the same hue/chroma (doc
+ * oklch(60% .18 145) -> corrected oklch(54% .18 145)) to ~4.63:1; `ring`
+ * carries the same corrected value.
+ *
+ * success deliberately keeps the doc's literal, uncorrected value even
+ * though it is the same hue family as the corrected primary: success is
+ * not paired with white button text the way primary/on-primary is in
+ * this contract (it renders as tinted text and panel backgrounds, per
+ * 05-TOKEN-MAP.md §2, not a solid white-on-green button), so the AA
+ * text-contrast failure that forced primary's correction does not apply
+ * to it. This is not an inconsistency — it is two different roles that
+ * happen to share a hue.
+ *
+ * info is derived independently rather than folded from the doc's
+ * accent-2 (orange): the doc uses accent-2 for a decorative promo-banner
+ * strip, not a status/badge role, so the rename map's fold condition
+ * doesn't apply. Orange was also avoided because it would sit too close
+ * to warning and the dropped accent-2 itself, collapsing the status-colour
+ * distinctions the token set exists to preserve. A cool blue was derived
+ * instead.
+ *
+ * border repurposes the doc's surface-sunken value directly, the same
+ * disposition Atelier's uses, since the doc's own border-width: 0 gives
+ * no explicit border colour to use directly.
+ *
+ * Because this theme's main surfaces are light, its five inverse tokens
+ * (drawers, Stripe host, email templates) go dark — the opposite polarity
+ * from every dark theme, per Phase 5 D-06, mirroring `luxe`'s precedent.
+ *
+ * Shape: this preset is the direction doc's named radius outlier — its
+ * single figure (1rem) is larger than any step in volt-dark's default
+ * scale. The doc's literal figure anchors radius-xl, and the whole
+ * progression is scaled up from volt-dark's default to keep the four
+ * steps visibly distinct, the same technique midnight used to anchor its
+ * own doc figure at radius-lg.
+ *
+ * Per D-02, every token is required and declares a literal value. No token
+ * resolves through a second token as a fallback default. The display
+ * token below references the CSS variable app/layout.tsx exposes for
+ * Nunito (next/font, loaded once, preload disabled) — this file itself
+ * declares no font-loading at-rule. font-sans stays the Geist stack, an
+ * explicit override of the doc's own "font-body Nunito" recommendation
+ * (Nunito is used for font-display only), recorded here so it is not
+ * mistaken for an oversight.
+ */
+/* @theme label: Market | industry: grocery, specialty food, coffee, farm boxes | synopsis: Bright, dense and friendly — off-white surfaces, forest-green text, a produce-green accent, and big radius rounded sans. Feels like a good neighborhood grocer's app. */
+[data-theme="market"] {
+  /* Main colours */
+  --store-primary: #008819;
+  --store-on-primary: #ffffff;
+  --store-surface: #faf9f1;
+  --store-surface-elevated: #ffffff;
+  --store-foreground: #172614;
+  --store-muted-foreground: #576953;
+  --store-border: #ecedd7;
+  --store-ring: #008819;
+  --store-success: #189a30;
+  --store-warning: #e19100;
+  --store-danger: #c92f33;
+  --store-info: #008ec8;
+
+  /* Inverse colours (dark panels on a light app: drawers, Stripe, emails) */
+  --store-surface-inverse: #040c02;
+  --store-surface-inverse-elevated: #0c170a;
+  --store-on-inverse: #faf9f1;
+  --store-muted-on-inverse: #7e8a7c;
+  --store-border-inverse: #1e271c;
+
+  /* Shape — the doc's single 1rem figure anchors radius-xl, the phase's
+     largest radius scale; the whole progression is scaled up from
+     volt-dark's default to keep the four steps visibly distinct */
+  --store-radius-sm: 0.375rem;
+  --store-radius-md: 0.5rem;
+  --store-radius-lg: 0.75rem;
+  --store-radius-xl: 1rem;
+
+  /* Type — Geist stays for body copy (an explicit override of the doc's
+     own Nunito body-font recommendation); display references the
+     layout's Nunito variable */
+  --store-font-sans: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --store-font-display: var(--font-nunito), 'Nunito', system-ui, sans-serif;
+}

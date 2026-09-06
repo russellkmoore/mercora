@@ -18,7 +18,10 @@ type InsertPromotion = typeof promotions.$inferInsert;
 
 interface AdminPromotion {
   id: string;
+  /** First coupon code (kept for existing callers). */
   code: string;
+  /** Every coupon code attached to this promotion, in creation order (#87). */
+  codes: string[];
   name: string;
   description: string;
   type: "percentage" | "fixed_amount" | "free_shipping";
@@ -36,7 +39,11 @@ interface AdminPromotion {
 /**
  * Convert MACH Promotion to Admin format
  */
-function convertToAdminFormat(promotion: Promotion, couponInstance?: CouponInstance): AdminPromotion {
+function convertToAdminFormat(
+  promotion: Promotion,
+  couponInstance?: CouponInstance,
+  allCouponInstances: CouponInstance[] = couponInstance ? [couponInstance] : [],
+): AdminPromotion {
   const displayName = typeof promotion.name === 'string' ? promotion.name : promotion.name.en || 'Unnamed Promotion';
   const description = typeof promotion.description === 'string' ? promotion.description || '' : promotion.description?.en || '';
   
@@ -93,13 +100,16 @@ function convertToAdminFormat(promotion: Promotion, couponInstance?: CouponInsta
   return {
     id: promotion.id,
     code: couponInstance?.code || promotion.codes?.single_code || '',
+    codes: allCouponInstances.length > 0
+      ? allCouponInstances.map(c => c.code)
+      : promotion.codes?.single_code ? [promotion.codes.single_code] : [],
     name: displayName,
     description,
     type,
     value,
     minimumAmount,
     maxUses: promotion.usage_limits?.total_uses,
-    currentUses: couponInstance?.usage_count || 0,
+    currentUses: allCouponInstances.reduce((sum, c) => sum + (c.usage_count || 0), 0),
     validFrom: promotion.valid_from || new Date().toISOString(),
     validTo: promotion.valid_to || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
     status: promotion.status === 'active' ? 'active' : 'inactive'
@@ -208,9 +218,13 @@ export async function GET(request: NextRequest) {
     const couponInstances = await listCouponInstances();
     
     // Convert to admin format
+    // One promotion fans out to many coupon instances (#87): keep every code,
+    // in creation order, instead of only the first match.
     const adminPromotions = promotions.map(promotion => {
-      const couponInstance = couponInstances.find(c => c.promotion_id === promotion.id);
-      return convertToAdminFormat(promotion, couponInstance);
+      const related = couponInstances
+        .filter(c => c.promotion_id === promotion.id)
+        .sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? ''));
+      return convertToAdminFormat(promotion, related[0], related);
     });
     
     return NextResponse.json(adminPromotions);

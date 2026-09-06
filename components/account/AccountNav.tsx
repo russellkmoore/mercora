@@ -24,7 +24,7 @@ export function AccountNav() {
   return (
     <nav aria-label="Account" className="mb-8 flex flex-wrap gap-2 md:w-48 md:flex-col">
       {links.map(([label, href]) => (
-        <Link key={href} href={href} className="rounded-md border border-neutral-700 px-4 py-2 text-sm text-gray-200 hover:border-orange-500 hover:text-orange-400">
+        <Link key={href} href={href} className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:border-primary hover:text-primary/90">
           {label}
         </Link>
       ))}

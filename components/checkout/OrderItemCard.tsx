@@ -19,7 +19,7 @@ export default function OrderItemCard({ item, authoritativeLine }: OrderItemCard
     ? Money.fromMajor(authoritativeLine.lineTotal.amount, authoritativeLine.lineTotal.currency)
     : cartItemTotal(item!);
   return (
-    <div className="flex items-center gap-3 border rounded-lg p-1 bg-white">
+    <div className="flex items-center gap-3 border rounded-lg p-1 bg-surface-elevated">
       <div className="relative w-10 h-10 rounded overflow-hidden">
         {item?.primaryImageUrl && (
           <Image
@@ -34,11 +34,11 @@ export default function OrderItemCard({ item, authoritativeLine }: OrderItemCard
 
       <div className="flex-1">
         <div className="font-medium text-sm leading-tight">{name}</div>
-        <div className="text-xs text-gray-500">
+        <div className="text-xs text-muted-foreground">
           {quantity} × {unitPrice.format()}
         </div>
         {item?.giftCardCustomization && (
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-muted-foreground">
             For {item.giftCardCustomization.recipientName || item.giftCardCustomization.recipientEmail}
           </div>
         )}

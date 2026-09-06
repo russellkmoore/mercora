@@ -1,23 +1,23 @@
 # Mercora Production Deployment Guide
 
-> **Complete step-by-step guide for deploying Mercora to production**
+The complete setup-and-deploy runbook: Cloudflare, Clerk, and Stripe accounts, resource creation, environment configuration, migrations, build variables, and going live.
 
-This comprehensive guide covers the complete deployment process for Mercora, including all third-party services, infrastructure configuration, security setup, and admin dashboard deployment.
+**Status:** Active — this is Mercora's single deployment runbook; the former Stripe setup guide is retired into it.
 
-## 🏗️ Infrastructure Overview
+## Infrastructure Overview
 
 Mercora runs on Cloudflare's edge infrastructure with integrated services:
 
 - **Hosting**: Cloudflare Workers + Next.js 15 with App Router
 - **Database**: Cloudflare D1 (distributed SQLite with Drizzle ORM)
 - **Storage**: Cloudflare R2 Object Storage for images and content
-- **AI Platform**: Cloudflare AI (Llama 3.1 8B + BGE embeddings)
+- **AI Platform**: Cloudflare AI (`@cf/openai/gpt-oss-20b` + BGE embeddings)
 - **Vector Database**: Cloudflare Vectorize (38-item index)
 - **Authentication**: Clerk Authentication (with admin role support)
 - **Payments**: Stripe with Stripe Tax for global tax calculation
 - **Admin Dashboard**: Complete admin interface with AI analytics
 
-## 📋 Prerequisites
+## Prerequisites
 
 ### Required Service Accounts
 1. **Cloudflare Account** - Workers paid plan required ($5/month minimum)
@@ -26,7 +26,7 @@ Mercora runs on Cloudflare's edge infrastructure with integrated services:
 4. **GitHub Account** - Repository hosting and optional CI/CD
 
 ### Local Development Environment
-- **Node.js 18+** and npm/yarn/pnpm
+- **Node.js 24.18.1** (pinned in `.nvmrc` and `engines` in `package.json`) and npm/yarn/pnpm
 - **Git** for version control
 - **Wrangler CLI**: `npm install -g wrangler`
 - **Terminal/Command Line** access
@@ -37,7 +37,7 @@ Mercora runs on Cloudflare's edge infrastructure with integrated services:
 
 ---
 
-## 1️⃣ Cloudflare Setup
+## 1. Cloudflare Setup
 
 ### **Step 1: Create Cloudflare Account**
 1. Sign up at [cloudflare.com](https://cloudflare.com)
@@ -52,7 +52,7 @@ Mercora runs on Cloudflare's edge infrastructure with integrated services:
 npx wrangler d1 create mercora-db
 
 # Note the database ID from output
-# Example: c1ea0c17-14ae-48cc-ade8-4433e9130594
+# Example: your-d1-database-id-here
 ```
 
 #### **R2 Bucket**
@@ -132,7 +132,7 @@ returns an error, so the request continues instead of being rejected.
 
 ---
 
-## 2️⃣ Clerk Authentication Setup
+## 2. Clerk Authentication Setup
 
 ### **Step 1: Create Clerk Application**
 1. Sign up at [clerk.com](https://clerk.com)
@@ -148,7 +148,7 @@ From your Clerk Dashboard:
 
 ### **Step 3: Configure Environment Variables**
 
-#### **Local Development (.env.local)**
+#### **Local Development (`.dev.vars`)**
 ```env
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_your_publishable_key_here
 CLERK_SECRET_KEY=sk_test_your_secret_key_here
@@ -172,6 +172,11 @@ Update `wrangler.jsonc` vars:
 }
 ```
 
+These are the only two variables this runbook lists for Clerk. Every other
+public or optional configuration value — store identity, images, email
+provider, gift cards, subscriptions, and the rest — is documented once in
+`docs/runtime-configuration.md`; this runbook does not duplicate that list.
+
 ### **Step 4: Configure Domains**
 In Clerk Dashboard:
 1. Go to **Domains**
@@ -180,7 +185,7 @@ In Clerk Dashboard:
 
 ---
 
-## 3️⃣ Stripe Payment & Tax Setup
+## 3. Stripe Payment & Tax Setup
 
 ### **Step 1: Create Stripe Account**
 1. Sign up at [stripe.com](https://stripe.com)
@@ -202,18 +207,14 @@ From Stripe Dashboard > **Developers > API Keys**:
 1. Go to **Developers > Webhooks**
 2. Click **+ Add endpoint**
 3. Set endpoint URL: `https://yourdomain.com/api/webhooks/stripe`
-4. Select events:
-   - `payment_intent.succeeded`
-   - `payment_intent.payment_failed`
-   - `checkout.session.completed`
-   - `charge.refunded`
-   - `refund.updated`
-   - `refund.failed`
+4. Select the events. `docs/webhooks-refunds-inventory.md` is the binding
+   source for the required event set and the reasoning behind it — select
+   events from that document, not from memory or this runbook.
 5. Copy the **Signing secret** (starts with `whsec_`)
 
 ### **Step 5: Configure Environment Variables**
 
-#### **Local Development (.env.local)**
+#### **Local Development (`.dev.vars`)**
 ```env
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_your_publishable_key_here
 STRIPE_SECRET_KEY=sk_test_your_secret_key_here
@@ -238,18 +239,42 @@ Update `wrangler.jsonc` vars:
 }
 ```
 
+### **Step 6: Test Payments and Tax**
+Use Stripe's published test values during development. These are documentation
+values, not credentials.
+
+**Test cards:**
+- **Successful payment**: `4242424242424242`
+- **Declined payment**: `4000000000000002`
+- **3D Secure**: `4000002500003155`
+
+**Test tax addresses** (US, for Stripe Tax):
+- **California**: High tax rate (~10%)
+- **Montana**: No state sales tax
+- **New York**: Moderate tax rate (~8%)
+
 ---
 
-## 4️⃣ Database Setup
+## 4. Database Setup
 
 ### **Step 1: Run Migrations**
+Mercora never applies remote migrations as part of a deploy — every remote
+schema change is an explicit, gated operator action. See
+`docs/database-migrations.md` for the binding policy.
+
 ```bash
-# Apply migrations to local database (for development)
+# Local (development)
 npx wrangler d1 migrations apply mercora-db --local
 
-# Apply migrations to production database
-npx wrangler d1 migrations apply mercora-db
+# Preview - check, then apply
+npm run db:migrate:status:preview
+npm run db:migrate:apply:preview
+
+# Production - check, then apply behind the gate
+npm run db:migrate:status:production
+MERCORA_ALLOW_PRODUCTION_MIGRATIONS=1 npm run db:migrate:apply:production
 ```
+See `docs/database-migrations.md` for the binding migration policy.
 
 ### **Step 2: Seed Data (Optional)**
 ```bash
@@ -268,7 +293,7 @@ npx wrangler d1 execute mercora-db --command="SELECT COUNT(*) FROM products;"
 
 ---
 
-## 5️⃣ AI Content Indexing
+## 5. AI Content Indexing
 
 ### **Step 1: Content Preparation**
 Ensure your content is properly organized:
@@ -277,17 +302,23 @@ Ensure your content is properly organized:
 - Content should be uploaded to R2 bucket before indexing
 
 ### **Step 2: Deploy and Index Content**
+
+**Deploy paths:** `npm run deploy` builds and uploads the Worker and never applies remote migrations.
+`npm run deploy:ci` (used by Cloudflare Workers Builds) applies production migrations before upload.
+Apply migrations yourself with the guarded `db:migrate:*` scripts; `docs/database-migrations.md` is the binding source.
 ```bash
 # Deploy the application first
 npm run deploy
 
 # Index both products and knowledge articles (consolidated endpoint)
-# Note: Authentication temporarily disabled for development
-curl -X GET "https://yourdomain.com/api/admin/vectorize"
-
-# For production with admin token:
-curl -X GET "https://yourdomain.com/api/admin/vectorize?token=your-admin-token"
+# The admin token is a Cloudflare Worker secret (ADMIN_VECTORIZE_TOKEN)
+curl -X POST "https://yourdomain.com/api/admin/vectorize" \
+  -H "Authorization: Bearer <ADMIN_VECTORIZE_TOKEN>"
 ```
+
+A build deployed with a development `NODE_ENV` locks every admin route with HTTP 503 instead of
+opening the development bypasses. See `docs/admin-authentication.md` for what trips this guard
+and how to recover.
 
 ### **Step 3: Verify AI System**
 1. Test the AI assistant via the chat interface
@@ -303,7 +334,7 @@ curl -X GET "https://yourdomain.com/api/admin/vectorize?token=your-admin-token"
 
 ---
 
-## 6️⃣ Deployment Process
+## 6. Deployment Process
 
 ### **Step 1: Final Configuration Check**
 Verify all environment variables and secrets are configured:
@@ -315,6 +346,26 @@ npx wrangler secret list
 # Verify wrangler.jsonc configuration
 cat wrangler.jsonc
 ```
+
+### Step 1b: Workers Builds variables (Dashboard > Settings > Builds > Variables and secrets)
+
+Two kinds of values matter at **build** time, and they are resolved differently:
+
+| Variable | Where it must live | Why |
+|---|---|---|
+| `NEXT_PUBLIC_*` (e.g. `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_THEME_DEFAULT`, `NEXT_PUBLIC_IMAGE_CDN`) | `wrangler.jsonc` → `vars` (source of truth). Optionally also as a Dashboard Build variable. | Next.js inlines `NEXT_PUBLIC_*` when the bundle is built. `build:worker` runs `scripts/build-with-public-env.mjs`, which copies every `NEXT_PUBLIC_*` key from `wrangler.jsonc` into the build environment and **overrides** any Dashboard Build variable with the same name. A Dashboard value is only used if the key is absent from `wrangler.jsonc`, or if a build command bypasses `build:worker`. |
+| `MERCORA_ALLOW_PRODUCTION_MIGRATIONS=1` | Dashboard Build variable only | `npm run deploy:ci` (the Workers Builds deploy command) applies production D1 migrations before upload and refuses without this gate (ADR-DBM-04). Never put it in `wrangler.jsonc`. |
+
+Checklist when adding or changing a public value:
+
+1. Set it in `wrangler.jsonc` `vars` (and the matching `env.*` block if you use environments).
+2. If you also set it in the Dashboard, keep the two identical — the `wrangler.jsonc` copy wins.
+3. Redeploy. Build-time values only change on the next build; a runtime var change alone does not re-inline them.
+
+The theme fallback specifically: `NEXT_PUBLIC_THEME_DEFAULT` must be one of the names in
+`lib/themes/manifest.generated.ts` (today: `atelier`, `clinical`, `luxe`, `market`, `midnight`,
+`retro`, `volt-dark`). It is only step 2 of the resolution order in `docs/theming.md`; an admin
+selection saved in D1 always wins over it.
 
 ### **Step 2: Build and Deploy**
 ```bash
@@ -345,7 +396,7 @@ npm run deploy
 
 ---
 
-## 7️⃣ Post-Deployment Configuration
+## 7. Post-Deployment Configuration
 
 ### **Step 1: Update Webhook URLs**
 Update webhook endpoints in third-party services to point to production:
@@ -371,7 +422,7 @@ Consider adding:
 
 ---
 
-## 8️⃣ Going Live (Production Keys)
+## 8. Going Live (Production Keys)
 
 When ready for real payments, switch to live Stripe keys:
 
@@ -404,94 +455,4 @@ npm run deploy
 
 ---
 
-## 9️⃣ Monitoring & Maintenance
-
-### **Cloudflare Monitoring**
-- Worker analytics and logs
-- D1 database performance
-- R2 storage usage
-- AI usage and costs
-
-### **Third-Party Monitoring**
-- Stripe payment success rates
-- Clerk authentication metrics
-- Error tracking and alerts
-
-### **Regular Maintenance**
-- Update dependencies monthly
-- Review and rotate API keys quarterly
-- Monitor resource usage and costs
-- Update AI content and indexes
-
----
-
-## 🔐 Security Checklist
-
-### **Environment Security**
-- ✅ All secrets stored in Cloudflare secrets (not vars)
-- ✅ `.env.local` files are gitignored
-- ✅ No hardcoded API keys in code
-
-### **API Security**
-- ✅ Webhook signature verification enabled
-- ✅ API rate limiting configured
-- ✅ Authentication required for admin endpoints
-
-### **Content Security**
-- ✅ CSP headers configured
-- ✅ Input validation on all forms
-- ✅ SQL injection protection via Drizzle ORM
-
----
-
-## 🆘 Troubleshooting
-
-### **Common Issues**
-
-#### **Deployment Fails**
-- Check wrangler.jsonc syntax
-- Verify all required secrets are set
-- Ensure Workers paid plan is active
-
-#### **Database Connection Issues**
-- Verify D1 database ID in wrangler.jsonc
-- Check migration status
-- Ensure proper bindings
-
-#### **Authentication Issues**
-- Verify Clerk domain configuration
-- Check redirect URL settings
-- Ensure API keys are correct
-
-#### **Payment Issues**
-- Verify Stripe webhook configuration
-- Check webhook signature validation
-- Ensure tax calculation is working
-
-### **Debug Commands**
-```bash
-# View deployment logs
-npx wrangler tail
-
-# Check database status
-npx wrangler d1 info mercora-db
-
-# Test API endpoints
-curl https://yourdomain.com/api/products
-
-# Check secrets
-npx wrangler secret list
-```
-
----
-
-## 📞 Support Resources
-
-- **Cloudflare Workers**: [workers.cloudflare.com](https://workers.cloudflare.com)
-- **Clerk Documentation**: [clerk.com/docs](https://clerk.com/docs)
-- **Stripe Documentation**: [stripe.com/docs](https://stripe.com/docs)
-- **Next.js Documentation**: [nextjs.org/docs](https://nextjs.org/docs)
-
----
-
-**🎉 Your Mercora platform is now ready for production!**
+**Your Mercora platform is now ready for production.**

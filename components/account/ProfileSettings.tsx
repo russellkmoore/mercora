@@ -17,11 +17,11 @@ export function ProfileSettings({ firstName: initialFirst, lastName: initialLast
     } catch (error) { setMessage(error instanceof Error ? error.message : "Settings could not be saved"); }
     finally { setBusy(false); }
   }
-  const input = "w-full rounded-md border border-neutral-600 bg-neutral-950 px-3 py-2 text-white";
-  return <form onSubmit={submit} className="max-w-xl space-y-4 rounded-lg border border-neutral-700 bg-neutral-900 p-5">
-    <label className="block text-sm text-gray-300">First name<input className={`${input} mt-1`} maxLength={100} value={firstName} onChange={(e) => setFirstName(e.target.value)} /></label>
-    <label className="block text-sm text-gray-300">Last name<input className={`${input} mt-1`} maxLength={100} value={lastName} onChange={(e) => setLastName(e.target.value)} /></label>
-    <button disabled={busy} className="rounded-md bg-orange-500 px-4 py-2 font-medium text-black">{busy ? "Saving…" : "Save settings"}</button>
-    {message && <p role="status" className="text-sm text-gray-300">{message}</p>}
+  const input = "w-full rounded-md border border-border bg-surface px-3 py-2 text-foreground";
+  return <form onSubmit={submit} className="max-w-xl space-y-4 rounded-lg border border-border bg-surface-elevated p-5">
+    <label className="block text-sm text-muted-foreground">First name<input className={`${input} mt-1`} maxLength={100} value={firstName} onChange={(e) => setFirstName(e.target.value)} /></label>
+    <label className="block text-sm text-muted-foreground">Last name<input className={`${input} mt-1`} maxLength={100} value={lastName} onChange={(e) => setLastName(e.target.value)} /></label>
+    <button disabled={busy} className="rounded-md bg-primary px-4 py-2 font-medium text-on-primary">{busy ? "Saving…" : "Save settings"}</button>
+    {message && <p role="status" className="text-sm text-muted-foreground">{message}</p>}
   </form>;
 }

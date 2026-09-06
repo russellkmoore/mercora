@@ -10,13 +10,13 @@
  */
 export function ProductCardSkeleton() {
   return (
-    <div className="bg-neutral-800 rounded-lg overflow-hidden shadow animate-pulse">
-      <div className="relative aspect-video bg-neutral-700" />
+    <div className="bg-surface-elevated rounded-lg overflow-hidden shadow animate-pulse">
+      <div className="relative aspect-video bg-surface-elevated" />
       <div className="p-3 sm:p-4">
-        <div className="h-6 bg-neutral-700 rounded mb-2" />
-        <div className="h-4 bg-neutral-700 rounded mb-2 w-3/4" />
-        <div className="h-4 bg-neutral-700 rounded mb-4 w-1/2" />
-        <div className="h-5 bg-neutral-700 rounded w-1/3" />
+        <div className="h-6 bg-surface-elevated rounded mb-2" />
+        <div className="h-4 bg-surface-elevated rounded mb-2 w-3/4" />
+        <div className="h-4 bg-surface-elevated rounded mb-4 w-1/2" />
+        <div className="h-5 bg-surface-elevated rounded w-1/3" />
       </div>
     </div>
   );
@@ -41,7 +41,7 @@ export function ProductGridSkeleton({ count = 3 }: { count?: number }) {
 export function PageSpinner() {
   return (
     <div className="flex items-center justify-center min-h-screen">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500" />
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
     </div>
   );
 }

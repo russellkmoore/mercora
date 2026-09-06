@@ -89,10 +89,10 @@ export default function CheckoutSuccessPage() {
 
   return (
     <div className="min-h-screen px-4 py-16 flex items-start justify-center">
-      <section className="bg-white p-8 rounded-xl shadow-sm max-w-md w-full text-center">
-        <h1 className="text-2xl font-bold text-gray-900 mb-3">{copy[phase].title}</h1>
-        <p className="text-gray-600 mb-6">{copy[phase].message}</p>
-        <Link className="inline-flex rounded-md bg-black px-5 py-3 text-white" href="/">
+      <section className="bg-surface-elevated p-8 rounded-xl shadow-sm max-w-md w-full text-center">
+        <h1 className="text-2xl font-bold text-foreground mb-3 font-display">{copy[phase].title}</h1>
+        <p className="text-muted-foreground mb-6">{copy[phase].message}</p>
+        <Link className="inline-flex rounded-md bg-surface px-5 py-3 text-foreground" href="/">
           Continue shopping
         </Link>
       </section>

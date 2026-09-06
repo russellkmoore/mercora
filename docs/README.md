@@ -1,90 +1,42 @@
-# Mercora Documentation Index
+# Documentation Index
 
-> **Complete documentation for the Mercora AI-powered eCommerce platform**
+One-line purpose: get a reader to the right document quickly.
 
-This directory contains comprehensive documentation for all aspects of the Mercora platform. Start here to find the information you need.
+**Status:** Living index — regenerated in phase 08.2 over the document set that survived plans 01
+through 03.
 
-## 📚 Documentation Map
+## Setup
 
-### 🚀 **Getting Started**
-- **[Main README](../README.md)** - Project overview, features, and quick start
-- **[Deployment Guide](DEPLOYMENT_SETUP.md)** - Complete production deployment instructions
-- **[Development Roadmap](ROADMAP.md)** - Current status and future plans
+- [AGENTS.md](../AGENTS.md) - Prerequisites, ordered setup commands, and the CI gate list for a coding assistant or contributor.
+- [DEPLOYMENT_SETUP.md](DEPLOYMENT_SETUP.md) - The setup-and-deploy runbook: Cloudflare, Clerk and Stripe accounts through going live.
+- [README.md](../README.md) - Project overview, quick start, and the preset and layout showcase.
+- [runtime-configuration.md](runtime-configuration.md) - The env-var contract for overriding public, non-secret storefront defaults.
+- [theming.md](theming.md) - The frozen token contract, preset switching, and the three layout switches.
 
-### 🏗️ **Technical Architecture**
-- **[System Architecture](architecture.md)** - Complete system design with Mermaid diagrams
-- **[API Architecture](api-architecture.md)** - RESTful API specifications and flows
-- **[Order and Checkout Trust Boundary](checkout-trust-boundary.md)** - Server-owned pricing, pending orders, and verified finalization
-- **[AI Processing Pipeline](ai-pipeline.md)** - Deep dive into AI workflows and anti-hallucination
-- **[Development Context](CLAUDE.md)** - Essential context for developers and AI assistants
+## Architecture
 
-### 💼 **Admin & Business Features**
-- **[Admin Dashboard Specification](admin-dashboard-specification.md)** - Complete admin interface specification
-- **[Admin Authentication](admin-authentication.md)** - Production-ready authentication and security
-- **[Stripe Integration](STRIPE_INTEGRATION.md)** - Payment processing and tax calculation
+- [ai-pipeline.md](ai-pipeline.md) - Volt's AI request flow: embeddings, vector search, and response generation.
+- [architecture.md](architecture.md) - System diagrams for request flow, the AI pipeline, and deployment.
+- [content-publishing.md](content-publishing.md) - Store-neutral CMS pages and blog publishing.
+- [mcp-server-specification.md](mcp-server-specification.md) - The authenticated MCP HTTP API an external agent uses to shop.
+- [observability.md](observability.md) - The versioned, bounded telemetry envelope for commerce failures.
 
-### 🚀 **Innovation & Future**
-- **[MCP Server Integration](mcp-server-specification.md)** - Revolutionary agentic commerce through developer tools
+## Operations
 
-## 📋 **Quick Reference**
+- [admin-authentication.md](admin-authentication.md) - The multi-layered authentication and role-based access control protecting admin routes.
+- [customer-communications.md](customer-communications.md) - Authenticated account navigation, order history, and profile settings.
+- [dependency-security.md](dependency-security.md) - The production dependency audit baseline and its owned exceptions.
+- [mobile-lighthouse-baseline.md](mobile-lighthouse-baseline.md) - Measured Lighthouse scores against the PRD's mobile performance target.
+- [shopify-migration.md](shopify-migration.md) - The operator-only Shopify import toolkit, defaulting to a dry run.
 
-### **Current Platform Status**
-- ✅ **Production Ready**: Complete eCommerce platform deployed and running
-- ✅ **AI Assistant**: Volt AI with semantic search and personalization
-- ✅ **Admin Dashboard**: Full management interface with AI analytics
-- ✅ **CMS System**: Content management for pages and articles  
-- ✅ **Authentication**: Multi-layered security with role-based access
-- 🚧 **MCP Server**: Under development for agentic commerce
+## Reference
 
-### **Key Technologies**
-- **Frontend**: Next.js 15, TypeScript, Tailwind CSS, shadcn/ui
-- **Backend**: Cloudflare Workers, D1 Database, R2 Storage
-- **AI**: Cloudflare AI (Llama 3.1 8B + BGE embeddings)
-- **Auth**: Clerk with role-based admin access
-- **Payments**: Stripe with Stripe Tax integration
+The checkout, webhook, migrations and subscriptions documents below are ADRs: all four carry a
+dated Accepted status and are locked in `gsd-ingest-manifest.yaml`.
 
-### **Live Demo**
-🌐 **[voltique.russellkmoore.me](https://voltique.russellkmoore.me)**
-
-## 🔍 **Find What You Need**
-
-### For Developers
-- Start with [CLAUDE.md](CLAUDE.md) for development context
-- Review [architecture.md](architecture.md) for system understanding
-- Check [api-architecture.md](api-architecture.md) for API specifications
-
-### For Business Users
-- Review [admin-dashboard-specification.md](admin-dashboard-specification.md) for admin capabilities
-- Check [ROADMAP.md](ROADMAP.md) for current status and future plans
-
-### For DevOps/Deployment
-- Follow [DEPLOYMENT_SETUP.md](DEPLOYMENT_SETUP.md) for complete setup
-- Review security sections in [admin-authentication.md](admin-authentication.md)
-
-### For AI Integration
-- Study [ai-pipeline.md](ai-pipeline.md) for AI implementation details
-- Review [mcp-server-specification.md](mcp-server-specification.md) for future AI features
-
-## 📊 **Documentation Quality**
-
-All documentation has been recently audited and updated to ensure:
-- ✅ **Accuracy**: Information matches current implementation
-- ✅ **Completeness**: All major features and capabilities documented
-- ✅ **Consistency**: Unified terminology and structure
-- ✅ **Timeliness**: Recent updates reflect latest developments
-- ✅ **Accessibility**: Clear navigation and cross-references
-
-## 🔄 **Documentation Updates**
-
-**Last Updated**: September 1, 2025
-
-**Recent Changes**:
-- Updated all docs to reflect current production state
-- Added CMS system and admin user management documentation
-- Corrected authentication status (now production-ready)
-- Updated API architecture with new admin endpoints
-- Consolidated roadmap with completed features
-
----
-
-💡 **Need help?** Start with the [Main README](../README.md) or jump to the specific documentation section you need above.
+- [CHANGELOG-docs.md](CHANGELOG-docs.md) - The running log of documentation retirements and merges.
+- [checkout-trust-boundary.md](checkout-trust-boundary.md) - ADR: server-owned pricing, pending orders, and verified finalization.
+- [CLAUDE.md](CLAUDE.md) - AI-assistant context not already owned by AGENTS.md or another doc.
+- [database-migrations.md](database-migrations.md) - ADR: remote D1 migrations are an explicit operator action, never automatic.
+- [subscriptions.md](subscriptions.md) - ADR: optional, disabled-by-default subscription acquisition.
+- [webhooks-refunds-inventory.md](webhooks-refunds-inventory.md) - ADR: Stripe webhooks, order state, and inventory as durable transitions.

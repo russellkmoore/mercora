@@ -25,6 +25,7 @@ export const order_effects = sqliteTable(
     next_attempt_at: text('next_attempt_at'),
     last_error: text('last_error'),
     result: text('result'),
+    payload: text('payload'),
     created_at: text('created_at').notNull(),
     updated_at: text('updated_at').notNull(),
     completed_at: text('completed_at'),

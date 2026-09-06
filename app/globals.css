@@ -1,18 +1,11 @@
 @import 'tailwindcss';
+@import '../themes/index.generated.css';
 @config '../tailwind.config.ts';
 
 /* Optimize font loading to reduce preload warnings */
 @layer base {
   html {
-    /* Use system fonts initially to reduce preload delay */
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-  }
-  
-  /* Progressive font enhancement */
-  .font-sans {
-    font-family: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-display: swap;
   }
   
   /* Only load mono font when actually needed */
@@ -23,6 +16,14 @@
   
   /* Reduce layout shift during font loading */
   body {
+    /* D-10: the storefront's body face. Must stay on body, never html — the
+       token's value starts with var(--font-geist-sans), and next/font's
+       generated class that declares that variable is applied to the body
+       element (see app/layout.tsx), not to <html>. A document-element
+       declaration would reference an undefined custom property there,
+       which is invalid at computed-value time and silently drops every
+       storefront page to the browser's default serif (T-06.1-13). */
+    font-family: var(--store-font-sans);
     font-synthesis: none;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
@@ -30,7 +31,8 @@
   }
 }
 
-/* Admin Layout Specific Styles */
+/* Admin Layout Specific Styles — hardcoded palette by decision D-14, excluded from the token scan */
+/* gsd:scan-ignore-start */
 @layer components {
   /* Admin layout container */
   .admin-layout {
@@ -127,6 +129,7 @@
     background: rgb(82 82 82); /* neutral-600 */
   }
 }
+/* gsd:scan-ignore-end */
 
 @layer utilities {
   .touch-manipulation {
@@ -152,7 +155,7 @@
     input:focus-visible,
     select:focus-visible,
     textarea:focus-visible {
-      outline: 2px solid #f97316;
+      outline: 2px solid var(--store-primary);
       outline-offset: 2px;
     }
   }

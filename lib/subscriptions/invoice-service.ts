@@ -8,6 +8,7 @@ import { SUBSCRIPTION_ACQUISITION_EXTENSION } from '@/lib/commerce/capabilities'
 import {
   preparePaidOrderEffectStatements,
 } from '@/lib/services/order-effects';
+import { getActiveTheme } from '@/lib/themes/active-theme';
 import type { Address } from '@/lib/types';
 import type { Order, OrderItem } from '@/lib/types/order';
 
@@ -491,11 +492,13 @@ async function recoverOrReturnExisting(
   if (existing.payment_status !== 'pending' || existing.status !== 'pending') {
     throw new Error('Existing subscription invoice order is not recoverable');
   }
+  const themeName = await getActiveTheme();
   const statements = [
     ...preparePaidOrderEffectStatements(database, pendingOrder, {
       now,
       includeSubscription: false,
       includeGiftCard: false,
+      themeName,
     }),
     paidPromotion(
       database,
@@ -549,6 +552,7 @@ export async function fulfillSubscriptionInvoice(
   );
   if (existing) return existing;
 
+  const themeName = await getActiveTheme();
   const statements = [
     orderInsert(args.database, pendingOrder),
     invoiceOrderInsert(args.database, context, invoice, pendingOrder.id!),
@@ -556,6 +560,7 @@ export async function fulfillSubscriptionInvoice(
       now,
       includeSubscription: false,
       includeGiftCard: false,
+      themeName,
     }),
     paidPromotion(
       args.database,
