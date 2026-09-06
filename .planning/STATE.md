@@ -4,18 +4,18 @@ milestone: v2
 milestone_name: Themeable Storefront
 current_phase: 08.2
 current_phase_name: Documentation Overhaul & Agent Onboarding
-status: executing
-stopped_at: Completed 08.2-05-PLAN.md
-last_updated: "2026-09-05T23:51:54.638Z"
-last_activity: 2026-09-05
-last_activity_desc: Phase 08.2 execution started
-state_head: 01c1ba468b314071e792e6a5e2bff20ce3ae7789
+status: phase_complete
+stopped_at: Completed 08.2-06-PLAN.md
+last_updated: "2026-09-06T00:24:24.523Z"
+last_activity: 2026-09-06
+last_activity_desc: Phase 08.2 (final phase of v2) completed — style contract, claim check, and validation sign-off
+state_head: e8dce67f9c6fe111af99d7b802591c076c0b75bc
 progress:
   total_phases: 7
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 44
-  completed_plans: 43
-  percent: 86
+  completed_plans: 44
+  percent: 100
 ---
 
 # Project State
@@ -25,16 +25,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-05 after Phase 8.1)
 
 **Core value:** A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** Phase 08.2 — Documentation Overhaul & Agent Onboarding
+**Current focus:** Phase 08.2 complete — v2 milestone ready for `/gsd-audit-milestone` and `/gsd-complete-milestone v2`
 
 ## Current Position
 
-Phase: 08.2 (Documentation Overhaul & Agent Onboarding) — EXECUTING
+Phase: 08.2 (Documentation Overhaul & Agent Onboarding) — COMPLETE (last phase of milestone v2)
 Plan: 6 of 6
-Status: Ready to execute
-Last activity: 2026-09-05 — Phase 08.2 execution started
+Status: Phase complete. Shipped: `README.md` rewritten product-neutral with a preset/layout
+showcase and a docs index; nine stale `docs/` files retired and one merged, all through a proven
+retirement contract; `scripts/docs-lint.mjs` added as a local documentation gate; a root
+`AGENTS.md` written and tracked, giving a coding assistant an ordered, command-exact setup path;
+the surviving document set brought to one direct-language style contract and claim-checked against
+the code. DOCS-04 and DOCS-05 are both complete.
+Last activity: 2026-09-06 — Phase 08.2 execution completed
 
-Progress: [█████████░] 86%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -213,12 +218,25 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 08.2]: [Phase 08.2] 08.2-04: Corrected a wrong secret variable name inherited from 08.2-RESEARCH.md (GIFT_CARD_CODE_HMAC_KEYS_JSON, not _CURRENT_KEYS_JSON) after the claim check found it disagreed with lib/gift-cards/config.ts; AGENTS.md was written with the correct name.
 - [Phase 08.2]: [Phase 08.2] 08.2-04: docs/CLAUDE.md's gate order, environment-variable example, deployment, MCP inventory, and database-schema sections became one-sentence links to AGENTS.md and the docs that own each topic, cutting the file from 655 to 236 lines; its project-overview paragraph was rewritten to match AGENTS.md's themeable-storefront framing so the two files describing this repo to an AI assistant do not contradict each other.
 - [Phase 08.2]: README's docs-index section links a curated subset rather than duplicating the full 20-entry index — Plan verify only asserts six required link targets resolve; duplicating the full index would push the file toward its 250-line ceiling for no reader benefit.
+- [Phase 08.2]: 08.2-06: Cleared mermaid diagram content and Mermaid `%%` comments as an inert place to add sentence-ending punctuation for the phase's sentence-length style check, since diagram node labels and comments render identically with or without a trailing period — no diagram fact changed.
+- [Phase 08.2]: 08.2-06: Treated `docs/CHANGELOG-docs.md`'s references to retired document paths as an intentional exception to the whole-set dead-path and dead-variable checks, matching the "one file allowed to name a retired document" rule plans 01-03 already established and enforced inline.
+- [Phase 08.2]: 08.2-06: Phase closes with DOCS-04 and DOCS-05 both complete and the full CI-mirroring gate suite green (docs:lint, lint, typecheck, scan:tokens, build-themes --check, 2187 unit tests, 154 Workers tests, production build); v2 Themeable Storefront's four phases (5, 6/6.1, 7, 8/8.1/8.2) are all done.
 
 ### Pending Todos
 
 None.
 
 ### Blockers/Concerns
+
+- [Phase 08.2] `npm run docs:lint` (the phase's documentation gate) is a local check run by
+  convention, the same way `npm run scan:tokens` was before Phase 8.1 wired it into CI. It is not
+  wired into `.github/workflows/ci.yml`. A future plan should add it alongside `scan:tokens`, or
+  this documentation set can silently drift again.
+- [Phase 08.2] Two manual verifications from `08.2-VALIDATION.md` remain open for a human: (1) a
+  fresh-clone dry run of `AGENTS.md` with a coding assistant, and (2) confirming
+  `mise exec -- npm run dev` leaves `git status --short` clean for `AGENTS.md` after the Next.js
+  managed block regenerates. Neither blocks this phase's completion; both are named as the human's
+  job in the validation record.
 
 Open items carried from v1 close (blocks v2 feature work; full list in `milestones/v1-MILESTONE-AUDIT.md`):
 
@@ -276,8 +294,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T23:51:54.255Z
-Stopped at: Completed 08.2-05-PLAN.md
+Last session: 2026-09-06T00:24:24.523Z
+Stopped at: Completed 08.2-06-PLAN.md — phase 08.2 and milestone v2's roadmap are both complete
 Resume file: None
 
-Next: `/gsd-plan-phase 8.2` (context exists) then execute; then `/gsd-audit-milestone` → `/gsd-complete-milestone v2` → `/gsd-cleanup`
+Next: `/gsd-audit-milestone` → `/gsd-complete-milestone v2` → `/gsd-cleanup`
