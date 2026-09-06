@@ -60,6 +60,7 @@ to `main`:
 
 ```bash
 npm audit --omit=dev --audit-level=high
+npm run check:migrations -- --base <base-sha>   # pull requests only
 npm run build:themes:check
 npm run scan:tokens
 npm run lint

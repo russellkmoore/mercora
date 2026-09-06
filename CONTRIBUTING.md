@@ -26,6 +26,7 @@ merchants are welcome.
    npm run lint
    npm run typecheck
    npm run scan:tokens
+   npm run check:migrations -- --base origin/main
    npm run build:themes:check
    npm test
    npm run test:workers
