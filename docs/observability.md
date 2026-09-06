@@ -6,6 +6,8 @@ processing, cooldown storage, and alert delivery may all fail without changing
 payment, webhook, refund, inventory, fulfillment, email, or recommendation
 behavior.
 
+**Status:** Active
+
 ## Data contract
 
 The exact machine marker is `commerce.telemetry.v1`. The producer accepts only
@@ -27,21 +29,17 @@ structured log remains available and the commerce operation continues.
 
 `workers/observability-tail` is a separate Tail Worker. It:
 
-- scans a bounded number of trace items and log entries;
-- accepts only an error-level log containing one exact JSON envelope argument;
-- alerts only for the closed critical-event subset;
-- deduplicates and caps alert work and email payload size;
-- HTML-escapes alert content and includes both HTML and plain text;
-- coordinates cooldowns through one SQLite `AlertCooldown` Durable Object per
-  closed alert bucket, never a module global or one global object;
-- reserves the cooldown atomically before delivery;
-- shortens the reservation to a bounded failure backoff if delivery fails; and
-- sends through a provider-neutral adapter: Cloudflare Email Sending is the
-  recommended default, while Resend remains available for compatibility;
-- selects a provider explicitly with `EMAIL_PROVIDER=cloudflare|resend`, or
-  infers it only when exactly one provider is configured; and
-- never falls back across providers after delivery starts, avoiding duplicates
-  when the selected provider returns an ambiguous failure.
+- scans a bounded number of trace items and log entries.
+- accepts only an error-level log containing one exact JSON envelope argument.
+- alerts only for the closed critical-event subset.
+- deduplicates and caps alert work and email payload size.
+- HTML-escapes alert content and includes both HTML and plain text.
+- coordinates cooldowns through one SQLite `AlertCooldown` Durable Object per closed alert bucket, never a module global or one global object.
+- reserves the cooldown atomically before delivery.
+- shortens the reservation to a bounded failure backoff if delivery fails.
+- sends through a provider-neutral adapter: Cloudflare Email Sending is the recommended default, while Resend remains available for compatibility.
+- selects a provider explicitly with `EMAIL_PROVIDER=cloudflare|resend`, or infers it only when exactly one provider is configured.
+- never falls back across providers after delivery starts, avoiding duplicates when the selected provider returns an ambiguous failure.
 
 The Tail Worker keeps this small adapter inside its standalone package instead
 of importing the application sender. It mirrors the same provider selection,
@@ -58,10 +56,7 @@ runtime validation and cannot send mail.
 Tail Workers require a paid Workers plan. A producer deployment fails if a
 referenced Tail Worker service does not already exist, so order is load-bearing:
 
-1. Choose an outbound provider. Cloudflare Email Sending is recommended: onboard
-   a sender domain and verify the one alert destination in the target account.
-   For Resend compatibility, configure `RESEND_API_KEY` as a Wrangler secret.
-   Never put the key or any other secret in source control.
+1. Choose an outbound provider. Cloudflare Email Sending is recommended: onboard a sender domain and verify the one alert destination in the target account. For Resend compatibility, configure `RESEND_API_KEY` as a Wrangler secret. Never put the key or any other secret in source control.
 2. Copy `workers/observability-tail/wrangler.jsonc` into environment-owned
    deployment configuration. Replace every `configure-*` and
    `example.invalid` value. Keep both `destination_address` and
@@ -95,7 +90,7 @@ creation, or message send is performed by the repository test/build workflow.
 
 ## Local validation and non-production canary
 
-The normal gates are:
+Run the standard code gates first.
 
 ```sh
 npm run lint
@@ -103,6 +98,11 @@ npm run typecheck
 npm test
 npm run test:workers
 npm run test:observability-worker
+```
+
+Then check and dry-run the Tail Worker's own binding types and deploy.
+
+```sh
 npx wrangler types --check --include-runtime=false \
   --config workers/observability-tail/wrangler.jsonc \
   --env-interface ObservabilityTailEnv \
@@ -133,7 +133,7 @@ the behavior tests above.
 
 For a canary, use a non-production account and recipient controlled by the
 operator. Deploy the configured Tail Worker first, then attach one non-production
-producer. From a guarded non-production-only path, temporarily call:
+producer. From a guarded non-production-only path, temporarily call this.
 
 ```ts
 recordTelemetry(
@@ -148,7 +148,6 @@ recordTelemetry(
 );
 ```
 
-Confirm one alert, confirm another invocation is suppressed during the
-cooldown, remove the canary, and inspect Workers Logs for only the bounded
-envelope. Never use a customer request, real order, production payment, raw
-exception, or production recipient for this check.
+Confirm one alert, and confirm another invocation is suppressed during the cooldown. Remove the
+canary, and inspect Workers Logs for only the bounded envelope. Never use a customer request, real
+order, production payment, raw exception, or production recipient for this check.
