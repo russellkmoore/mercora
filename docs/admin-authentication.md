@@ -208,7 +208,7 @@ This menu item only renders once `isAdmin` resolves to true.
 
 3. **Valid API Token**:
    ```bash
-   curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+   curl -H "Authorization: Bearer $ADMIN_VECTORIZE_TOKEN" \
         https://app.com/api/admin/analytics
    # Returns: Valid analytics data
    ```
