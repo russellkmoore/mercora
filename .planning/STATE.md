@@ -2,49 +2,42 @@
 gsd_state_version: 1.0
 milestone: v2
 milestone_name: Themeable Storefront
-current_phase: 08.2
-status: completed
+status: Awaiting next milestone
 stopped_at: Phase 08.2 complete — all phases complete
-last_updated: "2026-09-06T00:52:00.986Z"
+last_updated: "2026-09-06T00:56:37.801Z"
 last_activity: 2026-09-06
-last_activity_desc: Phase 08.2 complete
-state_head: 7cfeb3e9d3dc8f80f0afd9cd0e15a74f33196d30
+last_activity_desc: Milestone v2 completed and archived
+state_head: 0c463469e99cf67bf9fa90dd362046da0d3694d2
 progress:
   total_phases: 7
   completed_phases: 7
   total_plans: 44
   completed_plans: 44
   percent: 100
+current_phase: 08.2
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-05 after Phase 8.1)
+See: .planning/PROJECT.md (updated 2026-09-05 after v2 milestone)
 
 **Core value:** A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** Phase 08.2 complete — v2 milestone ready for `/gsd-audit-milestone` and `/gsd-complete-milestone v2`
+**Current focus:** Planning next milestone (`/gsd-new-milestone`)
 
 ## Current Position
 
-Phase: 08.2
-Plan: Not started
-Status: All phases complete
-showcase and a docs index; nine stale `docs/` files retired and one merged, all through a proven
-retirement contract; `scripts/docs-lint.mjs` added as a local documentation gate; a root
-`AGENTS.md` written and tracked, giving a coding assistant an ordered, command-exact setup path;
-the surviving document set brought to one direct-language style contract and claim-checked against
-the code. DOCS-04 and DOCS-05 are both complete.
-Last activity: 2026-09-05 — Phase 08.2 complete
-
-Progress: [█████████░] 86%
+Phase: Milestone v2 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-09-05 — Milestone v2 completed and archived
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 61 (all v1)
+- Total plans completed: 61 (17 v1, 44 v2)
 - Average duration: 56 min/plan (Phase 5, 12 plans)
 - Total execution time: ~11.3 hours (v2)
 
@@ -229,40 +222,21 @@ None.
 
 ### Blockers/Concerns
 
-- [Phase 08.2] `npm run docs:lint` (the phase's documentation gate) is a local check run by
-  convention, the same way `npm run scan:tokens` was before Phase 8.1 wired it into CI. It is not
-  wired into `.github/workflows/ci.yml`. A future plan should add it alongside `scan:tokens`, or
-  this documentation set can silently drift again.
-- [Phase 08.2] Two manual verifications from `08.2-VALIDATION.md` remain open for a human: (1) a
-  fresh-clone dry run of `AGENTS.md` with a coding assistant, and (2) confirming
-  `mise exec -- npm run dev` leaves `git status --short` clean for `AGENTS.md` after the Next.js
-  managed block regenerates. Neither blocks this phase's completion; both are named as the human's
-  job in the validation record.
+Nothing blocks the next milestone. Open items carried out of v2 (full list in `milestones/v2-MILESTONE-AUDIT.md`):
 
-Open items carried from v1 close (blocks v2 feature work; full list in `milestones/v1-MILESTONE-AUDIT.md`):
+- [Needs Russell] Walk through `/admin/settings/appearance` (theme grid and layout switches) in a real browser with a Clerk admin session; both are proven by dev-bypass probes and render tests only
+- [Needs Russell] Fresh-clone dry run of `AGENTS.md` with a coding assistant; run `mise exec -- npm run dev` once and confirm `git status --short` leaves `AGENTS.md` unchanged
+- [Follow-up] Add `npm run docs:lint` to `.github/workflows/ci.yml` next to `scan:tokens`
+- [Backlog] Direction-doc properties outside the 23-token contract (`.planning/todos/pending/theme-contract-dropped-properties.md`, `theme-direction-doc-backlog-06.1.md`); themed demo deployments (`themed-demo-deployments.md`); theme metadata in admin is shipped, todo `theme-metadata-industry-synopsis-admin.md` can be closed
+- [Environment-limited] Screenshot coverage for the Stripe payment step and the two Clerk-gated routes; UI-SPEC a11y screen-reader row
+- [Accepted] `border-inverse` dual use; 2-pixel headless-rendering parity residual (S-07-01)
+
+Open items carried from v1 close (`milestones/v1-MILESTONE-AUDIT.md`):
 
 - [Needs Russell] Add `NEXT_PUBLIC_SITE_URL` as a Cloudflare Workers Build variable and redeploy (sitemap still advertises `mercora.example.com`)
 - [Cloudflare hygiene] Delete the unused `ADMIN_USER_IDS` Worker secret
 - [Backlog] Mobile Lighthouse scores 72-80 vs. target 85 on all four measured routes
 - [Review 2026-12-01] Five moderate dev-only `npm audit` findings
-
-Research flags for v2 execution (from `.planning/research/SUMMARY.md`):
-
-Carried out of Phase 5:
-
-- [Phase 5] `data/d1/seed.sql` products bulk insert has a row missing its `options` value; the documented `--file=data/d1/seed.sql` load fails. Not fixed (out of scope); a local-only D1 fixture was used for screenshots
-- [Phase 5] Screenshot coverage gaps for Phase 8's visual QA: order-status (no seeded order), Stripe payment step (payment-intent 400 locally), authenticated account dashboard, review-form error state. Seed an order and a Clerk session before the cross-preset QA pass
-- [Phase 5] Prose blocks (`prose-invert prose-orange`) run on Typography plugin defaults; prose accent colour will not follow a theme until Phase 6 wires typography colours off the CSS variables
-- [Phase 5] `border-inverse` serves both drawer edges and email dividers; split into a second token in a later milestone only if a preset's email dividers read badly
-
-Carried out of Phase 6 (see `.planning/WINDOWS.md`):
-
-- [Closed 2026-09-05] `NEXT_PUBLIC_THEME_DEFAULT=volt-dark` added as a Dashboard Build variable by Russell; precedence documented in `docs/DEPLOYMENT_SETUP.md` §6 Step 1b (`wrangler.jsonc` vars win via `build-with-public-env.mjs`)
-- [Phase 6] `--store-font-display` is wired end to end but no component applies the `font-display` class, so Luxe's serif headings never render — **closed at 06.1-03**: `font-display` is applied to all 23 storefront headings, the `volt-dark` change is registered as intentional snap `S-TYPE-01`, and WINDOWS #1 is marked fixed
-- [Phase 6] `app/api/admin/settings/route.ts` GET re-inserts the entire `defaultSettings` array when a category filter returns no rows; would 500 a fresh install's first Appearance-page load. Pre-existing, out of scope so far (WINDOWS #3) — **closed at Phase 8 (08-01)**: the seed set is computed and guarded per category before any insert runs; WINDOWS #3 is marked fixed
-- [Phase 6] Admin Appearance page has not been walked through in a real browser with a Clerk admin session; Dialog/AlertDialog scrims under `luxe` verified by compositing test only (WINDOWS #2)
-- [Phase 6] Four more preset specs (Clinical, Retro, Atelier, Market) — **shipped at Phase 6.1** (06.1-01 through 06.1-04); the direction doc's extra properties (shadow, border-width, image-aspect, some `accent-2` values, font-mono, letter-spacing) remain backlog, recorded per preset in `.planning/todos/pending/theme-contract-dropped-properties.md` (luxe/midnight) and `.planning/todos/pending/theme-direction-doc-backlog-06.1.md` (clinical/retro/atelier/market)
-- [Phase 06-04] app/api/admin/settings/route.ts's GET ?category=X inserts the full defaultSettings array (all categories) when the filtered result is empty; appearance has no defaults, so a fresh DB with other categories already populated would 500 on the Appearance page's own load. Out of scope for 06-04 (interfaces explicitly forbid touching this file); logged in WINDOWS.md #3.
 
 ### Roadmap Evolution
 
@@ -291,12 +265,23 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 | Category | Item | Status | Deferred At | Milestone |
 |----------|------|--------|-------------|-----------|
-| *(none)* | | | | |
+| uat_gaps | 05/05-UAT.md | passed, 0 pending scenarios | 2026-09-05 | v2 |
+| uat_gaps | 06/06-UAT.md | passed, 0 pending scenarios | 2026-09-05 | v2 |
+| uat_gaps | 06.1/06.1-UAT.md | passed, 0 pending scenarios | 2026-09-05 | v2 |
+| uat_gaps | 07/07-UAT.md | passed, 0 pending scenarios | 2026-09-05 | v2 |
+| todos | theme-contract-dropped-properties.md | (presence-only) | 2026-09-05 | v2 |
+| todos | theme-direction-doc-backlog-06.1.md | (presence-only) | 2026-09-05 | v2 |
+| todos | theme-metadata-industry-synopsis-admin.md | (presence-only) | 2026-09-05 | v2 |
+| todos | themed-demo-deployments.md | (presence-only) | 2026-09-05 | v2 |
 
 ## Session Continuity
 
 Last session: 2026-09-06T00:24:24.523Z
-Stopped at: Phase 08.2 complete — all phases complete
+Stopped at: Milestone v2 archived
 Resume file: None
 
-Next: `/gsd-audit-milestone` → `/gsd-complete-milestone v2` → `/gsd-cleanup`
+Next: `/gsd-cleanup` then `/gsd-new-milestone`
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
