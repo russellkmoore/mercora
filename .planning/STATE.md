@@ -3,19 +3,18 @@ gsd_state_version: 1.0
 milestone: v2
 milestone_name: Themeable Storefront
 current_phase: 08.2
-current_phase_name: Documentation Overhaul & Agent Onboarding
-status: phase_complete
-stopped_at: Completed 08.2-06-PLAN.md
-last_updated: "2026-09-06T00:30:44.471Z"
+status: completed
+stopped_at: Phase 08.2 complete — all phases complete
+last_updated: "2026-09-06T00:52:00.986Z"
 last_activity: 2026-09-06
-last_activity_desc: Phase 08.2 (final phase of v2) completed — style contract, claim check, and validation sign-off
-state_head: 5d4f481b305605409fa6acab4ab83c34dc6b3137
+last_activity_desc: Phase 08.2 complete
+state_head: 7cfeb3e9d3dc8f80f0afd9cd0e15a74f33196d30
 progress:
   total_phases: 7
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 44
   completed_plans: 44
-  percent: 86
+  percent: 100
 ---
 
 # Project State
@@ -29,15 +28,15 @@ See: .planning/PROJECT.md (updated 2026-09-05 after Phase 8.1)
 
 ## Current Position
 
-Phase: 08.2 (Documentation Overhaul & Agent Onboarding) — COMPLETE (last phase of milestone v2)
-Plan: 6 of 6
-Status: Phase complete. Shipped: `README.md` rewritten product-neutral with a preset/layout
+Phase: 08.2
+Plan: Not started
+Status: All phases complete
 showcase and a docs index; nine stale `docs/` files retired and one merged, all through a proven
 retirement contract; `scripts/docs-lint.mjs` added as a local documentation gate; a root
 `AGENTS.md` written and tracked, giving a coding assistant an ordered, command-exact setup path;
 the surviving document set brought to one direct-language style contract and claim-checked against
 the code. DOCS-04 and DOCS-05 are both complete.
-Last activity: 2026-09-06 — Phase 08.2 execution completed
+Last activity: 2026-09-05 — Phase 08.2 complete
 
 Progress: [█████████░] 86%
 
@@ -45,7 +44,7 @@ Progress: [█████████░] 86%
 
 **Velocity:**
 
-- Total plans completed: 55 (all v1)
+- Total plans completed: 61 (all v1)
 - Average duration: 56 min/plan (Phase 5, 12 plans)
 - Total execution time: ~11.3 hours (v2)
 
@@ -66,6 +65,7 @@ Progress: [█████████░] 86%
 | 07 | 5 | - | - |
 | 08 | 5 | - | - |
 | 08.1 | 7 | - | - |
+| 08.2 | 6 | - | - |
 
 **Recent Trend:**
 
@@ -296,7 +296,7 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-09-06T00:24:24.523Z
-Stopped at: Completed 08.2-06-PLAN.md — phase 08.2 and milestone v2's roadmap are both complete
+Stopped at: Phase 08.2 complete — all phases complete
 Resume file: None
 
 Next: `/gsd-audit-milestone` → `/gsd-complete-milestone v2` → `/gsd-cleanup`
