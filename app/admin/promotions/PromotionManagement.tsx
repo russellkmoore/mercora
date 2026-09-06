@@ -16,6 +16,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 interface Promotion {
   id: string;
   code: string;
+  /** Every coupon code attached to the promotion; `code` is the first (#87). */
+  codes?: string[];
   name: string;
   description: string;
   type: "percentage" | "fixed_amount" | "free_shipping" | "bogo" | "tiered";
@@ -587,7 +589,7 @@ export default function PromotionManagement() {
         setFilteredPromotions(updatedPromotions.filter((promotion) =>
           !searchQuery.trim() ||
           promotion.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          promotion.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (promotion.codes ?? [promotion.code]).some((code) => code.toLowerCase().includes(searchQuery.toLowerCase())) ||
           promotion.description.toLowerCase().includes(searchQuery.toLowerCase())
         ));
       }
@@ -618,7 +620,7 @@ export default function PromotionManagement() {
       setFilteredPromotions(updatedPromotions.filter((promotion) =>
         !searchQuery.trim() ||
         promotion.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        promotion.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (promotion.codes ?? [promotion.code]).some((code) => code.toLowerCase().includes(searchQuery.toLowerCase())) ||
         promotion.description.toLowerCase().includes(searchQuery.toLowerCase())
       ));
       
@@ -666,7 +668,7 @@ export default function PromotionManagement() {
       setFilteredPromotions(updatedPromotions.filter((promotion) =>
         !searchQuery.trim() ||
         promotion.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        promotion.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (promotion.codes ?? [promotion.code]).some((code) => code.toLowerCase().includes(searchQuery.toLowerCase())) ||
         promotion.description.toLowerCase().includes(searchQuery.toLowerCase())
       ));
       
@@ -700,7 +702,7 @@ export default function PromotionManagement() {
 
     const filtered = promotions.filter((promotion) =>
       promotion.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      promotion.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (promotion.codes ?? [promotion.code]).some((code) => code.toLowerCase().includes(searchQuery.toLowerCase())) ||
       promotion.description.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
@@ -764,18 +766,23 @@ export default function PromotionManagement() {
             </div>
             
             <h3 className="text-lg font-semibold text-white mb-2">{promotion.name}</h3>
-            <div className="flex items-center space-x-2 mb-3">
-              <code className="bg-neutral-700 px-2 py-1 rounded text-orange-400 font-mono text-sm">
-                {promotion.code}
-              </code>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => copyCode(promotion.code)}
-                className="p-1 text-gray-400 hover:text-white"
-              >
-                <Copy className="w-3 h-3" />
-              </Button>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-3">
+              {(promotion.codes?.length ? promotion.codes : [promotion.code]).map((code) => (
+                <span key={code} className="inline-flex items-center space-x-1">
+                  <code className="bg-neutral-700 px-2 py-1 rounded text-orange-400 font-mono text-sm">
+                    {code}
+                  </code>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => copyCode(code)}
+                    className="p-1 text-gray-400 hover:text-white"
+                    aria-label={`Copy code ${code}`}
+                  >
+                    <Copy className="w-3 h-3" />
+                  </Button>
+                </span>
+              ))}
             </div>
             <p className="text-sm text-gray-400 mb-4">{promotion.description}</p>
             

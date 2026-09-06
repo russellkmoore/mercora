@@ -224,8 +224,8 @@ export default function AgentDrawer({
     }}>
       <SheetTrigger asChild>
         {variant === "mobile" ? (
-          <button 
-            className="flex items-center space-x-3 text-white hover:text-orange-500 py-3 px-4 rounded-lg hover:bg-neutral-800 cursor-pointer w-full text-left bg-transparent border-none"
+          <button
+            className="flex items-center space-x-3 text-foreground hover:text-primary py-3 px-4 rounded-lg hover:bg-surface-elevated cursor-pointer w-full text-left bg-transparent border-none"
             type="button"
           >
             <Search className="h-5 w-5" />
@@ -234,7 +234,7 @@ export default function AgentDrawer({
         ) : (
           <Button
             variant="ghost"
-            className="text-white hover:bg-white hover:text-orange-500"
+            className="text-foreground hover:bg-foreground hover:text-primary"
             data-testid="agent-drawer-trigger"
           >
             <Search className="mr-2 h-4 w-4" />
@@ -244,7 +244,7 @@ export default function AgentDrawer({
       </SheetTrigger>
       <SheetContent
         side="right"
-        className="bg-[#fdfdfb] text-black transition-all ease-in-out px-3 w-full sm:w-[400px] lg:!w-[800px] max-w-[800px]! duration-600! data-[state=closed]:duration-600! data-[state=open]:duration-600! flex flex-col h-full"
+        className="bg-surface-inverse text-on-inverse transition-all ease-in-out px-3 w-full sm:w-[400px] lg:!w-[800px] max-w-[800px]! duration-600! data-[state=closed]:duration-600! data-[state=open]:duration-600! flex flex-col h-full"
       >
         {/* Accessibility components */}
         <VisuallyHidden>
@@ -260,7 +260,7 @@ export default function AgentDrawer({
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 w-8 p-0 rounded-full bg-gray-100 hover:bg-gray-200 hover:text-gray-900 transition-colors"
+              className="h-8 w-8 p-0 rounded-full bg-surface-inverse-elevated hover:bg-surface-inverse-elevated hover:text-on-inverse transition-colors"
             >
               <X className="h-4 w-4" />
               <span className="sr-only">Close chat</span>
@@ -269,7 +269,7 @@ export default function AgentDrawer({
         </div>
 
         {/* Left fade */}
-        <div className="absolute left-0 top-0 h-full w-2 bg-linear-to-r from-black/20 to-transparent z-10 pointer-events-none" />
+        <div className="absolute left-0 top-0 h-full w-2 bg-linear-to-r from-on-inverse/20 to-transparent z-10 pointer-events-none" />
 
         {/* Header - fixed */}
         <div className="shrink-0">
@@ -281,12 +281,12 @@ export default function AgentDrawer({
 
         {/* Chat container - fixed height */}
         <div className="shrink-0">
-          <div 
+          <div
             ref={chatContainerRef}
-            className="border rounded-md p-3 h-60 sm:h-80 overflow-y-auto text-sm space-y-3 bg-gray-100"
+            className="border rounded-md p-3 h-60 sm:h-80 overflow-y-auto text-sm space-y-3 bg-surface-inverse-elevated"
           >
             {messages.length === 0 && !isLoading ? (
-              <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 space-y-3">
+              <div className="flex flex-col items-center justify-center h-full text-center text-muted-on-inverse space-y-3">
                 <div className="h-12 w-12 flex items-center justify-center">
                   <Image
                     src={store.theme.logoPath}
@@ -297,11 +297,11 @@ export default function AgentDrawer({
                   />
                 </div>
                 <div className="space-y-2">
-                  <p className="font-semibold text-gray-700">Hi! I&rsquo;m {assistantName}, your shopping assistant.</p>
+                  <p className="font-semibold text-muted-on-inverse">Hi! I&rsquo;m {assistantName}, your shopping assistant.</p>
                   <p className="text-xs leading-relaxed max-w-xs">
                     Ask me about products, recommendations, orders, shipping, or store policies.
                   </p>
-                  <p className="text-xs text-gray-600 italic">
+                  <p className="text-xs text-muted-on-inverse italic">
                     Try: &ldquo;Which product would you recommend?&rdquo; or &ldquo;How can I track my order?&rdquo;
                   </p>
                 </div>
@@ -310,7 +310,7 @@ export default function AgentDrawer({
               messages.map((msg, i) =>
                 msg.role === "user" ? (
                   <div key={i} className="flex justify-end">
-                    <div className="bg-blue-500 text-right text-white px-3 py-2 rounded-lg max-w-[75%]">
+                    <div className="bg-info text-right text-foreground px-3 py-2 rounded-lg max-w-[75%]">
                       <p>
                         <strong>You:</strong> {msg.content}
                       </p>
@@ -326,7 +326,7 @@ export default function AgentDrawer({
                         height={20}
                       />
                     </div>
-                    <div className="bg-white text-gray-800 px-3 py-2 rounded-lg max-w-[75%] shadow-sm border">
+                    <div className="bg-surface-inverse text-on-inverse px-3 py-2 rounded-lg max-w-[75%] shadow-sm border">
                       <p>
                         <strong>{assistantName}:</strong> {msg.content}
                       </p>
@@ -337,11 +337,11 @@ export default function AgentDrawer({
             )}
             {isLoading && (
               <div className="flex items-start space-x-2">
-                <div className="h-6 w-6 flex items-center justify-center bg-orange-500 rounded-full text-white text-xs font-bold">
+                <div className="h-6 w-6 flex items-center justify-center bg-primary rounded-full text-on-primary text-xs font-bold">
                   {assistantName.slice(0, 1).toUpperCase()}
                 </div>
-                <div className="bg-white text-gray-800 px-3 py-2 rounded-lg shadow-sm border">
-                  <p className="text-gray-500">
+                <div className="bg-surface-inverse text-on-inverse px-3 py-2 rounded-lg shadow-sm border">
+                  <p className="text-muted-on-inverse">
                     <strong>{assistantName}:</strong> Thinking...
                   </p>
                 </div>
@@ -353,7 +353,7 @@ export default function AgentDrawer({
         </div>
 
         {/* AI Disclaimer */}
-        <div className="shrink-0 text-xs text-gray-500 text-center px-2 py-1">
+        <div className="shrink-0 text-xs text-muted-on-inverse text-center px-2 py-1">
           AI-generated responses may contain inaccuracies. Verify recommendations before purchase.
         </div>
 
@@ -364,7 +364,7 @@ export default function AgentDrawer({
               ref={inputRef}
               type="text"
               placeholder={isLoading ? "Waiting for response..." : "Type your question..."}
-              className="w-full border rounded pl-3 pr-10 py-2 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className="w-full border rounded pl-3 pr-10 py-2 disabled:bg-surface-inverse-elevated disabled:cursor-not-allowed"
               value={input}
               disabled={isLoading}
               onChange={(e) => setInput(e.target.value)}
@@ -381,7 +381,7 @@ export default function AgentDrawer({
             <button
               onClick={handleSubmit}
               disabled={isLoading || !input.trim()}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-orange-400 hover:text-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-primary hover:text-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Send className="w-5 h-5" />
             </button>
@@ -389,13 +389,13 @@ export default function AgentDrawer({
         </div>
 
         {/* Divider */}
-        <hr className="my-4 shrink-0" />
+        <hr className="my-4 shrink-0 border-border-inverse" />
 
         {/* Products area - scrollable */}
-        <div className="flex-1 overflow-y-auto text-sm text-gray-600">
+        <div className="flex-1 overflow-y-auto text-sm text-muted-on-inverse">
           {products.length > 0 ? (
             <div className="space-y-2">
-              <h3 className="font-semibold text-base text-black sticky top-0 bg-[#fdfdfb] pb-2">
+              <h3 className="font-semibold text-base text-on-inverse sticky top-0 bg-surface-inverse pb-2">
                 Recommended Products ({products.length})
               </h3>
               <div className="space-y-2 pb-4">
@@ -405,10 +405,10 @@ export default function AgentDrawer({
               </div>
             </div>
           ) : (
-            <div className="text-center py-8 text-gray-400">
+            <div className="text-center py-8 text-muted-on-inverse">
               <div className="space-y-2">
                 <div className="text-2xl">🛍️</div>
-                <p className="font-medium text-gray-700">Product recommendations will appear here</p>
+                <p className="font-medium text-muted-on-inverse">Product recommendations will appear here</p>
                 <p className="text-xs">Ask {assistantName} about what you need and I&rsquo;ll show you relevant options.</p>
               </div>
             </div>

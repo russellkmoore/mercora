@@ -24,12 +24,12 @@ export function StarRating({ value, size = 'sm', className, ariaLabel }: StarRat
     <span
       role="img"
       aria-label={ariaLabel ?? `Rated ${safeValue.toFixed(1)} out of 5 stars`}
-      className={cn('relative inline-flex select-none text-neutral-600', sizeStyles[size], className)}
+      className={cn('relative inline-flex select-none text-muted-foreground', sizeStyles[size], className)}
     >
       <span aria-hidden="true">★★★★★</span>
       <span
         aria-hidden="true"
-        className="absolute inset-0 overflow-hidden text-yellow-400"
+        className="absolute inset-0 overflow-hidden text-primary"
         style={{ width }}
       >
         ★★★★★

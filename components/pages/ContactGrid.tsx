@@ -16,9 +16,9 @@ export default function ContactGrid({ sections, lead }: { sections: PageSection[
           const Icon = ICONS.find(({ match }) => match.test(section.heading))?.Icon ?? HelpCircle;
           const wide = index === sections.length - 1 && sections.length % 2 === 1;
           return (
-            <section key={section.id} id={section.id} className={`scroll-mt-24 rounded-xl border border-neutral-700 bg-neutral-900 p-6 ${wide ? "sm:col-span-2" : ""}`}>
-              <Icon aria-hidden className="mb-3 h-5 w-5 text-orange-400" />
-              <h2 className="text-lg font-semibold text-white">{section.heading}</h2>
+            <section key={section.id} id={section.id} className={`scroll-mt-24 rounded-xl border border-border bg-surface-elevated p-6 ${wide ? "sm:col-span-2" : ""}`}>
+              <Icon aria-hidden className="mb-3 h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold text-foreground font-display">{section.heading}</h2>
               <div className="prose prose-invert prose-orange mt-2 max-w-none text-sm" dangerouslySetInnerHTML={{ __html: section.html }} />
             </section>
           );

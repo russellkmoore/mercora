@@ -25,6 +25,8 @@ export const TELEMETRY_PATHS: ReadonlySet<string> = new Set([
 export const TELEMETRY_EVENTS = {
   'ai.response_guard_failed': { severity: 'error', sampleRate: 1 },
   'ai.response_guard_replaced': { severity: 'warning', sampleRate: 1 },
+  'theme.unknown_selection': { severity: 'warning', sampleRate: 1 },
+  'layout.unknown_selection': { severity: 'warning', sampleRate: 1 },
   'payment.pricing_rejected': { severity: 'warning', sampleRate: 0.05 },
   'payment.inventory_unavailable': { severity: 'warning', sampleRate: 0.1 },
   'payment.inventory_check_failed': { severity: 'critical', sampleRate: 1 },
@@ -68,6 +70,10 @@ export const TELEMETRY_EVENTS = {
   'recommendation.stale_rows': { severity: 'warning', sampleRate: 0.25 },
   'cron.recovery_failed': { severity: 'critical', sampleRate: 1 },
   'cron.analytics_failed': { severity: 'critical', sampleRate: 1 },
+  'auth.deployment_guard_tripped': { severity: 'critical', sampleRate: 1 },
+  'checkout.tax_fallback': { severity: 'warning', sampleRate: 1 },
+  'payment.intent_failed': { severity: 'warning', sampleRate: 1 },
+  'analytics.vitals_sink_unavailable': { severity: 'warning', sampleRate: 0.01 },
 } as const;
 
 export type TelemetryEvent = keyof typeof TELEMETRY_EVENTS;
@@ -95,22 +101,28 @@ const ALLOWED_ERROR_CLASSES = new Set([
   'TypeError',
 ]);
 
-const ALLOWED_FIELD_ENUMS = {
+// Source of truth for this closed taxonomy. Mirrored by `ENUM_FIELDS` in
+// workers/observability-tail/src/core.ts — exported so
+// tests/unit/workers/observability-tail-core.test.ts can assert byte-equal parity.
+export const ALLOWED_FIELD_ENUMS = {
   effect_type: new Set([
     'confirmation_email', 'coupon', 'gift_card', 'inventory', 'merchant_notification',
     'subscription', 'paid_decrement', 'refund_restock',
   ]),
   operation: new Set([
-    'audit_write', 'claim', 'complete', 'create', 'finalize', 'persist',
+    'audit_write', 'claim', 'complete', 'create', 'finalize', 'persist', 'price',
     'process', 'read', 'rebuild', 'record_failure', 'send', 'stage', 'transition',
     'validate',
   ]),
   outcome: new Set([
-    'conflict', 'failed', 'invalid', 'needs_review', 'partial_failure',
+    'conflict', 'degraded', 'failed', 'invalid', 'needs_review', 'partial_failure',
     'rejected', 'retry_scheduled', 'unavailable', 'unresolved',
   ]),
   provider: new Set([
     'analytics', 'carrier', 'cloudflare_email', 'd1', 'gift_card', 'resend', 'stripe', 'workers_ai',
+  ]),
+  reason: new Set([
+    'authentication_required', 'card_declined', 'expired_card', 'insufficient_funds', 'other',
   ]),
   trigger: new Set(['manual', 'recovery', 'request', 'scheduled', 'webhook']),
 } as const;

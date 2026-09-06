@@ -9,6 +9,8 @@ The tool schema is available from `GET /api/mcp/schema`. Authenticated clients
 can use either the individual REST routes under `/api/mcp` or the JSON tool
 dispatcher at `POST /api/mcp`.
 
+**Status:** Active
+
 ## Authentication and credentials
 
 Send an agent credential in one of these headers:

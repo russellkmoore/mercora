@@ -55,13 +55,13 @@ export default function OrderCard({
 
   const statusColor =
     {
-      pending: "bg-yellow-600 text-white",
-      processing: "bg-blue-600 text-white",
-      shipped: "bg-indigo-600 text-white",
-      delivered: "bg-green-600 text-white",
-      cancelled: "bg-red-600 text-white",
-      refunded: "bg-purple-600 text-white",
-    }[order.status as OrderStatus] ?? "bg-gray-700 text-white";
+      pending: "bg-warning text-foreground",
+      processing: "bg-info text-foreground",
+      shipped: "bg-info text-foreground",
+      delivered: "bg-success text-foreground",
+      cancelled: "bg-danger text-foreground",
+      refunded: "bg-danger text-foreground",
+    }[order.status as OrderStatus] ?? "bg-surface-elevated text-foreground";
 
   const orderId = order.id ?? "";
   const reviewable =
@@ -129,19 +129,19 @@ export default function OrderCard({
   }
 
   return (
-    <div className="rounded-lg border border-neutral-700 bg-neutral-800 p-4 shadow sm:p-6">
+    <div className="rounded-lg border border-border bg-surface-elevated p-4 shadow sm:p-6">
       <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h3 className="truncate text-base font-bold text-orange-400 sm:text-lg">
-          Order ID: <span className="text-white">{order.id}</span>
+        <h3 className="truncate text-base font-bold text-primary sm:text-lg">
+          Order ID: <span className="text-foreground">{order.id}</span>
         </h3>
         <span className={cn("self-start rounded-full px-2 py-1 text-xs sm:self-center", statusColor)}>
           {order.status}
         </span>
       </div>
 
-      <div className="mb-1 text-sm text-gray-400">Placed on {date}</div>
+      <div className="mb-1 text-sm text-muted-foreground">Placed on {date}</div>
 
-      <div className="mb-1 text-sm text-gray-300">
+      <div className="mb-1 text-sm text-muted-foreground">
         {itemCount} item{itemCount !== 1 ? "s" : ""}{" "}
         {previewItem && (
           <>
@@ -150,23 +150,23 @@ export default function OrderCard({
         )}
       </div>
 
-      <div className="mt-2 text-lg font-semibold text-white">
-        Total: <span className="text-green-400">{total}</span>
+      <div className="mt-2 text-lg font-semibold text-foreground">
+        Total: <span className="text-success">{total}</span>
       </div>
 
       {order.shipped_at && (
-        <div className="mt-4 rounded-md border border-neutral-700 bg-neutral-900 p-3 text-sm">
-          <p className="font-semibold text-white">Shipment</p>
-          <dl className="mt-2 space-y-1 text-gray-300">
+        <div className="mt-4 rounded-md border border-border bg-surface p-3 text-sm">
+          <p className="font-semibold text-foreground">Shipment</p>
+          <dl className="mt-2 space-y-1 text-muted-foreground">
             {shipment.carrierLabel && (
               <div className="flex justify-between gap-4">
-                <dt className="text-gray-400">Carrier</dt>
+                <dt className="text-muted-foreground">Carrier</dt>
                 <dd>{shipment.carrierLabel}</dd>
               </div>
             )}
             {shipment.trackingNumber && (
               <div className="flex justify-between gap-4">
-                <dt className="text-gray-400">Tracking number</dt>
+                <dt className="text-muted-foreground">Tracking number</dt>
                 <dd className="break-all font-mono">{shipment.trackingNumber}</dd>
               </div>
             )}
@@ -176,7 +176,7 @@ export default function OrderCard({
               href={shipment.trackingUrl}
               target="_blank"
               rel="noreferrer noopener"
-              className="mt-3 inline-flex font-medium text-orange-400 underline hover:text-orange-300"
+              className="mt-3 inline-flex font-medium text-primary underline hover:text-primary/90"
             >
               Track your package
             </a>
@@ -186,18 +186,18 @@ export default function OrderCard({
 
       <div className="mt-4 flex flex-col gap-2">
         {orderId && (
-          <Link href={`/account/orders/${encodeURIComponent(orderId)}`} className="text-sm font-medium text-orange-400 hover:text-orange-300">
+          <Link href={`/account/orders/${encodeURIComponent(orderId)}`} className="text-sm font-medium text-primary hover:text-primary/90">
             View order details
           </Link>
         )}
         {!reviewable && (
-          <p className="text-xs text-amber-300">
+          <p className="text-xs text-warning">
             Delivery pending – we’ll invite you to review items once your order arrives.
           </p>
         )}
-        {reviewError && <p className="text-xs text-red-400">{reviewError}</p>}
+        {reviewError && <p className="text-xs text-danger">{reviewError}</p>}
         {submittedReviewCount > 0 && (
-          <p className="text-xs text-green-300">
+          <p className="text-xs text-success">
             {submittedReviewCount} review{submittedReviewCount === 1 ? "" : "s"} submitted for this order.
           </p>
         )}
@@ -208,11 +208,11 @@ export default function OrderCard({
           <button
             type="button"
             onClick={() => setExpanded((value) => !value)}
-            className="flex w-full items-center justify-between rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-white transition hover:border-orange-500 hover:text-orange-300"
+            className="flex w-full items-center justify-between rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground transition hover:border-primary hover:text-primary/90"
             aria-expanded={expanded}
           >
             <span>{expanded ? "Hide order items" : "Review items from this order"}</span>
-            <span className="text-xs text-gray-400">{expanded ? "▲" : "▼"}</span>
+            <span className="text-xs text-muted-foreground">{expanded ? "▲" : "▼"}</span>
           </button>
           {expanded && (
             <div className="mt-4 space-y-4">
@@ -220,13 +220,13 @@ export default function OrderCard({
                 const itemKey = item.id ?? item.product_id ?? `${orderId}-${index}`;
                 const review = reviews[itemKey] ?? (item.product_id ? reviews[item.product_id] : undefined);
                 return (
-                  <div key={itemKey} className="rounded-lg border border-neutral-700 bg-neutral-900 p-4">
+                  <div key={itemKey} className="rounded-lg border border-border bg-surface p-4">
                     <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-white">{item.product_name}</p>
-                        <p className="text-xs text-gray-400">SKU {item.sku}</p>
+                        <p className="text-sm font-semibold text-foreground">{item.product_name}</p>
+                        <p className="text-xs text-muted-foreground">SKU {item.sku}</p>
                       </div>
-                      <p className="text-xs text-gray-400">Quantity: {item.quantity}</p>
+                      <p className="text-xs text-muted-foreground">Quantity: {item.quantity}</p>
                     </div>
                     {reviewable ? (
                       <ReviewForm
@@ -240,14 +240,14 @@ export default function OrderCard({
                         canSubmit={reviewable}
                       />
                     ) : (
-                      <p className="text-xs text-amber-300">
+                      <p className="text-xs text-warning">
                         Reviews unlock once delivery is confirmed for this order.
                       </p>
                     )}
                   </div>
                 );
               })}
-              {loadingReviews && <p className="text-xs text-gray-400">Checking existing reviews…</p>}
+              {loadingReviews && <p className="text-xs text-muted-foreground">Checking existing reviews…</p>}
             </div>
           )}
         </div>

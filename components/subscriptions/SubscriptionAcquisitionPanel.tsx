@@ -89,7 +89,7 @@ function SetupPaymentForm(props: {
       <button
         type="submit"
         disabled={!stripe || !elements || submitting}
-        className="w-full rounded bg-orange-500 px-5 py-3 font-bold text-black transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-50"
+        className="w-full rounded bg-primary px-5 py-3 font-bold text-on-primary transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {submitting ? "Confirming…" : "Confirm subscription"}
       </button>
@@ -264,12 +264,12 @@ export default function SubscriptionAcquisitionPanel({
   if (!enabled || !termsVersion) return null;
   if (completedOwner === currentOwner && currentOwner) {
     return (
-      <section className="rounded-lg border border-green-700 bg-green-950/30 p-5" aria-live="polite">
-        <h2 className="font-semibold text-green-300">Subscription request received</h2>
-        <p className="mt-2 text-sm text-gray-300">
+      <section className="rounded-lg border border-success bg-success/30 p-5" aria-live="polite">
+        <h2 className="font-semibold text-success">Subscription request received</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
           Your payment method is confirmed. The subscription is pending secure reconciliation.
         </p>
-        <Link className="mt-3 inline-block text-sm font-semibold text-orange-400 underline" href="/account/subscriptions">
+        <Link className="mt-3 inline-block text-sm font-semibold text-primary underline" href="/account/subscriptions">
           View subscriptions
         </Link>
       </section>
@@ -277,17 +277,17 @@ export default function SubscriptionAcquisitionPanel({
   }
   if (confirmedSetup?.ownerId === currentOwner && currentOwner) {
     if (finalizationWorking) {
-      return <p className="text-sm text-gray-400" role="status">Finalizing your subscription request…</p>;
+      return <p className="text-sm text-muted-foreground" role="status">Finalizing your subscription request…</p>;
     }
     return (
-      <section className="rounded-lg border border-red-800 bg-red-950/30 p-5" role="alert">
-        <h2 className="font-semibold text-red-200">Subscription finalization needs attention</h2>
-        <p className="mt-2 text-sm text-gray-300">
+      <section className="rounded-lg border border-danger bg-danger/30 p-5" role="alert">
+        <h2 className="font-semibold text-danger">Subscription finalization needs attention</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
           {checkoutError || "Subscription finalization is temporarily unavailable"}
         </p>
         <button
           type="button"
-          className="mt-3 text-sm font-semibold text-orange-400 underline"
+          className="mt-3 text-sm font-semibold text-primary underline"
           onClick={() => {
             setCheckoutError("");
             setFinalizationWorking(true);
@@ -302,14 +302,14 @@ export default function SubscriptionAcquisitionPanel({
   // Keep an already-started provider form mounted through inventory changes;
   // explicit Back/auth changes still unmount it and abort owner-bound handling.
   if (!available && !setup) return null;
-  if (loadingPlans) return <p className="text-sm text-gray-400" role="status">Checking subscription options…</p>;
+  if (loadingPlans) return <p className="text-sm text-muted-foreground" role="status">Checking subscription options…</p>;
   if (planError) {
     return (
-      <div className="rounded-lg border border-neutral-700 p-4 text-sm">
-        <p className="text-gray-300">{planError}</p>
+      <div className="rounded-lg border border-border p-4 text-sm">
+        <p className="text-muted-foreground">{planError}</p>
         <button
           type="button"
-          className="mt-2 text-orange-400 underline"
+          className="mt-2 text-primary underline"
           onClick={() => {
             setLoadingPlans(true);
             setPlanError("");
@@ -326,19 +326,19 @@ export default function SubscriptionAcquisitionPanel({
   if (!selectedPlan) return null;
 
   return (
-    <section className="rounded-lg border border-orange-700/70 bg-neutral-950 p-4 sm:p-5" aria-labelledby="subscribe-heading">
+    <section className="rounded-lg border border-primary/70 bg-surface p-4 sm:p-5" aria-labelledby="subscribe-heading">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 id="subscribe-heading" className="font-bold text-white">Subscribe</h2>
-          <p className="mt-1 text-sm text-gray-300">
+          <h2 id="subscribe-heading" className="font-bold text-foreground">Subscribe</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
             {formatPlanPrice(selectedPlan)} {cadenceLabel(selectedPlan)}
           </p>
         </div>
         {plans.length > 1 && !setup ? (
-          <label className="text-sm text-gray-300">
+          <label className="text-sm text-muted-foreground">
             Delivery schedule
             <select
-              className="mt-1 block rounded border border-neutral-600 bg-neutral-900 px-3 py-2 text-white"
+              className="mt-1 block rounded border border-border bg-surface-elevated px-3 py-2 text-foreground"
               value={selectedPlanId}
               onChange={(event) => {
                 setSelectedPlanId(event.target.value);
@@ -359,18 +359,18 @@ export default function SubscriptionAcquisitionPanel({
         ) : null}
       </div>
 
-      <p className="mt-3 text-xs leading-relaxed text-gray-400">
+      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
         Recurring charges continue {cadenceLabel(selectedPlan)} until canceled. You can request cancellation from your account.
       </p>
-      <p className="mt-2 text-sm font-semibold text-white" aria-live="polite">
+      <p className="mt-2 text-sm font-semibold text-foreground" aria-live="polite">
         Recurring total: {total?.formatted ?? "Unavailable"} {cadenceLabel(selectedPlan)}
       </p>
 
-      {!isLoaded ? <p className="mt-4 text-sm text-gray-400">Checking your account…</p> : null}
+      {!isLoaded ? <p className="mt-4 text-sm text-muted-foreground">Checking your account…</p> : null}
       {isLoaded && !isSignedIn ? (
         <div className="mt-4">
           <SignInButton mode="modal">
-            <button type="button" className="rounded bg-orange-500 px-4 py-2 font-semibold text-black hover:bg-orange-400">
+            <button type="button" className="rounded bg-primary px-4 py-2 font-semibold text-on-primary hover:bg-primary/90">
               Sign in to subscribe
             </button>
           </SignInButton>
@@ -379,7 +379,7 @@ export default function SubscriptionAcquisitionPanel({
 
       {isLoaded && isSignedIn && !setup ? (
         <div className="mt-4 space-y-4">
-          <label className="block text-sm font-medium text-gray-200">
+          <label className="block text-sm font-medium text-foreground">
             Quantity
             <input
               type="number"
@@ -393,13 +393,13 @@ export default function SubscriptionAcquisitionPanel({
                 setCheckoutError("");
                 setCompletedOwner(null);
               }}
-              className="mt-1 block w-24 rounded border border-neutral-600 bg-neutral-900 px-3 py-2 text-white"
+              className="mt-1 block w-24 rounded border border-border bg-surface-elevated px-3 py-2 text-foreground"
             />
           </label>
 
           {selectedPlan.shippingRequired ? (
             <div>
-              <label className="block text-sm font-medium text-gray-200">
+              <label className="block text-sm font-medium text-foreground">
                 Shipping address
                 <select
                   value={addressId}
@@ -410,7 +410,7 @@ export default function SubscriptionAcquisitionPanel({
                     setCheckoutError("");
                     setCompletedOwner(null);
                   }}
-                  className="mt-1 block w-full rounded border border-neutral-600 bg-neutral-900 px-3 py-2 text-white disabled:opacity-50"
+                  className="mt-1 block w-full rounded border border-border bg-surface-elevated px-3 py-2 text-foreground disabled:opacity-50"
                 >
                   <option value="">Select an address</option>
                   {visibleAddresses.map((address) => (
@@ -418,39 +418,39 @@ export default function SubscriptionAcquisitionPanel({
                   ))}
                 </select>
               </label>
-              {loadingAddresses ? <p className="mt-2 text-xs text-gray-400">Loading saved addresses…</p> : null}
-              {addressError ? <p className="mt-2 text-sm text-red-300" role="alert">{addressError}</p> : null}
+              {loadingAddresses ? <p className="mt-2 text-xs text-muted-foreground">Loading saved addresses…</p> : null}
+              {addressError ? <p className="mt-2 text-sm text-danger" role="alert">{addressError}</p> : null}
               {!loadingAddresses && visibleAddresses.length === 0 ? (
-                <p className="mt-2 text-sm text-gray-300">
+                <p className="mt-2 text-sm text-muted-foreground">
                   A saved shipping address is required.{" "}
-                  <Link className="text-orange-400 underline" href="/account/addresses">Manage addresses</Link>
+                  <Link className="text-primary underline" href="/account/addresses">Manage addresses</Link>
                 </p>
               ) : null}
             </div>
           ) : null}
 
           {quantity === null || total === null ? (
-            <p className="text-sm text-red-300" role="alert">Enter a valid quantity and recurring amount.</p>
+            <p className="text-sm text-danger" role="alert">Enter a valid quantity and recurring amount.</p>
           ) : (
-            <p className="rounded border border-neutral-700 bg-neutral-900 p-3 text-sm text-gray-200">
+            <p className="rounded border border-border bg-surface-elevated p-3 text-sm text-foreground">
               You will confirm a recurring total of <strong>{total.formatted}</strong> {cadenceLabel(selectedPlan)}.
             </p>
           )}
 
-          <label className="flex items-start gap-3 text-sm text-gray-300">
+          <label className="flex items-start gap-3 text-sm text-muted-foreground">
             <input
               type="checkbox"
               checked={accepted}
               onChange={(event) => setAccepted(event.target.checked)}
-              className="mt-1 h-4 w-4 accent-orange-500"
+              className="mt-1 h-4 w-4 accent-primary"
             />
             <span>
               I agree to the recurring purchase terms in the{" "}
-              <Link href={termsUrl} className="text-orange-400 underline">terms of service</Link>.
+              <Link href={termsUrl} className="text-primary underline">terms of service</Link>.
             </span>
           </label>
 
-          {checkoutError ? <p className="text-sm text-red-300" role="alert">{checkoutError}</p> : null}
+          {checkoutError ? <p className="text-sm text-danger" role="alert">{checkoutError}</p> : null}
           <button
             type="button"
             disabled={working || !accepted || quantity === null || total === null || !currentOwner
@@ -490,7 +490,7 @@ export default function SubscriptionAcquisitionPanel({
                 if (!controller.signal.aborted && ownerRef.current === owner) setWorking(false);
               }
             }}
-            className="w-full rounded bg-orange-500 px-5 py-3 font-bold text-black transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            className="w-full rounded bg-primary px-5 py-3 font-bold text-on-primary transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             {working ? "Starting secure setup…" : "Continue to payment method"}
           </button>
@@ -498,7 +498,7 @@ export default function SubscriptionAcquisitionPanel({
       ) : null}
 
       {setup && setup.ownerId === currentOwner ? (
-        <div className="mt-5 space-y-4 rounded bg-white p-4 text-black">
+        <div className="mt-5 space-y-4 rounded bg-surface-elevated p-4 text-foreground">
           <StripeProvider clientSecret={setup.clientSecret}>
             <SetupPaymentForm
               ownerId={setup.ownerId}
@@ -512,8 +512,8 @@ export default function SubscriptionAcquisitionPanel({
               onError={setCheckoutError}
             />
           </StripeProvider>
-          {checkoutError ? <p className="text-sm text-red-700" role="alert">{checkoutError}</p> : null}
-          <button type="button" className="text-sm text-neutral-700 underline" onClick={() => setSetup(null)}>
+          {checkoutError ? <p className="text-sm text-danger" role="alert">{checkoutError}</p> : null}
+          <button type="button" className="text-sm text-muted-foreground underline" onClick={() => setSetup(null)}>
             Back to subscription options
           </button>
         </div>

@@ -6,7 +6,7 @@ describe("Tailwind runtime theme tokens", () => {
     const colors = config.theme?.extend?.colors as unknown as Record<string, string>;
 
     expect(colors.primary).toBe("rgb(from var(--store-primary) r g b / <alpha-value>)");
-    expect(colors.background).toBe("rgb(from var(--store-surface) r g b / <alpha-value>)");
+    expect(colors.surface).toBe("rgb(from var(--store-surface) r g b / <alpha-value>)");
     expect(colors.foreground).toBe("rgb(from var(--store-foreground) r g b / <alpha-value>)");
   });
 });

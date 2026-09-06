@@ -1,5 +1,7 @@
 # Runtime configuration
 
+**Status:** Current (2026-09-05).
+
 Mercora has neutral demo defaults in `lib/store-config.ts`. A storefront can
 override public, non-secret values without editing components. The configuration
 is resolved when a request/render needs it; it is not captured at module import
@@ -12,7 +14,7 @@ time.
 | Public host and SEO | `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_ROBOTS_INDEX=true` |
 | Images | `NEXT_PUBLIC_IMAGE_CDN`, `NEXT_PUBLIC_IMAGE_TRANSFORMS=false` |
 | Browser persistence | `NEXT_PUBLIC_STORAGE_NAMESPACE`, `NEXT_PUBLIC_CART_STORAGE_KEY`, `NEXT_PUBLIC_CHAT_STORAGE_KEY` |
-| Theme | `NEXT_PUBLIC_THEME_PRIMARY`, `NEXT_PUBLIC_STORE_LOGO_PATH` |
+| Theme | `NEXT_PUBLIC_STORE_LOGO_PATH`, `NEXT_PUBLIC_THEME_DEFAULT` (deploy-time theme fallback; see `docs/theming.md`) |
 | Contact and legal links | `STORE_SUPPORT_EMAIL`, `STORE_SENDER_EMAIL`, `STORE_REPLY_TO_EMAIL`, `STORE_MERCHANT_NOTIFICATION_EMAIL`, `STORE_POSTAL_ADDRESS`, `STORE_SUPPORT_HOURS`, `NEXT_PUBLIC_PRIVACY_URL`, `NEXT_PUBLIC_TERMS_URL`, `NEXT_PUBLIC_RETURNS_URL` |
 | Commerce formatting | `STORE_LOCALE` (canonical BCP 47 locale, defaults to `en-US`), `STORE_CURRENCY` (must match active catalog variant currency; Mercora checkout is single-currency per cart) |
 | Gift-card reconciliation | `STORE_FEATURE_GIFT_CARD_RECONCILIATION=true` (defaults off; keep enabled while reservations or balances exist) |
@@ -25,6 +27,15 @@ time.
 `NEXT_PUBLIC_*` values are intentionally public. Store credentials (Stripe
 secrets, Clerk secrets, Cloudflare API tokens) belong in `.dev.vars` locally or
 Cloudflare secrets remotely, never in this file or `wrangler.jsonc`.
+
+`NEXT_PUBLIC_*` values are inlined at **build** time. `build:worker` injects them from
+`wrangler.jsonc` `vars` via `scripts/build-with-public-env.mjs`, and that copy overrides a
+Cloudflare Dashboard Build variable of the same name; see `docs/DEPLOYMENT_SETUP.md`
+§6 Step 1b for the full precedence and checklist.
+
+Storefront colours no longer come from an environment variable. The active
+look is selected by the `data-theme` attribute on `<html>` and resolves
+through the matching `themes/*.css` file in the CSS cascade.
 
 `STORE_CURRENCY` currently supports `USD`, `EUR`, `GBP`, `CAD`, `AUD`, `CHF`,
 `CNY`, `INR`, `BRL`, `JPY`, `BHD`, and `KWD`. Unsupported values fall back to

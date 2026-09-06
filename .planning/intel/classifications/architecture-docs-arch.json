@@ -1,0 +1,28 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/architecture.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Mercora Architecture Documentation",
+  "summary": "Mermaid architecture diagrams for the Mercora platform covering system overview, AI assistant, data flow, database schema, components, deployment pipeline, and security.",
+  "scope": [
+    "Next.js 15 frontend",
+    "Cloudflare Workers",
+    "Cloudflare AI (Llama 3.1 8B, BGE embeddings)",
+    "Vectorize",
+    "D1 database",
+    "R2 object storage",
+    "KV store",
+    "Clerk auth",
+    "AI chat assistant",
+    "shopping cart",
+    "checkout flow",
+    "admin dashboard",
+    "deployment pipeline",
+    "security architecture"
+  ],
+  "cross_refs": [],
+  "locked": false,
+  "precedence": null,
+  "notes": "Type taken from MANIFEST_TYPE=DOC. Content agrees: diagram-only reference with no decisions, requirements, or API contracts. Filename hash suffix is a deterministic path-derived stand-in (no shell available to compute SHA-256)."
+}

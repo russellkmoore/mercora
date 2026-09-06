@@ -107,25 +107,25 @@ export default function DiscountCodeInput() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-sm text-gray-600">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Tag className="h-4 w-4" />
         <span>Have a discount code?</span>
       </div>
-      
+
       {/* Applied Discounts */}
       {appliedDiscounts.length > 0 && (
         <div className="space-y-2">
           {appliedDiscounts.map((discount) => (
             <div
               key={discount.promotionId}
-              className="flex items-center justify-between bg-green-50 border border-green-200 rounded-md px-3 py-2"
+              className="flex items-center justify-between bg-success/10 border border-success rounded-md px-3 py-2"
             >
               <div className="flex items-center gap-2">
-                <Tag className="h-4 w-4 text-green-600" />
-                <span className="text-sm font-medium text-green-700">
+                <Tag className="h-4 w-4 text-success" />
+                <span className="text-sm font-medium text-success">
                   {discount.code}
                 </span>
-                <span className="text-xs text-green-600">
+                <span className="text-xs text-success">
                   ({discount.displayName})
                 </span>
               </div>
@@ -133,7 +133,7 @@ export default function DiscountCodeInput() {
                 size="sm"
                 variant="ghost"
                 onClick={() => handleRemoveDiscount(discount.promotionId)}
-                className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-100"
+                className="h-6 w-6 p-0 text-success hover:text-success/90 hover:bg-success/10"
               >
                 <X className="h-3 w-3" />
               </Button>
@@ -161,7 +161,7 @@ export default function DiscountCodeInput() {
           onClick={handleApplyDiscount}
           disabled={isLoading || !code.trim()}
           size="sm"
-          className="bg-orange-500 hover:bg-orange-600 text-white"
+          className="bg-primary hover:bg-primary/80 text-on-primary"
         >
           {isLoading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -173,14 +173,14 @@ export default function DiscountCodeInput() {
 
       {/* Error Message */}
       {error && (
-        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+        <div className="text-sm text-danger bg-danger/10 border border-danger rounded-md px-3 py-2">
           {error}
         </div>
       )}
 
       {/* Demo Codes Hint */}
       {process.env.NODE_ENV === 'development' && appliedDiscounts.length === 0 && (
-        <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
+        <div className="text-xs text-muted-foreground bg-surface-elevated border border-border rounded-md px-3 py-2">
           <strong>Demo codes:</strong> SAVE20, FREESHIP, 10OFF, TOOLS30, VIP25, WELCOME15, HALFSHIP
         </div>
       )}

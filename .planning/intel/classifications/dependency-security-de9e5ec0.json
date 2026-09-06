@@ -1,0 +1,27 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/dependency-security.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Dependency Security Baseline",
+  "summary": "npm audit baseline for Mercora: remediated direct dependencies, two time-bounded Next-bundled exceptions (PostCSS, Sharp), dev-only findings, and the CI audit gate.",
+  "scope": [
+    "npm audit",
+    "next",
+    "postcss",
+    "sharp",
+    "@clerk/nextjs",
+    "@opennextjs/cloudflare",
+    "drizzle-orm",
+    "wrangler",
+    "undici",
+    "esbuild",
+    "Dependabot",
+    "CI audit gate",
+    "Next 16 upgrade"
+  ],
+  "cross_refs": [],
+  "locked": false,
+  "precedence": null,
+  "notes": "Type set by manifest (DOC). Content agrees: security baseline/runbook with status header, audit tables, and exception records; no ADR/PRD/SPEC structure. Contains operational rules (do not weaken CI gate; keep custom image loader while Sharp exception is open) the synthesizer may want as constraints. Filename hash suffix is a stand-in; no shell was available to compute SHA-256 of the source path."
+}

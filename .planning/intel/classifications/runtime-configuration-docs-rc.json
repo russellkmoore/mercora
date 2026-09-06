@@ -1,0 +1,34 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/runtime-configuration.md",
+  "type": "SPEC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Runtime configuration",
+  "summary": "Environment variable contract for Mercora storefront runtime configuration, feature flags, secrets handling, currency support, and image/robots behavior.",
+  "scope": [
+    "lib/store-config.ts",
+    "NEXT_PUBLIC_* environment variables",
+    "store identity and theme",
+    "assistant/MCP configuration",
+    "robots indexing",
+    "image CDN and Cloudflare Image Transformations",
+    "browser storage keys",
+    "contact and legal links",
+    "STORE_LOCALE and STORE_CURRENCY",
+    "gift-card acquisition and reconciliation flags",
+    "GIFT_CARD_CODE_HMAC key ring",
+    "subscription acquisition and reconciliation flags",
+    "outbound email provider",
+    "lib/money/currencies.ts",
+    ".dev.vars and Cloudflare secrets"
+  ],
+  "cross_refs": [
+    "lib/store-config.ts",
+    "lib/money/currencies.ts",
+    ".dev.vars",
+    "wrangler.jsonc"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

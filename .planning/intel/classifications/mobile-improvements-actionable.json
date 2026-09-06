@@ -1,0 +1,25 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/mobile-improvements-actionable.md",
+  "type": "PRD",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Mobile UX Improvements - Actionable Implementation Guide",
+  "summary": "Prioritized mobile UX improvements: touch targets, navigation, product cards, web vitals tracking, checkout form inputs, with checklist and success metrics.",
+  "scope": [
+    "Button component touch targets",
+    "CartItemCard quantity controls",
+    "HeaderClient mobile menu",
+    "category navigation indentation",
+    "ProductCard mobile spacing",
+    "useWebVitals hook",
+    "/api/analytics/vitals route",
+    "ShippingForm mobile inputs",
+    "mobile CSS",
+    "mobile checkout flow",
+    "Lighthouse mobile audit"
+  ],
+  "cross_refs": [],
+  "locked": false,
+  "precedence": null,
+  "notes": "Type set by manifest (PRD). Content signals lean DOC/implementation guide: code snippets per file, implementation checklist, no user stories. Has success metrics (touch response <100ms, mobile PageSpeed >85, cart conversion) and priority order, which are PRD-compatible. One item (web vitals hook) is marked completed. No markdown links to other docs; file references are to source code paths."
+}

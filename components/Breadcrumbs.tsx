@@ -66,7 +66,7 @@ export default function Breadcrumbs({ items, className = "" }: BreadcrumbsProps)
 
   return (
     <nav 
-      className={`flex items-center space-x-2 text-sm text-gray-400 bg-neutral-900/50 px-4 py-3 border-b border-neutral-800 ${className}`}
+      className={`flex items-center space-x-2 text-sm text-muted-foreground bg-surface-elevated/50 px-4 py-3 border-b border-border ${className}`}
       aria-label="Breadcrumb navigation"
     >
       {breadcrumbItems.map((item, index) => {
@@ -76,29 +76,29 @@ export default function Breadcrumbs({ items, className = "" }: BreadcrumbsProps)
         return (
           <div key={key} className="flex items-center space-x-2">
             {index > 0 && (
-              <ChevronRight className="w-4 h-4 text-gray-600" />
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
             )}
             {index === 0 ? (
               <Link
                 href={linkHref ?? "/"}
-                className="flex items-center hover:text-orange-400 transition-colors"
+                className="flex items-center hover:text-primary/90 transition-colors"
               >
                 <Home className="w-4 h-4" />
                 <span className="ml-1 hidden sm:inline">{item.label}</span>
               </Link>
             ) : item.current ? (
-              <span className="text-white font-medium truncate max-w-[150px] sm:max-w-none">
+              <span className="text-foreground font-medium truncate max-w-[150px] sm:max-w-none">
                 {item.label}
               </span>
             ) : linkHref ? (
               <Link
                 href={linkHref}
-                className="hover:text-orange-400 transition-colors truncate max-w-[100px] sm:max-w-none"
+                className="hover:text-primary/90 transition-colors truncate max-w-[100px] sm:max-w-none"
               >
                 {item.label}
               </Link>
             ) : (
-              <span className="truncate max-w-[100px] sm:max-w-none text-gray-300">
+              <span className="truncate max-w-[100px] sm:max-w-none text-muted-foreground">
                 {item.label}
               </span>
             )}

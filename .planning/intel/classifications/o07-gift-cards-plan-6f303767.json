@@ -1,0 +1,24 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/o07-gift-cards-plan.md",
+  "type": "PRD",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "O07 Gift Cards: Completion Plan",
+  "summary": "Completion plan for stored-value gift cards: implementation waves, security and commerce invariants, test matrix, PR dependency chain, and per-wave release-gate status.",
+  "scope": [
+    "gift cards",
+    "stored-value ledger",
+    "bearer codes (HMAC digest, AES-GCM retry material)",
+    "mixed-cart pricing and snapshots",
+    "checkout and MCP tender lifecycle",
+    "issuance and email delivery",
+    "refund convergence (cash and gift legs)",
+    "customer/admin gift-card APIs and UI",
+    "scheduler reconciliation and reservation expiry",
+    "D1 migration 0022"
+  ],
+  "cross_refs": [],
+  "locked": false,
+  "precedence": null,
+  "notes": "Type set by manifest (PRD). Content is plan-shaped: numbered implementation waves, an invariants list, a test matrix, and a dated status audit table; no user stories or acceptance criteria. Without the manifest the content signals would point to SPEC/DOC. Filename suffix is a fixed identifier, not a computed SHA-256 (no shell available)."
+}

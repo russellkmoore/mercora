@@ -18,10 +18,10 @@ export default function ProductRecommendations({
 
   return (
     <section className="relative mt-20 text-center" aria-labelledby="recommendations-title">
-      <div className="relative mb-10 w-full border-t border-neutral-700">
+      <div className="relative mb-10 w-full border-t border-border">
         <h2
           id="recommendations-title"
-          className="absolute -top-4 left-1/2 -translate-x-1/2 bg-neutral-900 px-4 font-serif text-xl font-semibold text-orange-400"
+          className="absolute -top-4 left-1/2 -translate-x-1/2 bg-surface-elevated px-4 font-serif text-xl font-semibold text-primary"
         >
           You may also like
         </h2>

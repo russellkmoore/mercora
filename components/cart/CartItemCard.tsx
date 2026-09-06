@@ -36,7 +36,7 @@ export default function CartItemCard({ item }: CartItemCardProps) {
             <Button
               variant="outline"
               size="sm"
-              className="h-10 w-10 p-0 text-base touch-manipulation bg-neutral-100 text-black border border-gray-300 hover:bg-neutral-200"
+              className="h-10 w-10 p-0 text-base touch-manipulation bg-surface-inverse-elevated text-on-inverse border border-border-inverse hover:bg-surface-inverse-elevated"
               onClick={() => updateQuantity(item.lineId, item.quantity - 1)}
             >
               -
@@ -47,18 +47,18 @@ export default function CartItemCard({ item }: CartItemCardProps) {
             <Button
               variant="outline"
               size="sm"
-              className="h-10 w-10 p-0 text-base touch-manipulation bg-neutral-100 text-black border border-gray-300 hover:bg-neutral-200"
+              className="h-10 w-10 p-0 text-base touch-manipulation bg-surface-inverse-elevated text-on-inverse border border-border-inverse hover:bg-surface-inverse-elevated"
               onClick={() => updateQuantity(item.lineId, item.quantity + 1)}
             >
               +
             </Button>
           )}
         </div>
-        <p className="text-xs sm:text-sm text-gray-500 mt-1">
+        <p className="text-xs sm:text-sm text-muted-on-inverse mt-1">
           {Money.fromStored(item.price).format()} × {item.quantity} : {cartItemTotal(item).format()}
         </p>
         {item.giftCardCustomization && (
-          <p className="mt-1 text-xs text-gray-600">
+          <p className="mt-1 text-xs text-muted-on-inverse">
             For {item.giftCardCustomization.recipientName || item.giftCardCustomization.recipientEmail}
             {item.giftCardCustomization.deliveryDate
               ? ` · Delivery ${item.giftCardCustomization.deliveryDate}`
@@ -69,7 +69,7 @@ export default function CartItemCard({ item }: CartItemCardProps) {
           <Button
             variant="outline"
             size="sm"
-            className="text-red-600 mt-2 border border-red-200 bg-red-50 hover:bg-orange-500 hover:text-white text-sm h-12 touch-manipulation"
+            className="text-danger mt-2 border border-danger bg-danger/10 hover:bg-primary hover:text-on-primary text-sm h-12 touch-manipulation"
             onClick={() => removeItem(item.lineId)}
           >
             Remove

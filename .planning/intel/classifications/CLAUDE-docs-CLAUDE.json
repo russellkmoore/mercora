@@ -1,0 +1,34 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/CLAUDE.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Mercora - Claude AI Assistant Reference",
+  "summary": "Onboarding reference for AI assistants covering the Mercora eCommerce platform's overview, tech stack, build commands, and project structure.",
+  "scope": [
+    "Mercora eCommerce platform",
+    "Volt AI shopping assistant",
+    "Next.js 15 App Router",
+    "Cloudflare Workers / OpenNext",
+    "Cloudflare D1 / Drizzle ORM",
+    "Cloudflare R2",
+    "Cloudflare AI / Vectorize",
+    "Clerk authentication",
+    "Stripe integration",
+    "admin dashboard",
+    "MCP server",
+    "build commands",
+    "project structure"
+  ],
+  "cross_refs": [
+    "README.md",
+    "docs/architecture.md",
+    "docs/ai-pipeline.md",
+    "docs/STRIPE_INTEGRATION.md",
+    "docs/API_STRUCTURE.md",
+    "docs/mcp-server-specification.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

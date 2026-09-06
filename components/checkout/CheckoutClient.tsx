@@ -225,8 +225,6 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
         throw new Error(err.error || 'Failed to create order');
       }
 
-      const orderResponse = await res.json();
-      console.log('Order created successfully:', orderResponse);
       clearPendingCheckout(paymentIntentId);
 
       // Clear cart immediately after successful order creation
@@ -258,8 +256,8 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
   if ((!items || items.length === 0) && currentStep !== 'confirmation') {
     return (
       <div className="text-center py-12">
-        <h2 className="text-2xl font-bold text-white mb-4">Your cart is empty</h2>
-        <p className="text-gray-400">Add some items to your cart to continue.</p>
+        <h2 className="text-2xl font-bold text-foreground mb-4">Your cart is empty</h2>
+        <p className="text-muted-foreground">Add some items to your cart to continue.</p>
       </div>
     );
   }
@@ -269,7 +267,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
       <ProgressBar step={currentStep === 'shipping' ? 0 : currentStep === 'payment' ? 2 : 3} />
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+        <div className="bg-danger/10 border border-danger text-danger px-4 py-3 rounded-lg">
           {error}
         </div>
       )}
@@ -278,8 +276,8 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
         <div className="space-y-6 min-w-0">
           {/* Shipping Address Section */}
           {currentStep === 'shipping' ? (
-            <div className="bg-white p-6 rounded-xl">
-              <h3 className="text-lg font-semibold mb-4 text-gray-900">Shipping Address</h3>
+            <div className="bg-surface-elevated p-6 rounded-xl">
+              <h3 className="text-lg font-semibold mb-4 text-foreground">Shipping Address</h3>
               <ShippingForm
                 address={address}
                 onChange={handleAddressChange}
@@ -291,18 +289,18 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
               />
             </div>
           ) : (currentStep === 'payment' || currentStep === 'confirmation') && shippingAddress && (
-            <div className="bg-gray-50 p-4 rounded-lg border-l-4 border-orange-500">
+            <div className="bg-surface p-4 rounded-lg border-l-4 border-success">
               <div className="flex justify-between items-start mb-2">
-                <h4 className="font-semibold text-gray-900">Shipping Address</h4>
+                <h4 className="font-semibold text-foreground">Shipping Address</h4>
                 <button
                   onClick={handleBackToShipping}
-                  className="text-sm text-orange-600 hover:text-orange-700 font-medium"
+                  className="text-sm text-success hover:text-success/90 font-medium"
                   disabled={isLoading}
                 >
                   Edit
                 </button>
               </div>
-              <div className="text-sm text-gray-600 space-y-1">
+              <div className="text-sm text-muted-foreground space-y-1">
                 <p>{typeof shippingAddress.recipient === 'string' ? shippingAddress.recipient : 'Customer'}</p>
                 <p>{typeof shippingAddress.line1 === 'string' ? shippingAddress.line1 : ''}</p>
                 {shippingAddress.line2 && <p>{typeof shippingAddress.line2 === 'string' ? shippingAddress.line2 : ''}</p>}
@@ -313,8 +311,8 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
 
           {/* Shipping Options Section */}
           {currentStep === 'shipping' && shippingOptions.length > 0 && (
-            <div className="bg-white p-6 rounded-xl">
-              <h3 className="text-lg font-semibold mb-4 text-gray-900">Shipping Method</h3>
+            <div className="bg-surface-elevated p-6 rounded-xl">
+              <h3 className="text-lg font-semibold mb-4 text-foreground">Shipping Method</h3>
               <ShippingOptions
                 address={address}
                 options={shippingOptions}
@@ -327,20 +325,20 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
 
           {/* Shipping Method Summary */}
           {(currentStep === 'payment' || currentStep === 'confirmation') && shippingOption && (
-            <div className="bg-gray-50 p-4 rounded-lg border-l-4 border-orange-500">
+            <div className="bg-surface p-4 rounded-lg border-l-4 border-success">
               <div className="flex justify-between items-start mb-2">
-                <h4 className="font-semibold text-gray-900">Shipping Method</h4>
+                <h4 className="font-semibold text-foreground">Shipping Method</h4>
                 <button
                   onClick={handleBackToShipping}
-                  className="text-sm text-orange-600 hover:text-orange-700 font-medium"
+                  className="text-sm text-success hover:text-success/90 font-medium"
                   disabled={isLoading}
                 >
                   Edit
                 </button>
               </div>
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-muted-foreground">
                 <p>{shippingOption.label}</p>
-                <p className="text-gray-500">{Money.fromStored(shippingOption.cost).format()} - {shippingOption.estimatedDays ? `${shippingOption.estimatedDays} business days` : 'Standard delivery'}</p>
+                <p className="text-muted-foreground">{Money.fromStored(shippingOption.cost).format()} - {shippingOption.estimatedDays ? `${shippingOption.estimatedDays} business days` : 'Standard delivery'}</p>
               </div>
             </div>
           )}
@@ -372,7 +370,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
           />
 
           {currentStep === 'shipping' && (
-            <div className="bg-white p-4 rounded-xl text-black">
+            <div className="bg-surface-elevated p-4 rounded-xl text-foreground">
               <label htmlFor="gift-card-code" className="block text-sm font-medium mb-1">
                 Gift card
               </label>
@@ -385,17 +383,17 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
                 }}
                 autoComplete="off"
                 maxLength={512}
-                className="w-full rounded border border-gray-300 px-3 py-2"
+                className="w-full rounded border border-border px-3 py-2"
                 placeholder="Enter gift card code"
               />
-              <p className="mt-1 text-xs text-gray-600">Applied securely when the checkout quote is created.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Applied securely when the checkout quote is created.</p>
             </div>
           )}
 
           {/* Payment Form */}
           {currentStep === 'payment' && clientSecret && (
-            <div className="bg-white p-4 sm:p-6 rounded-xl w-full min-h-[400px]">
-              <h3 className="text-lg font-semibold mb-4 text-gray-900">Payment Information</h3>
+            <div className="bg-surface-elevated p-4 sm:p-6 rounded-xl w-full min-h-[400px]">
+              <h3 className="text-lg font-semibold mb-4 text-foreground">Payment Information</h3>
               <div className="w-full">
                 <StripeProvider clientSecret={clientSecret}>
                   <PaymentForm

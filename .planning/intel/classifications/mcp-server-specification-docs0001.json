@@ -1,0 +1,31 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/mcp-server-specification.md",
+  "type": "SPEC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Mercora MCP commerce API",
+  "summary": "Authenticated HTTP/MCP commerce API contract covering agent credentials, permissions, session ownership, catalog wire shapes, checkout workflow, tool list, and credential rotation.",
+  "scope": [
+    "MCP server",
+    "/api/mcp REST routes and JSON tool dispatcher",
+    "agent credentials and API keys",
+    "permissions (write:cart, place:orders, agents:manage)",
+    "rate limits",
+    "sessions and ownership checks",
+    "catalog public serializer",
+    "MACH decimal money wire shape",
+    "create_payment_intent and place_order flow",
+    "Stripe PaymentIntent",
+    "get_order_status and shipment tracking",
+    "credential rotation",
+    "migration 0012_expand_mcp_agent_credentials.sql",
+    "data/d1/seed-dev.sql"
+  ],
+  "cross_refs": [
+    "0012_expand_mcp_agent_credentials.sql",
+    "data/d1/seed-dev.sql"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": "Type set from MANIFEST_TYPE=SPEC. Content agrees: endpoint definitions, header contracts, permission table, tool table, JSON wire shape, and workflow sequencing. Filename suffix is a path-derived token, not a SHA-256 hash, because no shell tool is available to this agent."
+}

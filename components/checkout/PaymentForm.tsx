@@ -137,19 +137,19 @@ export default function PaymentForm({
   };
 
   return (
-    <div className="text-black w-full">
+    <div className="text-foreground w-full">
       {!stripe || !elements ? (
         <div className="min-h-[300px] w-full flex items-center justify-center">
           <div className="flex flex-col items-center gap-2">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-500"></div>
-            <p className="text-sm text-gray-600">Loading payment form...</p>
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+            <p className="text-sm text-muted-foreground">Loading payment form...</p>
           </div>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-6 w-full">
           {/* Stripe Payment Element */}
           <div className="min-h-[300px] w-full">
-            <PaymentElement 
+            <PaymentElement
               id="payment-element"
               options={paymentElementOptions}
             />
@@ -157,7 +157,7 @@ export default function PaymentForm({
 
           {/* Error display */}
           {errorMessage && (
-            <div className="text-red-600 text-sm font-medium p-3 bg-red-50 rounded-lg border border-red-200">
+            <div className="text-danger text-sm font-medium p-3 bg-danger/10 rounded-lg border border-danger">
               {errorMessage}
             </div>
           )}
@@ -166,18 +166,18 @@ export default function PaymentForm({
           <Button
             type="submit"
             disabled={!stripe || !elements || isLoading || disabled}
-            className="w-full bg-black text-white hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] touch-manipulation"
+            className="w-full bg-surface text-foreground hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] touch-manipulation"
           >
             {isLoading ? (
               <div className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-foreground"></div>
                 Processing...
               </div>
             ) : (
               'Complete Payment'
             )}
           </Button>
-          <p className="text-center text-xs text-gray-500">
+          <p className="text-center text-xs text-muted-foreground">
             By completing payment, you agree to the <a className="underline" href={store.urls.terms}>terms</a> and acknowledge the <a className="underline" href={store.urls.privacy}>privacy policy</a>.
             {store.urls.returnsConfigured && (
               <> Review the <a className="underline" href={store.urls.returns}>returns policy</a> before ordering.</>
@@ -187,7 +187,7 @@ export default function PaymentForm({
       )}
 
       {/* Payment security notice */}
-      <div className="mt-4 text-xs text-gray-500 text-center">
+      <div className="mt-4 text-xs text-muted-foreground text-center">
         <p>Your payment information is secure and encrypted</p>
       </div>
     </div>

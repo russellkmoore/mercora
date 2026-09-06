@@ -1,5 +1,7 @@
 # Database migrations
 
+**Status:** Accepted (2026-08-03)
+
 Mercora does not apply remote D1 migrations as part of `npm run deploy`.
 Schema changes are an explicit operator action so a preview or a failed build
 cannot silently mutate production data.

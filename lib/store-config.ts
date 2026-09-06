@@ -52,12 +52,6 @@ export type StoreConfig = {
     chatKey: string;
   };
   theme: {
-    mode: "dark" | "light";
-    primary: string;
-    surface: string;
-    surfaceElevated: string;
-    foreground: string;
-    mutedForeground: string;
     logoPath: string;
   };
   social: Record<"instagram" | "facebook" | "x" | "youtube" | "linkedin", string>;
@@ -112,12 +106,6 @@ export const storeDefaults: StoreConfig = {
     chatKey: "mercora.chat",
   },
   theme: {
-    mode: "dark",
-    primary: "#f97316",
-    surface: "#000000",
-    surfaceElevated: "#171717",
-    foreground: "#ffffff",
-    mutedForeground: "#a3a3a3",
     logoPath: "/volt.png",
   },
   social: { instagram: "", facebook: "", x: "", youtube: "", linkedin: "" },
@@ -419,7 +407,6 @@ export function resolveStoreConfig(env: Environment = {}): StoreConfig {
     },
     theme: {
       ...storeDefaults.theme,
-      primary: text(env, "NEXT_PUBLIC_THEME_PRIMARY", storeDefaults.theme.primary),
       logoPath: text(env, "NEXT_PUBLIC_STORE_LOGO_PATH", storeDefaults.theme.logoPath),
     },
     mcp: {
@@ -481,4 +468,22 @@ function parseOptionalCents(value: string | undefined) {
 /** Runtime entry point; safe when Cloudflare lazily populates process.env. */
 export function getStoreConfig() {
   return resolveStoreConfig(process.env);
+}
+
+/**
+ * Client-safe view of StoreConfig. Next.js serializes props passed into a
+ * client component (e.g. StoreConfigProvider) into the RSC payload sent to
+ * every visitor's browser, so this must never carry server-only contact
+ * details. `merchantNotificationEmail` is an internal operator inbox read
+ * only by server-side email builders (`lib/utils/email.ts`,
+ * `lib/services/order-confirmation.ts`) — no client consumer of
+ * `useStoreConfig()` reads it.
+ */
+export type PublicStoreConfig = Omit<StoreConfig, "contact"> & {
+  contact: Omit<StoreConfig["contact"], "merchantNotificationEmail">;
+};
+
+export function toPublicStoreConfig(config: StoreConfig): PublicStoreConfig {
+  const { merchantNotificationEmail: _merchantNotificationEmail, ...publicContact } = config.contact;
+  return { ...config, contact: publicContact };
 }

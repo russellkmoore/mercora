@@ -1,0 +1,26 @@
+/* @theme label: Good | industry: testing | synopsis: A known-clean control fixture the validator must accept. */
+[data-theme="good"] {
+  --store-primary: #F97316;
+  --store-on-primary: #000000;
+  --store-surface: #000000;
+  --store-surface-elevated: #171717;
+  --store-foreground: #ffffff;
+  --store-muted-foreground: #a3a3a3;
+  --store-border: #404040;
+  --store-ring: #404040;
+  --store-success: #22c55e;
+  --store-warning: #f59e0b;
+  --store-danger: #ef4444;
+  --store-info: #3b82f6;
+  --store-surface-inverse: #fdfdfb;
+  --store-surface-inverse-elevated: #f3f4f6;
+  --store-on-inverse: #000000;
+  --store-muted-on-inverse: #6b7280;
+  --store-border-inverse: #374151;
+  --store-radius-sm: 0.25rem;
+  --store-radius-md: 0.375rem;
+  --store-radius-lg: 0.5rem;
+  --store-radius-xl: 0.75rem;
+  --store-font-sans: system-ui, sans-serif;
+  --store-font-display: system-ui, sans-serif;
+}

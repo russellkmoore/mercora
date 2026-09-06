@@ -1,5 +1,7 @@
 # Subscriptions
 
+**Status:** Accepted (2026-08-14)
+
 New subscription acquisition is optional and disabled by default. Migration `0021` is
 additive and may be deployed while old code is still running. Roll back the
 application by disabling acquisition; never down-migrate subscription or

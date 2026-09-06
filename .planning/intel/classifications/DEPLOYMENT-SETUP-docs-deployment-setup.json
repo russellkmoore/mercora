@@ -1,0 +1,38 @@
+{
+  "source_path": "/Users/rmoore/Workspaces/mercora/docs/DEPLOYMENT_SETUP.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Mercora Production Deployment Guide",
+  "summary": "Step-by-step runbook for deploying Mercora to Cloudflare Workers, covering D1, R2, Vectorize, Clerk, Stripe setup, secrets, migrations, indexing, go-live, and troubleshooting.",
+  "scope": [
+    "Cloudflare Workers",
+    "Cloudflare D1",
+    "Cloudflare R2",
+    "Cloudflare Vectorize",
+    "Cloudflare AI",
+    "wrangler.jsonc",
+    "rate limiters (AI_RATE_LIMITER, PUBLIC_RATE_LIMITER)",
+    "Clerk authentication",
+    "Stripe payments and Stripe Tax",
+    "Stripe webhooks",
+    "environment variables and secrets",
+    "database migrations",
+    "AI content indexing (/api/admin/vectorize)",
+    "admin dashboard",
+    "custom domain",
+    "monitoring and maintenance",
+    "security checklist",
+    "troubleshooting"
+  ],
+  "cross_refs": [
+    "wrangler.jsonc",
+    "./lib/db/seed.sql",
+    ".env.local",
+    "data/r2/products_md/",
+    "data/r2/knowledge_md/"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": "Type set by manifest (DOC). Content agrees: numbered tutorial steps, shell commands, checklists, no decision or requirement statements. Output filename uses a path-based suffix instead of a SHA-256 hash because no shell tool is available to this agent."
+}

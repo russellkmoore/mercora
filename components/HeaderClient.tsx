@@ -162,7 +162,7 @@ export default function HeaderClient({
         return (
           <div key={category.id}>
             <DropdownMenuItem
-              className="hover:text-orange-500 p-0"
+              className="hover:text-primary p-0"
               asChild
             >
               <Link 
@@ -172,7 +172,7 @@ export default function HeaderClient({
                 style={{ paddingLeft: `${level * 8}px` }}
               >
                 <span className={`flex items-center ${hasChildCategories ? 'font-semibold' : ''}`}>
-                  {level > 0 && <span className="mr-2 text-gray-400">└</span>}
+                  {level > 0 && <span className="mr-2 text-muted-foreground">└</span>}
                   {getCategoryName(category)}
                 </span>
               </Link>
@@ -192,11 +192,11 @@ export default function HeaderClient({
   const getIndentationClass = (level: number): string => {
     const indentationClasses = {
       0: '',
-      1: 'ml-4 border-l-2 border-orange-500/20 pl-3',
-      2: 'ml-8 border-l-2 border-orange-500/10 pl-3',
-      3: 'ml-10 border-l-2 border-orange-500/5 pl-3'
+      1: 'ml-4 border-l-2 border-primary/20 pl-3',
+      2: 'ml-8 border-l-2 border-primary/10 pl-3',
+      3: 'ml-10 border-l-2 border-primary/5 pl-3'
     };
-    return indentationClasses[level as keyof typeof indentationClasses] || 'ml-12 border-l border-neutral-700 pl-4';
+    return indentationClasses[level as keyof typeof indentationClasses] || 'ml-12 border-l border-border pl-4';
   };
 
   /**
@@ -228,20 +228,20 @@ export default function HeaderClient({
             <Link
               href={`/category/${getCategorySlug(group.parent)}`}
               onClick={onCategorySelect}
-              className="flex items-center justify-between w-full p-4 bg-linear-to-r from-orange-600/20 to-orange-500/10 rounded-lg border border-orange-500/30 hover:border-orange-400 transition-all duration-200 group"
+              className="flex items-center justify-between w-full p-4 bg-linear-to-r from-primary/20 to-primary/10 rounded-lg border border-primary/30 hover:border-primary/90 transition-all duration-200 group"
               prefetch={true}
             >
               <div>
-                <div className="text-white font-semibold text-base group-hover:text-orange-300 transition-colors">
+                <div className="text-foreground font-semibold text-base group-hover:text-primary/90 transition-colors">
                   {getCategoryName(group.parent)}
                 </div>
                 {group.children.length > 0 && (
-                  <div className="text-xs text-gray-400 mt-1">
+                  <div className="text-xs text-muted-foreground mt-1">
                     {group.children.length} subcategories
                   </div>
                 )}
               </div>
-              <ChevronRight className="w-5 h-5 text-orange-400 group-hover:text-orange-300 transition-colors" />
+              <ChevronRight className="w-5 h-5 text-primary group-hover:text-primary/90 transition-colors" />
             </Link>
             
             {/* Child Categories - Compact Grid */}
@@ -252,7 +252,7 @@ export default function HeaderClient({
                     key={child.id}
                     href={`/category/${getCategorySlug(child)}`}
                     onClick={onCategorySelect}
-                    className="text-sm text-gray-300 hover:text-orange-400 py-2 px-3 rounded-md hover:bg-neutral-800/50 transition-all duration-200 truncate"
+                    className="text-sm text-muted-foreground hover:text-primary/90 py-2 px-3 rounded-md hover:bg-surface-elevated/50 transition-all duration-200 truncate"
                     prefetch={true}
                   >
                     {getCategoryName(child)}
@@ -262,7 +262,7 @@ export default function HeaderClient({
                   <Link
                     href={`/category/${getCategorySlug(group.parent)}`}
                     onClick={onCategorySelect}
-                    className="text-xs text-orange-500 hover:text-orange-400 py-2 px-3 rounded-md hover:bg-neutral-800/50 transition-all duration-200 col-span-2 text-center border border-orange-500/20 hover:border-orange-400/40"
+                    className="text-xs text-primary hover:text-primary/90 py-2 px-3 rounded-md hover:bg-surface-elevated/50 transition-all duration-200 col-span-2 text-center border border-primary/20 hover:border-primary/40"
                     prefetch={true}
                   >
                     View all {group.children.length} items →
@@ -275,15 +275,15 @@ export default function HeaderClient({
         
         {/* Additional categories if any */}
         {categoryGroups.length > 6 && (
-          <div className="border-t border-neutral-700 pt-4 mt-6">
-            <div className="text-xs text-gray-400 mb-3 uppercase tracking-wide">More Categories</div>
+          <div className="border-t border-border pt-4 mt-6">
+            <div className="text-xs text-muted-foreground mb-3 uppercase tracking-wide">More Categories</div>
             <div className="grid grid-cols-2 gap-2">
               {categoryGroups.slice(6).map(group => (
                 <Link
                   key={group.parent.id}
                   href={`/category/${getCategorySlug(group.parent)}`}
                   onClick={onCategorySelect}
-                  className="text-sm text-gray-300 hover:text-orange-400 py-3 px-4 rounded-md hover:bg-neutral-800/50 transition-all duration-200 truncate text-center border border-neutral-700 hover:border-orange-500/30"
+                  className="text-sm text-muted-foreground hover:text-primary/90 py-3 px-4 rounded-md hover:bg-surface-elevated/50 transition-all duration-200 truncate text-center border border-border hover:border-primary/30"
                   prefetch={true}
                 >
                   {getCategoryName(group.parent)}
@@ -312,7 +312,7 @@ export default function HeaderClient({
               {hasChildCategories ? (
                 <button
                   onClick={() => toggleCategoryExpansion(category.id)}
-                  className="mr-2 p-3 text-gray-400 hover:text-white shrink-0 min-h-[48px] min-w-[48px] flex items-center justify-center"
+                  className="mr-2 p-3 text-muted-foreground hover:text-foreground shrink-0 min-h-[48px] min-w-[48px] flex items-center justify-center"
                   aria-label={isExpanded ? 'Collapse category' : 'Expand category'}
                 >
                   {isExpanded ? (
@@ -327,7 +327,7 @@ export default function HeaderClient({
               <Link
                 href={`/category/${getCategorySlug(category)}`}
                 onClick={() => setIsMobileMenuOpen(false)}
-                className={`block text-white hover:text-orange-500 py-2 px-2 rounded hover:bg-neutral-800 flex-1 ${hasChildCategories ? 'font-semibold' : ''}`}
+                className={`block text-foreground hover:text-primary py-2 px-2 rounded hover:bg-surface-elevated flex-1 ${hasChildCategories ? 'font-semibold' : ''}`}
                 prefetch={true}
               >
                 {getCategoryName(category)}
@@ -345,7 +345,7 @@ export default function HeaderClient({
   );
 
   return (
-    <div className="flex w-full min-w-0 items-center justify-between gap-1 bg-black px-4 py-4 text-white sm:gap-2 sm:px-6">
+    <div className="flex w-full min-w-0 items-center justify-between gap-1 bg-surface px-4 py-4 text-foreground sm:gap-2 sm:px-6">
       <Link
         href="/"
         className="min-w-0 flex-1 truncate text-lg font-bold sm:text-xl md:flex-none"
@@ -359,7 +359,7 @@ export default function HeaderClient({
         <Link 
           href="/"
           prefetch={true}
-          className="flex items-center gap-2 px-4 py-2 text-white hover:bg-white hover:text-orange-500 rounded-md transition-colors"
+          className="flex items-center gap-2 px-4 py-2 text-foreground hover:bg-foreground hover:text-primary rounded-md transition-colors"
         >
           <Home className="h-4 w-4" />
           Home
@@ -369,13 +369,13 @@ export default function HeaderClient({
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              className="text-white hover:bg-white hover:text-orange-500"
+              className="text-foreground hover:bg-foreground hover:text-primary"
             >
               <Grid3X3 className="mr-2 h-4 w-4" />
               Categories <ChevronDown className="ml-1 h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="bg-white text-black max-h-96 overflow-y-auto">
+          <DropdownMenuContent align="start" className="bg-foreground text-surface max-h-96 overflow-y-auto">
             {rootCategories.length > 0 ? (
               <CategoryDropdownTree cats={rootCategories} />
             ) : (
@@ -383,7 +383,7 @@ export default function HeaderClient({
               categories.map((category) => (
                 <DropdownMenuItem
                   key={category.id}
-                  className="hover:text-orange-500 hover:border-l-2 border-orange-500 p-0"
+                  className="hover:text-primary hover:border-l-2 border-primary p-0"
                   asChild
                 >
                   <Link 
@@ -419,14 +419,14 @@ export default function HeaderClient({
               variant="ghost"
               size="icon"
               aria-label="Open navigation menu"
-              className="text-white hover:bg-white hover:text-orange-500"
+              className="text-foreground hover:bg-foreground hover:text-primary"
             >
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
           <SheetContent
             side="right"
-            className="bg-black text-white transition-all ease-in-out px-3 w-full sm:w-[400px] max-w-[400px]! duration-300! data-[state=closed]:duration-200! data-[state=open]:duration-300! flex flex-col h-full border-l border-neutral-800 overflow-y-auto"
+            className="bg-surface text-foreground transition-all ease-in-out px-3 w-full sm:w-[400px] max-w-[400px]! duration-300! data-[state=closed]:duration-200! data-[state=open]:duration-300! flex flex-col h-full border-l border-border overflow-y-auto"
           >
             {/* Accessibility components */}
             <VisuallyHidden>
@@ -437,13 +437,13 @@ export default function HeaderClient({
             </VisuallyHidden>
 
             {/* Mobile Menu Header */}
-            <div className="flex items-center justify-between mb-6 pb-4 border-b border-neutral-700">
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
               <div>
-                <h2 className="text-xl font-bold text-white">Menu</h2>
-                <p className="text-sm text-gray-400">{store.identity.tagline}</p>
+                <h2 className="text-xl font-bold text-foreground">Menu</h2>
+                <p className="text-sm text-muted-foreground">{store.identity.tagline}</p>
               </div>
-              <div className="w-8 h-8 bg-orange-500/20 rounded-full flex items-center justify-center">
-                <Grid3X3 className="w-4 h-4 text-orange-400" />
+              <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
+                <Grid3X3 className="w-4 h-4 text-primary" />
               </div>
             </div>
 
@@ -451,7 +451,7 @@ export default function HeaderClient({
               <Link 
                 href="/" 
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="flex items-center space-x-3 text-white hover:text-orange-500 py-3 px-4 rounded-lg hover:bg-neutral-800"
+                className="flex items-center space-x-3 text-foreground hover:text-primary py-3 px-4 rounded-lg hover:bg-surface-elevated"
                 prefetch={true}
               >
                 <Home className="h-5 w-5" />
@@ -462,9 +462,9 @@ export default function HeaderClient({
                 <SimpleMobileCategoryList categories={categories} onCategorySelect={() => setIsMobileMenuOpen(false)} />
               </div>
 
-              <div className="border-t border-neutral-700 pt-6 space-y-3">
+              <div className="border-t border-border pt-6 space-y-3">
                 <button 
-                  className="flex items-center space-x-3 text-white hover:text-orange-500 py-3 px-4 rounded-lg hover:bg-neutral-800 w-full text-left"
+                  className="flex items-center space-x-3 text-foreground hover:text-primary py-3 px-4 rounded-lg hover:bg-surface-elevated w-full text-left"
                   onClick={() => {
                     setIsMobileMenuOpen(false);
                     // Force open the agent drawer

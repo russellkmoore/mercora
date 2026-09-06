@@ -39,3 +39,27 @@ ON CONFLICT(agent_id) DO UPDATE SET
   rate_limit_rpm = excluded.rate_limit_rpm,
   rate_limit_oph = excluded.rate_limit_oph,
   is_active = excluded.is_active;
+
+-- Development-only guest order fixture so the token-gated /order-status/<id> page has
+-- something to render locally and can be screenshotted (docs/theming.md documents this
+-- id). customer_id is NULL, which is what makes this a guest order — the only kind the
+-- page serves. The id is fixed ('dev-order-001') so the capture command can hardcode it.
+-- DO NOTHING (not DO UPDATE) keeps `predev`'s every-startup re-run idempotent without
+-- ever touching the row after first insert.
+INSERT INTO orders (
+  id, customer_id, status, total_amount, currency_code,
+  shipping_address, items, payment_status, shipped_at, tracking_number, created_at
+) VALUES (
+  'dev-order-001',
+  NULL,
+  'shipped',
+  '{"amount":4999,"currency":"USD"}',
+  'USD',
+  '{"street":"1 Main St","city":"Denver","state":"CO","zipCode":"80202","country":"US"}',
+  '[{"product_id":"dev-fixture-item","sku":"DEV-SKU-001","quantity":1,"unit_price":{"amount":4999,"currency":"USD"},"total_price":{"amount":4999,"currency":"USD"},"product_name":"Dev Fixture Item"}]',
+  'paid',
+  datetime('now'),
+  'DEV-TRACK-001',
+  datetime('now')
+)
+ON CONFLICT(id) DO NOTHING;

@@ -42,29 +42,39 @@ import CategoryDisplay from "./CategoryDisplay";
 import Image from "next/image";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { toPublicProduct } from "@/lib/models/mach/product-serializer";
+import { notFound } from "next/navigation";
+import type { Product } from "@/lib/types";
+import { getLayoutSettings } from "@/lib/layout/settings";
 
 /**
  * Category page component that displays products for a specific category
- * 
+ *
  * @param params - URL parameters object containing the category slug
  * @returns Server-rendered category page with products
  */
-export default async function CategoryPage({ params }: any) {
-  const category = await getCategoryBySlug(params.slug);
-  
+export default async function CategoryPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const category = await getCategoryBySlug(slug);
+
   if (!category) {
-    return <div>Category not found for slug: {params.slug}</div>;
+    notFound();
   }
-  
-  let products: any[] = [];
+
+  const { categoryLayout } = await getLayoutSettings();
+
+  let products: Product[] = [];
   let error: string | null = null;
-  
+
   try {
     products = (await getProductsByCategory(category.id as string))
       .filter((product) => product.status === "active")
       .map(toPublicProduct);
-  } catch (e: any) {
-    error = e?.message || 'Unknown error';
+  } catch (e) {
+    error = e instanceof Error ? e.message : 'Unknown error';
   }
   
   /**
@@ -102,7 +112,7 @@ export default async function CategoryPage({ params }: any) {
   const breadcrumbItems = [
     { label: "Home", href: "/" },
     { label: "Categories", href: "/categories" },
-    { label: categoryName, href: `/category/${params.slug}`, current: true }
+    { label: categoryName, href: `/category/${slug}`, current: true }
   ];
 
   return (
@@ -123,13 +133,13 @@ export default async function CategoryPage({ params }: any) {
             sizes="(min-width: 1024px) 100vw, 100vw"
             priority={true}
           />
-          <div className="absolute inset-0 bg-black/40 flex items-end">
-            <div className="p-6 sm:p-8 text-white">
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2">
+          <div className="absolute inset-0 bg-surface/40 flex items-end">
+            <div className="p-6 sm:p-8 text-foreground">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2 font-display">
                 {typeof category.name === 'string' ? category.name : (category.name?.en || 'Category')}
               </h1>
               {category.description && (
-                <p className="line-clamp-3 max-w-2xl whitespace-pre-line text-lg text-gray-200">
+                <p className="line-clamp-3 max-w-2xl whitespace-pre-line text-lg text-foreground">
                   {typeof category.description === 'string' ? category.description : (category.description?.en || '')}
                 </p>
               )}
@@ -141,11 +151,11 @@ export default async function CategoryPage({ params }: any) {
       {/* Category Header (fallback if no image) */}
       {!categoryImageUrl && (
         <div className="mb-8 text-center">
-          <h1 className="text-3xl sm:text-4xl font-bold mb-4">
+          <h1 className="text-3xl sm:text-4xl font-bold mb-4 font-display">
             {typeof category.name === 'string' ? category.name : (category.name?.en || 'Category')}
           </h1>
           {category.description && (
-            <p className="mx-auto max-w-2xl whitespace-pre-line text-gray-400">
+            <p className="mx-auto max-w-2xl whitespace-pre-line text-muted-foreground">
               {typeof category.description === 'string' ? category.description : (category.description?.en || '')}
             </p>
           )}
@@ -155,13 +165,13 @@ export default async function CategoryPage({ params }: any) {
       {/* Error Display */}
       {error && (
         <div className="text-center py-8">
-          <p className="text-red-400">Error loading products: {error}</p>
+          <p className="text-danger">Error loading products: {error}</p>
         </div>
       )}
 
       {/* Products Grid with Sorting */}
       {!error && (
-        <CategoryDisplay products={products} />
+        <CategoryDisplay products={products} categoryLayout={categoryLayout} />
       )}
       </div>
     </div>

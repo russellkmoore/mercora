@@ -1,5 +1,7 @@
 # Webhooks, refunds, and inventory operations
 
+**Status:** Accepted (2026-08-06)
+
 Mercora treats Stripe, order state, and variant inventory as a set of durable,
 retryable transitions. A successful HTTP request is not the recovery mechanism;
 the D1 ledgers and scheduled worker are.
