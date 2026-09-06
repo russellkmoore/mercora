@@ -90,7 +90,7 @@ function violation(check, file, line, detail) {
 }
 
 // --- Check 1: documentation references resolve -----------------------------
-const DOCS_PATH_RE = /docs\/[A-Za-z0-9_.-]+\.md/g;
+const DOCS_PATH_RE = /docs\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.md/g;
 
 function checkReferencesResolve() {
   const violations = [];
@@ -193,11 +193,26 @@ function checkLockedAdrGuard() {
       violations.push(violation("locked-adr-guard", MANIFEST_PATH, 0, `locked ADR not listed in manifest: ${p}`));
     }
   }
+  // Bind `locked: true` to each ADR's own entry: the marker must appear inside the
+  // lines between `- path: <adr>` and the next `- path:`. A global count would still
+  // pass if the marker moved to a different document.
   const stripped = manifestLines.filter((l) => !/^\s*#/.test(l));
-  const lockedCount = stripped.filter((l) => l.includes("locked: true")).length;
-  if (lockedCount !== 4) {
+  const entryStarts = stripped
+    .map((l, i) => (/^\s*-\s*path:\s/.test(l) ? i : -1))
+    .filter((i) => i >= 0);
+  for (const p of LOCKED_ADRS) {
+    const start = stripped.findIndex((l) => l.includes(`path: ${p}`));
+    if (start < 0) continue; // already reported above
+    const next = entryStarts.find((i) => i > start) ?? stripped.length;
+    const block = stripped.slice(start, next);
+    if (!block.some((l) => /^\s*locked:\s*true\s*$/.test(l))) {
+      violations.push(violation("locked-adr-guard", MANIFEST_PATH, 0, `locked ADR entry lacks locked: true: ${p}`));
+    }
+  }
+  const lockedCount = stripped.filter((l) => /^\s*locked:\s*true\s*$/.test(l)).length;
+  if (lockedCount !== LOCKED_ADRS.length) {
     violations.push(
-      violation("locked-adr-guard", MANIFEST_PATH, 0, `locked marker count is ${lockedCount}, expected 4`),
+      violation("locked-adr-guard", MANIFEST_PATH, 0, `locked marker count is ${lockedCount}, expected ${LOCKED_ADRS.length}`),
     );
   }
   return violations;
@@ -257,6 +272,10 @@ function checkHeaderConvention() {
     const first = lines[0] || "";
     if (!/^# /.test(first)) {
       violations.push(violation("header-convention", rel, 1, "first line is not a level-one heading"));
+    }
+    const statusIdx = lines.findIndex((l) => /^\*\*Status:\*\*\s*\S/.test(l));
+    if (statusIdx < 0) {
+      violations.push(violation("header-convention", rel, 1, "no `**Status:**` line in the header"));
     }
   }
   return violations;
