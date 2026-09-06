@@ -55,7 +55,7 @@ describe('Workers-safe Stripe client', () => {
     expect(getStripeClient()).toBe(getStripe());
     expect(mocks.constructor).toHaveBeenCalledOnce();
     expect(mocks.constructor).toHaveBeenCalledWith('sk_test_placeholder', {
-      apiVersion: '2026-07-29.dahlia',
+      apiVersion: '2026-08-26.dahlia',
       typescript: true,
       httpClient: mocks.httpClient,
     });
