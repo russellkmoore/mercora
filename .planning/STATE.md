@@ -224,6 +224,8 @@ None.
 
 Nothing blocks the next milestone. Open items carried out of v2 (full list in `milestones/v2-MILESTONE-AUDIT.md`):
 
+- [Closed 2026-09-06] Live not-found pages returned 200: root `app/loading.tsx` removed (a04e1ea); 404s verified live. Admin toasts doubled: storefront Toaster gated off `/admin` (ecc6c4f)
+
 - [Needs Russell] Walk through `/admin/settings/appearance` (theme grid and layout switches) in a real browser with a Clerk admin session; both are proven by dev-bypass probes and render tests only
 - [Needs Russell] Fresh-clone dry run of `AGENTS.md` with a coding assistant; run `mise exec -- npm run dev` once and confirm `git status --short` leaves `AGENTS.md` unchanged
 - [Follow-up] Add `npm run docs:lint` to `.github/workflows/ci.yml` next to `scan:tokens`
@@ -233,7 +235,7 @@ Nothing blocks the next milestone. Open items carried out of v2 (full list in `m
 
 Open items carried from v1 close (`milestones/v1-MILESTONE-AUDIT.md`):
 
-- [Needs Russell] Add `NEXT_PUBLIC_SITE_URL` as a Cloudflare Workers Build variable and redeploy (sitemap still advertises `mercora.example.com`)
+- [Closed 2026-09-06] `NEXT_PUBLIC_SITE_URL` set in `wrangler.jsonc` vars (bcce1ca); live sitemap advertises `voltique.russellkmoore.me`
 - [Cloudflare hygiene] Delete the unused `ADMIN_USER_IDS` Worker secret
 - [Backlog] Mobile Lighthouse scores 72-80 vs. target 85 on all four measured routes
 - [Review 2026-12-01] Five moderate dev-only `npm audit` findings
