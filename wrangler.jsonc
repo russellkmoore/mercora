@@ -111,6 +111,7 @@
     "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_bGVhcm5pbmctbGlnZXItMTAuY2xlcmsuYWNjb3VudHMuZGV2JA",
     "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51Rwyc6LL7e1EcFUl2kqrcgWa8KDNzC9m4lc38wQQKiKVmekTxi3q6R6R2nohizFzRNNw9bHTeN8mripgZzgUYUDd00nlOhCWEs",
     "NEXT_PUBLIC_IMAGE_CDN": "https://voltique-images.russellkmoore.me",
+    "NEXT_PUBLIC_SITE_URL": "https://voltique.russellkmoore.me",
     // Deploy-time fallback for getActiveTheme() (D-10). Must also be added
     // as a Workers Build variable in the Cloudflare Dashboard per the
     // project rule for NEXT_PUBLIC_* vars (see 06-02 user setup).

@@ -56,7 +56,7 @@ import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import PromotionalBanner from "@/components/PromotionalBanner";
-import { Toaster } from "sonner";
+import { StorefrontToaster } from "@/components/StorefrontToaster";
 import { dark } from "@clerk/themes";
 import { Suspense } from "react";
 import WebVitals from "@/components/analytics/WebVitals";
@@ -266,15 +266,8 @@ export default async function RootLayout({
           {/* Global footer */}
           <Footer />
 
-          {/* Global toast notification system */}
-          <Toaster
-            position="top-center"
-            toastOptions={{
-              className:
-                "bg-primary/80 text-on-primary font-semibold rounded-md mt-[60px] shadow-lg animate-in fade-in slide-in-from-top-5",
-              duration: 3000,
-            }}
-          />
+          {/* Global toast notification system (storefront only; admin mounts its own) */}
+          <StorefrontToaster />
           
           {/* Core Web Vitals monitoring */}
           <WebVitals />
