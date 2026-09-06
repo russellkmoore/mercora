@@ -77,7 +77,7 @@ API mode additionally requires these variables.
 ```text
 MIGRATION_SOURCE_MODE=api
 SHOPIFY_STORE_URL=https://store.myshopify.com
-SHOPIFY_ACCESS_TOKEN=private-read-token
+SHOPIFY_ACCESS_TOKEN=<your-shopify-read-only-token>
 SHOPIFY_API_VERSION=2026-07
 ```
 

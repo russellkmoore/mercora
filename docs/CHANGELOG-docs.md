@@ -30,4 +30,13 @@
   `docs/DEPLOYMENT_SETUP.md`; its webhook event list is owned by
   `docs/webhooks-refunds-inventory.md` and its payment/finalization behavior by
   `docs/checkout-trust-boundary.md`.
+- Whole-set claim check (plan 08.2-06): fixed a stale example variable name in
+  `docs/admin-authentication.md`'s "Valid API Token" test (`$ADMIN_TOKEN` corrected to
+  `$ADMIN_VECTORIZE_TOKEN`, matching the variable documented earlier in the same file) and
+  replaced a real-looking example Shopify access token in `docs/shopify-migration.md`
+  (`private-read-token`) with the file's own angle-bracket placeholder convention. Confirmed
+  `docs/theming.md`'s five quoted validator messages are still byte-identical to
+  `scripts/build-themes.mjs`, every `npm run` command named anywhere in the surviving set exists
+  in `package.json`, and every backticked relative path resolves except the ones this file
+  intentionally names as retired.
 </content>
