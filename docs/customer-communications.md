@@ -1,5 +1,7 @@
 # Customer accounts and communications
 
+**Status:** Current (2026-09-05).
+
 Mercora provides authenticated account navigation, owner-scoped order history,
 saved addresses, and basic profile settings without requiring an email provider.
 The legacy `/orders` URL redirects to `/account/orders` and preserves query

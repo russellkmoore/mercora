@@ -1,5 +1,7 @@
 # Runtime configuration
 
+**Status:** Current (2026-09-05).
+
 Mercora has neutral demo defaults in `lib/store-config.ts`. A storefront can
 override public, non-secret values without editing components. The configuration
 is resolved when a request/render needs it; it is not captured at module import

@@ -40,3 +40,4 @@
   in `package.json`, and every backticked relative path resolves except the ones this file
   intentionally names as retired.
 </content>
+- 2026-09-05 (08.2 verification gap closure): added `**Status:**` lines to `ai-pipeline.md`, `content-publishing.md`, `customer-communications.md`, `runtime-configuration.md`; added the CI `check:migrations` step to the gate lists in `AGENTS.md` and `CONTRIBUTING.md`.
