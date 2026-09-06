@@ -2,20 +2,42 @@
 
 ## What This Is
 
-Mercora is an AI-assisted outdoor-gear commerce platform running on Cloudflare's edge. Its storefront brand is **Voltique**, live at https://voltique.russellkmoore.me, where shoppers browse gear, ask the **Volt** assistant for help, and check out with Stripe. The same commerce core is exposed to external AI shopping agents through an MCP server at `/api/mcp`, so an agent can search the catalog, build a cart, pay, and track an order without a browser.
+Mercora is an AI-assisted commerce platform running on Cloudflare's edge, built to be re-skinned for any product vertical. Its demo storefront brand is **Voltique**, live at https://voltique.russellkmoore.me, where shoppers browse the catalog, ask the **Volt** assistant for help, and check out with Stripe. A storefront's look is a theme: one 23-token CSS file in `themes/`, chosen from admin, applied to pages, emails, and the crash page; three page templates expose enumerated layout switches. The same commerce core is exposed to external AI shopping agents through an MCP server at `/api/mcp`, so an agent can search the catalog, build a cart, pay, and track an order without a browser.
 
 ## Core Value
 
-A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
+A customer or an external AI agent can find the right product through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
 
 ## Business Context
 
-- **Customer**: Outdoor-gear shoppers on the Voltique storefront, plus AI shopping agents (Claude Desktop, Cursor, VS Code, custom agents) using the MCP server
+- **Customer**: Shoppers on a Mercora-powered storefront (Voltique is the outdoor-gear demo), plus AI shopping agents (Claude Desktop, Cursor, VS Code, custom agents) using the MCP server
 - **Revenue model**: Direct product sales through Stripe; stored-value gift cards; subscriptions (new acquisition is off by default per ADR-SUB-01)
 - **Success metric**: TBD
 - **Strategy notes**: `docs/ROADMAP.md` (2025 strategic priorities; its 12 planned items are backlogged in `.planning/milestones/v1-REQUIREMENTS.md`, not in v1)
 
 ## Current State
+
+**Shipped: v2 Themeable Storefront (2026-09-05).** Seven phases (5, 6, 6.1, 7, 8, 8.1, 8.2), 44 plans, 125 tasks over 2026-09-03 to 2026-09-05. Archive: `.planning/milestones/v2-ROADMAP.md`, `v2-REQUIREMENTS.md`, `v2-MILESTONE-AUDIT.md`, `v2-phases/`.
+
+What v2 changed:
+
+- Every storefront surface reads a frozen 23-token contract; `npm run scan:tokens` (in CI) reports zero hardcoded palette values outside admin.
+- A theme is one validated CSS file in `themes/`; `scripts/build-themes.mjs` generates the committed barrel and manifest and fails the build on a bad file.
+- `getActiveTheme()` and `getLayoutSettings()` resolve per request from D1 through one shared `React.cache` reader; admin `/admin/settings/appearance` sets the theme and three layout switches.
+- Seven presets ship, each with its own display face; emails and the crash page follow the admin-selected theme (cron-drained emails carry it in `order_effects.payload`, migration 0023).
+- `docs/` is 20 files with one style contract, claim-checked against the code and guarded by `npm run docs:lint`; README is product-neutral; root `AGENTS.md` onboards a coding assistant from clone to deploy.
+
+Codebase after v2: 265 unit test files (2,187 tests) plus the Workers and observability suites; `docs/` 20 files; `themes/` 7 files.
+
+**Open items carried out of v2** (none blocks feature work; full list in `.planning/milestones/v2-MILESTONE-AUDIT.md`):
+
+- Walk through the admin Appearance page in a real browser with a Clerk admin session.
+- Fresh-clone dry run of `AGENTS.md` with a coding assistant; confirm `npm run dev` leaves `AGENTS.md` unchanged.
+- Add `npm run docs:lint` to CI.
+- Direction-doc theme properties outside the token contract and themed demo deployments stay in `.planning/todos/pending/`.
+
+<details>
+<summary>Previous: v1 Hardening (2026-09-02)</summary>
 
 **Shipped: v1 Hardening (2026-09-02).** Four phases, 17 plans, 46 tasks over 2026-08-31 to 2026-09-02. Archive: `.planning/milestones/v1-ROADMAP.md`, `v1-REQUIREMENTS.md`, `v1-MILESTONE-AUDIT.md`, `v1-phases/`.
 
@@ -37,29 +59,7 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 - Cloudflare hygiene: delete the unused `ADMIN_USER_IDS` Worker secret; two unpromoted Worker versions from 2026-08-31 can be ignored.
 - Dependency review due 2026-12-01 (five moderate dev-only findings).
 
-## Current Milestone: v2 Themeable Storefront
-
-**Goal:** The storefront is skinnable without touching component code — a theme is a CSS file in `themes/`, selectable from admin with swatch previews, and page templates expose enumerated layout switches configurable from admin. Tokens + enumerated variants, never free composition, never per-theme markup.
-
-**Target features:**
-- Token contract (~18 tokens: colors, radius, fonts) and a full storefront component/template sweep to token classes; admin explicitly excluded (keeps its hardcoded palette)
-- Theme file mechanism: prebuild script scans `themes/*.css`, generates a CSS import barrel + typed manifest, fails the build on invalid themes; `getActiveTheme()` resolves server-side from `admin_settings` → env default → manifest default; admin "Appearance" section with swatch cards; 2–3 preset themes, one light
-- Layout switches: `appearance.category_layout` (grid-3/grid-2/list), `appearance.home_hero` (full-bleed/split/minimal), `appearance.product_gallery` (left/top) as enumerated variant components chosen server-side
-- Close-out: `docs/theming.md`, `docs/CLAUDE.md` update, visual QA of presets × layout variants, targeted refresh of `.planning/codebase/` structure/architecture docs
-
-**Decisions taken during milestone discussion (2026-09-02):**
-
-| Decision | Call |
-|----------|------|
-| Theme registry | Build-time generated from `themes/*.css` only — never a wrangler var or hand-maintained list |
-| New theme requires deploy | Accepted; switching between shipped themes is instant via D1 |
-| `getActiveTheme()` D1 read per request | Accept; revisit only if traces show it |
-| Per-category layout overrides | Not now; per-template only |
-| `theme.mode` (dark/light) | Fold into the theme file — a theme IS a mode |
-| Admin theming | Never in this milestone |
-| Per-theme component/markup overrides | Rejected on principle — tokens + enumerated variants is the line |
-
-**Deferred candidates not in this milestone** (from the v1 close): mobile performance / image caching, wishlist, PWA, multi-language, advanced security, email marketing, advanced analytics, visual search, predictive analytics, social features, touch interactions, U13 shipment command, MCP legacy credential column removal, account deletion and data export, Lighthouse CI / Playwright mobile automation.
+</details>
 
 ## Requirements
 
@@ -108,48 +108,52 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 - ✓ Category, home hero and product gallery render as enumerated, server-chosen named variants (8 components, typed lookup maps, repo-wide contract test) — Phase 7
 - ✓ `docs/theming.md` (contract, anatomy, duplication recipe, validator rejections, resolution, admin, layouts, gates, QA summary, known limits), `docs/CLAUDE.md` refreshed, codebase docs refreshed, 21-run visual QA matrix with zero defects — Phase 8
 - ✓ v2 tech debt closed: emails and the crash page follow the admin-selected theme (staged on effect rows for cron retries), `scan:tokens` in CI, one request-scoped appearance read, one image resolver, loud parity snapshots, logged seed fallback, review Info items, order-status screenshots via a dev-only seeded order — Phase 8.1
+- ✓ Docs overhaul: 9 docs retired, 20 remain under one style contract with a claim check against the code and `npm run docs:lint` guarding references, script names, retired paths, locked ADRs and status lines; README product-neutral with preset screenshots; root `AGENTS.md` (Next-generated block preserved) with an ordered command-exact setup path, root `CLAUDE.md` pointing to it, `docs/CLAUDE.md` 655→236 lines — Phase 8.2 (DOCS-04, DOCS-05)
 
 ### Active
 
-<!-- v2 Themeable Storefront — defined by /gsd-new-milestone 2026-09-02. REQ-IDs assigned in .planning/REQUIREMENTS.md. -->
+<!-- Next milestone not yet defined. `/gsd-new-milestone` writes a fresh .planning/REQUIREMENTS.md. Candidates: see ROADMAP.md "Next Milestone". -->
 
+(None — v2 shipped; define the next milestone)
 
 ### Out of Scope
 
 <!-- Explicit boundaries. Includes reasoning to prevent re-adding. -->
 
-- The 12 planned items in `docs/ROADMAP.md` (PWA, touch interactions, wishlist, social, visual search, predictive analytics, multi-language, advanced security, email marketing, advanced analytics, image caching, reviews header) — backlogged in `.planning/milestones/v1-REQUIREMENTS.md` by user decision; v1 was hardening only. Candidates for the next milestone, not out of scope forever
-- Unbuilt modules in `docs/admin-dashboard-specification.md` (MFA, WebSocket/SSE, custom report builder, fulfillment automation, GDPR/CCPA tools, VIP tiers, personalization admin) — that document is a historical design doc, not a backlog (W2 resolved); admin is treated as shipped
+- The 12 planned items from the retired `docs/ROADMAP.md` (PWA, touch interactions, wishlist, social, visual search, predictive analytics, multi-language, advanced security, email marketing, advanced analytics, image caching, reviews header) — backlogged in `.planning/milestones/v1-REQUIREMENTS.md` by user decision; v1 was hardening only. Candidates for the next milestone, not out of scope forever
+- Unbuilt modules from the retired `docs/admin-dashboard-specification.md` (MFA, WebSocket/SSE, custom report builder, fulfillment automation, GDPR/CCPA tools, VIP tiers, personalization admin) — that document is a historical design doc, not a backlog (W2 resolved); admin is treated as shipped
 - The U13 shipment command and `SHIPMENT_NO_UNSETTLED_REFUNDS_SQL` end-to-end CAS test — future ADR-scoped work with its own migration; not a hardening gap
 - Account deletion and personal-data export — explicitly deferred by `docs/customer-communications.md`; needs a separate design
 - Switching the `pk_test_` Stripe/Clerk publishable keys in `wrangler.jsonc` to live keys — production is intentionally a demo environment with no live Stripe account (confirmed 2026-09-01)
 - Splitting large service files (`checkout-pricing.ts`, `reviews.ts`, `products.ts`, `inventory.ts`, `agent-chat/route.ts`) — refactor with no user-observable outcome; revisit only when a feature touches them
 - Deleting the 12 empty `app/api/*` directories — git does not track empty directories, so they exist only in the local working tree; one local `find app/api -type d -empty -delete` clears them
-- Playwright mobile suite and Lighthouse CI workflow from `docs/mobile-testing-automation.md` — v1 records a one-time baseline (MOB-01); ongoing automation is backlog
+- Playwright mobile suite and Lighthouse CI workflow from the retired `docs/mobile-testing-automation.md` — v1 records a one-time baseline (MOB-01); ongoing automation is backlog
 - Differentiating the generic `"Checkout details are invalid or unavailable"` response — telemetry already records `payment.pricing_rejected` with an error class; user-facing detail would leak validation internals
 
 ## Context
 
 **Brownfield.** The codebase was mapped on 2026-08-31 (`.planning/codebase/ARCHITECTURE.md`, `CONCERNS.md`, `CONVENTIONS.md`, `INTEGRATIONS.md`, `STACK.md`, `STRUCTURE.md`, `TESTING.md`) and 26 docs were ingested on 2026-09-01 (`.planning/intel/`, `.planning/INGEST-CONFLICTS.md`). Milestone v1 existed because the docs and the code disagreed in specific, verified places. As of 2026-09-02 they agree; the codebase map and ingest intel predate v1's changes and should be refreshed (`/gsd-map-codebase`) before planning code-heavy work.
 
-**Two generations of docs.** The 2025-dated docs (`CLAUDE.md`, `README.md`, `ROADMAP.md`, `architecture.md`, `ai-pipeline.md`, `api-architecture.md`, `DEPLOYMENT_SETUP.md`, `STRIPE_INTEGRATION.md`, `admin-*.md`, `mobile-*.md`) describe an earlier system. The 2026-dated operational docs (the four ADRs, `observability.md`, `runtime-configuration.md`, `content-publishing.md`, `customer-communications.md`, `dependency-security.md`, `shopify-migration.md`, `migration-reservations.md`, `o07-gift-cards-plan.md`) are newer and match the code. Where they disagree, the 2026 set wins.
+**Docs after v2.** `docs/` holds 20 files: four locked ADRs (`checkout-trust-boundary.md`, `webhooks-refunds-inventory.md`, `database-migrations.md`, `subscriptions.md`), the setup runbook `DEPLOYMENT_SETUP.md`, `theming.md`, `architecture.md`, `CLAUDE.md` (AI-assistant context), and the feature references. The 2025-era docs that described an earlier system were retired in Phase 8.2 (`docs/CHANGELOG-docs.md` lists them). Root `AGENTS.md` is the onboarding entry point; `gsd-ingest-manifest.yaml` must list exactly the files in `docs/` (`npm run docs:lint` enforces it).
 
 **Facts a planner should not re-derive** (all now reflected in `docs/` after v1):
 - MCP `place_order` (`lib/mcp/tools/order.ts`) calls the same `finalizeOrderPayment` as `app/api/orders/route.ts` and the Stripe webhook route. MCP checkout is inside the paid inventory boundary; ADR-CTB-15 is superseded and `docs/checkout-trust-boundary.md` says so.
 - Admin auth is enforced in production through Clerk role or an active `adminUsers` row, or a header-only bearer token. The `x-dev-admin` bypass and the signed-in-user shortcut require `NODE_ENV === "development"`, and `lib/auth/deployment-guard.ts` returns 503 if such a build ever reaches the Workers runtime.
 - The text model is `@cf/openai/gpt-oss-20b` (`lib/ai/config.ts`). The MCP server exposes 19 tools (`app/api/mcp/route.ts`).
 - `npm run deploy` never applies remote migrations (ADR-DBM-01). `npm run deploy:ci`, used by Cloudflare Workers Builds, applies production migrations before uploading. Expand-only migrations (ADR-DBM-05) is a hard rule because the schema lands before the new Worker.
-- Migrations live in `migrations/`; the highest tracked file is `0022_add_gift_cards.sql`; the next free schema-bearing number is `0023`.
-- Telemetry taxonomy now includes `auth.deployment_guard_tripped`, `checkout.tax_fallback`, and `payment.intent_failed`; web vitals go to the `mercora_web_vitals` Analytics Engine dataset via the `WEB_VITALS` binding. The `commerce-observability-tail` Worker is wired as a tail consumer in `wrangler.jsonc`.
+- Migrations live in `migrations/`; the highest tracked file is `0023_add_order_effects_payload.sql`; the next free schema-bearing number is `0024`.
+- Telemetry taxonomy now includes `auth.deployment_guard_tripped`, `checkout.tax_fallback`, `payment.intent_failed`, and `theme.unknown_selection`; web vitals go to the `mercora_web_vitals` Analytics Engine dataset via the `WEB_VITALS` binding. The `commerce-observability-tail` Worker is wired as a tail consumer in `wrangler.jsonc`.
 - `wrangler.jsonc` carries two `pk_test_` publishable keys by design (demo environment); the file stays tracked.
 
-**Known debt after v1** (nothing here blocks feature work):
+**Known debt after v1 and v2** (nothing here blocks feature work):
 - Mobile Lighthouse scores are 72–80 on all four measured routes against a target of 85.
 - `NEXT_PUBLIC_SITE_URL` is a runtime var only, so the live sitemap advertises `mercora.example.com` until a Workers Build variable is added.
 - `lib/hooks/useEnhancedUserContext.ts` still has the cosmetic `favoriteCategories` TODO.
 - Six non-`/api/admin` callers of `authenticateRequest` get 401 rather than 503 when the deployment guard trips (documented residual, `docs/admin-authentication.md`).
 - Client-side dev-mode admin shortcuts in `components/admin/AdminGuard.tsx` remain (accepted risk AR-01-03).
-- The dated "Recent Fixes" and "Current Git Status" sections of `docs/CLAUDE.md` are stale.
+- `npm run docs:lint` is a local gate only, not in CI.
+- The admin Appearance page has never been walked through with a real Clerk admin session.
+- Direction-doc theme properties outside the 23-token contract are backlog (`.planning/todos/pending/`).
 
 ## Constraints
 
@@ -157,12 +161,13 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 - **Runtime**: Node 24.18.1 (`>=24.18.1 <25`), use `mise exec --` for project commands — ADR-WRI-14 and `package.json` engines
 - **Security**: Stripe, Clerk, Cloudflare, gift-card HMAC, and unsubscribe secrets live only in Worker secrets or `.dev.vars`; never in `wrangler.jsonc`, `lib/store-config.ts`, source, docs, or git history; `NEXT_PUBLIC_*` values are intentionally public — ADR-WRI-03, RC-03, RC-06
 - **Telemetry**: `commerce.telemetry.v1` accepts only the closed event/severity taxonomy and low-cardinality fields; never headers, cookies, payment details, customer or order identifiers, addresses, raw exceptions, or query-bearing URLs; telemetry failure must never change commerce behavior — OBS-01, OBS-02; any new event (tax fallback, web vitals) must respect this
-- **Data**: Migrations are additive expand/contract only, hand-authored in `migrations/`, numbered from `0023`; never down-migrate merchant, subscription, or gift-card state — ADR-DBM-05, ADR-SUB-01, CP-03
+- **Data**: Migrations are additive expand/contract only, hand-authored in `migrations/`, numbered from `0024`; never down-migrate merchant, subscription, or gift-card state — ADR-DBM-05, ADR-SUB-01, CP-03
 - **Money**: Integer minor units in D1 via the `Money` class; MACH decimal wire shape on HTTP/MCP; single currency per cart — MCP-05, CONVENTIONS.md
-- **Verification gates**: `npm run lint`, `npm run typecheck`, `npm run cf-typecheck`, `npm test`, `npm run test:workers`, `npm run test:observability-worker`, `npm run check:migrations`, `npm audit --omit=dev`, `npm run build` all run in CI; the Workers suite is a required correctness gate — ADR-WRI-14, OBS-08, `.github/workflows/ci.yml`
+- **Verification gates**: `npm run build:themes:check`, `npm run scan:tokens`, `npm run lint`, `npm run typecheck`, `npm run cf-typecheck`, `npm test`, `npm run test:workers`, `npm run test:observability-worker`, `npm run check:migrations`, `npm audit --omit=dev`, `npm run build` all run in CI; `npm run docs:lint` is a local gate; the Workers suite is a required correctness gate — ADR-WRI-14, OBS-08, `.github/workflows/ci.yml`
 - **Provider isolation**: No development or test path may call Stripe, send email, deploy, create Cloudflare resources, or use real credentials — REQ-gift-cards-invariants, OBS-07
 - **Image pipeline**: The custom image loader must remain and image handling must not switch to Next's default optimizer while the Sharp audit exception is open — `docs/dependency-security.md`
-- **Documentation as source**: `docs/` is the ingest source for planning; `gsd-ingest-manifest.yaml` types each doc; doc changes should keep the manifest accurate so re-ingest stays clean
+- **Documentation as source**: `docs/` is the ingest source for planning; `gsd-ingest-manifest.yaml` types each doc and must match the `docs/` tree exactly (`npm run docs:lint`); the four locked ADRs are trim-and-link only, never merged, renamed or deleted; the Next-generated block in `AGENTS.md` is never hand-edited
+- **Theming line**: tokens plus enumerated variants only; never per-theme markup, never free composition; the 23-token contract is one-way frozen (adding a token touches the validator, every theme file, and the sweep)
 - **Regression sensitivity**: Russell's profile flags regressions as the top frustration; verify safety and flag risk before touching working checkout, webhook, or auth code
 
 ## Key Decisions
@@ -243,6 +248,12 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 | One request-scoped `React.cache` reader (`lib/themes/appearance-read.ts`) shared by the theme and layout resolvers; `React.cache` is a no-op outside a render, so it is the one allowed cache (Phase 8.1) | Avoids a second D1 read per page without an isolate cache | ✓ Good |
 | Bare relative image paths now resolve root-relative (`/products/x.jpg`) after consolidating on `resolveProductImageSrc`; the one accepted output change, product route hash-identical (Phase 8.1, D-11) | A bare path resolves against the current route and was the less correct form | ✓ Good |
 
+| Docs retirement is one commit per document: delete, fix inbound links, drop the manifest entry, add a changelog line; the four locked ADRs are trim-and-link only (Phase 8.2) | A half-retired doc leaves dangling links and a manifest that lies; the ADRs are the ingest source of binding decisions | ✓ Good — 9 retired, `docs:lint` guards the invariant |
+| `AGENTS.md` at the repo root is the coding-assistant onboarding file, wrapped around the Next-generated `nextjs-agent-rules` block; root `CLAUDE.md` is `@AGENTS.md`; `docs/CLAUDE.md` links rather than restates (Phase 8.2) | Russell's choice 2026-09-05; one entry point every assistant reads, `next dev` keeps regenerating its block byte-identically | ✓ Good — fresh-clone dry run pending Russell |
+| Themed demo deployments deferred out of v2; README shows preset screenshots instead (Phase 8.2) | Demos need separate Workers, D1 and secrets per preset; the screenshots answer "what does it look like" without them | ✓ Good — `.planning/todos/pending/themed-demo-deployments.md` |
+| `scripts/docs-lint.mjs` binds `locked: true` to each ADR's own manifest entry and requires a `**Status:**` line per doc (Phase 8.2 code review CR-01/WR-01) | A global marker count passed when the marker moved to another doc; the header check let four docs ship without a status line | ✓ Good — both mutations now fail the gate |
+| Milestone v2 closed with 12 accepted open items, all environment-limited, user-owned, or explicitly deferred | Russell chose to close the code-closable debt first (Phase 8.1), then complete; the rest needs a Clerk/Stripe session, a person, or a later milestone | ✓ Good |
+
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
@@ -261,4 +272,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-05 after Phase 8.1 (v2 Tech-Debt Closure)*
+*Last updated: 2026-09-05 after v2 milestone (Themeable Storefront)*
