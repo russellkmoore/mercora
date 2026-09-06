@@ -1,6 +1,10 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
+// Pin the test timezone so date formatting renders identically on developer
+// machines and in CI (which runs in UTC). Node re-reads TZ at runtime.
+process.env.TZ = "UTC";
+
 export default defineConfig({
   oxc: {
     // Unit tests import async React Server Components directly for contract

@@ -28,7 +28,9 @@ export function categoryProductsFixture(): Product[] {
       rating: {
         average: 4.5,
         count: 12,
-        lastPublishedAt: "2026-01-15T00:00:00.000Z",
+        // Midday UTC so the rendered "Updated Jan 14, 2026" is the same in every
+        // timezone (a midnight timestamp formatted as Jan 14 in PDT and Jan 15 in CI's UTC).
+        lastPublishedAt: "2026-01-14T12:00:00.000Z",
       },
       variants: [
         {
