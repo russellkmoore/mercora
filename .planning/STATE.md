@@ -5,16 +5,16 @@ milestone_name: Gift Card Product
 current_phase: 10
 current_phase_name: Gift Card Purchase Flow
 status: executing
-stopped_at: Phase 10 UI-SPEC approved
-last_updated: "2026-09-08T17:17:11.674Z"
+stopped_at: Completed 10-01-PLAN.md
+last_updated: "2026-09-08T17:32:48.748Z"
 last_activity: 2026-09-08
-last_activity_desc: Phase 9 complete, transitioned to Phase 10
-state_head: a58b08352f3b52397069547f03a2e50e228c8fd2
+last_activity_desc: Phase 10 execution started
+state_head: 018685c6433ad872275414ec2f1743c2c31209d4
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 9
-  completed_plans: 4
+  completed_plans: 5
   percent: 25
 ---
 
@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-09-08 after Phase 9)
 
 ## Current Position
 
-Phase: 10 (Gift Card Purchase Flow) — READY TO EXECUTE
-Plan: Not started
+Phase: 10 (Gift Card Purchase Flow) — EXECUTING
+Plan: 2 of 5
 Status: Ready to execute
-Last activity: 2026-09-08 — Phase 9 complete, transitioned to Phase 10
+Last activity: 2026-09-08 — Phase 10 execution started
 
 Progress: [███░░░░░░░] 25%
 
@@ -126,6 +126,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 9 P02 | 12min | 3 tasks | 3 files |
 | Phase 9 P03 | 10min | 2 tasks | 1 files |
 | Phase 9 P04 | 15min | 3 tasks | 2 files |
+| Phase 10 P01 | 13min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -240,6 +241,8 @@ Decisions locked for v2:
 - [Phase 9]: Mixed-order test injects a hand-written D1 fake (prepare/bind/batch) instead of vi.mock. — Exercises the real stageInventoryAdjustments code path end to end and lets the test assert on the actual bound arguments, rather than mocking a module.
 - [Phase 9]: Chose candidate 1 of 4 Workers-AI-generated gift card renders: true olive-drab accent stripe and paper/fabric matte texture, over candidates 2/4 (gold/brass accent, rounded plastic-card corners, off-brief) and candidate 3 (correct hue but rubbery/plasticky texture).
 - [Phase 9]: [Phase 9] apply-active: Russell chose to write the gift card into production now, seeded active, over apply-draft or hold. — Phase 9 closes provably against the real site and Phase 10 has a live product to build the recipient form against, accepting that a shopper can add it to cart and hit a checkout refusal until Phase 10 ships.
+- [Phase 10]: Allow direct-to-main commits for sequential execution (git.allow_default_branch_commits) — This run's orchestrator explicitly assigned sequential execution directly on the main working tree; branching_strategy is already "none" and the project's own history commits directly to main. Set the sanctioned config override rather than bypassing the protected-branch guard silently.
+- [Phase 10]: Per-field error copy as small switch functions, not one shared Record — Each field's validator can only ever return a subset of the five GiftCardFieldError codes; a shared Record<GiftCardFieldError, string> would need unreachable placeholder text for codes that field can never produce.
 
 ### Pending Todos
 
@@ -305,9 +308,9 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-08T16:40:10.992Z
-Stopped at: Phase 10 UI-SPEC approved
-Resume file: .planning/phases/10-gift-card-purchase-flow/10-UI-SPEC.md
+Last session: 2026-09-08T17:32:48.727Z
+Stopped at: Completed 10-01-PLAN.md
+Resume file: None
 
 Next: `/gsd-plan-phase 10`
 

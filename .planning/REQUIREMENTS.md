@@ -18,10 +18,10 @@ Requirements for this milestone. Each maps to a roadmap phase.
 
 ### Storefront purchase
 
-- [ ] **SHOP-01**: On a gift card product page the shopper sees a recipient form (recipient email required; recipient name, message, and delivery date optional) in place of the physical-product add-to-cart controls
-- [ ] **SHOP-02**: The form validates client-side with the same limits the server enforces (email format, 254/100/500 character caps, no control characters) and shows field-level errors; add to cart stays disabled until the form is valid
-- [ ] **SHOP-03**: A signed-in shopper can choose "Send to myself", which fills the recipient email and name from their account; guests do not see the option
-- [ ] **SHOP-04**: Adding to cart creates a line that carries the recipient customization; two gift cards for different recipients stay as separate lines, the same recipient and denomination merge into one line
+- [x] **SHOP-01**: On a gift card product page the shopper sees a recipient form (recipient email required; recipient name, message, and delivery date optional) in place of the physical-product add-to-cart controls
+- [x] **SHOP-02**: The form validates client-side with the same limits the server enforces (email format, 254/100/500 character caps, no control characters) and shows field-level errors; add to cart stays disabled until the form is valid
+- [x] **SHOP-03**: A signed-in shopper can choose "Send to myself", which fills the recipient email and name from their account; guests do not see the option
+- [x] **SHOP-04**: Adding to cart creates a line that carries the recipient customization; two gift cards for different recipients stay as separate lines, the same recipient and denomination merge into one line
 - [ ] **SHOP-05**: The recipient name, email, message, and delivery date are visible on the cart item, the checkout order summary, the order confirmation, and the account order detail page
 - [ ] **SHOP-06**: When every line in the cart is digital, web checkout hides the shipping address and shipping method steps and submits the order without an address; carts that also hold physical items are unchanged
 - [ ] **SHOP-07**: A gift-card-only order paid in Stripe test mode on production results in an issued gift card, a delivery email to the recipient, and the card appearing under Account → Gift Cards for the recipient's account
@@ -75,10 +75,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CAT-02 | Phase 9 | Complete |
 | CAT-03 | Phase 9 | Complete |
 | CAT-04 | Phase 9 | Complete |
-| SHOP-01 | Phase 10 | Pending |
-| SHOP-02 | Phase 10 | Pending |
-| SHOP-03 | Phase 10 | Pending |
-| SHOP-04 | Phase 10 | Pending |
+| SHOP-01 | Phase 10 | Complete |
+| SHOP-02 | Phase 10 | Complete |
+| SHOP-03 | Phase 10 | Complete |
+| SHOP-04 | Phase 10 | Complete |
 | SHOP-05 | Phase 10 | Pending |
 | SHOP-06 | Phase 10 | Pending |
 | SHOP-07 | Phase 12 | Pending |
