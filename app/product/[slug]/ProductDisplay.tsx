@@ -55,6 +55,8 @@ import SubscriptionAcquisitionPanel from "@/components/subscriptions/Subscriptio
 import ProductGalleryLeft from "@/components/layout/product/ProductGalleryLeft";
 import ProductGalleryTop from "@/components/layout/product/ProductGalleryTop";
 import type { ProductGallery } from "@/lib/layout/variants";
+import GiftCardRecipientForm from "@/components/product/GiftCardRecipientForm";
+import type { GiftCardCustomization } from "@/lib/types/cartitem";
 
 /**
  * Typed lookup map from the resolved product-gallery enum to its named
@@ -192,6 +194,41 @@ export default function ProductDisplay({
   const GalleryVariant = PRODUCT_GALLERY_MAP[productGallery];
   const galleryLayout = PRODUCT_GALLERY_LAYOUT[productGallery];
 
+  const handleGiftCardAdd = (customization?: GiftCardCustomization) => {
+    const productName = typeof product.name === "string" ? product.name : "";
+    const variantDisplay = selectedVariant?.option_values?.map((value) => `${value.value}`).join(", ") || "";
+    const fullName = variantDisplay ? `${productName} - ${variantDisplay}` : productName;
+
+    useCartStore.getState().addItem({
+      productId: product.id,
+      variantId: selectedVariant?.id,
+      name: fullName,
+      price: Money.fromMinor(price).toJSON(),
+      quantity: 1,
+      primaryImageUrl: (() => {
+        try {
+          return (
+            (product.primary_image as any)?.url ||
+            (product.primary_image as any)?.file?.url ||
+            "/placeholder.jpg"
+          );
+        } catch (error) {
+          return "/placeholder.jpg";
+        }
+      })(),
+      ...(customization ? { giftCardCustomization: customization } : {}),
+    });
+
+    toast("Added to Cart", {
+      description: `${fullName} has been added to your cart.`,
+      icon: "🔥",
+      action: {
+        label: "View Cart",
+        onClick: () => useCartUIStore.getState().openCart(),
+      },
+    });
+  };
+
   return (
     <>
       {/* Main Product Display Grid */}
@@ -323,42 +360,15 @@ export default function ProductDisplay({
               </p>
             )}
 
-            {available ? (
+            {product.type === "gift_card" ? (
+              <GiftCardRecipientForm
+                available={available}
+                onAdd={(customization) => handleGiftCardAdd(customization)}
+              />
+            ) : available ? (
               <button
                 className="w-full rounded bg-primary px-6 py-3 font-bold text-on-primary transition hover:bg-primary/90 sm:w-auto"
-                onClick={() => {
-                  const productName = typeof product.name === "string" ? product.name : "";
-                  const variantDisplay = selectedVariant?.option_values?.map((value) => `${value.value}`).join(", ") || "";
-                  const fullName = variantDisplay ? `${productName} - ${variantDisplay}` : productName;
-
-                  useCartStore.getState().addItem({
-                    productId: product.id,
-                    variantId: selectedVariant?.id,
-                    name: fullName,
-                    price: Money.fromMinor(price).toJSON(),
-                    quantity: 1,
-                    primaryImageUrl: (() => {
-                      try {
-                        return (
-                          (product.primary_image as any)?.url ||
-                          (product.primary_image as any)?.file?.url ||
-                          "/placeholder.jpg"
-                        );
-                      } catch (error) {
-                        return "/placeholder.jpg";
-                      }
-                    })(),
-                  });
-
-                  toast("Added to Cart", {
-                    description: `${fullName} has been added to your cart.`,
-                    icon: "🔥",
-                    action: {
-                      label: "View Cart",
-                      onClick: () => useCartUIStore.getState().openCart(),
-                    },
-                  });
-                }}
+                onClick={() => handleGiftCardAdd()}
               >
                 Add to Cart
               </button>
