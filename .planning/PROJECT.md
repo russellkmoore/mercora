@@ -121,12 +121,12 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 - ✓ `docs/theming.md` (contract, anatomy, duplication recipe, validator rejections, resolution, admin, layouts, gates, QA summary, known limits), `docs/CLAUDE.md` refreshed, codebase docs refreshed, 21-run visual QA matrix with zero defects — Phase 8
 - ✓ v2 tech debt closed: emails and the crash page follow the admin-selected theme (staged on effect rows for cron retries), `scan:tokens` in CI, one request-scoped appearance read, one image resolver, loud parity snapshots, logged seed fallback, review Info items, order-status screenshots via a dev-only seeded order — Phase 8.1
 - ✓ Docs overhaul: 9 docs retired, 20 remain under one style contract with a claim check against the code and `npm run docs:lint` guarding references, script names, retired paths, locked ADRs and status lines; README product-neutral with preset screenshots; root `AGENTS.md` (Next-generated block preserved) with an ordered command-exact setup path, root `CLAUDE.md` pointing to it, `docs/CLAUDE.md` 655→236 lines — Phase 8.2 (DOCS-04, DOCS-05)
+- ✓ Gift card catalogue product: `prod_33` "Voltique Gift Card" (`type = gift_card`, `fulfillment_type = digital`, four variants at $25/$50/$100/$200, `tax_category = txcd_00000000`, untracked inventory) seeded as an idempotent `INSERT OR IGNORE` block in `data/d1/seed.sql`, applied to production D1 (status active), rendering at `/product/gift-card` and in the Featured grid with a Workers AI dark-studio image at `products/gift-card-33.png`; never-out-of-stock and never-decrement proven by tests on the existing helpers — Phase 9 (CAT-01..CAT-04)
 
 ### Active
 
 <!-- v2.1 Gift Card Product. REQ-IDs live in .planning/REQUIREMENTS.md. -->
 
-- [ ] A gift card product exists in the catalogue (four denominations) and renders like any other product
 - [ ] A shopper can enter recipient details on the product page and add the customised gift card to the cart
 - [ ] Cart and checkout carry and display the recipient details through to the paid order
 - [ ] Production has the gift card flags and key secrets set so issuance and delivery actually run
@@ -269,6 +269,10 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 | Themed demo deployments deferred out of v2; README shows preset screenshots instead (Phase 8.2) | Demos need separate Workers, D1 and secrets per preset; the screenshots answer "what does it look like" without them | ✓ Good — `.planning/todos/pending/themed-demo-deployments.md` |
 | `scripts/docs-lint.mjs` binds `locked: true` to each ADR's own manifest entry and requires a `**Status:**` line per doc (Phase 8.2 code review CR-01/WR-01) | A global marker count passed when the marker moved to another doc; the header check let four docs ship without a status line | ✓ Good — both mutations now fail the gate |
 | Milestone v2 closed with 12 accepted open items, all environment-limited, user-owned, or explicitly deferred | Russell chose to close the code-closable debt first (Phase 8.1), then complete; the rest needs a Clerk/Stripe session, a person, or a later milestone | ✓ Good |
+| Gift card tax classification is Stripe's unconditional nontaxable code `txcd_00000000` on the product and all four variants, not the jurisdiction-dependent `txcd_10502000` "Gift Card" code (Phase 9, D-09) | A $25 card must cost $25; tax is collected when the card is spent. Data-only, reversible with one `UPDATE` | ✓ Good |
+| Gift card seed rows are a sentinel-delimited `INSERT OR IGNORE` block at the end of `data/d1/seed.sql` (`prod_33`, `variant_33..36`, `price_33`); production apply slices only that block, never the whole file (Phase 9, D-13) | Research proved the full seed file is not idempotent on replay (categories UNIQUE constraint); the block alone is | ✓ Good — one production write, read-back verified |
+| Gift card catalogue product seeded `active` in production before Phase 10 ships the recipient form; a shopper who adds it to the cart is refused at checkout by the existing pricing guard until then (Phase 9, D-12; Russell chose `apply-active`) | Phase 9 closes against the real site and Phase 10 builds against a live product; demo-site interim accepted | ✓ Good — Phase 10 removes the interim |
+| Gift card image is one shared 1024×1536 lucid-origin render (matte charcoal card, olive-drab edge, dark studio set, no lettering) chosen by the executor from four candidates; no per-denomination images, no home-page pinning, no footer link (Phase 9, D-02..D-07) | Keeps the template free of sample-data knowledge and matches the catalogue shoot; Russell confirmed the style match at UAT | ✓ Good |
 
 ## Evolution
 
@@ -288,4 +292,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-07 after starting milestone v2.1 (Gift Card Product)*
+*Last updated: 2026-09-08 after Phase 9 (Gift Card Catalogue)*
