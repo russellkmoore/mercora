@@ -327,7 +327,7 @@ pass `"dev-order-001?token=<minted token>"` as `--order-id`.
 ### Phase 8 visual QA summary
 
 Seven presets by three packed layout combinations, copied verbatim from
-[`08-QA-MATRIX.md`](../.planning/phases/08-documentation-visual-qa-close-out/08-QA-MATRIX.md)'s own
+[`08-QA-MATRIX.md`](../.planning/milestones/v2-phases/08-documentation-visual-qa-close-out/08-QA-MATRIX.md)'s own
 `## Visual QA Summary` section — that record is the full evidence (findings table, judgement
 design, and close-out rollup); this is the compact grid a reader scans, not a re-derivation of it.
 
@@ -350,7 +350,7 @@ Every other mark cites the specific findings row(s) it rests on. Zero defects we
 ## Known limits and backlog
 
 The Phase 8 visual QA pass above found zero unresolved findings — all 46 findings rows in
-[`08-QA-MATRIX.md`](../.planning/phases/08-documentation-visual-qa-close-out/08-QA-MATRIX.md) are
+[`08-QA-MATRIX.md`](../.planning/milestones/v2-phases/08-documentation-visual-qa-close-out/08-QA-MATRIX.md) are
 clean, so there is no QA-sourced item to add to this table beyond the items already tracked below.
 
 | Item | Tracked in | What closing it would take |
