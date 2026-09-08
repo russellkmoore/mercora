@@ -52,8 +52,22 @@ function dateErrorCopy(): string {
   return "Choose a delivery date between today and one year from now.";
 }
 
+/**
+ * Local-calendar-date string (YYYY-MM-DD) for a Date, built from local date
+ * components rather than `toISOString()` — `toISOString()` always reports
+ * the UTC calendar date, which is tomorrow's date for any shopper west of
+ * UTC once local clock time crosses the UTC-midnight rollover (all US time
+ * zones, most evenings).
+ */
+function localIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function computeDeliveryDateBounds(): { min: string; max: string } {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate(new Date());
   const [year, month, day] = today.split("-").map(Number);
   const maxDate = new Date(Date.UTC(year, month - 1, day));
   maxDate.setUTCFullYear(maxDate.getUTCFullYear() + 1);
