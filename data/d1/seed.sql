@@ -380,3 +380,24 @@ INSERT INTO coupon_instances (id, promotion_id, code, status, usage_count, usage
 ('coupon_vip25', 'promo_vip_25', 'VIP25', 'active', 0, 100, datetime('now'), datetime('now'), NULL, NULL, NULL, NULL),
 ('coupon_welcome15', 'promo_welcome15', 'WELCOME15', 'active', 0, 1000, datetime('now'), datetime('now'), NULL, NULL, NULL, NULL),
 ('coupon_halfship', 'promo_halfship', 'HALFSHIP', 'active', 0, 500, datetime('now'), datetime('now'), NULL, NULL, NULL, NULL);
+
+-- BEGIN gift-card-block (Phase 9)
+-- =====================================================
+-- Gift Card Product (Phase 9, idempotent -- safe to re-run against production)
+-- =====================================================
+
+INSERT OR IGNORE INTO products (id, name, description, slug, status, external_references, created_at, updated_at, brand, categories, tags, options, default_variant_id, fulfillment_type, tax_category, primary_image, media, seo, rating, related_products, extensions, type) VALUES
+('prod_33', 'Voltique Gift Card', '{"en": "Give the gear, skip the guesswork. The Voltique Gift Card arrives by email as soon as payment clears and never expires, so your recipient can spend it on anything in the shop, from a Vivid Mission Pack to a Field Ration Resupply box. Choose $25, $50, $100, or $200. It''s not redeemable for cash, just for whatever they''re after."}', 'gift-card', 'active', '{}', datetime('now'), datetime('now'), 'Mercora', '["cat_1"]', '["gift", "gift card", "present", "voucher", "gift certificate", "digital"]', '[{"id": "amount", "name": "Amount", "type": "select", "values": [{"id": "25", "value": "$25"}, {"id": "50", "value": "$50"}, {"id": "100", "value": "$100"}, {"id": "200", "value": "$200"}]}]', 'variant_33', 'digital', 'txcd_00000000', '{"url": "products/gift-card-33.png", "alt_text": "Voltique Gift Card"}', '[{"url": "products/gift-card-33.png", "alt_text": "Voltique Gift Card"}]', '{"meta_title": "Voltique Gift Card - Give Any Amount, Any Gear", "meta_description": "Voltique gift cards deliver by email after payment, never expire, and cover any item in the shop. Choose $25, $50, $100, or $200."}', NULL, '[]', '{"ai_notes": "The Voltique Gift Card is a digital, stored-value product for shoppers who want to give Voltique gear without picking a specific item. Match it whenever a shopper asks about a gift, present, voucher, gift certificate, or something for someone who already has everything.", "use_cases": ["gift", "present", "last-minute gift", "voucher", "gift certificate"]}', 'gift_card');
+
+INSERT OR IGNORE INTO product_variants (id, product_id, sku, option_values, price, status, position, compare_at_price, cost, weight, dimensions, barcode, inventory, tax_category, shipping_required, media, attributes, created_at, updated_at) VALUES
+('variant_33', 'prod_33', 'GC-025', '[{"option_id": "amount", "value": "$25"}]', '{"amount": 2500, "currency": "USD"}', 'active', 1, NULL, NULL, NULL, NULL, NULL, '{"track_inventory": false}', 'txcd_00000000', 0, '[]', '{}', datetime('now'), datetime('now')),
+
+('variant_34', 'prod_33', 'GC-050', '[{"option_id": "amount", "value": "$50"}]', '{"amount": 5000, "currency": "USD"}', 'active', 2, NULL, NULL, NULL, NULL, NULL, '{"track_inventory": false}', 'txcd_00000000', 0, '[]', '{}', datetime('now'), datetime('now')),
+
+('variant_35', 'prod_33', 'GC-100', '[{"option_id": "amount", "value": "$100"}]', '{"amount": 10000, "currency": "USD"}', 'active', 3, NULL, NULL, NULL, NULL, NULL, '{"track_inventory": false}', 'txcd_00000000', 0, '[]', '{}', datetime('now'), datetime('now')),
+
+('variant_36', 'prod_33', 'GC-200', '[{"option_id": "amount", "value": "$200"}]', '{"amount": 20000, "currency": "USD"}', 'active', 4, NULL, NULL, NULL, NULL, NULL, '{"track_inventory": false}', 'txcd_00000000', 0, '[]', '{}', datetime('now'), datetime('now'));
+
+INSERT OR IGNORE INTO pricing (id, product_id, list_price, sale_price, type, status, external_references, created_at, updated_at, valid_from, valid_to, campaign_id, pricelist_id, catalog_id, tax, currency_code, minimum_quantity, customer_segment_id, channel_id, region_id, extensions) VALUES
+('price_33', 'prod_33', '2500', '2500', 'retail', 'active', '{}', datetime('now'), datetime('now'), datetime('now'), NULL, NULL, NULL, NULL, '{"included": false, "rate": 0, "type": "none"}', 'USD', 1, NULL, NULL, 'US', '{"on_sale": false}');
+-- END gift-card-block (Phase 9)
