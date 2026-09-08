@@ -89,3 +89,13 @@ All Wave 0 gaps Research identified are closed.
 - [x] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** approved 2026-09-08
+
+## Validation Audit 2026-09-08
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
+
+CAT-01..CAT-04 each map to at least one green automated test (`seed-gift-card`, `availability`, `inventory-adjustments`, `product-serializer`) plus the recorded production/live-site checks; no MISSING or PARTIAL requirement. Audit run by gsd-validate-phase (State A, no auditor spawn needed).
