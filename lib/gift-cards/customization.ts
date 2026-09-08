@@ -149,3 +149,48 @@ export function validateGiftCardRecipientEmail(value: string): GiftCardFieldErro
     return 'invalid_format';
   }
 }
+
+export function validateGiftCardRecipientName(value: string): GiftCardFieldError | null {
+  if (value.trim().length === 0) return null;
+  try {
+    normalizedOptionalText(value, GIFT_CARD_RECIPIENT_NAME_MAX_LENGTH);
+    return null;
+  } catch {
+    return CONTROL_CHARACTERS.test(value) ? 'control_characters' : 'too_long';
+  }
+}
+
+export function validateGiftCardMessage(value: string): GiftCardFieldError | null {
+  if (value.trim().length === 0) return null;
+  try {
+    normalizedMessage(value);
+    return null;
+  } catch {
+    return CONTROL_CHARACTERS.test(value) ? 'control_characters' : 'too_long';
+  }
+}
+
+/**
+ * The client-only calendar bound (today through one year out) is stricter
+ * than the server: normalizedDeliveryDate accepts any real calendar date.
+ * This is a UX guard, never a place the client is more permissive than the
+ * server that would let an invalid value slip through.
+ */
+export function validateGiftCardDeliveryDate(
+  value: string,
+  todayIso?: string,
+): GiftCardFieldError | null {
+  if (value.trim().length === 0) return null;
+  try {
+    normalizedDeliveryDate(value);
+  } catch {
+    return 'invalid_format';
+  }
+  const referenceDay = todayIso ?? new Date().toISOString().slice(0, 10);
+  const [year, month, day] = referenceDay.split('-').map(Number);
+  const upperBoundDate = new Date(Date.UTC(year, month - 1, day));
+  upperBoundDate.setUTCFullYear(upperBoundDate.getUTCFullYear() + 1);
+  const upperBound = upperBoundDate.toISOString().slice(0, 10);
+  if (value < referenceDay || value > upperBound) return 'out_of_range';
+  return null;
+}
