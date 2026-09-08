@@ -6,10 +6,10 @@ current_phase: 10
 current_phase_name: Gift Card Purchase Flow
 status: planning
 stopped_at: Phase 9 complete, ready to plan Phase 10
-last_updated: "2026-09-08T16:18:15.016Z"
+last_updated: "2026-09-08T16:18:25.968Z"
 last_activity: 2026-09-08
 last_activity_desc: Phase 9 complete, transitioned to Phase 10
-state_head: f534453a53ba5c41fd54e96fe8c418d378f9095b
+state_head: 28491663f4592f04fe570a9c349ccdd2b5aaedd9
 progress:
   total_phases: 4
   completed_phases: 1
@@ -22,10 +22,10 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-07 after starting milestone v2.1)
+See: .planning/PROJECT.md (updated 2026-09-08 after Phase 9)
 
 **Core value:** A customer or an external AI agent can find the right product through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** Phase 9 — Gift Card Catalogue
+**Current focus:** Phase 10 — Gift Card Purchase Flow
 
 ## Current Position
 
@@ -264,6 +264,7 @@ Open items carried from v1 close (`milestones/v1-MILESTONE-AUDIT.md`):
 - [Cloudflare hygiene] Delete the unused `ADMIN_USER_IDS` Worker secret
 - [Backlog] Mobile Lighthouse scores 72-80 vs. target 85 on all four measured routes
 - [Review 2026-12-01] Five moderate dev-only `npm audit` findings
+- [Phase 9] Interim: the live gift card (/product/gift-card, active) can be added to the cart but checkout refuses it until Phase 10 ships the recipient form (D-12, apply-active). Phase 10 removes this.
 
 ### Roadmap Evolution
 
