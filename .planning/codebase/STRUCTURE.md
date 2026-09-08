@@ -217,6 +217,8 @@ mercora/
 │   │   └── [other checkout]/
 │   ├── cart/                     # Cart UI
 │   │   └── CartSummary.tsx       # Cart display
+│   ├── gift-cards/                # Shared gift-card recipient display (hook-free, RSC-safe)
+│   │   └── GiftCardRecipientBlock.tsx # To/Deliver/message block, used by cart + checkout + account
 │   ├── account/                  # Account page components
 │   │   ├── OrdersList.tsx        # Order history
 │   │   └── AddressesList.tsx     # Saved addresses
