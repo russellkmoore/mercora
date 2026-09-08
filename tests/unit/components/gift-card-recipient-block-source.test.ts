@@ -54,7 +54,8 @@ describe('truncateGiftCardMessage', () => {
   });
 
   it('preserves newlines inside the retained portion', () => {
-    const message = `${'a'.repeat(39)}\n${'b'.repeat(41)}`;
+    const message = `${'a'.repeat(39)}\n${'b'.repeat(40)}`;
+    expect(Array.from(message).length).toBe(80);
     const result = truncateGiftCardMessage(message);
     expect(result).toContain('\n');
     expect(result).toBe(message);
