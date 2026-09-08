@@ -17,7 +17,7 @@ Not in this phase: the recipient form and any change to add-to-cart, cart, or ch
 
 ### Placement and discovery
 - **D-01:** The gift card belongs to the Featured category (`cat_1`) only. No other category membership; a dedicated Gift Cards category stays deferred (CAT-05).
-- **D-02:** It sits last in the Featured grid in natural table order (insert as the next product id, `prod_31`). No ordering code is added to the category page.
+- **D-02:** It sits last in the Featured grid in natural table order (insert as the next free product id — `prod_33` at research time, since `prod_31` and `prod_32` were added by PR #92). No ordering code is added to the category page.
 - **D-03:** It does not need to appear among the home page's three Featured cards. Roadmap success criterion 2's "renders on the home page" is read as "renders wherever the Featured category is rendered, like any other product"; the home page query and hero are untouched. If the planner wants a home-page proof, it is the Featured category page (`/category/featured`), not `/`.
 - **D-04:** No footer link. Russell asked whether a footer link would hardcode the template to sample data; it would, since the footer is fully data-driven today (CMS navigation pages plus store-config policy URLs). The two data-driven alternatives are recorded under Deferred Ideas and were declined for now.
 
@@ -97,7 +97,7 @@ Not in this phase: the recipient form and any change to add-to-cart, cart, or ch
 - Storefront components use token classes only; `scan:tokens` runs in CI.
 
 ### Integration Points
-- Home page: `app/page.tsx` takes the first three active Featured products in table order; the gift card as `prod_31` will not be among them (D-03 accepts this).
+- Home page: `app/page.tsx` takes the first three active Featured products in table order; the gift card as the newest product row will not be among them (D-03 accepts this).
 - Featured category page `/category/featured`: `getProductsByCategory('cat_1')` in table order; the card shows last (D-02).
 - Product page `/product/gift-card`: standard `ProductDisplay` with the variant `Select`; Phase 10 swaps in the recipient form.
 - Volt: `app/api/admin/vectorize/route.ts` indexes all products; re-index deferred to Phase 12 (D-14).
