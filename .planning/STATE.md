@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Gift Card Product
 status: planning
-last_updated: "2026-09-08T06:10:27.803Z"
+last_updated: "2026-09-07T00:00:00.000Z"
 last_activity: 2026-09-07
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -19,15 +19,17 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-09-07 after starting milestone v2.1)
 
-**Core value:** A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** Planning next milestone (`/gsd-new-milestone`)
+**Core value:** A customer or an external AI agent can find the right product through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
+**Current focus:** Phase 9 — Gift Card Catalogue
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-09-07 — Milestone v2.1 started
+Phase: 9 of 12 (Gift Card Catalogue) — 1st of 4 phases in v2.1
+Plan: — (not yet planned)
+Status: Roadmap created, ready to plan Phase 9
+Last activity: 2026-09-07 — ROADMAP.md created for v2.1 (Phases 9-12), 18/18 requirements mapped
+
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -55,6 +57,10 @@ Last activity: 2026-09-07 — Milestone v2.1 started
 | 08 | 5 | - | - |
 | 08.1 | 7 | - | - |
 | 08.2 | 6 | - | - |
+| 9 (v2.1) | TBD | - | - |
+| 10 (v2.1) | TBD | - | - |
+| 11 (v2.1) | TBD | - | - |
+| 12 (v2.1) | TBD | - | - |
 
 **Recent Trend:**
 
@@ -115,7 +121,12 @@ Last activity: 2026-09-07 — Milestone v2.1 started
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
+Decisions are logged in PROJECT.md Key Decisions table. Recent decisions affecting current work:
+
+- [v2.1 roadmap]: Phases derived from the 18 v1 requirements in vertical-slice order: catalogue data first (Phase 9), then storefront recipient/cart/checkout UI (Phase 10), then production secrets and flags (Phase 11), then content/Volt re-index/live proof (Phase 12) — each phase depends on the previous so it can be verified before the next starts, and the SHOP-07 live production proof lands last, after enablement.
+- [v2.1 roadmap]: SHOP-07 (live production proof) grouped into Phase 12 with the content requirements rather than its own phase — it can only be exercised after Phase 11's flags/secrets are live, and it is the natural close-out check for the whole milestone.
+
+Decisions locked for v2:
 
 - Theme registry is build-time generated from `themes/*.css` only — never a wrangler var or hand-maintained list
 - A new theme requires a deploy; switching between shipped themes is instant via D1
@@ -154,7 +165,7 @@ Decisions are logged in PROJECT.md Key Decisions table. Decisions locked for v2:
 - [Phase 06]: [Phase 06-01] Barrel @import lines use an explicit relative prefix (./volt-dark.css) — a bare specifier broke the real Next.js build because Tailwind's CSS import resolution treats it as a Node-style module lookup, not a relative path.
 - [Phase 06-02]: theme.unknown_selection registered a task early (Task 1, not Task 2) because recordTelemetry's event param is a literal-union type that Task 1's own typecheck gate requires satisfied
 - [Phase 06-02]: An env default (NEXT_PUBLIC_THEME_DEFAULT) that is not a manifest name falls through silently with no telemetry -- treated as operator error at deploy, not a per-request anomaly
-- [Phase 06]: [Phase 06-03] Both presets took every token value from 06-UI-SPEC.md's pre-computed table verbatim, including its two flagged accessibility corrections (Midnight's on-primary, Luxe's ring) — no oklch value was re-derived by hand.
+- [Phase 06]: [Phase 06-03] Both presets took every token value from 06-UI-SPEC.md's pre-computed table verbatim, including its two flagged accessibility corrections (Midnight's on-primary, Luxe's ring) — no oklch value re-derived by hand.
 - [Phase 06]: [Phase 06-03] Direction-doc properties dropped under D-03 were folded into existing tokens where the role overlapped (Midnight's accent-2 cyan into info; Luxe's surface-sunken into border) rather than lost outright; recorded in .planning/todos/pending/theme-contract-dropped-properties.md.
 - [Phase 06]: [Phase 06-03] font-display is fully wired (Tailwind class, CSS var, next/font load) but unused by any component in app/ or components/ — luxe's serif display face does not currently render anywhere; flagged in .planning/WINDOWS.md for plan 06-05.
 - [Phase 06]: [Phase 06-04] Imported the appearance setting constants directly from lib/themes/active-theme.ts into the client ThemePresetGrid component per the plan's interface contract, verified via a real npm run build that this does not break the client bundle.
@@ -218,7 +229,7 @@ None.
 
 ### Blockers/Concerns
 
-Nothing blocks the next milestone. Open items carried out of v2 (full list in `milestones/v2-MILESTONE-AUDIT.md`):
+Nothing blocks Phase 9. Open items carried out of v2 (full list in `milestones/v2-MILESTONE-AUDIT.md`):
 
 - [Closed 2026-09-06] Live not-found pages returned 200: root `app/loading.tsx` removed (a04e1ea); 404s verified live. Admin toasts doubled: storefront Toaster gated off `/admin` (ecc6c4f)
 
@@ -238,6 +249,7 @@ Open items carried from v1 close (`milestones/v1-MILESTONE-AUDIT.md`):
 
 ### Roadmap Evolution
 
+- v2.1 ROADMAP.md created: Phases 9-12 derived from the 18 v1 requirements (CAT-01..04, SHOP-01..07, OPS-01..04, CONTENT-01..03), in vertical-slice dependency order — catalogue, storefront purchase flow, production enablement, content/Volt/live proof. 100% coverage, no orphans.
 - Phase 06.1 inserted after Phase 6: Remaining presets from the theme direction doc (Clinical, Retro, Atelier, Market) — Russell asked for all six during autonomous run (URGENT)
 
 Carried out of Phase 7 (see `.planning/WINDOWS.md`):
@@ -274,12 +286,12 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-06T00:24:24.523Z
-Stopped at: Milestone v2 archived
+Last session: 2026-09-07T00:00:00.000Z
+Stopped at: ROADMAP.md and STATE.md created for v2.1 (Phases 9-12); REQUIREMENTS.md traceability filled in
 Resume file: None
 
-Next: `/gsd-cleanup` then `/gsd-new-milestone`
+Next: `/gsd-plan-phase 9`
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Review the v2.1 roadmap (Phases 9-12), then start planning with `/gsd-plan-phase 9`

@@ -71,30 +71,30 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CAT-01 | — | Pending |
-| CAT-02 | — | Pending |
-| CAT-03 | — | Pending |
-| CAT-04 | — | Pending |
-| SHOP-01 | — | Pending |
-| SHOP-02 | — | Pending |
-| SHOP-03 | — | Pending |
-| SHOP-04 | — | Pending |
-| SHOP-05 | — | Pending |
-| SHOP-06 | — | Pending |
-| SHOP-07 | — | Pending |
-| OPS-01 | — | Pending |
-| OPS-02 | — | Pending |
-| OPS-03 | — | Pending |
-| OPS-04 | — | Pending |
-| CONTENT-01 | — | Pending |
-| CONTENT-02 | — | Pending |
-| CONTENT-03 | — | Pending |
+| CAT-01 | Phase 9 | Pending |
+| CAT-02 | Phase 9 | Pending |
+| CAT-03 | Phase 9 | Pending |
+| CAT-04 | Phase 9 | Pending |
+| SHOP-01 | Phase 10 | Pending |
+| SHOP-02 | Phase 10 | Pending |
+| SHOP-03 | Phase 10 | Pending |
+| SHOP-04 | Phase 10 | Pending |
+| SHOP-05 | Phase 10 | Pending |
+| SHOP-06 | Phase 10 | Pending |
+| SHOP-07 | Phase 12 | Pending |
+| OPS-01 | Phase 11 | Pending |
+| OPS-02 | Phase 11 | Pending |
+| OPS-03 | Phase 11 | Pending |
+| OPS-04 | Phase 11 | Pending |
+| CONTENT-01 | Phase 12 | Pending |
+| CONTENT-02 | Phase 12 | Pending |
+| CONTENT-03 | Phase 12 | Pending |
 
 **Coverage:**
 - v1 requirements: 18 total
-- Mapped to phases: 0
-- Unmapped: 18 ⚠️
+- Mapped to phases: 18
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-07*
-*Last updated: 2026-09-07 after initial definition*
+*Last updated: 2026-09-07 after roadmap creation (Phases 9-12)*
