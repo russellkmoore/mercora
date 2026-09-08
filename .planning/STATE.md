@@ -1,37 +1,33 @@
 ---
 gsd_state_version: 1.0
-milestone: v2
-milestone_name: Themeable Storefront
-status: Awaiting next milestone
-stopped_at: Phase 08.2 complete — all phases complete
-last_updated: "2026-09-06T00:56:37.801Z"
-last_activity: 2026-09-06
-last_activity_desc: Milestone v2 completed and archived
-state_head: 0c463469e99cf67bf9fa90dd362046da0d3694d2
+milestone: v2.1
+milestone_name: Gift Card Product
+status: planning
+last_updated: "2026-09-08T06:10:27.803Z"
+last_activity: 2026-09-07
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 44
-  completed_plans: 44
-  percent: 100
-current_phase: 08.2
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-05 after v2 milestone)
+See: .planning/PROJECT.md (updated 2026-09-07 after starting milestone v2.1)
 
 **Core value:** A customer or an external AI agent can find the right outdoor gear through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
 **Current focus:** Planning next milestone (`/gsd-new-milestone`)
 
 ## Current Position
 
-Phase: Milestone v2 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-09-05 — Milestone v2 completed and archived
+Status: Defining requirements
+Last activity: 2026-09-07 — Milestone v2.1 started
 
 ## Performance Metrics
 
