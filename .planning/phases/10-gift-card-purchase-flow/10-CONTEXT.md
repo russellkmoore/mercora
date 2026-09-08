@@ -17,9 +17,9 @@ Not in this phase: production flags and key secrets (Phase 11); the support arti
 ## Implementation Decisions
 
 ### Digital-only checkout (SHOP-06)
-- **D-01:** An all-digital cart replaces the Shipping Address step with a slim **Contact** step (name, email, country, postal code). The client posts those values in the existing `shippingAddress` slot of `POST /api/payment-intent` and sends `shippingMethodId: "digital"`; the Shipping Method step is skipped entirely. The server route, `checkout-pricing.ts` (which already prices digital-only carts with the `digital` method and $0 shipping and stores `shipping_address: null`) and ADR-CTB stay untouched. — **Reversibility:** reversible — client-only; relaxing the route later is a separate decision.
+- **D-01:** An all-digital cart replaces the Shipping Address step with a **Billing details** step: the existing address form (name, email, line1, line2, city, region, postal code, country) relabelled for billing, because `normalizeAddress` in `app/api/payment-intent/route.ts` requires non-empty `line1`, `city`, `region`, `postal_code` and `country` and Stripe Tax is called with that address. The client posts it in the existing `shippingAddress` slot and sends `shippingMethodId: "digital"`; the Shipping Method step is skipped entirely. The server route, `checkout-pricing.ts` (which already prices digital-only carts with the `digital` method, $0 shipping, and stores `shipping_address: null`) and ADR-CTB stay untouched. Russell chose this over relaxing the route or sending placeholder address fields (2026-09-08). — **Reversibility:** reversible — client-only; relaxing the route later is a separate decision.
 - **D-02:** The checkout progress bar derives its steps from the cart: digital-only shows Contact → Payment → Confirmation; any cart with a physical line keeps the existing four labels. Mixed carts are byte-identical to today (SHOP-06).
-- **D-03:** On the Contact step a signed-in shopper's name and email are prefilled from Clerk and remain editable; guests type them.
+- **D-03:** On the Billing details step a signed-in shopper's name and email are prefilled from Clerk and remain editable; guests type them.
 - **D-04:** The order summary shows whatever tax the server quote returns for a gift-card-only cart (expected $0.00 under `txcd_00000000`); no client special-casing or hiding of the tax line.
 
 ### Recipient form on the product page (SHOP-01, SHOP-02, SHOP-03)
@@ -40,7 +40,7 @@ Not in this phase: production flags and key secrets (Phase 11); the support arti
 - Storefront changes render through the 23-token classes only (`npm run scan:tokens` in CI); the admin palette is untouched.
 
 ### Claude's Discretion
-- Exact copy for labels, helper text, error messages, and the Contact step heading; where the Contact step stores its values in the cart store (reuse `setShippingAddress` with the slim record is acceptable).
+- Exact copy for labels, helper text, error messages, and the Billing details step heading; the step stores its values through the existing `setShippingAddress` so the payment step and pending-checkout payload need no change.
 - Whether the recipient form is a new `components/product/GiftCardRecipientForm.tsx` or lives inside `ProductDisplay.tsx`; the shared block's file name and props.
 - Test strategy: unit tests for the per-field validators and the form's validity gating, a render test for the shared recipient block, a cart-store test for merge-vs-separate lines with two customizations, and a CheckoutClient test for step derivation (digital-only vs mixed). Existing patterns: `tests/unit/components/*.test.ts` source-contract tests and vitest.
 - Whether the cart drawer shows a quantity stepper for gift-card lines (merging increments quantity today; keeping the stepper is fine).
@@ -98,7 +98,7 @@ Not in this phase: production flags and key secrets (Phase 11); the support arti
 
 ### Integration Points
 - `ProductDisplay.tsx` add-to-cart block → recipient form (D-05) → `useCartStore.getState().addItem({..., giftCardCustomization})`.
-- `CheckoutClient.tsx` step derivation from `items` (any `fulfillment_type`/gift-card line check via the cart items' `giftCardCustomization` presence or a product-type lookup already available on the item) → Contact step (D-01) → `POST /api/payment-intent` with the slim address and `shippingMethodId: 'digital'`.
+- `CheckoutClient.tsx` step derivation from `items` (any `fulfillment_type`/gift-card line check via the cart items' `giftCardCustomization` presence or a product-type lookup already available on the item) → Billing details step (D-01) → `POST /api/payment-intent` with the slim address and `shippingMethodId: 'digital'`.
 - `ProgressBar.tsx` labels (D-02); `OrderSummary`/`OrderItemCard` (D-10); `OrderConfirmationModal` + success page (D-11); `app/account/orders/[id]/page.tsx` (D-12).
 
 </code_context>
@@ -116,7 +116,7 @@ Not in this phase: production flags and key secrets (Phase 11); the support arti
 ## Deferred Ideas
 
 - In-cart editing of recipient details (D-13) — would need an edit affordance that replaces the line; revisit after Phase 12.
-- Relaxing `/api/payment-intent` to accept a minimal contact record for digital-only carts (alternative to D-01) — a checkout-route change with its own ADR discussion.
+- Relaxing `/api/payment-intent` to accept a minimal contact record (name, email, country, postal code) for digital-only carts, and a slim Contact step — the alternative to D-01 Russell declined on 2026-09-08; a checkout-route change with its own ADR discussion.
 - Scheduled delivery honouring the delivery date (SHOP-08), custom amounts (SHOP-09), Gift Cards category (CAT-05) — already tracked in REQUIREMENTS.md v2.
 
 </deferred>
