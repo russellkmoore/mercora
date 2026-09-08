@@ -169,6 +169,9 @@ mercora/
 │   ├── gift-cards/               # Gift card logic
 │   │   ├── checkout.ts           # Gift card in checkout
 │   │   └── [operations]/
+│   ├── checkout/                 # Client-side checkout step-machine helpers
+│   │   ├── order-payload.ts      # Pending-checkout localStorage handoff
+│   │   └── digital-only.ts       # ← Digital-only fulfilment mix (predicate, method id, step labels)
 │   ├── subscriptions/            # Subscription logic
 │   │   ├── lifecycle.ts          # Subscription state machine
 │   │   └── billing.ts            # Invoice generation

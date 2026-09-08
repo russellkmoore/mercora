@@ -4,17 +4,17 @@ milestone: v2.1
 milestone_name: Gift Card Product
 current_phase: 10
 current_phase_name: Gift Card Purchase Flow
-status: executing
-stopped_at: Completed 10-04-PLAN.md
-last_updated: "2026-09-08T18:01:46.440Z"
+status: verifying
+stopped_at: Completed 10-05-PLAN.md
+last_updated: "2026-09-08T18:21:40.066Z"
 last_activity: 2026-09-08
 last_activity_desc: Phase 10 execution started
-state_head: 49997542ceb1ba052fd1b01ee296260d41a84c61
+state_head: 3c907238e78818ab470006c9a6e17b58e244ad1c
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 9
-  completed_plans: 8
+  completed_plans: 9
   percent: 0
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-09-08 after Phase 9)
 
 Phase: 10 (Gift Card Purchase Flow) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-08 — Phase 10 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -130,6 +130,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 10 P02 | 11min | 2 tasks | 5 files |
 | Phase 10 P03 | 4min | 2 tasks | 3 files |
 | Phase 10 P04 | 6 | 2 tasks | 4 files |
+| Phase 10 P05 | 14min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -251,6 +252,9 @@ Decisions locked for v2:
 - [Phase 10]: [Phase 10] [10-03] Documented two Task 2 acceptance-criteria grep counts as planning-time miscounts, not code changes — The "^ +address\.[a-z_]+ &&$" line-count regex excludes "line1" (a digit isn't in [a-z_]+), so the correct count is 5 not 6; "address.country" already appeared twice pre-plan (isSubmitDisabled plus the Select's value prop), not once. Verified identical at HEAD~3 and HEAD, proving no regression. The real invariant -- all seven required fields present, isSubmitDisabled byte-identical -- was verified directly via an empty diff inside the expression.
 - [Phase 10]: [Phase 10] [10-04] OrderConfirmationModal's line total uses Money.fromStored(item.price).times(item.quantity) directly, not cartItemTotal — The plan's own action text names only Money in the import list for this task; the expression is the exact same calculation lib/money/cart.ts's cartItemTotal performs, so the modal's line total is identical to what the cart drawer and checkout order summary already show for the same line.
 - [Phase 10]: [Phase 10] [10-04] Account order detail's item row shares one inner flex justify-between gap-4 div for both physical and gift-card items, rather than branching the whole row's markup — Keeps the gift-card addition a clean item.gift_card && <GiftCardRecipientBlock /> append; only the li's own className switches between "py-3" and "flex flex-col gap-1 py-3" based on gift_card presence. A physical item's classes and content are unchanged; the DOM gains one non-visual wrapping div with no visual difference.
+- [Phase 10]: Excluded the empty-cart composition from the isDigitalOnlyCart / hasPhysicalCheckoutLines paired-invariant test loop, keeping it only as a standalone assertion. — hasPhysicalCheckoutLines([]) is vacuously false, so its negation is true, while isDigitalOnlyCart([]) is false by design (an empty cart is never digital-only). The two signals genuinely cannot agree on a composition with nothing in it.
+- [Phase 10]: createPaymentIntent takes an explicit addressOverride parameter rather than always reading the destructured shippingAddress store value. — The digital branch calls setShippingAddress and createPaymentIntent inside the same handler tick — without the parameter, the posted body would carry the previous render's stale or empty address (T-10-14, planner-found hazard).
+- [Phase 10]: Clerk prefill (isLoaded/isSignedIn-gated, empty-field-guarded) is not gated on isDigitalOnly. — A signed-in shopper's own name and email are equally correct to prefill on a physical checkout; the empty guard makes it harmless either way, per the plan's explicit instruction.
 
 ### Pending Todos
 
@@ -316,8 +320,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-08T18:01:46.395Z
-Stopped at: Completed 10-04-PLAN.md
+Last session: 2026-09-08T18:21:40.040Z
+Stopped at: Completed 10-05-PLAN.md
 Resume file: None
 
 Next: `/gsd-plan-phase 10`
