@@ -22,8 +22,7 @@ covered_files:
   - tests/unit/lib/inventory/availability.test.ts
   - tests/unit/lib/services/inventory-adjustments.test.ts
   - tests/unit/lib/models/mach/product-serializer.test.ts
-covered_digest: "v1:sha256:a055eb02b452a19386eb02fb4e63ade154d525baa4971b80a5923fa92f15c99d"
-digest_note: "gsd-tools.cjs (verification.fingerprint verb) was not found anywhere under this machine's GSD install paths, checked at ~/.claude, the repo, and a full-filesystem find. Digest computed manually with shasum -a 256 over the sorted per-file hashes of covered_files, in the same order listed above. If the canonical verb becomes available later, regenerate and replace this field."
+covered_digest: "v1:sha256:0e45656108e5b134f1e696c57f42baf0c391aa25b3ce997be04b1c8678314110"
 human_verification:
   - test: "Open https://voltique.russellkmoore.me/product/gift-card and compare the product photo against the two sibling shots at https://voltique-images.russellkmoore.me/products/field-ration-resupply-31.png and https://voltique-images.russellkmoore.me/products/campfire-smores-kit-32.png"
     expected: "The gift card image reads as belonging to the same photo shoot as the two sibling images: same near-black seamless backdrop, same soft studio lighting and shadow falloff, matte charcoal/olive-drab palette, no lettering, no logos, no numerals"
