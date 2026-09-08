@@ -93,7 +93,7 @@ Plans:
   4. The recipient name, email, message, and delivery date are visible on the cart item, the checkout order summary, the order confirmation, and the account order detail page
   5. When every line in the cart is digital, web checkout hides the shipping address and shipping method steps and submits the order without an address; carts that also hold physical items are unchanged
 
-**Plans**: 3/5 plans executed
+**Plans**: 4/5 plans executed
 **UI hint**: yes
 
 Plans:
@@ -108,7 +108,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 10-04-PLAN.md — Recipient details on the order confirmation modal and the account order detail page
+- [x] 10-04-PLAN.md — Recipient details on the order confirmation modal and the account order detail page
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -149,6 +149,6 @@ Plans:
 | 1-4 (v1 Hardening) | 17/17 | Complete | 2026-09-02 |
 | 5-8.2 (v2 Themeable Storefront) | 44/44 | Complete | 2026-09-05 |
 | 9. Gift Card Catalogue | 4/4 | Complete    | 2026-09-08 |
-| 10. Gift Card Purchase Flow | 3/5 | In Progress|  |
+| 10. Gift Card Purchase Flow | 4/5 | In Progress|  |
 | 11. Production Enablement | 0/TBD | Not started | - |
 | 12. Content, Assistant & Live Proof | 0/TBD | Not started | - |
