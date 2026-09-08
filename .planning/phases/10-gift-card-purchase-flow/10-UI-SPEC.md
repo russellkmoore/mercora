@@ -305,7 +305,7 @@ Physical items are visually unchanged.
 
 ## UI Considerations
 
-Applicable state considerations resolved: 22 covered, 2 backstop, 0 unresolved. Autonomous run per
+Applicable state considerations resolved: 39 applicable per the UI-consideration probe over 6 surfaces — 42 covered, 5 backstop, 0 unresolved (the researcher's 24 rows plus 23 probe-raised rows; a11y and selection-state rows are additional prose-owned coverage).
 the scope note — no `AskUserQuestion` blocking; every judgement below is a recorded, reasoned
 assumption available for the planner to challenge.
 
@@ -335,6 +335,29 @@ assumption available for the planner to challenge.
 | long-text | Account order detail gift-card message | ✅ covered | Full message, `whitespace-pre-line`, no truncation — detail view, not a compact card |
 | a11y | Field-level validation (product recipient form; Billing details step reuses `ShippingForm`'s existing validation unchanged) | ✅ covered | Every invalid field in the new recipient form carries `aria-invalid` + `aria-describedby` pointing at its `role="alert"` error text, using the shadcn primitives' already-built-in styling; the Billing details step's validation is `ShippingForm`'s own existing behavior, not new this phase |
 | resolved | Billing details step's `line1`/`city`/`region`/`postal_code` values | ✅ covered | Digital-only checkout posts a complete address via the existing `ShippingForm` fields; no placeholder values are sent — resolved by design (D-01), superseding the earlier slim-Contact-step approach flagged in a prior pass of this spec |
+| loading | `GiftCardRecipientForm` | ✅ covered | Pure client state; no async load. Add to Cart shows the existing toast synchronously; no spinner or skeleton is introduced |
+| loading | Cart/checkout recipient block | ✅ covered | Rendered from the persisted cart item synchronously; the cart drawer's existing hydration guard (`cart-hydration-contract`) covers first paint |
+| loading | Billing details step | ✅ covered | Reuses `CheckoutClient`'s existing "Processing…" disabled-button state on the payment-intent fetch; no new loading UI |
+| loading | Progress bar | ✅ covered | Static labels derived from cart items on render; no async source |
+| loading | Order confirmation modal items list | ✅ covered | Snapshot is taken synchronously before `clearCart()`; the modal opens only after `POST /api/orders` resolves, so the list never renders in a loading state |
+| loading | Account order detail gift-card block | ✅ covered | Server-rendered page; no client loading state |
+| error | Cart/checkout recipient block | ✅ covered | A cart item that fails `normalizeCartItemForStore` is dropped by the store, so the block never receives a malformed customization; no error UI needed |
+| error | Progress bar | ✅ covered | Labels are a pure function of cart items; an unknown step index falls back to the existing 4-label array |
+| error | Order confirmation modal items list | 🧪 backstop | If `POST /api/orders` fails the existing success-page `failed`/`error` phases render and the modal never opens; verify once by forcing the failure path in a test |
+| error | Account order detail gift-card block | ✅ covered | A gift-card item without a persisted `gift_card` object renders as a plain item row (existing behaviour); nothing throws |
+| partial | Cart/checkout recipient block | ✅ covered | Name, message and date are each optional; the block omits the "Deliver:" line and the message line when absent and falls back to the email alone in the "To:" line |
+| partial | Billing details step | ✅ covered | `ShippingForm`'s existing required-field gating keeps **Use Address** disabled until line1, city, region, postal code, country, name and email are present; line2/company optional |
+| partial | Order confirmation modal items list | ✅ covered | Physical lines in a mixed order render name × quantity only; gift-card lines add the recipient block |
+| partial | Account order detail gift-card block | ✅ covered | Optional fields absent from `item.gift_card` are omitted line by line; only email is guaranteed |
+| overflow | Progress bar | 🧪 backstop | Three-label bar uses the same flex layout as the four-label bar; verify at 360px that "Billing details" does not wrap onto two lines, else shorten to "Billing" |
+| overflow | Order confirmation modal items list | 🧪 backstop | Modal body gets `max-h-[60vh] overflow-y-auto` around the list; verify once with 6+ lines |
+| overflow | Account order detail gift-card block | ✅ covered | Full-width block inside the existing item `<li>`; long messages wrap with `whitespace-pre-line`, no horizontal overflow |
+| populated | Progress bar | ✅ covered | Digital-only: 3 labels with the same fill animation; mixed/physical: unchanged 4 labels |
+| zero-one-many | Progress bar | ✅ covered | Exactly 3 or 4 labels by construction; no other cardinality |
+| zero-one-many | Order confirmation modal items list | ✅ covered | One line → single row; many → scrollable list (overflow row above); zero → section omitted (empty row above) |
+| long-text | Billing details step | ✅ covered | `ShippingForm` inputs already cap lengths via the server's bounded-string limits (line1 256, city 128, region 128, postal 32); unchanged |
+| long-text | Progress bar | ✅ covered | Labels are fixed strings from the Copywriting Contract, never user text |
+| long-text | Order confirmation modal items list | ✅ covered | Recipient block truncates the message at 80 characters with ellipsis and `title`, same component as the cart line |
 
 ---
 
