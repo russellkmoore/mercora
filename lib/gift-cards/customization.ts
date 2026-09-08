@@ -123,3 +123,29 @@ export function canonicalGiftCardCustomization(value: GiftCardCustomization): st
     parsed.deliveryDate ?? null,
   ]);
 }
+
+/**
+ * Field-level error codes for the recipient form's per-field validators
+ * (D-06). These wrap the private normalisers above so the client can never
+ * be more permissive than parseGiftCardCustomization — every validator
+ * below delegates to the same normaliser the whole-object gate uses.
+ */
+export type GiftCardFieldError =
+  | 'required'
+  | 'invalid_format'
+  | 'too_long'
+  | 'control_characters'
+  | 'out_of_range';
+
+export function validateGiftCardRecipientEmail(value: string): GiftCardFieldError | null {
+  if (value.trim().length === 0) return 'required';
+  try {
+    normalizedEmail(value);
+    return null;
+  } catch {
+    if (CONTROL_CHARACTERS.test(value)) return 'control_characters';
+    const normalized = value.normalize('NFC').trim().toLowerCase();
+    if (normalized.length > GIFT_CARD_RECIPIENT_EMAIL_MAX_LENGTH) return 'too_long';
+    return 'invalid_format';
+  }
+}
