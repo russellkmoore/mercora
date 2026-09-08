@@ -6,6 +6,7 @@ import type { StableCartItem } from "@/lib/types/cartitem";
 import { Button } from "@/components/ui/button";
 import { usePathname } from "next/navigation";
 import { cartItemTotal, Money } from "@/lib/money";
+import GiftCardRecipientBlock from "@/components/gift-cards/GiftCardRecipientBlock";
 
 interface CartItemCardProps {
   item: StableCartItem;
@@ -58,12 +59,7 @@ export default function CartItemCard({ item }: CartItemCardProps) {
           {Money.fromStored(item.price).format()} × {item.quantity} : {cartItemTotal(item).format()}
         </p>
         {item.giftCardCustomization && (
-          <p className="mt-1 text-xs text-muted-on-inverse">
-            For {item.giftCardCustomization.recipientName || item.giftCardCustomization.recipientEmail}
-            {item.giftCardCustomization.deliveryDate
-              ? ` · Delivery ${item.giftCardCustomization.deliveryDate}`
-              : ''}
-          </p>
+          <GiftCardRecipientBlock customization={item.giftCardCustomization} tone="inverse" />
         )}
         {!isCheckoutPage && (
           <Button

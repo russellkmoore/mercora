@@ -2,6 +2,7 @@ import Image from "next/image";
 import type { CartItem } from "@/lib/types/cartitem";
 import { cartItemTotal, Money } from "@/lib/money";
 import type { AuthoritativeCheckoutLine } from './OrderSummary';
+import GiftCardRecipientBlock from "@/components/gift-cards/GiftCardRecipientBlock";
 
 interface OrderItemCardProps {
   item?: CartItem;
@@ -38,9 +39,7 @@ export default function OrderItemCard({ item, authoritativeLine }: OrderItemCard
           {quantity} × {unitPrice.format()}
         </div>
         {item?.giftCardCustomization && (
-          <div className="text-xs text-muted-foreground">
-            For {item.giftCardCustomization.recipientName || item.giftCardCustomization.recipientEmail}
-          </div>
+          <GiftCardRecipientBlock customization={item.giftCardCustomization} />
         )}
       </div>
 
