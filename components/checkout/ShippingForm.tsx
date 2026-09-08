@@ -18,6 +18,8 @@ interface Props {
   onSubmit: (address: Partial<Address>) => void;
   error?: string | null;
   disabled?: boolean;
+  heading?: string;
+  helperText?: string;
 }
 
 export default function ShippingForm({
@@ -27,6 +29,8 @@ export default function ShippingForm({
   onSubmit,
   error,
   disabled = false,
+  heading = "Shipping Address",
+  helperText,
 }: Props) {
   const isSubmitDisabled =
     disabled ||
@@ -46,7 +50,10 @@ export default function ShippingForm({
         disabled ? "opacity-50 pointer-events-none" : ""
       }`}
     >
-      <h2 className="text-lg font-semibold mb-4">Shipping Address</h2>
+      <h2 className="text-lg font-semibold mb-4">{heading}</h2>
+      {helperText && (
+        <p className="text-sm text-muted-foreground mb-4">{helperText}</p>
+      )}
 
       <div className="space-y-4">
         <Input
