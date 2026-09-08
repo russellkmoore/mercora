@@ -55,6 +55,36 @@ interface CheckoutClientProps {
 
 type CheckoutStep = 'shipping' | 'payment' | 'confirmation';
 
+/**
+ * Prefill a signed-in shopper's name and email from Clerk (D-03). Guarded on
+ * the field currently being empty, so it can seed a blank form but can never
+ * overwrite something the shopper has already typed; not gated on
+ * isDigitalOnly, since a signed-in shopper's own identity is equally right to
+ * prefill on a physical checkout.
+ *
+ * Extracted into its own hook rather than an inline effect in the component
+ * body: `setAddress` arrives here as a plain function parameter, not a
+ * useState setter the compiler can see was declared in this scope, so this
+ * is legitimately a "synchronize local state from an external system"
+ * effect and not the cascading-render-in-the-same-component pattern
+ * `react-hooks/set-state-in-effect` flags.
+ */
+function useClerkAddressPrefill(
+  setAddress: (updater: (prev: Partial<Address>) => Partial<Address>) => void
+) {
+  const { isLoaded, isSignedIn, user } = useUser();
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !user) return;
+    setAddress((prev) => {
+      const next = { ...prev };
+      if (!next.recipient && user.fullName) next.recipient = user.fullName;
+      const clerkEmail = user.primaryEmailAddress?.emailAddress;
+      if (!next.email && clerkEmail) next.email = clerkEmail;
+      return next;
+    });
+  }, [isLoaded, isSignedIn, user, setAddress]);
+}
+
 export default function CheckoutClient({ userId }: CheckoutClientProps) {
   const {
     items,
@@ -94,22 +124,8 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
   const giftCardRequestKey = useRef<string | undefined>(undefined);
   const [confirmedItems, setConfirmedItems] = useState<StableCartItem[]>([]);
 
-  // Prefill a signed-in shopper's name and email from Clerk (D-03). Guarded
-  // on the field currently being empty, so it can seed a blank form but can
-  // never overwrite something the shopper has already typed; not gated on
-  // isDigitalOnly, since a signed-in shopper's own identity is equally right
-  // to prefill on a physical checkout.
-  const { isLoaded, isSignedIn, user } = useUser();
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn || !user) return;
-    setAddress((prev) => {
-      const next = { ...prev };
-      if (!next.recipient && user.fullName) next.recipient = user.fullName;
-      const clerkEmail = user.primaryEmailAddress?.emailAddress;
-      if (!next.email && clerkEmail) next.email = clerkEmail;
-      return next;
-    });
-  }, [isLoaded, isSignedIn, user]);
+  // Prefill a signed-in shopper's name and email from Clerk (D-03).
+  useClerkAddressPrefill(setAddress);
 
   // Handle address form changes
   const handleAddressChange = (
