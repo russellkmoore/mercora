@@ -4,17 +4,17 @@ milestone: v2.1
 milestone_name: Gift Card Product
 current_phase: 9
 current_phase_name: Gift Card Catalogue
-status: planning
-stopped_at: Phase 9 context gathered
-last_updated: "2026-09-08T07:31:58.194Z"
-last_activity: 2026-09-07
-last_activity_desc: ROADMAP.md created for v2.1 (Phases 9-12), 18/18 requirements mapped
-state_head: 57b8102af3f8d34b4afc0dd7949630ab86d291bf
+status: executing
+stopped_at: Completed 09-01-PLAN.md
+last_updated: "2026-09-08T07:45:26.288Z"
+last_activity: 2026-09-08
+last_activity_desc: Phase 9 execution started
+state_head: 9695b19ebff6feea61671caa45de24ed504924e5
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 4
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-09-07 after starting milestone v2.1)
 
 ## Current Position
 
-Phase: 9 (Gift Card Catalogue) — READY TO EXECUTE
-Plan: — (not yet planned)
-Status: Roadmap created, ready to plan Phase 9
-Last activity: 2026-09-07 — ROADMAP.md created for v2.1 (Phases 9-12), 18/18 requirements mapped
+Phase: 9 (Gift Card Catalogue) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-09-08 — Phase 9 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -121,6 +121,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 08.2 P04 | 15min | 3 tasks | 4 files |
 | Phase 08.2 P05 | 35min | 3 tasks | 9 files |
 | Phase 08.2 P06 | 130min | 3 tasks | 10 files |
+| Phase 9 P01 | 20 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -227,6 +228,9 @@ Decisions locked for v2:
 - [Phase 08.2]: 08.2-06: Cleared mermaid diagram content and Mermaid `%%` comments as an inert place to add sentence-ending punctuation for the phase's sentence-length style check, since diagram node labels and comments render identically with or without a trailing period — no diagram fact changed.
 - [Phase 08.2]: 08.2-06: Treated `docs/CHANGELOG-docs.md`'s references to retired document paths as an intentional exception to the whole-set dead-path and dead-variable checks, matching the "one file allowed to name a retired document" rule plans 01-03 already established and enforced inline.
 - [Phase 08.2]: 08.2-06: Phase closes with DOCS-04 and DOCS-05 both complete and the full CI-mirroring gate suite green (docs:lint, lint, typecheck, scan:tokens, build-themes --check, 2187 unit tests, 154 Workers tests, production build); v2 Themeable Storefront's four phases (5, 6/6.1, 7, 8/8.1/8.2) are all done.
+- [Phase 9]: Used prod_33/variant_33..36/price_33 (Research verified prod_31/prod_32 already occupied the ids CONTEXT.md assumed were free)
+- [Phase 9]: Used txcd_00000000 (Stripe's unconditional Nontaxable code), not the topically-named but conditional txcd_10502000
+- [Phase 9]: Skipped the standalone inventory table for the four gift-card variants; no storefront query joins it
 
 ### Pending Todos
 
@@ -291,9 +295,9 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-08T06:56:27.628Z
-Stopped at: Phase 9 context gathered
-Resume file: .planning/phases/09-gift-card-catalogue/09-CONTEXT.md
+Last session: 2026-09-08T07:45:26.276Z
+Stopped at: Completed 09-01-PLAN.md
+Resume file: None
 
 Next: `/gsd-plan-phase 9`
 
