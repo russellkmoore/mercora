@@ -115,7 +115,14 @@
     // Deploy-time fallback for getActiveTheme() (D-10). Must also be added
     // as a Workers Build variable in the Cloudflare Dashboard per the
     // project rule for NEXT_PUBLIC_* vars (see 06-02 user setup).
-    "NEXT_PUBLIC_THEME_DEFAULT": "volt-dark"
+    "NEXT_PUBLIC_THEME_DEFAULT": "volt-dark",
+    // Subscriptions (docs/subscriptions.md). Reconciliation must stay on once
+    // the first subscription exists; disable acquisition first to stop sales.
+    // The terms version must match the recurring-terms section published on
+    // the Terms of Service page.
+    "STORE_FEATURE_SUBSCRIPTION_RECONCILIATION": "true",
+    "STORE_FEATURE_SUBSCRIPTION_ACQUISITION": "true",
+    "STORE_SUBSCRIPTION_TERMS_VERSION": "2026-09-07"
   },
   /**
    * Note: Use secrets to store sensitive data.

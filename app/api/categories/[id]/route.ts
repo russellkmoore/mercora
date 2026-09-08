@@ -4,6 +4,7 @@ import { getCategory, updateCategory, deleteCategory } from "@/lib/models/mach/c
 import type { ApiResponse, Category } from "@/lib/types";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
 import { errorDetails } from "@/lib/utils/error-response";
+import { revalidateCategoryNav } from "@/lib/cache-tags";
 
 function categoryValidationMessage(error: unknown): string | undefined {
   if (!(error instanceof Error)) return undefined;
@@ -73,6 +74,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       );
     }
 
+    revalidateCategoryNav();
+
     const response: ApiResponse<Category> = {
       data: category,
       meta: {
@@ -121,6 +124,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         { status: 404 }
       );
     }
+
+    revalidateCategoryNav();
 
     return NextResponse.json({
       success: true,

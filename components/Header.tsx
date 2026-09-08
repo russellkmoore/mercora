@@ -32,12 +32,13 @@
 import { listCategories } from "@/lib/models";
 import HeaderClient from "./HeaderClient";
 import { unstable_cache } from "next/cache";
+import { CATEGORY_NAV_CACHE_TAG } from "@/lib/cache-tags";
 
-// Cache categories for better performance
+// Cache categories for an hour; admin category writes expire the tag early.
 const getCachedCategories = unstable_cache(
   async () => listCategories(),
   ['header-categories'],
-  { revalidate: 3600 } // Cache for 1 hour
+  { revalidate: 3600, tags: [CATEGORY_NAV_CACHE_TAG] }
 );
 
 /**
