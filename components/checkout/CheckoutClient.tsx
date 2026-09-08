@@ -41,6 +41,11 @@ import type { Address, ShippingOption } from '@/lib/types';
 import { Money } from '@/lib/money';
 import { clearPendingCheckout, savePendingCheckout } from '@/lib/checkout/order-payload';
 import { projectCartLineForCheckout } from '@/lib/gift-cards/line-identity';
+import {
+  DIGITAL_CHECKOUT_STEPS,
+  DIGITAL_SHIPPING_METHOD_ID,
+  isDigitalOnlyCart,
+} from '@/lib/checkout/digital-only';
 
 interface CheckoutClientProps {
   userId: string | null;
@@ -61,6 +66,9 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
     appliedDiscounts,
     clearCart,
   } = useCartStore();
+
+  // The cart's fulfilment mix, derived once per render (D-01, D-02).
+  const isDigitalOnly = isDigitalOnlyCart(items);
 
   // State management
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('shipping');
@@ -97,6 +105,35 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
     setError('');
 
     try {
+      if (isDigitalOnly) {
+        // Nothing ships: skip /api/shipping-options and the shipping-method
+        // panel entirely, and go straight to payment with the digital
+        // method id and the address the shopper just submitted (D-01).
+        const billingAddress = {
+          recipient: address.recipient || '',
+          email: address.email || '',
+          line1: address.line1 || '',
+          line2: address.line2,
+          city: address.city || '',
+          region: address.region || '',
+          postal_code: address.postal_code || '',
+          country: address.country || 'US',
+          type: 'shipping',
+          status: 'unverified',
+        } as Address;
+        setShippingAddress(billingAddress);
+        await createPaymentIntent(
+          {
+            id: DIGITAL_SHIPPING_METHOD_ID,
+            label: 'Digital delivery',
+            cost: Money.zero(items[0]?.price.currency).toJSON(),
+            estimatedDays: 0,
+          },
+          billingAddress
+        );
+        return;
+      }
+
       // Get shipping options
       const res = await fetch('/api/shipping-options', {
         method: 'POST',
@@ -157,7 +194,8 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
 
   // Create Payment Intent with Stripe
   const createPaymentIntent = async (
-    selectedShippingOption: ShippingOption
+    selectedShippingOption: ShippingOption,
+    addressOverride?: Address
   ) => {
     try {
       // Create payment intent
@@ -166,7 +204,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: items.map(projectCartLineForCheckout),
-          shippingAddress,
+          shippingAddress: addressOverride ?? shippingAddress,
           shippingMethodId: selectedShippingOption.id,
           discountCodes: appliedDiscounts.map((discount) => discount.code),
           ...(giftCardToken.trim() ? {

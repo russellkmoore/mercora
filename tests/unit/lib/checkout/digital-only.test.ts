@@ -86,7 +86,14 @@ describe('isDigitalOnlyCart', () => {
   });
 
   describe('paired invariant against hasPhysicalCheckoutLines', () => {
-    for (const fixture of fixtures) {
+    // The empty-cart composition is excluded here: hasPhysicalCheckoutLines([])
+    // is vacuously false (no items disagree), so its negation is true, while
+    // isDigitalOnlyCart([]) is false by design — an empty cart is never
+    // digital-only, it hits the empty-cart branch before any step UI renders
+    // (must_haves, "empty" truth). The invariant is meaningful only when both
+    // signals are evaluated over an actual, non-empty fulfilment mix; the
+    // empty-array case is covered on its own above.
+    for (const fixture of fixtures.filter((f) => f.cartItems.length > 0)) {
       it(`agrees with the negation of hasPhysicalCheckoutLines for: ${fixture.name}`, () => {
         const clientSignal = isDigitalOnlyCart(fixture.cartItems);
         const serverSignal = !hasPhysicalCheckoutLines(fixture.orderItems);
