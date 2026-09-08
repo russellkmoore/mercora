@@ -61,6 +61,18 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 
 </details>
 
+## Current Milestone: v2.1 Gift Card Product
+
+**Goal:** A shopper can buy a Voltique gift card on the storefront and the recipient receives it by email, using the gift card backend that shipped in v1.
+
+**Target features:**
+- Catalogue product with `type = gift_card`, `fulfillment_type = digital`, four denomination variants ($25 / $50 / $100 / $200), a matching catalogue image, and seed rows applied to production
+- Product-page recipient form (email, name, message, optional delivery date) that adds the customised line to the cart; cart and checkout show those details
+- Production runtime enablement: `STORE_FEATURE_GIFT_CARD_RECONCILIATION` and `STORE_FEATURE_GIFT_CARD_ACQUISITION` plus the `GIFT_CARD_CODE_HMAC_*` and `GIFT_CARD_DELIVERY_*` key secrets, rolled out in the order `docs/runtime-configuration.md` requires
+- Knowledge article and Volt re-index so the assistant can sell it; article promises (denominations, delivery time, no expiry) must match what ships
+
+**Key context:** The back half is built and locked behind ADR-CTB-10 (PR #79: tables, HMAC codes, tender, issuance, delivery, refunds, admin and account pages). Checkout already requires `product.type === 'gift_card'` with `fulfillment_type === 'digital'` and a recipient customization on the line. This milestone adds only the storefront front half and production enablement. Phase numbering continues at 9.
+
 ## Requirements
 
 ### Validated
@@ -112,9 +124,13 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 
 ### Active
 
-<!-- Next milestone not yet defined. `/gsd-new-milestone` writes a fresh .planning/REQUIREMENTS.md. Candidates: see ROADMAP.md "Next Milestone". -->
+<!-- v2.1 Gift Card Product. REQ-IDs live in .planning/REQUIREMENTS.md. -->
 
-(None — v2 shipped; define the next milestone)
+- [ ] A gift card product exists in the catalogue (four denominations) and renders like any other product
+- [ ] A shopper can enter recipient details on the product page and add the customised gift card to the cart
+- [ ] Cart and checkout carry and display the recipient details through to the paid order
+- [ ] Production has the gift card flags and key secrets set so issuance and delivery actually run
+- [ ] Volt and the support article describe the gift card that ships
 
 ### Out of Scope
 
@@ -272,4 +288,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-05 after v2 milestone (Themeable Storefront)*
+*Last updated: 2026-09-07 after starting milestone v2.1 (Gift Card Product)*
