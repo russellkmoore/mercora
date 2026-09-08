@@ -361,10 +361,14 @@ export default function ProductDisplay({
             )}
 
             {product.type === "gift_card" ? (
-              <GiftCardRecipientForm
-                available={available}
-                onAdd={(customization) => handleGiftCardAdd(customization)}
-              />
+              available ? (
+                <GiftCardRecipientForm
+                  available={available}
+                  onAdd={(customization) => handleGiftCardAdd(customization)}
+                />
+              ) : (
+                <p className="text-lg font-semibold text-warning sm:text-xl">Coming soon</p>
+              )
             ) : available ? (
               <button
                 className="w-full rounded bg-primary px-6 py-3 font-bold text-on-primary transition hover:bg-primary/90 sm:w-auto"
