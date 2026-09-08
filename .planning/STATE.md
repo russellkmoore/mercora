@@ -4,17 +4,17 @@ milestone: v2.1
 milestone_name: Gift Card Product
 current_phase: 9
 current_phase_name: Gift Card Catalogue
-status: executing
-stopped_at: Completed 09-03-PLAN.md
-last_updated: "2026-09-08T08:00:29.417Z"
+status: verifying
+stopped_at: Completed 09-04-PLAN.md
+last_updated: "2026-09-08T08:44:16.147Z"
 last_activity: 2026-09-08
 last_activity_desc: Phase 9 execution started
-state_head: 6adde5e2464b28fa8b0ace00e346541803bd2dac
+state_head: 67f3e5b6626cdceb7a71050d90ee6eb8cf9fec70
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-09-07 after starting milestone v2.1)
 
 Phase: 9 (Gift Card Catalogue) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-08 — Phase 9 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -124,6 +124,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 9 P01 | 20 min | 2 tasks | 2 files |
 | Phase 9 P02 | 12min | 3 tasks | 3 files |
 | Phase 9 P03 | 10min | 2 tasks | 1 files |
+| Phase 9 P04 | 15min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -237,6 +238,7 @@ Decisions locked for v2:
 - [Phase 9]: Gift-card-only paid-order and checkout-availability cases inject no database at all. — stagePaidInventoryAdjustments and assertCheckoutInventoryAvailable only resolve a database once the demand map is non-empty; a clean resolve with no injected database is itself the proof the gift-card skip fired.
 - [Phase 9]: Mixed-order test injects a hand-written D1 fake (prepare/bind/batch) instead of vi.mock. — Exercises the real stageInventoryAdjustments code path end to end and lets the test assert on the actual bound arguments, rather than mocking a module.
 - [Phase 9]: Chose candidate 1 of 4 Workers-AI-generated gift card renders: true olive-drab accent stripe and paper/fabric matte texture, over candidates 2/4 (gold/brass accent, rounded plastic-card corners, off-brief) and candidate 3 (correct hue but rubbery/plasticky texture).
+- [Phase 9]: [Phase 9] apply-active: Russell chose to write the gift card into production now, seeded active, over apply-draft or hold. — Phase 9 closes provably against the real site and Phase 10 has a live product to build the recipient form against, accepting that a shopper can add it to cart and hit a checkout refusal until Phase 10 ships.
 
 ### Pending Todos
 
@@ -301,8 +303,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-08T08:00:23.515Z
-Stopped at: Completed 09-03-PLAN.md
+Last session: 2026-09-08T08:44:08.847Z
+Stopped at: Completed 09-04-PLAN.md
 Resume file: None
 
 Next: `/gsd-plan-phase 9`
