@@ -523,9 +523,9 @@ Not applicable — this is a greenfield data-addition phase (new product), not a
 | A2 | `docs/docs-lint.mjs`'s path-existence check covers inline bash code-fence paths (like the stale `./lib/db/seed.sql` reference), not just markdown `[text](path)` links — confirmed the script does existence-checking, but the exact regex scope for *which* strings get checked was not traced line-by-line | Finding 9 / Gates | Low — worst case, fixing the stale path either passes trivially or the gate doesn't check it at all; either way running `npm run docs:lint` after the edit resolves the uncertainty before commit |
 | A3 | Recommending `GC-025` ($25 variant) as `default_variant_id` — CONTEXT.md leaves this to Claude's Discretion but doesn't state a specific choice; this is this research's recommendation, not a verified requirement | Finding 5, Standard Stack SQL example | Low — cosmetic only; any of the four variants would satisfy CAT-01..04, this just affects which price shows first on the card |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should a `pricing` table row be added for the four variants?**
+1. **Should a `pricing` table row be added for the four variants?** — RESOLVED: plan 09-01 adds a single product-scoped `price_33` row (2500 USD, zero-rate tax object), matching the recommendation; the `pricing` table is product-scoped so four variant rows cannot exist.
    - What we know: `prod_31`/`prod_32` both have `pricing` rows (`price_31`/`price_32`); `variant_31`/`variant_32` also carry price directly on `product_variants.price`. No code path was found this session that reads the `pricing` table for storefront display (checkout/storefront read `variant.price` directly per `checkout-pricing.ts:653`/`ProductDisplay.tsx:170`).
    - What's unclear: whether `pricing` table rows are consumed by any admin or reporting path not covered by this session's grep sweep (e.g., BI dashboard, admin product list).
    - Recommendation: Claude's Discretion note in CONTEXT.md already flags this as optional; add rows for consistency with all 32 other products at negligible cost (matches every existing row's shape) unless the planner finds a reason not to.

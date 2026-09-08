@@ -67,9 +67,17 @@ Full phase details, success criteria, and plan lists: `milestones/v2-ROADMAP.md`
 **Plans**: 4 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 09-01-PLAN.md — Seed the gift-card block in `data/d1/seed.sql` and prove `/product/gift-card` renders locally (tracer)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 09-02-PLAN.md — Cover the untracked-inventory, paid-decrement-skip and public-projection behaviors with tests
 - [ ] 09-03-PLAN.md — Generate the Workers AI catalogue image and upload it to the public bucket
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 09-04-PLAN.md — Fix the seed step in the deploy runbook, then apply the block to production and prove the card is live
 
 ### Phase 10: Gift Card Purchase Flow
