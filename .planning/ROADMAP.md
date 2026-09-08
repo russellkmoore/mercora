@@ -64,7 +64,7 @@ Full phase details, success criteria, and plan lists: `milestones/v2-ROADMAP.md`
   3. The product page shows a Workers-AI-generated image in the catalogue's dark-studio style, stored in `data/r2/products/` and uploaded to the public `voltique-images` bucket
   4. None of the four variants ever shows as out of stock, and a paid gift card order does not decrement their inventory
 
-**Plans**: 2/4 plans executed
+**Plans**: 3/4 plans executed
 
 Plans:
 **Wave 1**
@@ -74,7 +74,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 09-02-PLAN.md — Cover the untracked-inventory, paid-decrement-skip and public-projection behaviors with tests
-- [ ] 09-03-PLAN.md — Generate the Workers AI catalogue image and upload it to the public bucket
+- [x] 09-03-PLAN.md — Generate the Workers AI catalogue image and upload it to the public bucket
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -130,7 +130,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1-4 (v1 Hardening) | 17/17 | Complete | 2026-09-02 |
 | 5-8.2 (v2 Themeable Storefront) | 44/44 | Complete | 2026-09-05 |
-| 9. Gift Card Catalogue | 2/4 | In Progress|  |
+| 9. Gift Card Catalogue | 3/4 | In Progress|  |
 | 10. Gift Card Purchase Flow | 0/TBD | Not started | - |
 | 11. Production Enablement | 0/TBD | Not started | - |
 | 12. Content, Assistant & Live Proof | 0/TBD | Not started | - |
