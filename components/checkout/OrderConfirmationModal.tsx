@@ -10,12 +10,16 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import type { StableCartItem } from "@/lib/types/cartitem";
+import { Money } from "@/lib/money";
+import GiftCardRecipientBlock from "@/components/gift-cards/GiftCardRecipientBlock";
 
 interface OrderConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
   orderId: string;
   userId?: string | null;
+  items?: StableCartItem[];
 }
 
 export default function OrderConfirmationModal({
@@ -23,6 +27,7 @@ export default function OrderConfirmationModal({
   onClose,
   orderId,
   userId,
+  items,
 }: OrderConfirmationModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -42,6 +47,33 @@ export default function OrderConfirmationModal({
             {orderId}
           </pre>
         </div>
+
+        {items && items.length > 0 && (
+          <div className="space-y-2 text-left">
+            <h3 className="text-sm font-semibold text-foreground">Order items</h3>
+            <div className="max-h-[60vh] overflow-y-auto space-y-2">
+              {items.map((item) => (
+                <div
+                  key={item.lineId}
+                  className="flex items-center gap-3 rounded-lg p-2 bg-surface text-left"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm leading-tight">{item.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {item.quantity} × {Money.fromStored(item.price).format()}
+                    </div>
+                    {item.giftCardCustomization && (
+                      <GiftCardRecipientBlock customization={item.giftCardCustomization} />
+                    )}
+                  </div>
+                  <div className="text-sm font-medium">
+                    {Money.fromStored(item.price).times(item.quantity).format()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <DialogFooter className="flex flex-col gap-4 pt-4">
           <Button

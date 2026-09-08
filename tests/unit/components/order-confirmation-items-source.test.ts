@@ -28,9 +28,9 @@ describe('OrderConfirmationModal items source contract', () => {
     expect(source).toContain('key={item.lineId}');
   });
 
-  it('imports and renders GiftCardRecipientBlock exactly twice (import + render)', () => {
-    const matches = source.match(/GiftCardRecipientBlock/g) ?? [];
-    expect(matches.length).toBe(2);
+  it('imports and renders GiftCardRecipientBlock on exactly two lines (import + render)', () => {
+    const matchingLines = source.split('\n').filter((line) => line.includes('GiftCardRecipientBlock'));
+    expect(matchingLines.length).toBe(2);
   });
 
   it('guards the GiftCardRecipientBlock render on giftCardCustomization', () => {
