@@ -278,9 +278,30 @@ See `docs/database-migrations.md` for the binding migration policy.
 
 ### **Step 2: Seed Data (Optional)**
 ```bash
-# Execute seed data if you have any
-npx wrangler d1 execute mercora-db --file=./lib/db/seed.sql
+# Local: apply the full sample catalogue to a local D1 database
+npx wrangler d1 execute mercora-db --local --file=data/d1/seed.sql
 ```
+
+**Applying one catalogue addition to production.** `data/d1/seed.sql`'s
+earlier bulk inserts are plain `INSERT` statements, not `INSERT OR IGNORE` —
+a whole-file `--remote` apply stops at the first row that already exists in
+production and never reaches a newer addition appended to the end of the
+file. To add a single new catalogue block without touching anything already
+live, slice out just that block and apply the slice:
+
+```bash
+# Slice the sentinel-delimited block out of the seed file
+sed -n '/^-- BEGIN gift-card-block (Phase 9)$/,/^-- END gift-card-block (Phase 9)$/p' \
+  data/d1/seed.sql > /tmp/gift-card-block.sql
+
+# Apply only that slice to production
+npx wrangler d1 execute mercora-db --remote --file=/tmp/gift-card-block.sql
+```
+
+Each catalogue addition since Phase 9 is wrapped in its own
+`-- BEGIN <name> (Phase N)` / `-- END <name> (Phase N)` sentinel pair inside
+`data/d1/seed.sql` for exactly this reason — find the boundary by its
+sentinel comment, never by line number.
 
 ### **Step 3: Verify Database**
 ```bash
