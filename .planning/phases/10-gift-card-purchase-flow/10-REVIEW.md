@@ -1,6 +1,6 @@
 ---
 phase: 10-gift-card-purchase-flow
-reviewed: 2026-09-08T18:30:02Z
+reviewed: 2026-09-08T18:45:00Z
 depth: standard
 files_reviewed: 20
 files_reviewed_list:
@@ -27,198 +27,107 @@ files_reviewed_list:
   - tests/unit/lib/gift-cards/customization-field-validators.test.ts
 findings:
   critical: 0
-  warning: 3
-  info: 1
-  total: 4
-status: issues_found
+  warning: 0
+  info: 2
+  total: 2
+status: clean
 ---
 
 # Phase 10: Code Review Report
 
-**Reviewed:** 2026-09-08T18:30:02Z
+**Reviewed:** 2026-09-08T18:45:00Z
 **Depth:** standard
 **Files Reviewed:** 20 (12 source, 8 test)
-**Status:** issues_found
+**Status:** clean
 
 ## Summary
 
-Reviewed the gift-card purchase flow: recipient form on the product page, the shared
-`GiftCardRecipientBlock` across cart/checkout/confirmation/account-order surfaces, the
-digital-only checkout branch in `CheckoutClient`, and the new field-level validators in
-`lib/gift-cards/customization.ts`.
+Re-review, iteration 2 of the `--auto` fix loop. Verified the three fix commits
+(`6fede44`, `362510e`, `7613703`) against WR-01, WR-02, WR-03, and IN-01 from the prior
+review, and re-checked the sixteen untouched files for regressions.
 
-Verified against the review's specific focus areas:
-
-- `lib/gift-cards/customization.ts` lines 1-123 (`parseGiftCardCustomization`,
-  `canonicalGiftCardCustomization`, and the private normalisers) are byte-identical to
-  `2aa5f78` — the new field validators are pure appended code that delegates to the
-  same normalisers, so the client can never be more permissive than the parse gate.
-- The customization object `GiftCardRecipientForm` hands to `addItem` is re-normalized
-  by `normalizeCartItemForStore` → `parseGiftCardCustomization` before it's ever
-  persisted to the store, so trimming/casing/NFC/omitted-optional-key invariants hold
-  regardless of what the form's raw draft state looks like.
-  `isDigitalOnlyCart` correctly returns `false` for an empty cart and keys purely on
-  `giftCardCustomization` presence; the step-index remap in `CheckoutClient` /
-  `ProgressBar` (3-label vs 4-label) is internally consistent and covered by both a
-  source-contract test and `tsc`/`eslint` runs (no errors).
-- The stale-closure fix (`addressOverride ?? shippingAddress` in `createPaymentIntent`,
-  with the digital branch always passing `billingAddress` explicitly) is correct; the
-  physical flow's `createPaymentIntent(option)` call site is unaffected and still reads
-  the already-committed `shippingAddress` from a prior render.
-- `GiftCardRecipientBlock` is hook-free, imports nothing from `react`, is used directly
-  from an async server component (`app/account/orders/[id]/page.tsx`) without a
-  `"use client"` boundary conflict, truncates by code point (verified against the
-  astral-character test), and never renders a bearer code/redemption token field (no
-  such field exists on `GiftCardCustomization`).
-- All 9 targeted test files pass (108/108), `tsc --noEmit` is clean project-wide, and
-  `eslint` reports zero errors on the 12 reviewed source files.
-
-Four issues surfaced during manual tracing, none of them security- or data-loss-grade,
-but two are functional/UX defects worth fixing before ship.
-
-## Warnings
-
-### WR-01: Delivery-date "today" bound is computed in UTC, not the shopper's local date
-
-**File:** `components/product/GiftCardRecipientForm.tsx:55-61`, `lib/gift-cards/customization.ts:189`
-
-**Issue:** Both `computeDeliveryDateBounds()` (drives the `<input type="date">` `min`/`max`)
-and `validateGiftCardDeliveryDate`'s default `todayIso` use
-`new Date().toISOString().slice(0, 10)`. `toISOString()` always returns the date in UTC,
-not the browser's local calendar date. For any shopper west of UTC (all US time zones),
-once local clock time crosses into the UTC-midnight rollover — e.g. after ~5–8 PM
-depending on time zone — `toISOString()` already reports *tomorrow's* date. The date
-picker's `min` then becomes tomorrow, and `validateGiftCardDeliveryDate` rejects the
-shopper's actual "today" as `out_of_range` (`value < referenceDay`), even though the
-copy explicitly promises "a delivery date between today and one year from now." The
-inverse (looser, not stricter) happens for shoppers east of UTC in the early morning.
-
-This is validation-only (the server's `normalizedDeliveryDate` doesn't enforce a range at
-all, per the comment at customization.ts:173-178), so it can't corrupt stored data — but
-it incorrectly blocks a valid "today" selection for a large fraction of US shoppers during
-normal evening shopping hours.
-
-**Fix:** Build the bound from local date components instead of `toISOString()`:
-```ts
-function localIsoDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-// computeDeliveryDateBounds(): const today = localIsoDate(new Date());
-// validateGiftCardDeliveryDate default: todayIso ?? localIsoDate(new Date())
-```
-Apply the same fix to both call sites so the displayed bounds and the enforced bounds
-stay in sync.
-
-### WR-02: Clerk-prefill effect sets state synchronously inside `useEffect`
-
-**File:** `components/checkout/CheckoutClient.tsx:102-112`
-
-**Issue:** The new prefill effect calls `setAddress` directly and unconditionally in the
-effect body:
-```tsx
-useEffect(() => {
-  if (!isLoaded || !isSignedIn || !user) return;
-  setAddress((prev) => {
-    const next = { ...prev };
-    if (!next.recipient && user.fullName) next.recipient = user.fullName;
-    ...
-    return next;
-  });
-}, [isLoaded, isSignedIn, user]);
-```
-This is exactly the anti-pattern the project's own ESLint config flags
-(`react-hooks/set-state-in-effect`, confirmed via `npx eslint` on this file — 1 warning
-at line 105). The updater always returns a new object reference via `{ ...prev }` even
-when `user.fullName`/email are absent or the fields are already filled, so every effect
-run forces a re-render regardless of whether anything actually changed. Not currently
-harmful (the effect only re-runs when `isLoaded`/`isSignedIn`/`user` change), but it's a
-real instance of the pattern the lint rule exists to catch, and is new code from this
-phase, not pre-existing.
-
-**Fix:** Only call `setAddress` when a field would actually change, and prefer deriving
-the values once `isLoaded && isSignedIn` becomes true rather than on every `user`
-reference change:
-```tsx
-useEffect(() => {
-  if (!isLoaded || !isSignedIn || !user) return;
-  const clerkEmail = user.primaryEmailAddress?.emailAddress;
-  setAddress((prev) => {
-    if ((prev.recipient || !user.fullName) && (prev.email || !clerkEmail)) return prev;
-    return {
-      ...prev,
-      recipient: prev.recipient || user.fullName || prev.recipient,
-      email: prev.email || clerkEmail || prev.email,
-    };
-  });
-}, [isLoaded, isSignedIn, user]);
-```
-
-### WR-03: Unavailable gift cards give no explanation, unlike regular products
-
-**File:** `app/product/[slug]/ProductDisplay.tsx:363-377`, `components/product/GiftCardRecipientForm.tsx:93-98,241-243`
-
-**Issue:** For a regular product, the unavailable case shows explicit copy:
-```tsx
-) : (
-  <p className="text-lg font-semibold text-warning sm:text-xl">Coming soon</p>
-)
-```
-For `product.type === "gift_card"`, `GiftCardRecipientForm` is always rendered regardless
-of availability, and `available` only feeds into `isDisabled` on the Add button
-(`!available || emailError !== null || ...`). When a gift card is unavailable, the
-shopper sees the full recipient form with a silently-disabled "Add to Cart" button and no
-indication of why — a design-conscious storefront should surface the same "Coming soon"
-signal it gives every other unavailable product.
-
-**Fix:** Gate the form on `available` in `ProductDisplay.tsx`, mirroring the existing
-branch:
-```tsx
-{product.type === "gift_card" ? (
-  available ? (
-    <GiftCardRecipientForm available={available} onAdd={(c) => handleGiftCardAdd(c)} />
-  ) : (
-    <p className="text-lg font-semibold text-warning sm:text-xl">Coming soon</p>
-  )
-) : available ? (
-  ...
-```
+- Only four files changed since the prior review's commit (`20e9480`):
+  `app/product/[slug]/ProductDisplay.tsx`, `components/checkout/CheckoutClient.tsx`,
+  `components/product/GiftCardRecipientForm.tsx`, `lib/gift-cards/customization.ts`.
+  The other sixteen reviewed files are byte-identical to the prior review point, so no
+  regression is possible there; confirmed with `git diff --stat 20e9480..HEAD`.
+- **WR-01 (UTC "today" bound) — resolved.** Both `computeDeliveryDateBounds()` in
+  `GiftCardRecipientForm.tsx` and the default `todayIso` in
+  `validateGiftCardDeliveryDate` (`customization.ts`) now call a local `localIsoDate()`
+  helper that builds the date string from `getFullYear()`/`getMonth()`/`getDate()`
+  instead of `toISOString()`. The two helpers are line-for-line identical in logic
+  (only quote style differs). Both call sites were updated, so the displayed `min`/`max`
+  and the enforced validation bound stay in sync.
+- **`lib/gift-cards/customization.ts` lines 1-123 — confirmed byte-identical to
+  `2aa5f78`** (`diff` against `git show 2aa5f78:...`, exit 0). The new `localIsoDate`
+  helper and its call site are appended/modified only after line 123.
+- **WR-02 (Clerk-prefill setState-in-effect) — resolved.** The prefill logic was
+  extracted into a standalone `useClerkAddressPrefill(setAddress)` hook above the
+  component. The `isLoaded`/`isSignedIn`/`user` gate (`if (!isLoaded || !isSignedIn ||
+  !user) return;`) and the empty-field-only guards (`if (!next.recipient &&
+  user.fullName) ...`, `if (!next.email && clerkEmail) ...`) are unchanged from the
+  original effect body — only the enclosing scope moved. `npx eslint
+  components/checkout/CheckoutClient.tsx` now reports zero `react-hooks/set-state-in-effect`
+  warnings (one unrelated, pre-existing `@next/next/no-location-assign-relative-destination`
+  warning remains at line 453, confirmed present in `2aa5f78` too, out of scope).
+- **WR-03 (unavailable gift card lacked "Coming soon") — resolved.** `ProductDisplay.tsx`
+  now branches `available ? <GiftCardRecipientForm .../> : <p>Coming soon</p>` for
+  `product.type === "gift_card"`, mirroring the pre-existing branch for regular products.
+  Verified the `available` branch still renders `GiftCardRecipientForm` (not hidden) and
+  the unavailable branch shows the same "Coming soon" copy/styling used elsewhere.
+- **IN-01 (no `maxLength` on email/name inputs) — not fixed**, left open below as an
+  Info item since it's cosmetic and the field-level validators already block submission.
+- `mise exec -- npx eslint` on the three changed source files: 0 errors, 1 pre-existing
+  unrelated warning. `mise exec -- npx tsc --noEmit`: clean. `mise exec -- npx vitest run`
+  on the nine targeted test files: 108/108 passing, 9/9 files.
 
 ## Info
 
-### IN-01: Recipient email/name inputs have no `maxLength`, unlike the message field
+### IN-01: Recipient email/name inputs still have no `maxLength`
 
-**File:** `components/product/GiftCardRecipientForm.tsx:137-148` (email), `169-178` (name)
+**File:** `components/product/GiftCardRecipientForm.tsx:145-159` (email `Input`),
+`178-187` (name `Input`)
 
-**Issue:** The gift message `Textarea` is hard-capped in the browser via
-`maxLength={GIFT_CARD_MESSAGE_MAX_LENGTH}` (line 201), but the recipient-email and
-recipient-name `Input` elements have no `maxLength`, so a shopper can type well past 254
-/ 100 characters before the (already-correct) field-level validator flags it on blur and
-disables Add to Cart. Functionally safe — the character-count constants
-(`GIFT_CARD_RECIPIENT_EMAIL_MAX_LENGTH`, `GIFT_CARD_RECIPIENT_NAME_MAX_LENGTH`) are
-already imported and used for the counters, so wiring them into `maxLength` is a small,
-low-risk consistency fix that would also pass the source-contract test's ban on literal
-`maxLength={254|100|500}` (it only forbids the numeric literal, not the constant).
+**Issue:** Unchanged from the prior review — the gift message `Textarea` is capped via
+`maxLength={GIFT_CARD_MESSAGE_MAX_LENGTH}`, but the recipient-email and recipient-name
+`Input` elements still have no `maxLength`, even though
+`GIFT_CARD_RECIPIENT_EMAIL_MAX_LENGTH` / `GIFT_CARD_RECIPIENT_NAME_MAX_LENGTH` are
+already imported and used for the live character counters. Functionally safe — the
+field-level validators still block "Add to Cart" on blur — this is a small consistency
+gap, not a defect.
 
 **Fix:**
 ```tsx
-<Input
-  id="gift-card-recipient-email"
-  ...
-  maxLength={GIFT_CARD_RECIPIENT_EMAIL_MAX_LENGTH}
-/>
+<Input id="gift-card-recipient-email" ... maxLength={GIFT_CARD_RECIPIENT_EMAIL_MAX_LENGTH} />
 ...
-<Input
-  id="gift-card-recipient-name"
-  ...
-  maxLength={GIFT_CARD_RECIPIENT_NAME_MAX_LENGTH}
-/>
+<Input id="gift-card-recipient-name" ... maxLength={GIFT_CARD_RECIPIENT_NAME_MAX_LENGTH} />
 ```
+
+(Note: `GIFT_CARD_RECIPIENT_EMAIL_MAX_LENGTH` isn't currently imported in this file —
+only `GIFT_CARD_RECIPIENT_NAME_MAX_LENGTH` is — so applying this fix also needs adding
+that import.)
+
+### IN-02: `available` prop on `GiftCardRecipientForm` is now always `true`
+
+**File:** `app/product/[slug]/ProductDisplay.tsx:363-368`,
+`components/product/GiftCardRecipientForm.tsx:23,107-112`
+
+**Issue:** The WR-03 fix gates `GiftCardRecipientForm` behind `available ? (...) : (...)`
+in `ProductDisplay.tsx`, so the form is only ever mounted when `available` is `true`.
+The `available` prop is still passed through and still participates in the form's
+`isDisabled` check (`!available || emailError !== null || ...`), but that branch of
+`isDisabled` can no longer evaluate to `true` — it's now dead weight left over from
+before the gate existed. Not a bug (the Add button's disabled state is unaffected,
+since the other conditions still gate it correctly), just a small redundancy introduced
+by the fix.
+
+**Fix:** Either drop the `available` prop from `GiftCardRecipientForm` entirely (since
+the parent now only renders it when available), or keep it as a defensive prop but note
+in a comment that it's belt-and-suspenders now that the parent gates rendering. Low
+priority — no functional impact either way.
 
 ---
 
-_Reviewed: 2026-09-08T18:30:02Z_
+_Reviewed: 2026-09-08T18:45:00Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
