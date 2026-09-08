@@ -47,6 +47,7 @@ import {
   DIGITAL_SHIPPING_METHOD_ID,
   isDigitalOnlyCart,
 } from '@/lib/checkout/digital-only';
+import type { StableCartItem } from '@/lib/types/cartitem';
 
 interface CheckoutClientProps {
   userId: string | null;
@@ -91,6 +92,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
   const [error, setError] = useState<string>('');
   const [giftCardToken, setGiftCardToken] = useState('');
   const giftCardRequestKey = useRef<string | undefined>(undefined);
+  const [confirmedItems, setConfirmedItems] = useState<StableCartItem[]>([]);
 
   // Prefill a signed-in shopper's name and email from Clerk (D-03). Guarded
   // on the field currently being empty, so it can seed a blank form but can
@@ -249,6 +251,9 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
       setTaxAmount(Money.fromMajor(data.quote.tax.amount, data.quote.tax.currency).toJSON());
       setAuthoritativeQuote(data.quote);
       if (data.noCash) {
+        // Snapshot into confirmedItems before the cart is cleared, so the
+        // confirmation modal can still show what was bought (D-11).
+        setConfirmedItems(items);
         clearCart();
         setGiftCardToken('');
         giftCardRequestKey.current = undefined;
@@ -284,7 +289,9 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
 
       clearPendingCheckout(paymentIntentId);
 
-      // Clear cart immediately after successful order creation
+      // Snapshot into confirmedItems before the cart is cleared, so the
+      // confirmation modal can still show what was bought (D-11).
+      setConfirmedItems(items);
       clearCart();
       
       // Show confirmation
@@ -431,6 +438,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
               }}
               orderId={orderId}
               userId={userId}
+              items={confirmedItems}
             />
           )}
         </div>
