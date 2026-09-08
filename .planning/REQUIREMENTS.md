@@ -14,7 +14,7 @@ Requirements for this milestone. Each maps to a roadmap phase.
 - [ ] **CAT-01**: The catalogue has one active gift card product with `type = 'gift_card'`, `fulfillment_type = 'digital'`, and four variants priced $25, $50, $100, and $200, recorded in `data/d1/seed.sql` and applied to production D1 with idempotent SQL
 - [ ] **CAT-02**: The gift card is listed in the Featured category and renders on the home page, the Featured grid, the product page, and search like any other product, showing the selected denomination's price
 - [ ] **CAT-03**: The product has a Workers AI image in the catalogue's dark-studio style, stored in `data/r2/products/` and uploaded to the public bucket
-- [ ] **CAT-04**: Gift card variants never show as out of stock and a paid order does not decrement inventory for them
+- [x] **CAT-04**: Gift card variants never show as out of stock and a paid order does not decrement inventory for them
 
 ### Storefront purchase
 
@@ -74,7 +74,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CAT-01 | Phase 9 | Pending |
 | CAT-02 | Phase 9 | Pending |
 | CAT-03 | Phase 9 | Pending |
-| CAT-04 | Phase 9 | Pending |
+| CAT-04 | Phase 9 | Complete |
 | SHOP-01 | Phase 10 | Pending |
 | SHOP-02 | Phase 10 | Pending |
 | SHOP-03 | Phase 10 | Pending |
@@ -91,6 +91,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONTENT-03 | Phase 12 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 18 total
 - Mapped to phases: 18
 - Unmapped: 0 ✓
