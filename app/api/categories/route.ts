@@ -3,6 +3,7 @@ import { listCategories, createCategory, updateCategory, listCategoriesWithRealT
 import type { ApiResponse, Category } from "@/lib/types";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
 import { errorDetails } from "@/lib/utils/error-response";
+import { revalidateCategoryNav } from "@/lib/cache-tags";
 
 function categoryValidationMessage(error: unknown): string | undefined {
   if (!(error instanceof Error)) return undefined;
@@ -93,6 +94,7 @@ export async function POST(request: NextRequest) {
     }
     // Optionally, add more MACH spec validation here
     const category = await createCategory(body as Category);
+    revalidateCategoryNav();
     const response: ApiResponse<Category> = {
       data: category,
       meta: {
