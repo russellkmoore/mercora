@@ -1,0 +1,100 @@
+# Requirements: Mercora v2.1 Gift Card Product
+
+**Defined:** 2026-09-07
+**Core Value:** A customer or an external AI agent can find the right product through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
+
+**Milestone goal:** A shopper can buy a Voltique gift card on the storefront and the recipient receives it by email, using the gift card backend that shipped in v1 (PR #79, locked behind ADR-CTB-10). This milestone adds the storefront front half, the catalogue entry, and production enablement. It changes nothing in `lib/gift-cards/` money paths.
+
+## v1 Requirements
+
+Requirements for this milestone. Each maps to a roadmap phase.
+
+### Catalogue
+
+- [ ] **CAT-01**: The catalogue has one active gift card product with `type = 'gift_card'`, `fulfillment_type = 'digital'`, and four variants priced $25, $50, $100, and $200, recorded in `data/d1/seed.sql` and applied to production D1 with idempotent SQL
+- [ ] **CAT-02**: The gift card is listed in the Featured category and renders on the home page, the Featured grid, the product page, and search like any other product, showing the selected denomination's price
+- [ ] **CAT-03**: The product has a Workers AI image in the catalogue's dark-studio style, stored in `data/r2/products/` and uploaded to the public bucket
+- [ ] **CAT-04**: Gift card variants never show as out of stock and a paid order does not decrement inventory for them
+
+### Storefront purchase
+
+- [ ] **SHOP-01**: On a gift card product page the shopper sees a recipient form (recipient email required; recipient name, message, and delivery date optional) in place of the physical-product add-to-cart controls
+- [ ] **SHOP-02**: The form validates client-side with the same limits the server enforces (email format, 254/100/500 character caps, no control characters) and shows field-level errors; add to cart stays disabled until the form is valid
+- [ ] **SHOP-03**: A signed-in shopper can choose "Send to myself", which fills the recipient email and name from their account; guests do not see the option
+- [ ] **SHOP-04**: Adding to cart creates a line that carries the recipient customization; two gift cards for different recipients stay as separate lines, the same recipient and denomination merge into one line
+- [ ] **SHOP-05**: The recipient name, email, message, and delivery date are visible on the cart item, the checkout order summary, the order confirmation, and the account order detail page
+- [ ] **SHOP-06**: When every line in the cart is digital, web checkout hides the shipping address and shipping method steps and submits the order without an address; carts that also hold physical items are unchanged
+- [ ] **SHOP-07**: A gift-card-only order paid in Stripe test mode on production results in an issued gift card, a delivery email to the recipient, and the card appearing under Account → Gift Cards for the recipient's account
+
+### Production enablement
+
+- [ ] **OPS-01**: The code HMAC key ring (`GIFT_CARD_CODE_HMAC_CURRENT_VERSION`, `GIFT_CARD_CODE_HMAC_KEYS_JSON`) and the delivery key ring (`GIFT_CARD_DELIVERY_CURRENT_VERSION`, `GIFT_CARD_DELIVERY_KEYS_JSON`) are generated with at least 32-byte secrets and stored only as Worker secrets and in local `.dev.vars`; nothing lands in `wrangler.jsonc`, source, docs, or git history
+- [ ] **OPS-02**: `STORE_FEATURE_GIFT_CARD_RECONCILIATION` is enabled and deployed first, then `STORE_FEATURE_GIFT_CARD_ACQUISITION`, in `wrangler.jsonc` `vars`, with `cloudflare-env.d.ts` regenerated and `cf-typecheck` passing
+- [ ] **OPS-03**: `docs/runtime-configuration.md` documents the delivery key ring alongside the code HMAC ring, and `docs/DEPLOYMENT_SETUP.md` carries a step-by-step enablement recipe (generate keys, put secrets, enable reconciliation, verify, enable acquisition)
+- [ ] **OPS-04**: `.env.example` shows the shape of all four gift card secrets with placeholder values so a developer can exercise the full flow locally
+
+### Content and assistant
+
+- [ ] **CONTENT-01**: The gift card support article in `data/r2/knowledge_md/` describes what actually ships (four denominations, immediate email delivery after payment, no expiry, no cash redemption, how to redeem at checkout, where to check a balance) and is uploaded to R2
+- [ ] **CONTENT-02**: Volt is re-indexed and recommends the gift card when a shopper asks about gifts, presents, or vouchers
+- [ ] **CONTENT-03**: The Terms of Service page gains a gift card section (email delivery, no expiry, no cash redemption, not transferable for resale) published through Admin → Pages
+
+## v2 Requirements
+
+Deferred to a later milestone. Tracked but not in the current roadmap.
+
+### Storefront purchase
+
+- **SHOP-08**: The optional delivery date actually delays the recipient email until that date (today the date is captured and shown but issuance sends immediately)
+- **SHOP-09**: A custom-amount variant lets the shopper type any value within a merchant-set range
+
+### Catalogue
+
+- **CAT-05**: A dedicated Gift Cards category in the nav
+
+## Out of Scope
+
+Explicitly excluded. Documented to prevent scope creep.
+
+| Feature | Reason |
+|---------|--------|
+| Any change to `lib/gift-cards/` money paths (tender, reservation, issuance, refunds) | Shipped and verified in v1; ADR-CTB-10 is locked. This milestone is front half and enablement only |
+| Physical or printed gift cards | Gift cards are stored value delivered by email; a physical SKU is a different fulfilment model |
+| Bulk or corporate gift card purchase | Single recipient per line is what the customization contract supports |
+| Buying a gift card through the MCP server | MCP checkout already carries the line shape; no agent-facing form exists to design and none was asked for |
+| Gift card balance top-up or reload | Not in the v1 domain model |
+| Live Stripe keys | Production stays a demo environment on `pk_test_` keys by prior decision |
+
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| CAT-01 | — | Pending |
+| CAT-02 | — | Pending |
+| CAT-03 | — | Pending |
+| CAT-04 | — | Pending |
+| SHOP-01 | — | Pending |
+| SHOP-02 | — | Pending |
+| SHOP-03 | — | Pending |
+| SHOP-04 | — | Pending |
+| SHOP-05 | — | Pending |
+| SHOP-06 | — | Pending |
+| SHOP-07 | — | Pending |
+| OPS-01 | — | Pending |
+| OPS-02 | — | Pending |
+| OPS-03 | — | Pending |
+| OPS-04 | — | Pending |
+| CONTENT-01 | — | Pending |
+| CONTENT-02 | — | Pending |
+| CONTENT-03 | — | Pending |
+
+**Coverage:**
+- v1 requirements: 18 total
+- Mapped to phases: 0
+- Unmapped: 18 ⚠️
+
+---
+*Requirements defined: 2026-09-07*
+*Last updated: 2026-09-07 after initial definition*
