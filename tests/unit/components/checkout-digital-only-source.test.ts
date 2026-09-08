@@ -64,3 +64,35 @@ describe('CheckoutClient digital-only source contract (D-01, D-02, D-03)', () =>
     expect((source.match(/Shipping Address/g) ?? []).length).toBe(2);
   });
 });
+
+describe('CheckoutClient confirmed-items snapshot source contract (D-11, SHOP-05)', () => {
+  it('declares a confirmedItems state typed as StableCartItem[]', () => {
+    expect(source).toMatch(/confirmedItems.*useState<StableCartItem\[\]>\(\[\]\)/);
+  });
+
+  it('calls setConfirmedItems with the destructured items value immediately before each clearCart() call', () => {
+    const lines = source.split('\n');
+    const clearIndexes = lines
+      .map((line, i) => (line.includes('clearCart()') ? i : -1))
+      .filter((i) => i !== -1);
+    expect(clearIndexes.length).toBe(2);
+    for (const idx of clearIndexes) {
+      const precedingLines = lines.slice(Math.max(0, idx - 3), idx).join('\n');
+      expect(precedingLines).toMatch(/setConfirmedItems\(items\)/);
+    }
+  });
+
+  it('takes the snapshot from the destructured items value, not a fresh store read', () => {
+    expect(source).not.toMatch(/setConfirmedItems\(useCartStore\.getState\(\)/);
+    expect(source).toContain('setConfirmedItems(items)');
+  });
+
+  it('passes confirmedItems to OrderConfirmationModal as its items prop', () => {
+    expect(source).toContain('items={confirmedItems}');
+  });
+
+  it('still clears the cart and transitions to confirmation at both sites', () => {
+    expect((source.match(/clearCart\(\)/g) ?? []).length).toBe(2);
+    expect((source.match(/setCurrentStep\('confirmation'\)/g) ?? []).length).toBe(2);
+  });
+});
