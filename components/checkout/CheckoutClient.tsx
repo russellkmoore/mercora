@@ -28,7 +28,8 @@
 
 "use client";
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useUser } from '@clerk/nextjs';
 import { useCartStore } from '@/lib/stores/cart-store';
 import StripeProvider from './StripeProvider';
 import PaymentForm from './PaymentForm';
@@ -91,6 +92,23 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
   const [giftCardToken, setGiftCardToken] = useState('');
   const giftCardRequestKey = useRef<string | undefined>(undefined);
 
+  // Prefill a signed-in shopper's name and email from Clerk (D-03). Guarded
+  // on the field currently being empty, so it can seed a blank form but can
+  // never overwrite something the shopper has already typed; not gated on
+  // isDigitalOnly, since a signed-in shopper's own identity is equally right
+  // to prefill on a physical checkout.
+  const { isLoaded, isSignedIn, user } = useUser();
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !user) return;
+    setAddress((prev) => {
+      const next = { ...prev };
+      if (!next.recipient && user.fullName) next.recipient = user.fullName;
+      const clerkEmail = user.primaryEmailAddress?.emailAddress;
+      if (!next.email && clerkEmail) next.email = clerkEmail;
+      return next;
+    });
+  }, [isLoaded, isSignedIn, user]);
+
   // Handle address form changes
   const handleAddressChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -106,9 +124,10 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
 
     try {
       if (isDigitalOnly) {
-        // Nothing ships: skip /api/shipping-options and the shipping-method
-        // panel entirely, and go straight to payment with the digital
-        // method id and the address the shopper just submitted (D-01).
+        // A digital-only cart has nothing to ship: skip /api/shipping-options
+        // and the shipping-method panel entirely, and go straight to payment
+        // with the digital method id and the address the shopper just
+        // submitted (D-01).
         const billingAddress = {
           recipient: address.recipient || '',
           email: address.email || '',
@@ -300,9 +319,20 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
     );
   }
 
+  // The step array and its index move together — a three-label bar with the
+  // four-label index would fill the wrong circle (D-02, RESEARCH Pitfall 4).
+  const progressBarProps = isDigitalOnly
+    ? {
+        steps: [...DIGITAL_CHECKOUT_STEPS],
+        step: currentStep === 'shipping' ? 0 : currentStep === 'payment' ? 1 : 2,
+      }
+    : {
+        step: currentStep === 'shipping' ? 0 : currentStep === 'payment' ? 2 : 3,
+      };
+
   return (
     <div className="space-y-4">
-      <ProgressBar step={currentStep === 'shipping' ? 0 : currentStep === 'payment' ? 2 : 3} />
+      <ProgressBar {...progressBarProps} />
 
       {error && (
         <div className="bg-danger/10 border border-danger text-danger px-4 py-3 rounded-lg">
@@ -312,10 +342,12 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
 
       <div className="flex flex-col xl:grid xl:grid-cols-[1fr_1.6fr] gap-4 lg:gap-6 w-full">
         <div className="space-y-6 min-w-0">
-          {/* Shipping Address Section */}
+          {/* Address Section */}
           {currentStep === 'shipping' ? (
             <div className="bg-surface-elevated p-6 rounded-xl">
-              <h3 className="text-lg font-semibold mb-4 text-foreground">Shipping Address</h3>
+              <h3 className="text-lg font-semibold mb-4 text-foreground">
+                {isDigitalOnly ? 'Billing details' : 'Shipping Address'}
+              </h3>
               <ShippingForm
                 address={address}
                 onChange={handleAddressChange}
@@ -324,12 +356,20 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
                 }
                 onSubmit={handleAddressSubmit}
                 error={null}
+                {...(isDigitalOnly
+                  ? {
+                      heading: 'Billing details',
+                      helperText: 'Nothing ships — we need this for your receipt and tax.',
+                    }
+                  : {})}
               />
             </div>
           ) : (currentStep === 'payment' || currentStep === 'confirmation') && shippingAddress && (
             <div className="bg-surface p-4 rounded-lg border-l-4 border-success">
               <div className="flex justify-between items-start mb-2">
-                <h4 className="font-semibold text-foreground">Shipping Address</h4>
+                <h4 className="font-semibold text-foreground">
+                  {isDigitalOnly ? 'Billing details' : 'Shipping Address'}
+                </h4>
                 <button
                   onClick={handleBackToShipping}
                   className="text-sm text-success hover:text-success/90 font-medium"
