@@ -126,10 +126,10 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
 
     try {
       if (isDigitalOnly) {
-        // A digital-only cart has nothing to ship: skip /api/shipping-options
-        // and the shipping-method panel entirely, and go straight to payment
-        // with the digital method id and the address the shopper just
-        // submitted (D-01).
+        // A digital-only cart has nothing to ship: skip the shipping-options
+        // lookup and the shipping-method panel entirely, and go straight to
+        // payment with the digital method id and the address the shopper
+        // just submitted (D-01).
         const billingAddress = {
           recipient: address.recipient || '',
           email: address.email || '',
