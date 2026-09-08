@@ -3,14 +3,20 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 
-export default function ProgressBar({ step }: { step: number }) {
-  const steps = [
-    "Shipping Address",
-    "Shipping Method",
-    "Payment Information",
-    "Order Submitted",
-  ];
+const DEFAULT_STEPS = [
+  "Shipping Address",
+  "Shipping Method",
+  "Payment Information",
+  "Order Submitted",
+];
 
+export default function ProgressBar({
+  step,
+  steps = DEFAULT_STEPS,
+}: {
+  step: number;
+  steps?: string[];
+}) {
   const [fillWidths, setFillWidths] = useState<number[]>(steps.map(() => 0));
 
   useEffect(() => {
