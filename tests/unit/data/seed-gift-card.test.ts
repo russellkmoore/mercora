@@ -59,6 +59,14 @@ describe("gift-card seed block: sentinel-delimited, replay-safe INSERT OR IGNORE
     expect(insertMatches).toHaveLength(3);
   });
 
+  it("orders INSERT OR IGNORE statements as products, then product_variants, then pricing", () => {
+    const slice = stripCommentLines(extractGiftCardSlice(seedSql));
+    const tableOrder = Array.from(
+      slice.matchAll(/INSERT OR IGNORE INTO (\w+)/g),
+    ).map((match) => match[1]);
+    expect(tableOrder).toEqual(["products", "product_variants", "pricing"]);
+  });
+
   it("names prod_33 and variant_33 through variant_36, and no other product id", () => {
     const slice = stripCommentLines(extractGiftCardSlice(seedSql));
 
