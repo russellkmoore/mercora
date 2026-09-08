@@ -1,6 +1,6 @@
 ---
 phase: 09-gift-card-catalogue
-reviewed: 2026-09-08T00:00:00Z
+reviewed: 2026-09-08T08:52:00Z
 depth: standard
 files_reviewed: 7
 files_reviewed_list:
@@ -13,10 +13,10 @@ files_reviewed_list:
   - tests/unit/lib/services/inventory-adjustments.test.ts
 findings:
   critical: 0
-  warning: 1
+  warning: 0
   info: 2
-  total: 3
-status: issues_found
+  total: 2
+status: clean
 ---
 
 # Phase 9: Code Review Report
@@ -24,58 +24,37 @@ status: issues_found
 **Reviewed:** 2026-09-08
 **Depth:** standard
 **Files Reviewed:** 7
-**Status:** issues_found
+**Status:** clean
 
 ## Summary
 
-This phase adds a `data/d1/seed.sql` block seeding a `gift_card`/`digital` catalogue product
-(`prod_33`, variants `variant_33..36`, `price_33`), four new unit test files that exercise the
-existing availability, inventory-adjustment, and serializer logic against that shape, and two
-documentation fixes (a stale seed-file path in `DEPLOYMENT_SETUP.md`, two dead links in
-`theming.md`).
+This is iteration 2 of the `--auto` fix loop, re-reviewing after commit `9f9e70a` addressed WR-01
+from the prior review (`09-REVIEW.iter2.md`).
 
-I traced the seed data against `migrations/0001_initial_schema.sql` column-by-column for
-`products`, `product_variants`, and `pricing` — column counts, value counts, and `CHECK`
-constraints all agree, every JSON blob in the new block parses, and both embedded apostrophes in
-the product description are correctly SQL-escaped (`''`). All three `INSERT`s use
-`INSERT OR IGNORE`, matching the idempotency claim in the block's own comment and in the new
-`DEPLOYMENT_SETUP.md` production-apply recipe (verified the `sed` sentinel-slice command actually
-produces a complete, valid three-statement SQL file). The `docs/theming.md` link fix points at a
-file that now genuinely exists at the new path (`.planning/milestones/v2-phases/...`), while the
-old path is gone.
+**WR-01 verification:** Read `tests/unit/data/seed-gift-card.test.ts:62-69`. The fixer added the
+exact test the previous review specified: it extracts the gift-card seed slice, strips comments,
+collects every `INSERT OR IGNORE INTO <table>` match in document order via
+`slice.matchAll(/INSERT OR IGNORE INTO (\w+)/g)`, and asserts the resulting table sequence equals
+`["products", "product_variants", "pricing"]`. This closes the gap the previous review identified
+— a future edit that reorders the block (e.g., variants before the parent product row) will now
+fail this test regardless of whether `PRAGMA foreign_keys` is on for the connection. Ran
+`mise exec -- npx vitest run tests/unit/data/seed-gift-card.test.ts`: 10/10 tests pass, including
+the new one. WR-01 is resolved.
 
-I also read the production code behind every test (`lib/inventory/availability.ts`,
-`lib/services/inventory-adjustments.ts`, `lib/gift-cards/checkout.ts`,
-`lib/models/mach/product-serializer.ts`) and confirmed the tests exercise real behavior rather
-than mocking it away: `aggregateOrderDemand`'s gift-card skip, `isGiftCardOrderLine`'s
-`fulfillment_type`+`gift_card` predicate, and `toPublicProduct`'s `isVariantAvailable`-driven
-`available_for_sale` projection are all genuinely reached by the new fixtures, using a
-hand-written D1 fake rather than module mocks for the batch-call assertions. The one substantive
-issue found is a test correctness gap, not a production defect — see WR-01.
+**Regression check on the other six files:** `git diff 51d6c68..HEAD` (the commit that produced
+the previous review) shows the *only* change since that review is the 8-line addition to
+`seed-gift-card.test.ts` above — `data/d1/seed.sql`, `docs/DEPLOYMENT_SETUP.md`, `docs/theming.md`,
+`availability.test.ts`, `product-serializer.test.ts`, and `inventory-adjustments.test.ts` are
+byte-identical to the versions already reviewed at standard depth in iteration 1. No new code was
+introduced in those files, so no new regressions are possible. Ran the full set of the four
+gift-card-related test files together (`seed-gift-card`, `availability`, `product-serializer`,
+`inventory-adjustments`): 35/35 pass.
 
-## Warnings
-
-### WR-01: `seed-gift-card.test.ts` never asserts the products/variants/pricing statements appear in that order
-
-**File:** `tests/unit/data/seed-gift-card.test.ts:56-60`
-**Issue:** The test `"the slice contains exactly three statements, each an INSERT OR IGNORE INTO"`
-counts `INSERT OR IGNORE INTO` occurrences but never checks *which* tables they target or that
-`products` precedes `product_variants` precedes `pricing`. Because `product_variants.product_id`
-and `pricing.product_id` both reference `products.id`, and D1/SQLite only enforces foreign keys
-when `PRAGMA foreign_keys = ON` is active for the connection, a future edit that reorders the
-block (e.g. variants before the product row) would pass every existing assertion in this file
-while silently becoming order-dependent on FK enforcement being off. That's the kind of thing a
-sentinel-block test suite exists to catch.
-**Fix:**
-```ts
-it("orders INSERT OR IGNORE statements as products, then product_variants, then pricing", () => {
-  const slice = stripCommentLines(extractGiftCardSlice(seedSql));
-  const tableOrder = Array.from(
-    slice.matchAll(/INSERT OR IGNORE INTO (\w+)/g),
-  ).map((match) => match[1]);
-  expect(tableOrder).toEqual(["products", "product_variants", "pricing"]);
-});
-```
+No Critical or Warning findings remain. The two Info items from the previous review
+(IN-01: single-pricing-row-per-product is an established pre-existing convention, not a defect;
+IN-02: the `sed` sentinel-slice recipe in `DEPLOYMENT_SETUP.md` has no guard against sentinel text
+drift) were not addressed by the fixer and were not required to be — they're carried forward
+unchanged below for visibility, not because they block ship.
 
 ## Info
 
@@ -85,11 +64,9 @@ it("orders INSERT OR IGNORE statements as products, then product_variants, then 
 **Issue:** `price_33` carries `list_price`/`sale_price` of `'2500'` (the $25 variant), but
 `prod_33` has four variants priced $25/$50/$100/$200. Any caller that reads the `pricing` table
 for a product-level display price (rather than the selected variant's `product_variants.price`)
-will show $25 regardless of which denomination is in view. This exactly mirrors the pre-existing
-pattern for other multi-variant products in this file (e.g. `prod_1`/`variant_1`/`variant_1_xl`
-only has one `pricing` row matching the base variant), so it is not a regression introduced by
-this phase — flagging only because a reviewer skimming the gift-card block in isolation, without
-the multi-variant precedent, could reasonably read it as a bug.
+will show $25 regardless of which denomination is in view. This mirrors the pre-existing pattern
+for other multi-variant products in this file (e.g. `prod_1`/`variant_1`/`variant_1_xl` only has
+one `pricing` row matching the base variant), so it is not a regression introduced by this phase.
 **Fix:** No action needed if this is accepted as the established one-`pricing`-row-per-product
 convention. If a future phase wants per-denomination display pricing sourced from `pricing`
 directly, that would need a schema/product-model change well outside this phase's scope.
@@ -97,10 +74,10 @@ directly, that would need a schema/product-model change well outside this phase'
 ### IN-02: `sed -n '...'p'` slice recipe in `DEPLOYMENT_SETUP.md` depends on exact sentinel text staying byte-identical
 
 **File:** `docs/DEPLOYMENT_SETUP.md:293-299`
-**Issue:** The documented `sed -n '/^-- BEGIN gift-card-block (Phase 9)$/,/^-- END gift-card-block (Phase 9)$/p'` command anchors on the literal sentinel text with `^...$`. It works today (verified
-by running it against the current file) but has no guard against a future edit that reflows or
-retitles the sentinel comment — the failure mode is a silent empty/partial slice rather than an
-error, since `sed` doesn't complain about an unmatched address range.
+**Issue:** The documented `sed -n '/^-- BEGIN gift-card-block (Phase 9)$/,/^-- END gift-card-block (Phase 9)$/p'` command anchors on the literal sentinel text with `^...$`. It works today but has
+no guard against a future edit that reflows or retitles the sentinel comment — the failure mode is
+a silent empty/partial slice rather than an error, since `sed` doesn't complain about an unmatched
+address range.
 **Fix:** Optional: add a one-line note that an empty output file from this command means the
 sentinel text was not found verbatim and to grep for the current `-- BEGIN ... (Phase N)` line
 before slicing, rather than trusting the copy-pasted command silently.
