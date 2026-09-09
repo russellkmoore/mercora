@@ -1,6 +1,6 @@
 # Runtime configuration
 
-**Status:** Current (2026-09-05).
+**Status:** Current (2026-09-09).
 
 Mercora has neutral demo defaults in `lib/store-config.ts`. A storefront can
 override public, non-secret values without editing components. The configuration
@@ -20,6 +20,7 @@ time.
 | Gift-card reconciliation | `STORE_FEATURE_GIFT_CARD_RECONCILIATION=true` (defaults off; keep enabled while reservations or balances exist) |
 | Optional gift-card acquisition | `STORE_FEATURE_GIFT_CARD_ACQUISITION=true` (defaults off and requires reconciliation enabled) |
 | Gift-card bearer lookup secrets | Server-only `GIFT_CARD_CODE_HMAC_CURRENT_VERSION` plus `GIFT_CARD_CODE_HMAC_KEYS_JSON` (at most four versioned keys; never `NEXT_PUBLIC_*`) |
+| Gift-card delivery encryption secrets | Server-only `GIFT_CARD_DELIVERY_CURRENT_VERSION` plus `GIFT_CARD_DELIVERY_KEYS_JSON` (at most four versioned AES-256 keys, base64-encoded, `base64:`-prefixed; never `NEXT_PUBLIC_*`) |
 | Subscription reconciliation | `STORE_FEATURE_SUBSCRIPTION_RECONCILIATION=true` (defaults off; keep enabled after the first subscription is sold) |
 | Optional subscription acquisition | `STORE_FEATURE_SUBSCRIPTION_ACQUISITION=true` plus a bounded `STORE_SUBSCRIPTION_TERMS_VERSION` matching the published recurring terms (defaults off and requires reconciliation enabled) |
 | Outbound email | `EMAIL_PROVIDER=cloudflare\|resend`; Cloudflare `EMAIL` binding (recommended) or encrypted `RESEND_API_KEY` |
@@ -67,6 +68,21 @@ and the ring is bounded to four keys. Store these values in local `.dev.vars`
 or encrypted Cloudflare secrets. They are intentionally absent from
 `StoreConfig`, browser configuration, committed deployment files, telemetry,
 and errors.
+
+`GIFT_CARD_DELIVERY_KEYS_JSON` is a JSON object whose canonical positive
+integer property names are key versions. Unlike the HMAC ring, every value
+carries the literal `base64:` prefix, and the remainder must decode to
+exactly 32 bytes — the AES-256 key length exported as
+`GIFT_CARD_DELIVERY_KEY_BYTES` from `lib/gift-cards/encryption.ts`. This ring
+is versioned independently of the HMAC ring. The current version must be
+present, and the ring is bounded to four keys. Store these values in local
+`.dev.vars` or encrypted Cloudflare secrets, never in `wrangler.jsonc`. They
+are intentionally absent from `StoreConfig`, browser configuration,
+committed deployment files, telemetry, and errors. Unlike the HMAC ring, the
+delivery ring is parsed on every scheduled delivery drain once reconciliation
+is enabled, and that parse happens before the drain checks whether anything
+is pending — so a malformed value fails the recovery cron every five minutes
+rather than failing one request when someone finally buys a card.
 
 Core one-time checkout never interprets catalog products as subscription
 acquisition. Products that also have subscription plans remain available for a
