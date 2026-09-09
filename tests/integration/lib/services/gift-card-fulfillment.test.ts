@@ -54,6 +54,8 @@ function giftOrder(giftMessage?: string): Order {
 function runtimeEnvironment(): Record<string, unknown> & { DB: D1Database } {
   return {
     DB: env.DB,
+    EMAIL: { send: vi.fn() },
+    EMAIL_PROVIDER: 'cloudflare',
     GIFT_CARD_CODE_HMAC_CURRENT_VERSION: '1',
     GIFT_CARD_CODE_HMAC_KEYS_JSON: JSON.stringify({ 1: hmacKey }),
     GIFT_CARD_DELIVERY_CURRENT_VERSION: '1',
@@ -191,9 +193,10 @@ describe('gift-card issuance and durable delivery on real D1', () => {
   it('escalates a permanently failing delivery to review after the attempt budget', async () => {
     const order = giftOrder();
     await insertOrder(order);
+    // A provider-configuration failure reports no provider at all (the sender
+    // never picked one); the envelope must still name email, not the database.
     mocks.send.mockResolvedValue({
-      success: false, provider: 'cloudflare', error: 'permanent bounce',
-      errorCode: 'E_PROVIDER_CONFIG',
+      success: false, error: 'permanent bounce', errorCode: 'E_PROVIDER_CONFIG',
     });
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
@@ -217,13 +220,14 @@ describe('gift-card issuance and durable delivery on real D1', () => {
         operation: 'send',
         outcome: 'failed',
         provider: 'cloudflare_email',
-        trigger: 'recovery',
+        // Attempt 1 is the immediate post-payment send, not the recovery drain.
+        trigger: 'request',
         retryable: true,
         attempt: 1,
       },
     });
     // The last attempt is the one that parks the row for a human.
-    expect(logged.at(-1)?.fields).toMatchObject({ attempt: 8, retryable: false });
+    expect(logged.at(-1)?.fields).toMatchObject({ attempt: 8, retryable: false, trigger: 'recovery' });
     // The tail worker only alerts on events in its critical list.
     expect(TAIL_CRITICAL_EVENTS).toContain('gift_card.delivery_failed');
     // Nothing free-text survives sanitizeTelemetryFields, so the provider's own
@@ -330,6 +334,7 @@ describe('gift-card issuance and durable delivery on real D1', () => {
       .bind('{ not json', order.id).run();
 
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     mocks.send.mockResolvedValueOnce({ success: true, id: 'no-snapshot' });
     await expect(drainGiftCardDeliveries({ environment: runtimeEnvironment(), now: now + 1 }))
       .resolves.toEqual({ attempted: 1 });
@@ -344,14 +349,21 @@ describe('gift-card issuance and durable delivery on real D1', () => {
 
     // IN-05: fail soft, but not in silence -- the article states as fact that
     // the note is included, so a snapshot that stops being readable has to say so.
-    const dropped = errorSpy.mock.calls
+    // The card was delivered, so this is a warning, never the critical paging event.
+    const paged = errorSpy.mock.calls
       .map((call) => JSON.parse(String(call[0])))
       .filter((entry) => entry.event === 'gift_card.delivery_failed');
+    expect(paged).toHaveLength(0);
+    const dropped = warnSpy.mock.calls
+      .map((call) => JSON.parse(String(call[0])))
+      .filter((entry) => entry.event === 'gift_card.delivery_note_dropped');
     expect(dropped).toHaveLength(1);
     expect(dropped[0]).toMatchObject({
-      fields: { provider: 'd1', retryable: true },
+      severity: 'warning',
+      fields: { outcome: 'degraded', provider: 'd1', retryable: false },
       error_class: 'SyntaxError',
     });
     errorSpy.mockRestore();
+    warnSpy.mockRestore();
   });
 });
