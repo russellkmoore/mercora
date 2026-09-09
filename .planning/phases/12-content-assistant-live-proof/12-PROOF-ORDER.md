@@ -1,142 +1,195 @@
 # Phase 12 — Live Gift-Card Purchase Proof (SHOP-07)
 
-**Status: HALTED before payment. No card was bought. No money moved. No gift card was issued.**
+**Attempt 2.** Attempt 1 halted before payment on a production tax finding and bought
+nothing; its record is preserved verbatim in `12-PROOF-ORDER-attempt1.md` and is still the
+authority on that finding. The fallback-tax fix (`3b821f7`) was deployed at
+2026-09-09T21:05:06Z before this attempt ran.
 
-**Run id:** `phase12-20260909-6a3455`
-**Attempted:** 2026-09-09T20:52:46Z by plan 12-05, Task 1 (scripted guest checkout, Stripe test mode)
+**Run id:** `phase12-20260909-80403f`
+**Executed:** 2026-09-09T21:24:15.669Z by plan 12-05, Task 1 (scripted guest checkout, Stripe test mode)
 **Store:** https://voltique.russellkmoore.me
-**Halted at:** Task 1 step 6 — the plan's own amount assertion, which fired before the payment was confirmed.
 
----
-
-## 1. What happened
-
-The plan told the script to check the quoted amount before confirming payment, and to stop if
-it was not $25.00. The quote came back **$27.06**. The script stopped there, exactly as written.
+## 1. Order created (POST /api/payment-intent)
 
 | Field | Value |
 |---|---|
-| Order id (created, never paid) | `WEB-GUEST-1788987166118-30E971BD` |
-| Payment intent id (created, never confirmed) | `pi_3UDsU6LL7e1EcFUl0hlGh34j` |
-| Quoted subtotal | 2500 minor units ($25.00) — correct |
-| Quoted tax | **206 minor units ($2.06) — not expected** |
-| Quoted total | 2706 minor units ($27.06) |
+| Order id | `WEB-GUEST-1788989054887-B4382C10` |
+| Payment intent id | `pi_3UDsyZLL7e1EcFUl0KV8QOiJ` |
+| Amount | 2500 minor units ($25.00) |
 | Currency | USD |
-| Order status / payment status | `pending` / `pending` |
-| `customer_id` on the order | `NULL` (guest checkout, as designed by D-05) |
 | Product / variant | `prod_33` / `variant_33`, quantity 1 |
-| Recipient in the request | russellkmoore@mac.com ("Russell") |
-| Message in the request | Phase 12 live proof — Voltique gift card (run phase12-20260909-6a3455) |
+| Recipient | russellkmoore@mac.com ("Russell") |
+| Recipient message | Phase 12 live proof — Voltique gift card (run phase12-20260909-80403f) |
 | Delivery date | none sent (D-05) |
 | Shipping method id | `digital` |
+| Purchaser | guest (no Clerk session) |
+| Timestamp | 2026-09-09T21:24:15.669Z |
 
-Both guards passed before anything was called: the proof artifact did not exist, and
-`gift_card_accounts` held zero rows. The Stripe credential used was only the public
-`pk_test_` publishable key read from the committed `wrangler.jsonc` vars block; the script
-also verified that no secret-prefixed Stripe key appears in that file or in the environment.
-The client secret returned by the payment-intent response was held in memory only and was
-discarded when the script exited — it was never printed, written here, or passed as a shell
-argument.
+The client secret returned alongside these fields was held in memory only for the
+duration of the confirm call: never printed, never written here, never passed as a
+shell argument. Stripe requires it never be stored, logged, or exposed.
 
-**Current production state, re-read after the halt:**
+## 2. Payment confirmed (Stripe test mode)
 
-| Table | Rows | Meaning |
-|---|---|---|
-| `gift_card_accounts` | 0 | no card was issued |
-| `gift_card_deliveries` | 0 | no delivery was queued |
-| `email_deliveries` | 0 | no email was sent |
+| Field | Value |
+|---|---|
+| Endpoint | `POST https://api.stripe.com/v1/payment_intents/{id}/confirm` |
+| Auth | public `pk_test_` publishable key (HTTP basic username, empty password) |
+| Payment method | `pm_card_visa` (Stripe test Visa) |
+| Returned status | **succeeded** |
+| Timestamp | 2026-09-09T21:24:16.548Z |
 
-The order row above is an unpaid pending order — the same state an abandoned browser checkout
-leaves behind. Two other unpaid guest pending orders from 2026-08-30 already sit in that table,
-so this is a pre-existing shape, not new damage. No D1 write of any kind was made by this plan;
-that row was written by the production Worker's own payment-intent route.
+## 3. Order finalized (POST /api/orders)
+
+| Field | Value |
+|---|---|
+| Request body | `orderId` + `paymentIntentId` only |
+| HTTP status | **200** |
+| Response | `{"data":{"id":"WEB-GUEST-1788989054887-B4382C10"},"meta":{"schema":"mach:order","idempotent":false}}` |
+| Server-side check | `finalizeOrderPayment` re-retrieved the PaymentIntent with the server's own secret key and matched status, order id, currency and amount against its own quote. The client's report of success is never trusted. |
+| Timestamp | 2026-09-09T21:24:19.187Z |
+
+
+## 4. Read-only evidence
+
+Every query below names its columns explicitly and filters on this run's order. No column whose
+name begins with the code prefix, and no ciphertext or nonce column, was ever selected (D-07).
+Account and delivery row ids are deliberately omitted from this artifact as well, per the
+carried-forward rule that no account id appears in any artifact.
+
+### Order (`orders`, by `id`)
+
+| Column | Value |
+|---|---|
+| status | `processing` |
+| payment_status | **`paid`** |
+| total_amount | **2500 USD** |
+| currency_code | USD |
+
+Read at 2026-09-09T21:24:35Z. The total is exactly the $25.00 list price — no tax — which is the
+fallback-tax fix (`3b821f7`) behaving as intended for a nontaxable line.
+
+### Issued gift card (`gift_card_accounts`, by `issued_order_id`)
+
+| Column | Value |
+|---|---|
+| rows for this order | **exactly 1** |
+| status | **`active`** |
+| currency_code | USD |
+| issued_amount_minor | **2500** |
+| purchaser_customer_id | **NULL** |
+| created_at | 1788989057 (2026-09-09T21:24:17Z) |
+
+Issuance ran synchronously at finalization — about two seconds after the order was paid, not on a
+later cron cycle.
+
+### Delivery (`gift_card_deliveries`, by `order_id`) — **did not reach `sent`**
+
+| Observed at | status | attempt_count | deliver_after | completed_at |
+|---|---|---|---|---|
+| 21:25:00Z | `pending` | 1 | 0 | NULL |
+| 21:27:04Z | `pending` | 2 | 0 | NULL |
+| 21:28:55Z | `pending` | 2 | 0 | NULL |
+| 21:35:51Z | `pending` | **4** | 0 | NULL |
+
+`recipient_email` reads `russellkmoore@mac.com` throughout — correct. Exactly one delivery row
+exists for this order. After two full five-minute cron cycles the status is still `pending` with
+a rising attempt count, so per the plan this is recorded as a finding and the wait stops here
+rather than continuing indefinitely.
+
+### Email delivery (`email_deliveries`, joined on the delivery's idempotency key)
+
+**No row exists.** The join returns zero results, so no send was ever recorded for this order —
+which means the phase's open question, "which email provider does production actually use",
+cannot be answered from this run. The honest answer measured here is that production is currently
+using **neither**: see §5.
+
+### Bounded tail capture
+
+Captured across the two cron ticks that followed the purchase (21:30:33Z and 21:35:33Z), in JSON
+form to a scratch file, asserted, and deleted immediately afterwards per 11-04's method.
+
+| Assertion | Result |
+|---|---|
+| `cron.recovery_failed` events | **0** |
+| cron cycles captured | 2 |
+| `outcome` on both | `ok` |
+| `exceptions` on both | `[]` (empty) |
+| recovery drain log | `[cron] recovery queues drained` with `giftCardDeliveries: { attempted: 1 }` on each cycle |
+
+**Read this carefully:** zero `cron.recovery_failed` does **not** mean the delivery succeeded. That
+event only fires when the whole recovery batch rejects. Each cycle picked this delivery up
+(`attempted: 1`) and the send failed inside a per-delivery `catch` in `deliverOne`, which swallows
+the error without logging it. The cron is healthy; the send is not.
 
 ---
 
-## 2. Why the amount was wrong: Stripe Tax is not working in production
+## 5. Why the delivery is not sending
 
-The gift card is explicitly marked nontaxable in the catalogue, and it was still taxed.
-
-**Evidence, all read-only:**
+The evidence points at email provider configuration, not at the gift-card code.
 
 | Check | Result |
 |---|---|
-| `products.tax_category` / `product_variants.tax_category` for `prod_33` | `txcd_00000000` — Stripe's "nontaxable" code, on both rows |
-| `tax_source` recorded on the halted order | `configured_fallback` — **not** `provider` |
-| `admin_settings` key `store.tax_rate` | `8.25` |
-| 2500 × 8.25% | 206.25 → 206 minor units — exactly the tax that was charged |
-| `POST /api/tax` probe (creates no order and no payment) | `calculated_by: "fallback"`, `error: "Stripe Tax unavailable, using fallback rate"` |
+| `email_deliveries` rows for this order | 0 |
+| `email_deliveries` rows in the entire table, ever | **0**, against **4 paid orders** in production |
+| `EMAIL` binding configured | yes (`wrangler.jsonc`) |
+| `RESEND_API_KEY` configured | yes (present in `wrangler secret list`, name only) |
+| `EMAIL_PROVIDER` set as a Worker var | no (absent from `wrangler.jsonc` vars) |
+| `EMAIL_PROVIDER` set as a Worker secret | no (absent from `wrangler secret list`) |
 
-So two separate things are true, and only the second one is about gift cards:
+`resolveRuntime()` in `lib/email/sender.ts` throws
+`"Both email providers are configured; set EMAIL_PROVIDER explicitly"` when both a Cloudflare
+`EMAIL` binding and a Resend key are present and `EMAIL_PROVIDER` names neither. That throw
+happens **before** `claimDelivery()` writes the `email_deliveries` row, which is exactly the
+pattern observed: attempt counts rise, no email row is ever created, no exception surfaces
+because `deliverOne` catches it silently.
 
-1. **Stripe Tax is unavailable on this production store.** Every checkout silently falls back to
-   the flat 8.25% configured rate. This affects every order, not just gift cards. The
-   independent `/api/tax` probe confirms it is the Stripe Tax call failing, not something
-   specific to the gift-card line.
-2. **The fallback ignores per-line tax codes.** `lib/services/checkout-pricing.ts` applies the
-   configured rate to the whole discounted merchandise total, so a line marked `txcd_00000000`
-   is taxed anyway. On the Stripe Tax path the per-line code is passed through and honoured,
-   and the gift card would have been taxed $0.
+That no email row has ever been written for any of the four paid orders in this store's history
+says this is not new and not gift-card-specific: **no transactional email has ever sent from
+production.** The gift-card purchase is simply the first thing to look closely enough to notice.
 
-Neither is caused by anything in Phase 12. Both are pre-existing, and both live in
-`lib/services/checkout-pricing.ts` and the Stripe account configuration, which this plan is
-forbidden to change.
+**What it would take:** set `EMAIL_PROVIDER` to `cloudflare` or `resend` and deploy.
+`docs/customer-communications.md` recommends `cloudflare` with the `send_email` binding. This
+plan is forbidden from changing configuration or deploying, so it stops here.
 
----
+**Left to run on its own:** the delivery keeps retrying every five minutes until
+`attempt_count` reaches 8 (`MAX_DELIVERY_ATTEMPTS`), at which point the row parks as
+`needs_review` with `completed_at` set. Setting `EMAIL_PROVIDER` before then would let a later
+cycle send it; after then, the parked row needs a deliberate re-queue. The gift card itself is
+issued, active and unaffected either way — only its delivery email is stuck.
 
-## 3. Why the run stopped instead of buying anyway
+## 6. SHOP-07: the Account → Gift Cards clause is a product gap, not a pending check
 
-The purchase is the one irreversible step in this milestone. Buying at $27.06 would have
-permanently recorded a real order that charges sales tax on a gift card the catalogue says is
-nontaxable, and would have emailed Russell a card whose order shows tax he arguably should not
-owe. The plan's own acceptance criteria and `must_haves` say the order total must read 2500 —
-that criterion cannot pass while the tax bug is live, so proceeding would have meant knowingly
-executing a costly, unreversible action against a criterion already known to fail.
-
-The plan's step 6 says the run stops. It stopped. Nothing was retried, and no second payment
-intent was created.
-
-**The decision this needs from Russell** is in the SUMMARY, under "Decision needed".
-
----
-
-## 4. SHOP-07: the Account → Gift Cards clause is a product gap, not a pending check
-
-This section is independent of the purchase, and it is recorded as a finding rather than as
-something still to be verified — because a person signing in would find nothing, by design.
+Recorded as a finding, not as something still to verify — a person signing in would find nothing,
+which is the whole point.
 
 **What SHOP-07 asks for:** the purchased card appears under Account → Gift Cards for the
 recipient's account.
 
-**Why that cannot happen, for any recipient who is not the buyer:**
+**Why that cannot happen for any recipient who is not the buyer:**
 
-- `GET /api/gift-cards` lists cards through `listCustomerGiftCardPresentations`, whose WHERE
-  clause filters on `gift_card_accounts.purchaser_customer_id` — the **purchaser**, never the
-  recipient. (`app/api/gift-cards/route.ts`, `lib/gift-cards/presentations.ts`)
-- `purchaser_customer_id` is written directly from the order's `customer_id` at issuance.
-  (`lib/services/gift-card-fulfillment.ts`)
-- A guest checkout writes `customer_id` as `NULL`. **Directly evidenced by this run:** the
-  halted order `WEB-GUEST-1788987166118-30E971BD` has `customer_id = NULL`, read back from
-  production above. `NULL` can never match `= ?` against any concrete Clerk user id.
-- Even a signed-in purchase would set the purchaser column to the **buyer**, not the recipient.
-  So a card bought for someone else can never appear in that someone else's account.
+- `GET /api/gift-cards` lists through `listCustomerGiftCardPresentations({ customerId: userId })`,
+  whose SQL reads `WHERE account.purchaser_customer_id = ?` — the **purchaser**, never the
+  recipient. Read verbatim from `app/api/gift-cards/route.ts` and `lib/gift-cards/presentations.ts`
+  this session.
+- `purchaser_customer_id` is written straight from the order's `customer_id` at issuance
+  (`lib/services/gift-card-fulfillment.ts`).
+- This guest purchase wrote it as **NULL** — the actual issued row above shows
+  `purchaser_customer_id = NULL`. A `NULL` can never match `= ?` against any concrete Clerk user
+  id, so this card will not appear under any account, including Russell's, even though the card
+  was bought for his address.
+- Even a signed-in purchase would set that column to the **buyer**. A card bought for someone
+  else can never appear in that someone else's account.
 
-**Evidence status, stated plainly:** the account-row form of this evidence — a
-`gift_card_accounts` row with a NULL purchaser column — was not obtained, because no card was
-issued. The order-row form of the same fact was obtained and is shown above, and it is the value
-that issuance copies into the purchaser column. The structural argument itself is verified
-against the source of both the write path and the read path (12-RESEARCH.md Pitfall 2).
+**What it would take:** matching issued cards to a verified recipient email, a change under
+`lib/gift-cards/`, out of this milestone's scope. Already on 12-CONTEXT.md's deferred list.
 
-**What it would take to satisfy the requirement as worded:** matching issued cards to a verified
-recipient email address, a change under `lib/gift-cards/`, out of this milestone's scope. It is
-already on 12-CONTEXT.md's deferred list as a product gap.
-
-**The decision for Russell:** either the recipient should be able to see cards sent to them
-(a product change), or SHOP-07's wording should be corrected to describe what the product
-actually does (list cards to their purchaser). This is not a "sign in and check" item.
+**The decision for Russell:** either recipients should see cards sent to them (a product change),
+or SHOP-07's wording should be corrected to describe what the product does — list cards to their
+purchaser.
 
 ---
 
-*Phase 12, plan 12-05. Written by the executor at the halt; every value above was read from
-production with column-named, order-filtered SELECTs. No gift-card code, ciphertext or nonce
-column was ever selected, printed, or recorded — no card exists to have one.*
+*Phase 12, plan 12-05, attempt 2. Every value above was read from production with column-named,
+order-filtered SELECTs. No gift-card code, ciphertext or nonce column was ever selected, printed
+or recorded, and no account or delivery row id appears in this file.*

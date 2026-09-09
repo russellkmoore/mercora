@@ -6,11 +6,11 @@ current_phase: 12
 current_phase_name: Content, Assistant & Live Proof
 current_plan: 5
 status: executing
-stopped_at: 12-05 blocked at Task 1 step 6 (tax finding); 12-06 still runnable
-last_updated: "2026-09-09T21:02:06.705Z"
+stopped_at: "12-05 attempt 2: order paid and card issued; delivery blocked on EMAIL_PROVIDER. 12-06 still runnable"
+last_updated: "2026-09-09T21:39:06.139Z"
 last_activity: 2026-09-09
 last_activity_desc: Phase 11 complete, transitioned to Phase 10
-state_head: 3b821f76a127fafc0fb70fa86e2070f710b32274
+state_head: 0ac6bc31f61d48e864b20a38720e033ea4c7baa1
 progress:
   total_phases: 4
   completed_phases: 0
@@ -309,6 +309,7 @@ Open items carried from v1 close (`milestones/v1-MILESTONE-AUDIT.md`):
 - [Review 2026-12-01] Five moderate dev-only `npm audit` findings
 - [Phase 9] Interim: the live gift card (/product/gift-card, active) can be added to the cart but checkout refuses it until Phase 10 ships the recipient form (D-12, apply-active). Phase 10 removes this.
 - 12-05 HALTED before payment: production quoted $27.06 for the $25 gift card. Stripe Tax is unavailable on the live store (tax_source=configured_fallback), and the fallback applies store.tax_rate 8.25% to all merchandise, ignoring the gift card's txcd_00000000 nontaxable code. SHOP-07's live proof is unproven. Decision needed from Russell — see 12-05-SUMMARY.md 'Decision needed'.
+- 12-05: no transactional email has ever sent from production. EMAIL_PROVIDER is set neither as a var nor a secret while both the EMAIL binding and RESEND_API_KEY exist, so resolveRuntime() in lib/email/sender.ts throws before any email_deliveries row is written (0 rows ever, against 4 paid orders). The phase-12 gift card is issued and active but its delivery email is stuck pending and will park as needs_review at attempt 8. Fix: set EMAIL_PROVIDER to cloudflare or resend and deploy.
 
 ### Roadmap Evolution
 
@@ -355,8 +356,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-09T20:59:11.187Z
-Stopped at: 12-05 blocked at Task 1 step 6 (tax finding); 12-06 still runnable
+Last session: 2026-09-09T21:39:06.115Z
+Stopped at: 12-05 attempt 2: order paid and card issued; delivery blocked on EMAIL_PROVIDER. 12-06 still runnable
 Resume file: .planning/phases/12-content-assistant-live-proof/12-05-SUMMARY.md
 
 Next: `/gsd-plan-phase 12` (then `/gsd-verify-work 10`)
