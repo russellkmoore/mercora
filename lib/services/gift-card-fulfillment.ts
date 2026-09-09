@@ -23,10 +23,23 @@ const MAX_DELIVERY_ATTEMPTS = 8;
 
 interface GiftCardFulfillmentEnvironment extends Record<string, unknown> { DB?: D1Database }
 
-/** The subset of the worker env the email sender needs, taken from the drain's environment. */
-function emailEnvironmentFrom(environment: GiftCardFulfillmentEnvironment): EmailSendOptions['env'] {
+/**
+ * The subset of the worker env the email sender needs, taken from the drain's
+ * environment — or undefined when this env carries no provider at all.
+ *
+ * The undefined matters: resolveRuntime branches on whether `options.env` is
+ * present, not on what it holds, so any non-empty object switches off its own
+ * getCloudflareContext fallback. Handing over `{ DB }` alone (a shape
+ * lib/services/order-effects.ts can build) would therefore be strictly worse
+ * than handing over nothing — the sender would stop looking for the EMAIL
+ * binding it would otherwise have found on the request context.
+ */
+function emailEnvironmentFrom(
+  environment: GiftCardFulfillmentEnvironment,
+): EmailSendOptions['env'] | undefined {
   const provider = environment.EMAIL_PROVIDER;
   const resendKey = environment.RESEND_API_KEY;
+  if (!environment.EMAIL && typeof resendKey !== 'string') return undefined;
   return {
     ...(environment.EMAIL ? { EMAIL: environment.EMAIL as CloudflareEnv['EMAIL'] } : {}),
     ...(environment.DB ? { DB: environment.DB } : {}),
@@ -167,7 +180,7 @@ async function deliverOne(args: {
   giftCardId: string;
   keys: GiftCardEncryptionKeyRing;
   now: number;
-  emailEnvironment: EmailSendOptions['env'];
+  emailEnvironment: EmailSendOptions['env'] | undefined;
 }): Promise<void> {
   const token = crypto.randomUUID();
   const claimed = await args.database.prepare(`UPDATE gift_card_deliveries
