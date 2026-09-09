@@ -79,11 +79,14 @@ describe("gift-cards knowledge article: promises match what ships", () => {
   // immediate send.
   it("states that a chosen delivery date defers the send to that date", () => {
     expect(content).toMatch(/delivery date chosen at purchase/i);
-    expect(content).toMatch(/chose a delivery date at purchase[^.]*sent on that date/i);
+    expect(content).toMatch(/chose a delivery date at purchase[^.]*sent at the start of that day/i);
+    // WR-13: scheduledDeliverAfter uses Date.UTC, so the article must not
+    // assert a local-calendar guarantee the scheduler does not make.
+    expect(content).toMatch(/runs on UTC/i);
   });
 
   it("does not promise a send window the code cannot honour", () => {
-    expect(content).not.toMatch(/within \\d+ (minute|hour|day)/i);
+    expect(content).not.toMatch(/within \d+ (minute|hour|day)/i);
     expect(content).not.toMatch(/instantl?y|immediately/i);
   });
 });
