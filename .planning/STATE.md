@@ -4,17 +4,17 @@ milestone: v2.1
 milestone_name: Gift Card Product
 current_phase: 11
 current_phase_name: Production Enablement
-status: executing
-stopped_at: Completed 11-04-PLAN.md
-last_updated: "2026-09-09T05:30:22.081Z"
+status: verifying
+stopped_at: Completed 11-05-PLAN.md
+last_updated: "2026-09-09T19:04:37.453Z"
 last_activity: 2026-09-08
 last_activity_desc: Phase 11 execution started
-state_head: a00a968c888c9c78f1902f7d136718a35cd91cf1
+state_head: f7d50678a5ca6bff941e2e5605ea8f867a5abcfe
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 14
-  completed_plans: 13
+  completed_plans: 14
   percent: 0
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-09-08 after Phase 9)
 
 Phase: 11 (Production Enablement) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-08 — Phase 11 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -135,6 +135,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 11 P02 | 4min | 2 tasks | 2 files |
 | Phase 11 P03 | 2min | 2 tasks | 2 files |
 | Phase 11 P04 | 19min | 3 tasks | 2 files |
+| Phase 11 P05 | 22min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -267,6 +268,8 @@ Decisions locked for v2:
 - [Phase 11]: Section 9's operator-facing commands use plain `npx wrangler`, not the `mise exec --` prefix this repository's agents use for their own execution. — The plan's own instruction directs matching the command style already used in sections 6 and 8 of docs/DEPLOYMENT_SETUP.md, which is plain npx wrangler / npm run — the mise exec prefix is a working convention for this repo's agents, not part of the operator-facing runbook.
 - [Phase 11]: Production secrets landed via the plan's fallback path after a deploy-state refusal — The first wrangler secret put attempt failed because the latest Worker version wasn't deployed. Pushed main as-is (no flag change) to unblock, waited for the new version, then retried all four secret puts successfully, per 11-RESEARCH.md Pitfall 4 and the Phase 1 ADMIN_VECTORIZE_TOKEN precedent.
 - [Phase 11]: Two pushes in this plan deployed ~98 unpushed commits, including all of deferred-verification Phase 10 — Russell approved on 2026-09-08 ("Push as planned") that main may carry every unpushed commit when reconciliation deploys. Only STORE_FEATURE_GIFT_CARD_RECONCILIATION flipped; acquisition is untouched, so nothing became purchasable. Phase 10's human verification stays deferred to plan 11-05's D-07 gate.
+- [Phase 11]: D-07: Russell chose enable-anyway — enabled gift-card acquisition in production accepting Phase 10's deferred human verification, reversible by flag
+- [Phase 11]: Both gift-card flags now true in production (reconciliation + acquisition); OPS-02 fully complete; gift cards purchasable on the live site
 
 ### Pending Todos
 
@@ -338,8 +341,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-09T05:30:22.060Z
-Stopped at: Completed 11-04-PLAN.md
+Last session: 2026-09-09T19:04:37.432Z
+Stopped at: Completed 11-05-PLAN.md
 Resume file: None
 
 Next: `/gsd-verify-work 10`

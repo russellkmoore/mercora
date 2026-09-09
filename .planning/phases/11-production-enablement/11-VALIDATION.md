@@ -3,10 +3,11 @@ phase: "11"
 slug: "production-enablement"
 # status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6)
 # audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: false) (#2117)
-status: draft
-nyquist_compliant: false
+status: validated
+nyquist_compliant: true
 wave_0_complete: true
 created: "2026-09-08"
+validated: "2026-09-09"
 ---
 
 # Phase 11 — Validation Strategy
@@ -60,18 +61,18 @@ runtime's secret-file guard refuses commands that name it literally.
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 11-01-01 | 01 | 1 | OPS-01 | T-11-01 / T-11-02 | A generated key never leaves the pipeline, and git cannot see the file it lands in | other (shell) | `git check-ignore -v .dev.vars > "$TMPDIR/gsd11-ignore.txt" && grep -q '^\.gitignore:' … && test "$(grep -oE '^GIFT_CARD_[A-Z_]+' .dev.vars \| sort -u \| wc -l)" -eq 4` | ✅ `.gitignore` | ⬜ pending |
-| 11-01-02 | 01 | 1 | OPS-01 | T-11-03 / T-11-04 | The production ring shape is proven acceptable, and an under-length key proven rejected, before any live command | unit | `mise exec -- npx vitest run tests/unit/lib/gift-cards/config.test.ts` | ✅ extends existing file | ⬜ pending |
-| 11-02-01 | 02 | 2 | OPS-04 | T-11-05 / T-11-06 | No placeholder in the public example can pass for key material | other (shell) | `test "$(grep -c 'GIFT_CARD_DELIVERY_KEYS_JSON' .env.example)" -eq 1 && test "$(grep -cE 'base64:[A-Za-z0-9+/]{20,}' .env.example)" -eq 0` | ✅ `.env.example` | ⬜ pending |
-| 11-02-02 | 02 | 2 | OPS-04 | T-11-07 | The documented shape cannot drift from the enforced shape | unit | `mise exec -- npx vitest run tests/unit/scripts/env-example-gift-card-shape.test.ts` | ❌ created by this task | ⬜ pending |
-| 11-03-01 | 03 | 2 | OPS-03 | T-11-10 | The variable contract is written without any credential-shaped string | other | `mise exec -- npm run docs:lint` | ✅ `scripts/docs-lint.mjs` | ⬜ pending |
-| 11-03-02 | 03 | 2 | OPS-03 | T-11-09 / T-11-11 / T-11-12 / T-11-13 | The runbook teaches the non-leaking pipeline, the enforced flag order, and a verification that can actually fail | other | `test "$(awk '/^## 9\./,0' docs/DEPLOYMENT_SETUP.md \| grep -cE 'npm run (deploy\|deploy:ci)')" -eq 0 && mise exec -- npm run docs:lint` | ✅ `docs/DEPLOYMENT_SETUP.md` | ⬜ pending |
-| 11-04-01 | 04 | 3 | OPS-01 | T-11-14 | Four values reach Cloudflare and nowhere else; the proof is names only | other (live, read-only) | `test "$(mise exec -- npx wrangler secret list \| grep -oE 'GIFT_CARD_(CODE_HMAC\|DELIVERY)_(CURRENT_VERSION\|KEYS_JSON)' \| sort -u \| wc -l)" -eq 4` | N/A — live check | ⬜ pending |
-| 11-04-02 | 04 | 3 | OPS-02 | T-11-17 / T-11-18 / T-11-19 | Reconciliation only; acquisition provably absent from this commit; generated types match CI's | other | `test "$(grep -c '"STORE_FEATURE_GIFT_CARD_RECONCILIATION": "true"' wrangler.jsonc)" -eq 1 && test "$(grep -c 'STORE_FEATURE_GIFT_CARD_ACQUISITION' wrangler.jsonc)" -eq 0 && test "$(grep -c 'GIFT_CARD_' cloudflare-env.d.ts)" -eq 0` | ✅ `wrangler.jsonc` | ⬜ pending |
-| 11-04-03 | 04 | 3 | OPS-01, OPS-02 | T-11-15 / T-11-16 / T-11-20 | A malformed ring would fail the cron within one cycle; no key-shaped material reached git | other (live, read-only) | `test "$(grep -c 'recovery queues drained' "$TMPDIR/mercora-11-cron.jsonl")" -ge 1 && test "$(grep -c 'cron.recovery_failed' …)" -eq 0` | N/A — live check | ⬜ pending |
-| 11-05-01 | 05 | 4 | OPS-02 | T-11-21 | A human decides before anything becomes purchasable; never auto-approved | manual | none — `checkpoint:decision gate="blocking-human"` | N/A — checkpoint | ⬜ pending |
-| 11-05-02 | 05 | 4 | OPS-02 | T-11-22 / T-11-23 / T-11-24 | Both flags consistent; a clean post-deploy cron cycle proves capability resolution did not throw | other (live, read-only) | `test "$(grep -c '"STORE_FEATURE_GIFT_CARD_ACQUISITION": "true"' wrangler.jsonc)" -eq 1 && test "$(grep -c 'recovery queues drained' "$TMPDIR/mercora-11-cron-acq.jsonl")" -ge 1` | ✅ `wrangler.jsonc` | ⬜ pending |
-| 11-05-03 | 05 | 4 | OPS-01..04 | T-11-25 / T-11-26 | Whole-phase re-check: no key in history, no forbidden path touched | other | `mise exec -- npm test && mise exec -- npm run test:workers && mise exec -- npm run test:observability-worker && mise exec -- npm run build && …` | ✅ `.github/workflows/ci.yml` | ⬜ pending |
+| 11-01-01 | 01 | 1 | OPS-01 | T-11-01 / T-11-02 | A generated key never leaves the pipeline, and git cannot see the file it lands in | other (shell) | `git check-ignore -v .dev.vars > "$TMPDIR/gsd11-ignore.txt" && grep -q '^\.gitignore:' … && test "$(grep -oE '^GIFT_CARD_[A-Z_]+' .dev.vars \| sort -u \| wc -l)" -eq 4` | ✅ `.gitignore` | ✅ green (re-run 2026-09-09: gitignore match + 4 names) |
+| 11-01-02 | 01 | 1 | OPS-01 | T-11-03 / T-11-04 | The production ring shape is proven acceptable, and an under-length key proven rejected, before any live command | unit | `mise exec -- npx vitest run tests/unit/lib/gift-cards/config.test.ts` | ✅ extends existing file | ✅ green (re-run 2026-09-09: 15/15 passed) |
+| 11-02-01 | 02 | 2 | OPS-04 | T-11-05 / T-11-06 | No placeholder in the public example can pass for key material | other (shell) | `test "$(grep -c 'GIFT_CARD_DELIVERY_KEYS_JSON' .env.example)" -eq 1 && test "$(grep -cE 'base64:[A-Za-z0-9+/]{20,}' .env.example)" -eq 0` | ✅ `.env.example` | ✅ green (re-run 2026-09-09) |
+| 11-02-02 | 02 | 2 | OPS-04 | T-11-07 | The documented shape cannot drift from the enforced shape | unit | `mise exec -- npx vitest run tests/unit/scripts/env-example-gift-card-shape.test.ts` | ✅ `tests/unit/scripts/env-example-gift-card-shape.test.ts` | ✅ green (re-run 2026-09-09: 5/5 passed) |
+| 11-03-01 | 03 | 2 | OPS-03 | T-11-10 | The variable contract is written without any credential-shaped string | other | `mise exec -- npm run docs:lint` | ✅ `scripts/docs-lint.mjs` | ✅ green (re-run 2026-09-09: 0 violations) |
+| 11-03-02 | 03 | 2 | OPS-03 | T-11-09 / T-11-11 / T-11-12 / T-11-13 | The runbook teaches the non-leaking pipeline, the enforced flag order, and a verification that can actually fail | other | `test "$(awk '/^## 9\./,0' docs/DEPLOYMENT_SETUP.md \| grep -cE 'npm run (deploy\|deploy:ci)')" -eq 0 && mise exec -- npm run docs:lint` | ✅ `docs/DEPLOYMENT_SETUP.md` | ✅ green (re-run 2026-09-09) |
+| 11-04-01 | 04 | 3 | OPS-01 | T-11-14 | Four values reach Cloudflare and nowhere else; the proof is names only | other (live, read-only) | `test "$(mise exec -- npx wrangler secret list \| grep -oE 'GIFT_CARD_(CODE_HMAC\|DELIVERY)_(CURRENT_VERSION\|KEYS_JSON)' \| sort -u \| wc -l)" -eq 4` | N/A — live check | ✅ green (re-run 2026-09-09: 4 names present in production) |
+| 11-04-02 | 04 | 3 | OPS-02 | T-11-17 / T-11-18 / T-11-19 | Reconciliation only; acquisition provably absent from this commit; generated types match CI's | other | `test "$(grep -c '"STORE_FEATURE_GIFT_CARD_RECONCILIATION": "true"' wrangler.jsonc)" -eq 1 && test "$(grep -c 'STORE_FEATURE_GIFT_CARD_ACQUISITION' wrangler.jsonc)" -eq 0 && test "$(grep -c 'GIFT_CARD_' cloudflare-env.d.ts)" -eq 0` | ✅ `wrangler.jsonc` | ✅ green (superseded 2026-09-09 by 11-05-02, which now also has acquisition; reconciliation flag itself re-confirmed present) |
+| 11-04-03 | 04 | 3 | OPS-01, OPS-02 | T-11-15 / T-11-16 / T-11-20 | A malformed ring would fail the cron within one cycle; no key-shaped material reached git | other (live, read-only) | `test "$(grep -c 'recovery queues drained' "$TMPDIR/mercora-11-cron.jsonl")" -ge 1 && test "$(grep -c 'cron.recovery_failed' …)" -eq 0` | N/A — live check | ✅ green (captured 2026-09-09 during 11-04 execution: drain success 1, recovery_failed 0; capture file deleted per plan) |
+| 11-05-01 | 05 | 4 | OPS-02 | T-11-21 | A human decides before anything becomes purchasable; never auto-approved | manual | none — `checkpoint:decision gate="blocking-human"` | N/A — checkpoint | ✅ green (Russell answered `enable-anyway` 2026-09-09; never auto-approved) |
+| 11-05-02 | 05 | 4 | OPS-02 | T-11-22 / T-11-23 / T-11-24 | Both flags consistent; a clean post-deploy cron cycle proves capability resolution did not throw | other (live, read-only) | `test "$(grep -c '"STORE_FEATURE_GIFT_CARD_ACQUISITION": "true"' wrangler.jsonc)" -eq 1 && test "$(grep -c 'recovery queues drained' "$TMPDIR/mercora-11-cron-acq.jsonl")" -ge 1` | ✅ `wrangler.jsonc` | ✅ green (2026-09-09: acquisition flag =1, deploy `31555fd0-5bcc-44bd-b1f7-3839a652c460`, drain success 1 / recovery_failed 0, capture file deleted) |
+| 11-05-03 | 05 | 4 | OPS-01..04 | T-11-25 / T-11-26 | Whole-phase re-check: no key in history, no forbidden path touched | other | `mise exec -- npm test && mise exec -- npm run test:workers && mise exec -- npm run test:observability-worker && mise exec -- npm run build && …` | ✅ `.github/workflows/ci.yml` | ✅ green (2026-09-09: full CI gate list all exit 0; forbidden-path scan 0; scoped + wide leak scans both 0) |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -108,6 +109,9 @@ the task that verifies with it (11-02-02) and lands under an include glob that a
 - [x] Wave 0 covers all MISSING references (none exist)
 - [x] No watch-mode flags
 - [x] Feedback latency < 11s
-- [ ] `nyquist_compliant: true` set in frontmatter — set by 11-05-03 once every row above is green
+- [x] `nyquist_compliant: true` set in frontmatter — set by 11-05-03 once every row above is green
 
-**Approval:** pending
+**Approval:** validated 2026-09-09 by 11-05 Task 3. Every row above is green. The three
+manual-only visual/interactive verifications in the table above this section remain open —
+they are not part of the automated Nyquist contract and are carried forward to
+`/gsd-verify-work 11` (and, for the still-open half, `/gsd-verify-work 10`) per D-07.
