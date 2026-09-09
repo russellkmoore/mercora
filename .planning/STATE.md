@@ -360,6 +360,7 @@ Items acknowledged and deferred at milestone close, most recent first:
 | Phase | State | Resume |
 |-------|-------|--------|
 | 10 | verification_deferred_human | /gsd-verify-work 10 |
+| 12 | verification_deferred_human | /gsd-verify-work 12 |
 
 ## Session Continuity
 
