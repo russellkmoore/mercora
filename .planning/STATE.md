@@ -6,10 +6,10 @@ current_phase: 10
 current_phase_name: Gift Card Purchase Flow
 status: planning
 stopped_at: Phase 11 complete, ready to plan Phase 10
-last_updated: "2026-09-09T19:20:02.482Z"
+last_updated: "2026-09-09T19:20:02.931Z"
 last_activity: 2026-09-09
 last_activity_desc: Phase 11 complete, transitioned to Phase 10
-state_head: 974d04ee137b8be60135b89564a13d0034bb3d02
+state_head: b320b3aaa2ec7b02dbfd8a3dd7a06c32bd30e1fe
 progress:
   total_phases: 4
   completed_phases: 1
@@ -271,6 +271,7 @@ Decisions locked for v2:
 - [Phase 11]: Two pushes in this plan deployed ~98 unpushed commits, including all of deferred-verification Phase 10 — Russell approved on 2026-09-08 ("Push as planned") that main may carry every unpushed commit when reconciliation deploys. Only STORE_FEATURE_GIFT_CARD_RECONCILIATION flipped; acquisition is untouched, so nothing became purchasable. Phase 10's human verification stays deferred to plan 11-05's D-07 gate.
 - [Phase 11]: D-07: Russell chose enable-anyway — enabled gift-card acquisition in production accepting Phase 10's deferred human verification, reversible by flag
 - [Phase 11]: Both gift-card flags now true in production (reconciliation + acquisition); OPS-02 fully complete; gift cards purchasable on the live site
+- [Phase 11]: [Phase 11] Unattended decision (2026-09-09): Phase 11's two human-verification items (signed-in GET /api/gift-cards; live checkout code-field rejection) were accepted on code-level and live read-only evidence rather than a browser session, per Russell's standing instruction to proceed on best assumptions. — Russell was away; he asked for best-assumption decisions on the demo site and a list at the end. Evidence: PDP 200 with form, /checkout 200, bogus balance code -> 200 {valid:false}, unauthenticated /api/gift-cards -> 401, 11-04 cron cycle clean.
 
 ### Pending Todos
 
