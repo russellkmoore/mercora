@@ -184,13 +184,34 @@ describe('gift-card issuance and durable delivery on real D1', () => {
   it('escalates a permanently failing delivery to review after the attempt budget', async () => {
     const order = giftOrder();
     await insertOrder(order);
-    mocks.send.mockResolvedValue({ success: false, error: 'permanent bounce' });
+    mocks.send.mockResolvedValue({
+      success: false, error: 'permanent bounce', errorCode: 'E_PROVIDER_CONFIG',
+    });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     // Attempt 1 happens in the paid effect; drain until the budget is exhausted.
     await fulfillPaidGiftCards(order, { environment: runtimeEnvironment(), now });
     for (let attempt = 1; attempt <= 7; attempt += 1) {
       await drainGiftCardDeliveries({ environment: runtimeEnvironment(), now: now + attempt });
     }
+
+    // Every attempt records why it failed, bounded and secret-free: a permanent
+    // config error must be distinguishable from a bouncing address.
+    const logged = errorSpy.mock.calls.map((call) => JSON.parse(String(call[0])));
+    expect(logged).toHaveLength(8);
+    expect(logged[0]).toEqual({
+      event: 'gift_card.delivery_failed',
+      giftCardId: expect.stringMatching(/^gift_card_/),
+      attempt: 1,
+      outcome: 'retry_scheduled',
+      errorCode: 'E_PROVIDER_CONFIG',
+      detail: 'permanent bounce',
+    });
+    expect(logged.at(-1)).toMatchObject({ attempt: 8, outcome: 'needs_review' });
+    const serialized = JSON.stringify(logged);
+    expect(serialized).not.toContain(order.items[0].gift_card!.recipientEmail);
+    expect(serialized).not.toMatch(/GC-[A-Z0-9]{4}/);
+    errorSpy.mockRestore();
 
     const parked = await env.DB.prepare(`SELECT status, attempt_count, completed_at
       FROM gift_card_deliveries WHERE order_id = ?`).bind(order.id)

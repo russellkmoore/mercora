@@ -50,6 +50,34 @@ function emailEnvironmentFrom(
 
 function epochSeconds(): number { return Math.floor(Date.now() / 1_000); }
 
+const MAX_LOGGED_DETAIL_CHARS = 200;
+
+function boundedDetail(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? undefined : trimmed.slice(0, MAX_LOGGED_DETAIL_CHARS);
+}
+
+/**
+ * Bounded, secret-free record of why one delivery attempt failed.
+ *
+ * Deliberately narrow: the gift-card id, the attempt number, what happens
+ * next, and a clipped error class/message. Never the bearer code, never the
+ * recipient address, never the rendered body. Without it a permanent
+ * E_PROVIDER_CONFIG misconfiguration looks exactly like a bouncing address,
+ * and burns the whole eight-attempt budget before anyone can see which it is.
+ */
+function logDeliveryFailure(fields: {
+  giftCardId: string;
+  attempt: number;
+  outcome: 'retry_scheduled' | 'needs_review';
+  errorName?: string;
+  errorCode?: string;
+  detail?: string;
+}): void {
+  console.error(JSON.stringify({ event: 'gift_card.delivery_failed', ...fields }));
+}
+
 /** Midnight-UTC epoch second of a validated YYYY-MM-DD scheduled delivery date. */
 function scheduledDeliverAfter(deliveryDate: string | undefined): number {
   if (!deliveryDate) return 0;
@@ -234,11 +262,31 @@ async function deliverOne(args: {
       env: args.emailEnvironment,
     });
     const status = result.success ? 'sent' : (result.needsReview || exhausted) ? 'needs_review' : 'pending';
+    if (!result.success) {
+      // The sender already diagnosed this; record its verdict instead of
+      // discarding it. The retry/status decision above is unchanged.
+      logDeliveryFailure({
+        giftCardId: args.giftCardId,
+        attempt: claimed.attempt_count,
+        outcome: status === 'needs_review' ? 'needs_review' : 'retry_scheduled',
+        ...(result.errorCode ? { errorCode: result.errorCode } : {}),
+        ...(boundedDetail(result.error) ? { detail: boundedDetail(result.error)! } : {}),
+      });
+    }
     await args.database.prepare(`UPDATE gift_card_deliveries SET status = ?, claim_token = NULL,
       lease_expires_at = NULL, completed_at = ?, updated_at = ? WHERE id = ? AND claim_token = ?`)
       .bind(status, status === 'sent' || status === 'needs_review' ? args.now : null, args.now, claimed.id, token).run();
-  } catch {
+  } catch (error) {
     const status = exhausted ? 'needs_review' : 'pending';
+    logDeliveryFailure({
+      giftCardId: args.giftCardId,
+      attempt: claimed.attempt_count,
+      outcome: exhausted ? 'needs_review' : 'retry_scheduled',
+      ...(error instanceof Error ? { errorName: error.name } : {}),
+      ...(boundedDetail(error instanceof Error ? error.message : error)
+        ? { detail: boundedDetail(error instanceof Error ? error.message : error)! }
+        : {}),
+    });
     await args.database.prepare(`UPDATE gift_card_deliveries SET status = ?, claim_token = NULL,
       lease_expires_at = NULL, completed_at = ?, updated_at = ? WHERE id = ? AND claim_token = ?`)
       .bind(status, exhausted ? args.now : null, args.now, claimed.id, token).run();
