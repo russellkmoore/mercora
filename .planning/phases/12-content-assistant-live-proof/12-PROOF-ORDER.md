@@ -83,7 +83,7 @@ fallback-tax fix (`3b821f7`) behaving as intended for a nontaxable line.
 Issuance ran synchronously at finalization — about two seconds after the order was paid, not on a
 later cron cycle.
 
-### Delivery (`gift_card_deliveries`, by `order_id`) — **did not reach `sent`**
+### Delivery (`gift_card_deliveries`, by `order_id`) — **did not reach `sent` within two cycles; see §7 for the eventual send**
 
 | Observed at | status | attempt_count | deliver_after | completed_at |
 |---|---|---|---|---|
@@ -124,7 +124,7 @@ the error without logging it. The cron is healthy; the send is not.
 
 ---
 
-## 5. Why the delivery is not sending
+## 5. Why the delivery was not sending (superseded by §7 — this section is the diagnosis, not the final state)
 
 The evidence points at email provider configuration, not at the gift-card code.
 
@@ -193,3 +193,111 @@ purchaser.
 *Phase 12, plan 12-05, attempt 2. Every value above was read from production with column-named,
 order-filtered SELECTs. No gift-card code, ciphertext or nonce column was ever selected, printed
 or recorded, and no account or delivery row id appears in this file.*
+
+---
+
+## 7. Resolution: the delivery sent
+
+The §4 and §5 readings above are preserved as they were taken — they are the honest record of the
+first two cron cycles and the diagnosis that came out of them. They were not the end state. Three
+fixes followed, each decided by the orchestrator under Russell's standing best-assumption
+instruction and each recorded in STATE.md, and the delivery then sent.
+
+### Timeline
+
+| Time (UTC) | What happened |
+|---|---|
+| 21:24:19 | order paid, card issued, delivery row created |
+| 21:25 – 21:55 | cron attempts 1–8, every one failing silently; row parks as `needs_review` at 21:55 |
+| 21:44 | `EMAIL_PROVIDER=cloudflare` added to `wrangler.jsonc` vars (`32b9df1`), deployed — **not sufficient**, attempts 6–8 still failed |
+| 22:01 | real root cause fixed in code (`f813499`), deployed |
+| 22:01:10 | one production D1 write by the orchestrator: the parked row re-queued |
+| 22:05 | first real send attempt — wrote the **first-ever** `email_deliveries` row: provider `cloudflare`, status `failed`, `error_code = E_SENDER_DOMAIN_NOT_AVAILABLE` |
+| 22:15:48 | `STORE_SENDER_EMAIL="Voltique <orders@russellkmoore.me>"` added to vars (`d8b4d11`), deployed |
+| 22:20:34 | **delivery `sent`**; `email_deliveries` reads `succeeded` |
+
+### The actual root cause
+
+Setting `EMAIL_PROVIDER` was necessary but not sufficient. `drainGiftCardDeliveries` and
+`fulfillPaidGiftCards` called `sendEmail` **without** an `env` argument, so inside the scheduled
+handler the sender fell back to `getCloudflareContext()` — which throws outside a request context
+— and never found the `EMAIL` binding or the database at all. Commit `f813499` makes both
+`deliverOne` call sites pass `{ EMAIL, DB, EMAIL_PROVIDER, RESEND_API_KEY }` from the fulfillment
+environment, with an integration test asserting it.
+
+The second failure was the sender address: the store still carried the placeholder
+`mercora.example.com`, which Cloudflare rejected with *"email from mercora.example.com not allowed
+because domain is not owned by the same account"*. DNS showed `russellkmoore.me` already onboarded
+to Cloudflare Email Sending, so `STORE_SENDER_EMAIL` was pointed at `orders@russellkmoore.me`.
+
+### The one production D1 write
+
+Made by the orchestrator at 22:01:10Z, not by this plan, and recorded here for the audit trail:
+
+```sql
+UPDATE gift_card_deliveries
+   SET status='pending', attempt_count=0, completed_at=NULL, claim_token=NULL,
+       lease_expires_at=NULL, updated_at=strftime('%s','now')
+ WHERE order_id='WEB-GUEST-1788989054887-B4382C10' AND status='needs_review';
+```
+
+Reported `changes: 1`. It re-queued the row that had exhausted its eight attempts against the
+broken code path, so the fixed code could retry it. The gift card itself was never touched.
+
+### Final evidence, re-read at 2026-09-09T22:21:23Z
+
+**Order** (`orders`, by `id`)
+
+| Column | Value |
+|---|---|
+| status | `processing` |
+| payment_status | **`paid`** |
+| total_amount | **2500 USD** |
+| currency_code | USD |
+
+**Issued gift card** (`gift_card_accounts`, by `issued_order_id`)
+
+| Column | Value |
+|---|---|
+| rows for this order | **exactly 1** (and exactly 1 in the whole table) |
+| status | **`active`** |
+| currency_code | USD |
+| issued_amount_minor | **2500** |
+| purchaser_customer_id | **NULL** |
+| created_at | 1788989057 |
+
+**Delivery** (`gift_card_deliveries`, by `order_id`)
+
+| Column | Value |
+|---|---|
+| rows for this order | **exactly 1** |
+| status | **`sent`** |
+| recipient_email | russellkmoore@mac.com |
+| attempt_count | 4 (counted from the 22:01:10Z re-queue) |
+| deliver_after | 0 |
+| completed_at | 1788992434 (2026-09-09T22:20:34Z) |
+
+**Email delivery** (`email_deliveries`, joined on the delivery's idempotency key)
+
+| Column | Value |
+|---|---|
+| provider | **`cloudflare`** |
+| status | **`succeeded`** |
+| error_code | NULL |
+| provider_message_id | present (value not recorded here) |
+| completed_at | 2026-09-09T22:20:35.521Z |
+| rows in the whole table | 1 — this send is the first transactional email this store has ever recorded |
+
+**The phase's open question is answered by measurement: production's email provider is
+`cloudflare`.** It was read from the delivery's own row, not assumed from config.
+
+### Still open for Russell
+
+1. **Stripe Tax is unavailable on the live account.** The `3b821f7` fix corrects how the
+   configured-rate fallback treats nontaxable lines; it does not restore the provider. Every
+   taxable order is still charged a flat 8.25% guess rather than a calculated rate.
+2. **`STORE_SUPPORT_EMAIL` is still the placeholder, and there is no routing rule for `orders@`.**
+   Gift-card emails now send *from* `orders@russellkmoore.me`, but a reply to one will bounce.
+3. **The `/api/tax` estimate route ignores tax codes.** It hardcodes `txcd_99999999` for every
+   line, so its displayed estimate will tax a gift card even though checkout no longer does. It is
+   display-only and does not affect what anyone is charged, but the two paths now disagree.

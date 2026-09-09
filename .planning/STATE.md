@@ -4,18 +4,18 @@ milestone: v2.1
 milestone_name: Gift Card Product
 current_phase: 12
 current_phase_name: Content, Assistant & Live Proof
-current_plan: 5
+current_plan: 6
 status: executing
-stopped_at: "12-05 attempt 2: order paid and card issued; delivery blocked on EMAIL_PROVIDER. 12-06 still runnable"
-last_updated: "2026-09-09T22:12:23.175Z"
+stopped_at: "12-05 complete: order paid, card issued, delivery sent via cloudflare. 12-06 next"
+last_updated: "2026-09-09T22:25:00.196Z"
 last_activity: 2026-09-09
-last_activity_desc: Phase 11 complete, transitioned to Phase 10
-state_head: d8b4d11a1592997afb963e67bbc2aab785f38f7a
+last_activity_desc: Phase 12 plan 12-05 complete — live gift-card purchase, issuance and delivery proven on production
+state_head: 8cc564f04eaf7361ddbc4b8cdade4e959c3cb108
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 20
-  completed_plans: 18
+  completed_plans: 19
   percent: 0
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-09-09 after Phase 11)
 ## Current Position
 
 Phase: 12 (Content, Assistant & Live Proof) — IN PROGRESS
-Current Plan: 5
+Current Plan: 6
 Total Plans in Phase: 6
 Status: Ready to execute
 Last activity: 2026-09-09 — Phase 12 wave 2 (12-02, 12-03) complete
@@ -142,6 +142,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 12 P01 | 7min | 3 tasks | 1 files |
 | Phase 12 P02 | 9min | 3 tasks | 2 files |
 | Phase 12 P04 | 7min | 3 tasks | 0 files |
+| Phase 12 P05 | 2h | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -311,8 +312,9 @@ Open items carried from v1 close (`milestones/v1-MILESTONE-AUDIT.md`):
 - [Backlog] Mobile Lighthouse scores 72-80 vs. target 85 on all four measured routes
 - [Review 2026-12-01] Five moderate dev-only `npm audit` findings
 - [Phase 9] Interim: the live gift card (/product/gift-card, active) can be added to the cart but checkout refuses it until Phase 10 ships the recipient form (D-12, apply-active). Phase 10 removes this.
-- 12-05 HALTED before payment: production quoted $27.06 for the $25 gift card. Stripe Tax is unavailable on the live store (tax_source=configured_fallback), and the fallback applies store.tax_rate 8.25% to all merchandise, ignoring the gift card's txcd_00000000 nontaxable code. SHOP-07's live proof is unproven. Decision needed from Russell — see 12-05-SUMMARY.md 'Decision needed'.
-- 12-05: no transactional email has ever sent from production. EMAIL_PROVIDER is set neither as a var nor a secret while both the EMAIL binding and RESEND_API_KEY exist, so resolveRuntime() in lib/email/sender.ts throws before any email_deliveries row is written (0 rows ever, against 4 paid orders). The phase-12 gift card is issued and active but its delivery email is stuck pending and will park as needs_review at attempt 8. Fix: set EMAIL_PROVIDER to cloudflare or resend and deploy.
+- [Closed 2026-09-09] 12-05 halted before payment on a $27.06 quote for a $25 gift card. The configured-rate tax fallback taxed a txcd_00000000 (nontaxable) line; fixed in 3b821f7 with a regression test, deployed 21:05:06Z. Attempt 2 was quoted exactly 2500 and paid. **Still open:** Stripe Tax itself is unavailable on the live account, so every taxable order gets the flat 8.25% fallback rather than a calculated rate.
+- [Closed 2026-09-09] 12-05: no transactional email had ever sent from production. Three causes, all fixed: EMAIL_PROVIDER was unset (32b9df1); the delivery cron called sendEmail without the worker env, so the sender fell back to getCloudflareContext and threw outside a request (f813499, integration test added); and the sender domain was the mercora.example.com placeholder (d8b4d11). The phase-12 gift-card email sent at 22:20:34Z via provider cloudflare, the store's first-ever email_deliveries row. **Still open:** STORE_SUPPORT_EMAIL is still a placeholder and no routing rule exists for orders@, so replies bounce.
+- [Needs Russell, from 12-05] Three findings left open by the live gift-card proof: (1) Stripe Tax is unavailable on the live account — every taxable order is charged the flat 8.25% admin_settings fallback, not a calculated rate; (2) STORE_SUPPORT_EMAIL is still the placeholder and there is no routing rule for orders@russellkmoore.me, so replies to gift-card emails bounce; (3) /api/tax hardcodes txcd_99999999 so its displayed estimate taxes a gift card even though checkout no longer does (display only).
 
 ### Roadmap Evolution
 
