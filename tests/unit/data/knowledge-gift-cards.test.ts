@@ -51,13 +51,20 @@ describe("gift-cards knowledge article: promises match what ships", () => {
     expect(content).toMatch(/gift card.*field/i);
   });
 
-  // The dashboard is a buyer's receipt list, not a wallet: /api/gift-cards is
-  // scoped to the authenticated purchaser, and the empty state says gift codes
-  // are only delivered to their recipient. The article must not read as though
-  // a recipient can look their card up there.
+  // The dashboard is a buyer's receipt list, not a wallet, and only for a
+  // signed-in buyer: listCustomerGiftCardPresentations filters on
+  // account.purchaser_customer_id, which is the order's customer_id and is null
+  // for a guest purchase. So there are two ways to hold a card and see nothing
+  // there -- receive one, or buy one as a guest -- and the article has to name
+  // both rather than read as though every card shows up.
   it("names Account -> Gift cards as where a purchased balance is visible", () => {
     expect(content).toMatch(/under Account, then Gift cards/i);
     expect(content).toMatch(/received does not appear there/i);
+  });
+
+  it("limits the Account listing to a signed-in purchase", () => {
+    expect(content).toMatch(/bought while signed in appears under Account/i);
+    expect(content).toMatch(/bought as a guest is not listed there/i);
   });
 
   // components/checkout/CheckoutClient.tsx renders a code input and no balance
