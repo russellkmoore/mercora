@@ -476,4 +476,101 @@ npm run deploy
 
 ---
 
+## 9. Gift Card Enablement
+
+Gift cards ship disabled. Enabling them is four secrets and two feature flags applied in a
+fixed order. `docs/runtime-configuration.md` owns the variable contract for both key rings.
+
+### **Step 1: Generate and Store the Four Secrets**
+
+Each value is generated and piped straight into Cloudflare in a single command, so it is
+never printed, never held in a shell variable, and never written to a file.
+
+```bash
+# Code HMAC lookup ring
+printf '1' | npx wrangler secret put GIFT_CARD_CODE_HMAC_CURRENT_VERSION
+printf '{"1":"%s"}' "$(openssl rand -base64 32)" \
+  | npx wrangler secret put GIFT_CARD_CODE_HMAC_KEYS_JSON
+
+# Delivery encryption ring
+printf '1' | npx wrangler secret put GIFT_CARD_DELIVERY_CURRENT_VERSION
+printf '{"1":"base64:%s"}' "$(openssl rand -base64 32)" \
+  | npx wrangler secret put GIFT_CARD_DELIVERY_KEYS_JSON
+```
+
+The HMAC ring uses the generated string's raw bytes directly as key material, so it takes no
+prefix. The delivery ring is an AES-256 key, so it must carry the `base64:` prefix in front of
+a payload that decodes to exactly 32 bytes.
+
+Confirm only the names landed:
+
+```bash
+npx wrangler secret list
+```
+
+The proof is the four names — never a value.
+
+If the command reports that the latest version of the Worker is not currently deployed,
+deploy the current `main` first, then retry the four commands above.
+
+### **Step 2: Enable Reconciliation**
+
+Add one entry to `wrangler.jsonc` `vars`, next to the subscription flags:
+
+```jsonc
+"STORE_FEATURE_GIFT_CARD_RECONCILIATION": "true",
+```
+
+Regenerate the generated Cloudflare types and confirm they match:
+
+```bash
+npm run cf-typegen
+npm run cf-typecheck
+```
+
+One non-obvious requirement: `wrangler types` reads local env files, including `.dev.vars`
+and `.env.local`. Move both out of the working tree before either command runs, and move them
+back afterward — otherwise the generated file picks up local-only names that CI does not have.
+
+Commit `wrangler.jsonc` and the regenerated types together and push to `main`. Cloudflare
+Workers Builds deploys the push.
+
+### **Step 3: Verify Reconciliation**
+
+Do not proceed to Step 4 until all three checks pass.
+
+1. The new version appears in `npx wrangler deployments list`.
+2. One five-minute recovery cron cycle completes cleanly: watch the Worker's tail and expect
+   the recovery-drain success log, with no `cron.recovery_failed` telemetry event in the same
+   window. This is the sharp check — the delivery ring is parsed on every tick before the drain
+   checks whether anything is pending, so a malformed ring shows up within one cycle even with
+   zero deliveries queued.
+3. A signed-in request to the account gift-card listing endpoint (`GET /api/gift-cards`)
+   returns a `cards` array; a 503 there means the ring or the database is unhealthy. The public
+   balance endpoint (`POST /api/gift-cards/balance`) answers identically for a bad code, an
+   unknown card, and a broken ring, by design — it proves availability and nothing about ring
+   health.
+
+### **Step 4: Enable Acquisition**
+
+Only after Step 3 passes. Same entry shape, same regenerate-commit-push cycle:
+
+```jsonc
+"STORE_FEATURE_GIFT_CARD_ACQUISITION": "true",
+```
+
+The order is not advisory: acquisition enabled without reconciliation throws at capability
+resolution, on the first request or cron tick after such a deploy.
+
+### **Step 5: Rolling Back**
+
+Set acquisition back to `"false"` and push, to stop new gift-card sales. Leave reconciliation
+enabled for as long as any balance or reservation exists, so existing cards can still be
+verified, settled, and released.
+
+To rotate a ring, add a second version to the JSON object and move the current-version
+pointer. Never remove a key version that has issued cards under it.
+
+---
+
 **Your Mercora platform is now ready for production.**
