@@ -5,16 +5,16 @@ milestone_name: Gift Card Product
 current_phase: 11
 current_phase_name: Production Enablement
 status: executing
-stopped_at: Completed 11-01-PLAN.md
-last_updated: "2026-09-09T04:55:06.730Z"
+stopped_at: Completed 11-02-PLAN.md
+last_updated: "2026-09-09T05:01:19.801Z"
 last_activity: 2026-09-08
 last_activity_desc: Phase 11 execution started
-state_head: 3f287e3fc016cb0ba9036f68b3d0e12d1fa00e06
+state_head: 7406862c0448fcaad9970818a6f79b1895d3cdc6
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 14
-  completed_plans: 10
+  completed_plans: 11
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-08 after Phase 9)
 ## Current Position
 
 Phase: 11 (Production Enablement) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-09-08 — Phase 11 execution started
 
@@ -132,6 +132,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 10 P04 | 6 | 2 tasks | 4 files |
 | Phase 10 P05 | 14min | 3 tasks | 5 files |
 | Phase 11 P01 | 8min | 2 tasks | 1 files |
+| Phase 11 P02 | 4min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -258,6 +259,8 @@ Decisions locked for v2:
 - [Phase 10]: Clerk prefill (isLoaded/isSignedIn-gated, empty-field-guarded) is not gated on isDigitalOnly. — A signed-in shopper's own name and email are equally correct to prefill on a physical checkout; the empty guard makes it harmless either way, per the plan's explicit instruction.
 - [Phase 11]: [Phase 11] [11-01] Recorded phase_base (this plan's only commit 3f287e3) for downstream leak scans; Task 1 (.dev.vars generation) produced no git-tracked artifact by design. — .dev.vars is untracked by design (D-02) -- nothing to commit for Task 1. Recording the single Task 2 test commit's SHA gives plans 11-02..11-05 a fixed point to scan git history from for accidental secret leakage.
 - [Phase 11]: [Phase 11] [11-01] Delivery-ring test fixtures built with template-literal interpolation (base64:${payload}) rather than a literal concatenated string. — Keeps the source text free of any long base64-shaped literal directly after a base64: prefix, so a naive secret-shape grep over the diff stays clean by construction, not by discipline alone.
+- [Phase 11]: [Phase 11] [11-02] D-12 wording used the corrected (not originally proposed) form: .dev.vars is the read path under plain npm run dev too, not split by runner. — next.config.ts calls initOpenNextCloudflareForDev() unconditionally in development, so getCloudflareContext().env is backed by .dev.vars regardless of runner, per 11-RESEARCH.md Pitfall 6 — writing the original split-by-runner wording would have been factually wrong.
+- [Phase 11]: [Phase 11] [11-02] Delivery-ring comment wrapped to 3 lines at ~80 chars per line, slightly wider than the file's typical ~78-char lines. — Fitting the AES-256 shape, base64: prefix, generation command, and fail-closed statement into the plan's specified 3-line comment shape required slightly wider lines than the file's typical width; kept meaning intact over strict width match.
 
 ### Pending Todos
 
@@ -329,8 +332,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-09T04:55:06.703Z
-Stopped at: Completed 11-01-PLAN.md
+Last session: 2026-09-09T05:01:19.777Z
+Stopped at: Completed 11-02-PLAN.md
 Resume file: None
 
 Next: `/gsd-verify-work 10`
