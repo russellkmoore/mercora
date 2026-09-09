@@ -345,6 +345,34 @@ customer path works end to end (12). The one thing the milestone set out to prov
 a guest-purchased card appearing under an account — is on record as a gap with its cause, not as
 a passing check.
 
+## The push and the deployment it triggered
+
+`git push origin main` moved `origin/main` from `d8b4d11` to `48dd60f` — four commits, all
+documentation and planning artifacts:
+
+| Commit | Subject |
+|---|---|
+| `8cc564f` | docs(12): record unattended sender-address decision |
+| `c6a8266` | docs(12-05): complete the live gift-card proof — paid, issued, delivered |
+| `6583376` | docs(12-06): fill the phase 12 validation contract from commands that ran |
+| `48dd60f` | docs(12-06): close phase 12 — CI gate green, all four requirements re-verified |
+
+No application code and no migration is in that push. Every line of application code in the wider
+phase range was already deployed during 12-05.
+
+Afterwards: `git rev-list --count origin/main..HEAD` -> **0**, `git status --porcelain
+--untracked-files=no` -> **empty** — `PHASE_CLOSED`.
+
+**Workers Builds deployment:** version `8b818bfe-1e44-4846-9edb-e276c99093b3`, deployment created
+**2026-09-09T22:39:43.477Z**, at 100%. It supersedes `720e9abb-7dee-4b65-97b2-f1d135809877`
+(22:15:48Z, the `STORE_SENDER_EMAIL` deploy from 12-05). Post-deploy liveness: the storefront
+returns 200 and `/terms-of-service` returns 200. Behaviour is unchanged, as expected for a
+docs-only range.
+
+The known untracked paths recorded in 12-01 remain untracked and were not cleaned up: `.gsd/`,
+`.planning/agent-history.json`, `.planning/config.json`, `.planning/state.json`,
+`MILESTONE-SEED.md`, `volt.png`, `volt.svg`.
+
 ## Self-Check: PASSED
 
 - `12-VALIDATION.md` — FOUND, `status: validated`, `nyquist_compliant: true`, 18 per-task rows, placeholder scan 0.
