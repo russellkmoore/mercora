@@ -5,16 +5,16 @@ milestone_name: Gift Card Product
 current_phase: 11
 current_phase_name: Production Enablement
 status: executing
-stopped_at: Completed 11-03-PLAN.md
-last_updated: "2026-09-09T05:07:36.753Z"
+stopped_at: Completed 11-04-PLAN.md
+last_updated: "2026-09-09T05:30:22.081Z"
 last_activity: 2026-09-08
 last_activity_desc: Phase 11 execution started
-state_head: 9c9c8601b19d12da49a3a63244233de629192b0d
+state_head: a00a968c888c9c78f1902f7d136718a35cd91cf1
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 14
-  completed_plans: 12
+  completed_plans: 13
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-08 after Phase 9)
 ## Current Position
 
 Phase: 11 (Production Enablement) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-09-08 — Phase 11 execution started
 
@@ -134,6 +134,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 11 P01 | 8min | 2 tasks | 1 files |
 | Phase 11 P02 | 4min | 2 tasks | 2 files |
 | Phase 11 P03 | 2min | 2 tasks | 2 files |
+| Phase 11 P04 | 19min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -264,6 +265,8 @@ Decisions locked for v2:
 - [Phase 11]: [Phase 11] [11-02] Delivery-ring comment wrapped to 3 lines at ~80 chars per line, slightly wider than the file's typical ~78-char lines. — Fitting the AES-256 shape, base64: prefix, generation command, and fail-closed statement into the plan's specified 3-line comment shape required slightly wider lines than the file's typical width; kept meaning intact over strict width match.
 - [Phase 11]: Section 9's Step 3 keeps the plan's hedged wording that a GET /api/gift-cards 503 "means the ring or the database is unhealthy" rather than narrowing it to a database-only claim. — That route's code path (listCustomerGiftCardPresentations) does not itself invoke either key-ring parser, so a stricter "the ring" claim would overstate what this specific endpoint proves. The plan's must_haves.truths locked this exact framing at planning time (D-06/RESEARCH.md); the hedge is accurate, and the sharper, code-verified signal (the cron drain parsing the ring unconditionally before checking for pending work) is stated first in the same step as the check that can actually fail.
 - [Phase 11]: Section 9's operator-facing commands use plain `npx wrangler`, not the `mise exec --` prefix this repository's agents use for their own execution. — The plan's own instruction directs matching the command style already used in sections 6 and 8 of docs/DEPLOYMENT_SETUP.md, which is plain npx wrangler / npm run — the mise exec prefix is a working convention for this repo's agents, not part of the operator-facing runbook.
+- [Phase 11]: Production secrets landed via the plan's fallback path after a deploy-state refusal — The first wrangler secret put attempt failed because the latest Worker version wasn't deployed. Pushed main as-is (no flag change) to unblock, waited for the new version, then retried all four secret puts successfully, per 11-RESEARCH.md Pitfall 4 and the Phase 1 ADMIN_VECTORIZE_TOKEN precedent.
+- [Phase 11]: Two pushes in this plan deployed ~98 unpushed commits, including all of deferred-verification Phase 10 — Russell approved on 2026-09-08 ("Push as planned") that main may carry every unpushed commit when reconciliation deploys. Only STORE_FEATURE_GIFT_CARD_RECONCILIATION flipped; acquisition is untouched, so nothing became purchasable. Phase 10's human verification stays deferred to plan 11-05's D-07 gate.
 
 ### Pending Todos
 
@@ -335,8 +338,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-09T05:07:36.728Z
-Stopped at: Completed 11-03-PLAN.md
+Last session: 2026-09-09T05:30:22.060Z
+Stopped at: Completed 11-04-PLAN.md
 Resume file: None
 
 Next: `/gsd-verify-work 10`
