@@ -6,11 +6,11 @@ current_phase: 12
 current_phase_name: Content, Assistant & Live Proof
 current_plan: 5
 status: executing
-stopped_at: Completed 12-04-PLAN.md
-last_updated: "2026-09-09T20:47:54.846Z"
+stopped_at: 12-05 blocked at Task 1 step 6 (tax finding); 12-06 still runnable
+last_updated: "2026-09-09T20:59:11.210Z"
 last_activity: 2026-09-09
 last_activity_desc: Phase 11 complete, transitioned to Phase 10
-state_head: b726fabe5bda2057620759842e8b11ab21d5b341
+state_head: 806b5c815c23b99ee8d7ef8fef25a31afac6c86a
 progress:
   total_phases: 4
   completed_phases: 0
@@ -307,6 +307,7 @@ Open items carried from v1 close (`milestones/v1-MILESTONE-AUDIT.md`):
 - [Backlog] Mobile Lighthouse scores 72-80 vs. target 85 on all four measured routes
 - [Review 2026-12-01] Five moderate dev-only `npm audit` findings
 - [Phase 9] Interim: the live gift card (/product/gift-card, active) can be added to the cart but checkout refuses it until Phase 10 ships the recipient form (D-12, apply-active). Phase 10 removes this.
+- 12-05 HALTED before payment: production quoted $27.06 for the $25 gift card. Stripe Tax is unavailable on the live store (tax_source=configured_fallback), and the fallback applies store.tax_rate 8.25% to all merchandise, ignoring the gift card's txcd_00000000 nontaxable code. SHOP-07's live proof is unproven. Decision needed from Russell — see 12-05-SUMMARY.md 'Decision needed'.
 
 ### Roadmap Evolution
 
@@ -353,9 +354,9 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-09T20:47:54.824Z
-Stopped at: Completed 12-04-PLAN.md
-Resume file: None
+Last session: 2026-09-09T20:59:11.187Z
+Stopped at: 12-05 blocked at Task 1 step 6 (tax finding); 12-06 still runnable
+Resume file: .planning/phases/12-content-assistant-live-proof/12-05-SUMMARY.md
 
 Next: `/gsd-plan-phase 12` (then `/gsd-verify-work 10`)
 

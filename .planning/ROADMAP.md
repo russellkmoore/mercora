@@ -158,7 +158,7 @@ Plans:
   3. The Terms of Service page has a gift card section (email delivery, no expiry, no cash redemption, not transferable for resale), published through Admin → Pages
   4. A gift-card-only order paid in Stripe test mode on production results in an issued gift card, a delivery email to the recipient, and the card appearing under Account → Gift Cards for the recipient's account
 
-**Plans**: 4/6 plans executed
+**Plans**: 5/6 plans executed
 
 Plans:
 **Wave 1**
@@ -176,7 +176,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 12-05-PLAN.md — Buy one gift card in Stripe test mode on production and gather the issuance and delivery evidence
+- [x] 12-05-PLAN.md — Buy one gift card in Stripe test mode on production and gather the issuance and delivery evidence
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
@@ -191,4 +191,4 @@ Plans:
 | 9. Gift Card Catalogue | 4/4 | Complete    | 2026-09-08 |
 | 10. Gift Card Purchase Flow | 5/5 | In Progress|  |
 | 11. Production Enablement | 5/5 | Complete    | 2026-09-09 |
-| 12. Content, Assistant & Live Proof | 4/6 | In Progress|  |
+| 12. Content, Assistant & Live Proof | 5/6 | In Progress|  |
