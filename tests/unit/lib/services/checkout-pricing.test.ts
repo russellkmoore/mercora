@@ -474,6 +474,79 @@ describe('server-authoritative checkout pricing', () => {
     expect(mistagged.tax).toEqual({ amount: 200, currency: 'USD' });
   });
 
+  it('sends txcd_00000000 to the tax provider for a mis-tagged gift-card line', async () => {
+    // WR-11: the fallback guard alone left the provider path -- the one that
+    // runs whenever Stripe is up -- taxing a gift card whose tax_category an
+    // admin had cleared. Classification now forces the nontaxable code before
+    // the provider call, so both paths inherit the same decision. This test
+    // uses a WORKING calculateTax stub, and one that would happily tax the
+    // gift line if it were asked to.
+    const products: Record<string, unknown> = {
+      prod_1: {
+        id: 'prod_1', name: 'Catalog name', status: 'active', categories: ['category-1'],
+        tax_category: 'txcd_99999999', default_variant_id: 'var_1',
+      },
+      gift_product: {
+        id: 'gift_product', name: 'Gift card', type: 'gift_card', fulfillment_type: 'digital',
+        status: 'active', tax_category: 'txcd_99999999', default_variant_id: 'gift_variant',
+      },
+    };
+    const variants: Record<string, unknown> = {
+      var_1: {
+        id: 'var_1', product_id: 'prod_1', sku: 'SKU-1', status: 'active',
+        option_values: [], price: Money.fromMinor(2_000).toJSON(),
+      },
+      gift_variant: {
+        id: 'gift_variant', product_id: 'gift_product', sku: 'GIFT', status: 'active',
+        option_values: [], shipping_required: false, tax_category: 'txcd_99999999',
+        price: Money.fromMinor(2_500).toJSON(),
+      },
+    };
+    // Models Stripe: taxes at 10% on whatever code it is handed, and returns
+    // zero only for the nontaxable code. So the gift line's zero here is earned
+    // by the classification, not assumed -- send it txcd_99999999 and this stub
+    // taxes it, exactly as the real provider would.
+    const calculateTax = vi.fn(async (params: any) => {
+      const taxFor = (line: any) =>
+        line.tax_code === 'txcd_00000000' ? 0 : Math.round(line.amount * 0.1);
+      return {
+        tax_amount_exclusive: params.line_items.reduce(
+          (sum: number, line: any) => sum + taxFor(line), 0,
+        ),
+        line_items: {
+          data: params.line_items.map((line: any) => ({ ...line, amount_tax: taxFor(line) })),
+          has_more: false,
+        },
+        shipping_cost: params.shipping_cost
+          ? { amount: params.shipping_cost.amount, amount_tax: 0 }
+          : null,
+      };
+    });
+    const providerDeps = dependencies({
+      getProduct: vi.fn(async (id: string) => products[id]),
+      getProductVariant: vi.fn(async (id: string) => variants[id]),
+      calculateTax,
+    });
+
+    const quote = await priceCheckout({
+      items: [
+        { productId: 'prod_1', variantId: 'var_1', quantity: 1 },
+        {
+          productId: 'gift_product', variantId: 'gift_variant', quantity: 1,
+          giftCardCustomization: { recipientEmail: 'recipient@example.test' },
+        },
+      ],
+      shippingAddress: address,
+      shippingMethodId: 'standard',
+    }, { dependencies: providerDeps as any });
+
+    expect(quote.taxSource).toBe('provider');
+    // The classification handed to Stripe, not just the number that came back.
+    const sentCodes = calculateTax.mock.calls[0][0].line_items.map((line: any) => line.tax_code);
+    expect(sentCodes).toEqual(['txcd_99999999', 'txcd_00000000']);
+    expect(quote.lineAllocations.map((line) => line.tax.amount)).toEqual([200, 0]);
+  });
+
   it('emits a checkout.tax_fallback telemetry envelope when the tax provider fails', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const fallbackDeps = dependencies({ calculateTax: vi.fn(async () => { throw new Error('offline'); }) });

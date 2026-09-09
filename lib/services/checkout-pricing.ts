@@ -664,7 +664,20 @@ export async function priceCheckout(
     ? storeSettings['store.default_tax_code']
     : 'txcd_99999999';
   const requireTaxCategory = storeSettings['store.require_tax_category'] === true;
+  // Classify once, so the provider path and the fallback path can never
+  // disagree about a line. A tax category is merchant-editable at three levels
+  // (variant, product, store default), so clearing it on a gift-card variant
+  // and product used to drop stored value through to store.default_tax_code and
+  // get it taxed. isGiftCardOrderLine reads fulfillment_type and the gift_card
+  // block, both enforced where the line is built and not editable in the admin,
+  // so a mis-tagged card cannot be taxed on either path. orderItems is built
+  // above this, over the same array, so index alignment holds.
+  //
+  // The short-circuit also skips the require_tax_category guard below, which is
+  // intended: a gift-card line's classification must not depend on catalogue
+  // data an admin can clear.
   const taxCodes = catalog.map(({ product, variant }, index) => {
+    if (isGiftCardOrderLine(orderItems[index])) return NONTAXABLE_TAX_CODE;
     const code = variant.tax_category || product.tax_category || defaultTaxCode;
     if (
       (requireTaxCategory && !variant.tax_category && !product.tax_category) ||
@@ -735,15 +748,11 @@ export async function priceCheckout(
     // rate applies only to the taxable lines, and the per-line allocation
     // gives those lines zero weight.
     //
-    // The tax code alone is not enough to lean on. It resolves from
-    // variant.tax_category || product.tax_category || store.default_tax_code,
-    // all three merchant-editable — clear the category on a gift-card variant
-    // and product and the line silently falls through to the default code and
-    // starts being taxed. isGiftCardOrderLine reads fulfillment_type and the
-    // gift_card block, both enforced at line construction and not editable in
-    // the admin, so a mis-tagged card still cannot be taxed.
+    // The single tax-code check is enough because gift-card lines are forced to
+    // NONTAXABLE_TAX_CODE at classification above, before the provider call, so
+    // both paths inherit the same decision.
     const taxableLineMinor = netLineMinor.map((amount, index) =>
-      taxCodes[index] === NONTAXABLE_TAX_CODE || isGiftCardOrderLine(orderItems[index]) ? 0 : amount
+      taxCodes[index] === NONTAXABLE_TAX_CODE ? 0 : amount
     );
     const taxableMerchandise = Money.fromMinor(
       taxableLineMinor.reduce((sum, amount) => sum + amount, 0),
