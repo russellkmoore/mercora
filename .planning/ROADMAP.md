@@ -158,12 +158,12 @@ Plans:
   3. The Terms of Service page has a gift card section (email delivery, no expiry, no cash redemption, not transferable for resale), published through Admin → Pages
   4. A gift-card-only order paid in Stripe test mode on production results in an issued gift card, a delivery email to the recipient, and the card appearing under Account → Gift Cards for the recipient's account
 
-**Plans**: 6 plans
+**Plans**: 1/6 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 12-01-PLAN.md — Prove the remote-binding tool chain reads production D1, R2, Vectorize and AI from one local process (tracer)
+- [x] 12-01-PLAN.md — Prove the remote-binding tool chain reads production D1, R2, Vectorize and AI from one local process (tracer)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -191,4 +191,4 @@ Plans:
 | 9. Gift Card Catalogue | 4/4 | Complete    | 2026-09-08 |
 | 10. Gift Card Purchase Flow | 5/5 | In Progress|  |
 | 11. Production Enablement | 5/5 | Complete    | 2026-09-09 |
-| 12. Content, Assistant & Live Proof | 0/6 | Planned | - |
+| 12. Content, Assistant & Live Proof | 1/6 | In Progress|  |
