@@ -65,6 +65,7 @@ export const TELEMETRY_EVENTS = {
   'fulfillment.query_failed': { severity: 'error', sampleRate: 0.25 },
   'email.delivery_failed': { severity: 'error', sampleRate: 0.25 },
   'gift_card.delivery_failed': { severity: 'critical', sampleRate: 1 },
+  'gift_card.delivery_note_dropped': { severity: 'warning', sampleRate: 1 },
   'email.audit_write_failed': { severity: 'error', sampleRate: 0.25 },
   'recommendation.rebuild_failed': { severity: 'critical', sampleRate: 1 },
   'recommendation.no_rows_written': { severity: 'warning', sampleRate: 0.25 },

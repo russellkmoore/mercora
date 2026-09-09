@@ -95,9 +95,12 @@ function epochSeconds(): number { return Math.floor(Date.now() / 1_000); }
  * bespoke line carried up to 200 characters of unfiltered third-party text
  * (which could include the recipient address on a rejection).
  */
+type DeliveryTrigger = 'recovery' | 'request';
+
 function recordDeliveryFailure(fields: {
   provider: 'cloudflare_email' | 'resend' | 'd1';
   retryable: boolean;
+  trigger: DeliveryTrigger;
   attempt?: number;
 }, error?: unknown): void {
   recordTelemetry('gift_card.delivery_failed', {
@@ -105,15 +108,24 @@ function recordDeliveryFailure(fields: {
     outcome: 'failed',
     provider: fields.provider,
     retryable: fields.retryable,
-    trigger: 'recovery',
+    trigger: fields.trigger,
     ...(fields.attempt === undefined ? {} : { attempt: fields.attempt }),
   }, error);
 }
 
-/** Map the sender's own provider name onto the telemetry provider enum. */
-function telemetryProvider(provider: unknown): 'cloudflare_email' | 'resend' | 'd1' {
-  if (provider === 'cloudflare') return 'cloudflare_email';
-  if (provider === 'resend') return 'resend';
+/**
+ * Map the sender's provider name onto the telemetry provider enum. When the
+ * sender could not pick a provider at all (configuration failures report none)
+ * fall back to the one the environment names, so a provider-config incident is
+ * attributed to email rather than to the database.
+ */
+function telemetryProvider(
+  provider: unknown,
+  configured: string | undefined,
+): 'cloudflare_email' | 'resend' | 'd1' {
+  const name = typeof provider === 'string' ? provider : configured;
+  if (name === 'cloudflare') return 'cloudflare_email';
+  if (name === 'resend') return 'resend';
   return 'd1';
 }
 
@@ -164,9 +176,12 @@ async function giftMessageFor(args: {
     return trimmed.length === 0 ? undefined : trimmed.slice(0, GIFT_CARD_MESSAGE_MAX_LENGTH);
   } catch (error) {
     // Fail soft -- a card without its note beats no card -- but not in silence.
-    // The article states as fact that the note is included, so a schema drift on
-    // orders.items or a purged order row must not silently stop delivering them.
-    recordDeliveryFailure({ provider: 'd1', retryable: true }, error);
+    // The card still goes out, so this is a degraded send, not a failed one:
+    // it must not page anyone. A schema drift on orders.items or a purged
+    // order row shows up here as a non-critical envelope.
+    recordTelemetry('gift_card.delivery_note_dropped', {
+      operation: 'read', outcome: 'degraded', provider: 'd1', retryable: false, trigger: 'recovery',
+    }, error);
     return undefined;
   }
 }
@@ -261,6 +276,7 @@ async function deliverOne(args: {
   keys: GiftCardEncryptionKeyRing;
   now: number;
   emailEnvironment: EmailSendOptions['env'] | undefined;
+  trigger: DeliveryTrigger;
 }): Promise<void> {
   const token = crypto.randomUUID();
   const claimed = await args.database.prepare(`UPDATE gift_card_deliveries
@@ -286,7 +302,7 @@ async function deliverOne(args: {
     // would eventually surface it: a paid card whose encrypted code material is
     // gone needs a human to reissue it, and nobody was being told.
     recordDeliveryFailure({
-      provider: 'd1', retryable: false, attempt: claimed.attempt_count,
+      provider: 'd1', retryable: false, trigger: args.trigger, attempt: claimed.attempt_count,
     });
     await args.database.prepare(`UPDATE gift_card_deliveries SET status = 'needs_review',
       claim_token = NULL, lease_expires_at = NULL, completed_at = ?, updated_at = ?
@@ -323,8 +339,9 @@ async function deliverOne(args: {
     if (!result.success) {
       // The retry/status decision above is unchanged; this only records it.
       recordDeliveryFailure({
-        provider: telemetryProvider(result.provider),
+        provider: telemetryProvider(result.provider, args.emailEnvironment?.EMAIL_PROVIDER),
         retryable: status !== 'needs_review',
+        trigger: args.trigger,
         attempt: claimed.attempt_count,
       });
     }
@@ -334,7 +351,7 @@ async function deliverOne(args: {
   } catch (error) {
     const status = exhausted ? 'needs_review' : 'pending';
     recordDeliveryFailure({
-      provider: 'd1', retryable: !exhausted, attempt: claimed.attempt_count,
+      provider: 'd1', retryable: !exhausted, trigger: args.trigger, attempt: claimed.attempt_count,
     }, error);
     await args.database.prepare(`UPDATE gift_card_deliveries SET status = ?, claim_token = NULL,
       lease_expires_at = NULL, completed_at = ?, updated_at = ? WHERE id = ? AND claim_token = ?`)
@@ -371,7 +388,7 @@ export async function fulfillPaidGiftCards(order: Order, options: {
   // drain picks them up. Immediate cards send here.
   const emailEnvironment = emailEnvironmentFrom(environment);
   for (const giftCardId of cards) {
-    await deliverOne({ database, giftCardId, keys: deliveryKeys, now, emailEnvironment });
+    await deliverOne({ database, giftCardId, keys: deliveryKeys, now, emailEnvironment, trigger: 'request' });
   }
 }
 
@@ -393,7 +410,7 @@ export async function drainGiftCardDeliveries(options: {
   const keys = parseGiftCardDeliveryKeyRing(environment);
   const emailEnvironment = emailEnvironmentFrom(environment);
   for (const row of rows.results ?? []) {
-    await deliverOne({ database: environment.DB, giftCardId: row.gift_card_id, keys, now, emailEnvironment });
+    await deliverOne({ database: environment.DB, giftCardId: row.gift_card_id, keys, now, emailEnvironment, trigger: 'recovery' });
   }
   return { attempted: rows.results?.length ?? 0 };
 }
