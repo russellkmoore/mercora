@@ -4,17 +4,18 @@ milestone: v2.1
 milestone_name: Gift Card Product
 current_phase: 12
 current_phase_name: Content, Assistant & Live Proof
+current_plan: 4
 status: executing
-stopped_at: Completed 12-01-PLAN.md
-last_updated: "2026-09-09T20:28:40.731Z"
+stopped_at: Completed 12-02-PLAN.md
+last_updated: "2026-09-09T20:39:07.544Z"
 last_activity: 2026-09-09
 last_activity_desc: Phase 11 complete, transitioned to Phase 10
-state_head: 2102380915137d48c96b3726f2e21b69dbf57a6c
+state_head: 499c2c3acde4cf5d077a550def66b97410f960a5
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 20
-  completed_plans: 15
+  completed_plans: 17
   percent: 25
 ---
 
@@ -29,10 +30,11 @@ See: .planning/PROJECT.md (updated 2026-09-09 after Phase 11)
 
 ## Current Position
 
-Phase: 12 (Content, Assistant & Live Proof) — READY TO EXECUTE
-Plan: Not started
+Phase: 12 (Content, Assistant & Live Proof) — IN PROGRESS
+Current Plan: 4
+Total Plans in Phase: 6
 Status: Ready to execute
-Last activity: 2026-09-09 — Phase 11 complete, transitioned to Phase 10
+Last activity: 2026-09-09 — Phase 12 wave 2 (12-02, 12-03) complete
 
 Progress: [███░░░░░░░] 25%
 
@@ -138,6 +140,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 11 P04 | 19min | 3 tasks | 2 files |
 | Phase 11 P05 | 22min | 3 tasks | 3 files |
 | Phase 12 P01 | 7min | 3 tasks | 1 files |
+| Phase 12 P02 | 9min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -275,6 +278,7 @@ Decisions locked for v2:
 - [Phase 11]: [Phase 11] Unattended decision (2026-09-09): Phase 11's two human-verification items (signed-in GET /api/gift-cards; live checkout code-field rejection) were accepted on code-level and live read-only evidence rather than a browser session, per Russell's standing instruction to proceed on best assumptions. — Russell was away; he asked for best-assumption decisions on the demo site and a list at the end. Evidence: PDP 200 with form, /checkout 200, bogus balance code -> 200 {valid:false}, unauthenticated /api/gift-cards -> 401, 11-04 cron cycle clean.
 - [Phase 12]: Phase 12 remote-binding harness stays in the session scratch dir, not promoted to scripts/ (D-01 discretion; committed script is a Deferred Idea)
 - [Phase 12]: 12-04 stays upsert-only: prod_33 already carries a healthy gift/present/voucher product vector, so no destructive clear-and-rebuild is needed
+- [Phase 12]: Rewrote gift-cards.md to match shipped behavior (D-08); source-contract test pins the promises; article uploaded to R2 and proven byte-identical via ETag=MD5
 
 ### Pending Todos
 
@@ -346,8 +350,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-09T20:28:40.708Z
-Stopped at: Completed 12-01-PLAN.md
+Last session: 2026-09-09T20:38:40.404Z
+Stopped at: Completed 12-02-PLAN.md
 Resume file: None
 
 Next: `/gsd-plan-phase 12` (then `/gsd-verify-work 10`)
