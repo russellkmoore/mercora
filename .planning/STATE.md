@@ -5,17 +5,17 @@ milestone_name: Gift Card Product
 current_phase: 12
 current_phase_name: Content, Assistant & Live Proof
 current_plan: 6
-status: executing
-stopped_at: "12-05 complete: order paid, card issued, delivery sent via cloudflare. 12-06 next"
-last_updated: "2026-09-09T22:25:00.196Z"
+status: verifying
+stopped_at: Completed 12-06-PLAN.md — phase 12 gate green, milestone v2.1 closed
+last_updated: "2026-09-09T22:35:23.230Z"
 last_activity: 2026-09-09
 last_activity_desc: Phase 12 plan 12-05 complete — live gift-card purchase, issuance and delivery proven on production
-state_head: 8cc564f04eaf7361ddbc4b8cdade4e959c3cb108
+state_head: 658337630ad0a60cb69cb4447603ccb4beb0ef91
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 20
-  completed_plans: 19
+  completed_plans: 20
   percent: 0
 ---
 
@@ -33,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-09-09 after Phase 11)
 Phase: 12 (Content, Assistant & Live Proof) — IN PROGRESS
 Current Plan: 6
 Total Plans in Phase: 6
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-09 — Phase 12 wave 2 (12-02, 12-03) complete
 
 Progress: [░░░░░░░░░░] 0%
@@ -143,6 +143,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 12 P02 | 9min | 3 tasks | 2 files |
 | Phase 12 P04 | 7min | 3 tasks | 0 files |
 | Phase 12 P05 | 2h | 3 tasks | 4 files |
+| Phase 12 P06 | 12min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -287,6 +288,7 @@ Decisions locked for v2:
 - [Phase 12]: [Phase 12, unattended]: The issued gift card's delivery email stayed pending because production had no EMAIL_PROVIDER (both the EMAIL binding and RESEND_API_KEY exist, so the sender refuses to pick one); no transactional email had ever sent from production. Chosen: add "EMAIL_PROVIDER": "cloudflare" to wrangler.jsonc vars (the documented recommendation; commit 32b9df1, env types regenerated), push so Workers Builds deploys it before the delivery row's retry cap. Alternative rejected: "resend" (a key exists but the Cloudflare binding is the documented default). If the Cloudflare send itself fails (unverified destination or sending domain), the row parks as needs_review for Russell to re-queue after fixing Email Routing.
 - [Phase 12]: [Phase 12, unattended]: EMAIL_PROVIDER alone did not unblock the gift-card email: the cron drain called sendEmail without the worker env, so the sender fell back to a request context that does not exist in a scheduled run and never found the EMAIL binding or DB; attempts failed silently until the row parked as needs_review (attempt 8). Chosen: fix lib/services/gift-card-fulfillment.ts to pass EMAIL/DB/EMAIL_PROVIDER/RESEND_API_KEY into sendEmail at both call sites (integration test asserts it), push to deploy, then re-queue the parked delivery row with one production D1 UPDATE (status pending, attempt_count 0, completed_at NULL) so the next cron cycle sends it. Alternative rejected: leave the row parked for Russell (SHOP-07's delivery half would stay unproven and the first customer card would never arrive).
 - [Phase 12]: [Phase 12, unattended]: With the sender fixed, Cloudflare Email Sending rejected the store's placeholder from-address (support@mercora.example.com, error E_SENDER_DOMAIN_NOT_AVAILABLE: domain not owned by the account). DNS shows russellkmoore.me is onboarded to Email Sending (cf-bounce MX, SPF, DKIM cf2024-1, DMARC). Chosen: set the public var STORE_SENDER_EMAIL = "Voltique <orders@russellkmoore.me>" in wrangler.jsonc and deploy. Not changed: STORE_SUPPORT_EMAIL (still the placeholder; reply-to/support address is Russell's call), and no Email Routing rule exists for orders@ so replies to the sender bounce.
+- [Phase 12]: [Phase 12, 12-06] The phase's scope assertion was run as written and recorded as failing — three files under lib/ and wrangler.jsonc changed, all four attributable to the unattended orchestrator commits 3b821f7, 32b9df1, f813499 and d8b4d11. The stronger true statement is asserted instead: app/, components/ and migrations/ are empty in the range, no migration was added, and the secret scan over added lines is 0.
 
 ### Pending Todos
 
@@ -361,9 +363,9 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-09T21:39:06.115Z
-Stopped at: 12-05 attempt 2: order paid and card issued; delivery blocked on EMAIL_PROVIDER. 12-06 still runnable
-Resume file: .planning/phases/12-content-assistant-live-proof/12-05-SUMMARY.md
+Last session: 2026-09-09T22:35:23.207Z
+Stopped at: Completed 12-06-PLAN.md — phase 12 gate green, milestone v2.1 closed
+Resume file: None
 
 Next: `/gsd-plan-phase 12` (then `/gsd-verify-work 10`)
 
