@@ -546,7 +546,8 @@ Do not proceed to Step 4 until all three checks pass.
    pending-deliveries query and before any row is processed, regardless of how many rows came
    back, so a malformed ring still fails the cycle even with zero deliveries queued.
 3. A signed-in request to the account gift-card listing endpoint (`GET /api/gift-cards`)
-   returns a `cards` array; a 503 there means the ring or the database is unhealthy. The public
+   returns a `cards` array; a 503 there means the database is unhealthy (this endpoint never
+   touches either key ring — check #2 above is what catches a malformed ring). The public
    balance endpoint (`POST /api/gift-cards/balance`) answers identically for a bad code, an
    unknown card, and a broken ring, by design — it proves availability and nothing about ring
    health.
