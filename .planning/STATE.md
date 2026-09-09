@@ -7,10 +7,10 @@ current_phase_name: Content, Assistant & Live Proof
 current_plan: 5
 status: executing
 stopped_at: 12-05 blocked at Task 1 step 6 (tax finding); 12-06 still runnable
-last_updated: "2026-09-09T20:59:11.210Z"
+last_updated: "2026-09-09T21:02:06.705Z"
 last_activity: 2026-09-09
 last_activity_desc: Phase 11 complete, transitioned to Phase 10
-state_head: 806b5c815c23b99ee8d7ef8fef25a31afac6c86a
+state_head: 3b821f76a127fafc0fb70fa86e2070f710b32274
 progress:
   total_phases: 4
   completed_phases: 0
@@ -282,6 +282,7 @@ Decisions locked for v2:
 - [Phase 12]: Rewrote gift-cards.md to match shipped behavior (D-08); source-contract test pins the promises; article uploaded to R2 and proven byte-identical via ETag=MD5
 - [Phase 12]: 12-04: Volt re-index ran upsert-only on the single knowledge-gift-cards vector (dispatch scope narrowing); index count unchanged at 48, nothing deleted
 - [Phase 12]: 12-04: embedding model id parsed from lib/ai/config.ts at run time and cross-checked against the admin route rather than hardcoded
+- [Phase 12]: [Phase 12, unattended]: The live-proof purchase halted because production quoted $27.06 for the $25 gift card: Stripe Tax is unavailable on the live account (every order uses the configured fallback rate) and the fallback rated every line, ignoring the gift card's nontaxable code. Chosen: fix the fallback in lib/services/checkout-pricing.ts to give txcd_00000000 lines zero tax (commit 3b821f7, 1 test added, full suite green), push so Workers Builds deploys it, then re-run 12-05 with a NEW PaymentIntent (the halted intent carries the wrong amount and was never confirmed). Alternatives rejected: buy anyway at $27.06 (records a wrong-tax order permanently); wait for Russell (milestone left incomplete). Still open for Russell: enable Stripe Tax on the live Stripe account so the provider path is used at all.
 
 ### Pending Todos
 
