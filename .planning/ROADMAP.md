@@ -126,12 +126,12 @@ Plans:
   3. `docs/runtime-configuration.md` documents the delivery key ring alongside the code HMAC ring, and `docs/DEPLOYMENT_SETUP.md` carries a step-by-step enablement recipe (generate keys, put secrets, enable reconciliation, verify, enable acquisition)
   4. `.env.example` shows the shape of all four gift card secrets with placeholder values so a developer can exercise the full flow locally
 
-**Plans**: 5 plans
+**Plans**: 1/5 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 11-01-PLAN.md — Prove the key-ring pipeline locally: generate a dev ring into `.dev.vars`, prove git cannot see it, pin both parser shapes (tracer)
+- [x] 11-01-PLAN.md — Prove the key-ring pipeline locally: generate a dev ring into `.dev.vars`, prove git cannot see it, pin both parser shapes (tracer)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -168,5 +168,5 @@ Plans:
 | 5-8.2 (v2 Themeable Storefront) | 44/44 | Complete | 2026-09-05 |
 | 9. Gift Card Catalogue | 4/4 | Complete    | 2026-09-08 |
 | 10. Gift Card Purchase Flow | 5/5 | In Progress|  |
-| 11. Production Enablement | 0/5 | Planned | - |
+| 11. Production Enablement | 1/5 | In Progress|  |
 | 12. Content, Assistant & Live Proof | 0/TBD | Not started | - |
