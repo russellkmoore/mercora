@@ -129,6 +129,26 @@ describe("gift-card seed block: sentinel-delimited, replay-safe INSERT OR IGNORE
     expect(imageMatches.length).toBeGreaterThanOrEqual(2);
   });
 
+  // CR-03: the product description is embedded into the product vector by
+  // app/api/admin/vectorize/route.ts and rendered on the product page, so it is
+  // retrieved by the same assistant, for the same question, as the knowledge
+  // article. The two must not contradict each other on when the card sends.
+  it("the catalogue copy does not promise an unconditional immediate send", () => {
+    const slice = stripCommentLines(extractGiftCardSlice(seedSql));
+    expect(slice).toMatch(/arrives by email as soon as payment clears/i);
+    expect(slice).toMatch(/or on the delivery date you choose/i);
+    // The immediacy claim must never appear without the scheduled qualifier
+    // trailing it inside the same description string.
+    expect(slice).not.toMatch(/as soon as payment clears(?![^"]*delivery date)/i);
+  });
+
+  it("the meta description does not promise an unconditional immediate send", () => {
+    const slice = stripCommentLines(extractGiftCardSlice(seedSql));
+    const metaDescription = slice.match(/"meta_description": "([^"]*)"/)?.[1];
+    expect(metaDescription).toBeDefined();
+    expect(metaDescription).toMatch(/or on a delivery date you choose/i);
+  });
+
   it("seeds rating as NULL and related_products as an empty JSON array", () => {
     const slice = stripCommentLines(extractGiftCardSlice(seedSql));
 
