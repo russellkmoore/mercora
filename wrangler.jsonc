@@ -129,7 +129,8 @@
     // acquisition first to stop new sales, and keep reconciliation on while
     // any gift-card balance or reservation exists.
     "STORE_FEATURE_GIFT_CARD_RECONCILIATION": "true",
-    "STORE_FEATURE_GIFT_CARD_ACQUISITION": "true"
+    "STORE_FEATURE_GIFT_CARD_ACQUISITION": "true",
+    "EMAIL_PROVIDER": "cloudflare"
   },
   /**
    * Note: Use secrets to store sensitive data.
