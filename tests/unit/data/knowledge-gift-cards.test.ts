@@ -35,8 +35,10 @@ describe("gift-cards knowledge article: promises match what ships", () => {
     expect(content).toMatch(/never expire/i);
   });
 
+  // Assert the sentence, not the vocabulary: /cash/i alone passes on the
+  // inverse claim ("can be redeemed for cash").
   it("states the card is not redeemable for cash", () => {
-    expect(content).toMatch(/cash/i);
+    expect(content).toMatch(/cannot be redeemed for cash|not redeemable for cash/i);
   });
 
   it("states the card is not transferable for resale", () => {
@@ -49,9 +51,20 @@ describe("gift-cards knowledge article: promises match what ships", () => {
     expect(content).toMatch(/gift card.*field/i);
   });
 
-  it("names Account -> Gift Cards as where a balance is visible", () => {
-    expect(content).toContain("Account");
-    expect(content).toContain("Gift Cards");
+  // The dashboard is a buyer's receipt list, not a wallet: /api/gift-cards is
+  // scoped to the authenticated purchaser, and the empty state says gift codes
+  // are only delivered to their recipient. The article must not read as though
+  // a recipient can look their card up there.
+  it("names Account -> Gift cards as where a purchased balance is visible", () => {
+    expect(content).toMatch(/under Account, then Gift cards/i);
+    expect(content).toMatch(/received does not appear there/i);
+  });
+
+  // components/checkout/CheckoutClient.tsx renders a code input and no balance
+  // readout; OrderSummary shows only the amount applied to this order.
+  it("does not claim checkout displays a remaining balance", () => {
+    expect(content).toMatch(/Checkout does not show a card's remaining balance/i);
+    expect(content).not.toMatch(/(see|check|view)[^.]{0,40}balance[^.]{0,40}at checkout/i);
   });
 
   it("front-matter tags carry the retrieval vocabulary: gift, present, voucher", () => {

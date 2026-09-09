@@ -21,7 +21,9 @@ To use a gift card, enter its code in the "Gift card" field on the checkout ship
 
 ## Checking a Balance
 
-Signed-in shoppers can see their gift cards and remaining balances under Account, then Gift Cards. Anyone holding a gift card code can also see its remaining balance by entering the code at checkout.
+A shopper who bought a gift card can see it and its remaining balance while signed in, under Account, then Gift cards. A gift card someone received does not appear there — for safety the code is only ever sent to the recipient's email address.
+
+Checkout does not show a card's remaining balance. Entering a code applies the card to that order, and the amount it covers appears in the order summary as "Other tender".
 
 ## Limits
 
