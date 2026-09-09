@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 5
+open_count: 6
 waived_count: 0
 fixed_count: 2
-total_count: 7
-last_updated: 2026-09-09T20:37:10.407Z
+total_count: 8
+last_updated: 2026-09-09T20:47:36.043Z
 ---
 
 # Broken Windows Ledger
@@ -22,6 +22,7 @@ last_updated: 2026-09-09T20:37:10.407Z
 | 5 | 08.1 | deviation | docs/CLAUDE.md |  | Gates/Testing sections still claim scan:tokens is local-only, not CI-wired — stale after 08.1-03 added the CI step; out of this plan's declared files_modified scope | open |  | 2026-09-05T20:22:36.784Z |  |
 | 6 | 08.1 | deviation | .planning/phases/08.1-v2-tech-debt-closure/08.1-07-PLAN.md |  | Task 3's automated verify includes a whole-file check that REQUIREMENTS.md has zero unchecked bold requirement lines; DOCS-04 and DOCS-05 (Phase 8.2, not yet executed) remain unchecked as intended, so this specific sub-check fails as literally written. DEBT-01's own checkbox and traceability row were verified directly instead; no other requirement's state was changed. | open |  | 2026-09-05T22:07:40.268Z |  |
 | 7 | 12 | deviation | N/A (CDN edge cache, not a repo file) |  | Public CDN URL https://voltique-images.russellkmoore.me/knowledge_md/gift-cards.md served a stale cached GET body (old article, TTL max-age=14400) for ~13min+ after the 12-02 upload while HEAD/ETag and the direct R2 object read already showed the correct new content; self-resolves by cache TTL expiry, no wrangler purge command exists, and plan 12-04's re-index reads via the R2 binding directly so is unaffected | open |  | 2026-09-09T20:37:10.407Z |  |
+| 8 | 12 | deviation | .planning/phases/12-content-assistant-live-proof/12-04-SUMMARY.md |  | 12-04 upserted only knowledge-gift-cards, not all nine knowledge articles (dispatch narrowed the plan's Task 1 scope); the other seven knowledge vectors carry pre-phase embeddings of unchanged articles | open |  | 2026-09-09T20:47:36.043Z |  |
 
 ````json
 [
@@ -107,6 +108,18 @@ last_updated: 2026-09-09T20:37:10.407Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-09T20:37:10.407Z",
+    "resolved_at": null
+  },
+  {
+    "id": 8,
+    "kind": "deviation",
+    "phase": "12",
+    "file": ".planning/phases/12-content-assistant-live-proof/12-04-SUMMARY.md",
+    "line": null,
+    "description": "12-04 upserted only knowledge-gift-cards, not all nine knowledge articles (dispatch narrowed the plan's Task 1 scope); the other seven knowledge vectors carry pre-phase embeddings of unchanged articles",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-09T20:47:36.043Z",
     "resolved_at": null
   }
 ]
