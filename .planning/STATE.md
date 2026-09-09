@@ -7,10 +7,10 @@ current_phase_name: Content, Assistant & Live Proof
 current_plan: 5
 status: executing
 stopped_at: "12-05 attempt 2: order paid and card issued; delivery blocked on EMAIL_PROVIDER. 12-06 still runnable"
-last_updated: "2026-09-09T21:57:43.411Z"
+last_updated: "2026-09-09T22:12:23.175Z"
 last_activity: 2026-09-09
 last_activity_desc: Phase 11 complete, transitioned to Phase 10
-state_head: f813499fb0db70bcd3fc78cb846642c110995907
+state_head: d8b4d11a1592997afb963e67bbc2aab785f38f7a
 progress:
   total_phases: 4
   completed_phases: 0
@@ -285,6 +285,7 @@ Decisions locked for v2:
 - [Phase 12]: [Phase 12, unattended]: The live-proof purchase halted because production quoted $27.06 for the $25 gift card: Stripe Tax is unavailable on the live account (every order uses the configured fallback rate) and the fallback rated every line, ignoring the gift card's nontaxable code. Chosen: fix the fallback in lib/services/checkout-pricing.ts to give txcd_00000000 lines zero tax (commit 3b821f7, 1 test added, full suite green), push so Workers Builds deploys it, then re-run 12-05 with a NEW PaymentIntent (the halted intent carries the wrong amount and was never confirmed). Alternatives rejected: buy anyway at $27.06 (records a wrong-tax order permanently); wait for Russell (milestone left incomplete). Still open for Russell: enable Stripe Tax on the live Stripe account so the provider path is used at all.
 - [Phase 12]: [Phase 12, unattended]: The issued gift card's delivery email stayed pending because production had no EMAIL_PROVIDER (both the EMAIL binding and RESEND_API_KEY exist, so the sender refuses to pick one); no transactional email had ever sent from production. Chosen: add "EMAIL_PROVIDER": "cloudflare" to wrangler.jsonc vars (the documented recommendation; commit 32b9df1, env types regenerated), push so Workers Builds deploys it before the delivery row's retry cap. Alternative rejected: "resend" (a key exists but the Cloudflare binding is the documented default). If the Cloudflare send itself fails (unverified destination or sending domain), the row parks as needs_review for Russell to re-queue after fixing Email Routing.
 - [Phase 12]: [Phase 12, unattended]: EMAIL_PROVIDER alone did not unblock the gift-card email: the cron drain called sendEmail without the worker env, so the sender fell back to a request context that does not exist in a scheduled run and never found the EMAIL binding or DB; attempts failed silently until the row parked as needs_review (attempt 8). Chosen: fix lib/services/gift-card-fulfillment.ts to pass EMAIL/DB/EMAIL_PROVIDER/RESEND_API_KEY into sendEmail at both call sites (integration test asserts it), push to deploy, then re-queue the parked delivery row with one production D1 UPDATE (status pending, attempt_count 0, completed_at NULL) so the next cron cycle sends it. Alternative rejected: leave the row parked for Russell (SHOP-07's delivery half would stay unproven and the first customer card would never arrive).
+- [Phase 12]: [Phase 12, unattended]: With the sender fixed, Cloudflare Email Sending rejected the store's placeholder from-address (support@mercora.example.com, error E_SENDER_DOMAIN_NOT_AVAILABLE: domain not owned by the account). DNS shows russellkmoore.me is onboarded to Email Sending (cf-bounce MX, SPF, DKIM cf2024-1, DMARC). Chosen: set the public var STORE_SENDER_EMAIL = "Voltique <orders@russellkmoore.me>" in wrangler.jsonc and deploy. Not changed: STORE_SUPPORT_EMAIL (still the placeholder; reply-to/support address is Russell's call), and no Email Routing rule exists for orders@ so replies to the sender bounce.
 
 ### Pending Todos
 
