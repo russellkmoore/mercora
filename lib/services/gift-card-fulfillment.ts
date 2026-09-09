@@ -8,6 +8,7 @@ import {
   type GiftCardEncryptionKeyRing,
 } from '@/lib/gift-cards/encryption';
 import { parseGiftCardCodeKeyRing, parseGiftCardDeliveryKeyRing } from '@/lib/gift-cards/config';
+import { GIFT_CARD_MESSAGE_MAX_LENGTH } from '@/lib/gift-cards/customization';
 import { isGiftCardOrderLine } from '@/lib/gift-cards/checkout';
 import { sendEmail, type EmailSendOptions } from '@/lib/email/sender';
 import { getStoreConfig } from '@/lib/store-config';
@@ -49,16 +50,67 @@ async function stableId(prefix: string, orderId: string, lineId: string): Promis
   return `${prefix}_${Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
 }
 
-function deliveryMessage(args: { code: string; amount: Money; recipientName?: string }) {
+/**
+ * The buyer's gift message, read from the immutable order-line snapshot.
+ *
+ * `gift_card_deliveries` carries no copy of the note by design — migrations are
+ * expand-only and the order snapshot is already the source of truth for every
+ * other customization field. A missing, unparseable, or messageless snapshot
+ * sends the card without the note rather than failing the delivery: the code
+ * itself is what the recipient needs.
+ */
+async function giftMessageFor(args: {
+  database: D1Database;
+  orderId: string | null;
+  orderLineId: string | null;
+}): Promise<string | undefined> {
+  if (!args.orderId || !args.orderLineId) return undefined;
+  try {
+    const row = await args.database.prepare('SELECT items FROM orders WHERE id = ?')
+      .bind(args.orderId).first<{ items: string | null }>();
+    if (!row?.items) return undefined;
+    const items: unknown = typeof row.items === 'string' ? JSON.parse(row.items) : row.items;
+    if (!Array.isArray(items)) return undefined;
+    const line = items.find(
+      (item): item is { id: string; gift_card?: { message?: unknown } } =>
+        typeof item === 'object' && item !== null
+        && (item as { id?: unknown }).id === args.orderLineId,
+    );
+    const message = line?.gift_card?.message;
+    if (typeof message !== 'string') return undefined;
+    const trimmed = message.trim();
+    // parseGiftCardCustomization caps this on the way in; re-clamp because this
+    // is a value read back out of storage, not one that just passed the gate.
+    return trimmed.length === 0 ? undefined : trimmed.slice(0, GIFT_CARD_MESSAGE_MAX_LENGTH);
+  } catch {
+    return undefined;
+  }
+}
+
+function deliveryMessage(args: {
+  code: string;
+  amount: Money;
+  recipientName?: string;
+  giftMessage?: string;
+}) {
   const store = getStoreConfig();
   const greeting = args.recipientName ? `Hello ${args.recipientName},` : 'Hello,';
   const subject = `${store.identity.name} gift card`;
+  // The buyer's note is untrusted shopper text. It is quoted as its own block
+  // and HTML-escaped line by line — never interpolated raw into the markup.
+  const noteText = args.giftMessage ? `\n\n"${args.giftMessage}"` : '';
+  const noteHtml = args.giftMessage
+    ? `<blockquote>${args.giftMessage.split('\n')
+        .filter((line) => line.trim().length > 0)
+        .map((line) => `<p>${escapeHtmlText(line)}</p>`)
+        .join('')}</blockquote>`
+    : '';
   return {
     from: store.contact.senderEmail,
     to: '',
     subject,
-    text: `${greeting}\n\nYou received a ${args.amount.format()} gift card.\n\nCode: ${args.code}\n\nKeep this code private.`,
-    html: `<p>${escapeHtmlText(greeting)}</p><p>You received a ${escapeHtmlText(args.amount.format())} gift card.</p><p><strong>${escapeHtmlText(args.code)}</strong></p><p>Keep this code private.</p>`,
+    text: `${greeting}\n\nYou received a ${args.amount.format()} gift card.${noteText}\n\nCode: ${args.code}\n\nKeep this code private.`,
+    html: `<p>${escapeHtmlText(greeting)}</p><p>You received a ${escapeHtmlText(args.amount.format())} gift card.</p>${noteHtml}<p><strong>${escapeHtmlText(args.code)}</strong></p><p>Keep this code private.</p>`,
   };
 }
 
@@ -123,11 +175,12 @@ async function deliverOne(args: {
         lease_expires_at = ?, updated_at = ?
     WHERE gift_card_id = ? AND deliver_after <= ?
       AND (status = 'pending' OR (status = 'processing' AND lease_expires_at <= ?))
-    RETURNING id, recipient_email, recipient_name, email_idempotency_key, code_ciphertext,
-      code_nonce, code_key_version, attempt_count`).bind(
+    RETURNING id, order_id, order_line_id, recipient_email, recipient_name,
+      email_idempotency_key, code_ciphertext, code_nonce, code_key_version, attempt_count`).bind(
     token, args.now + DELIVERY_LEASE_SECONDS, args.now, args.giftCardId, args.now, args.now,
   ).first<{
-    id: string; recipient_email: string; recipient_name: string | null; email_idempotency_key: string;
+    id: string; order_id: string | null; order_line_id: string | null;
+    recipient_email: string; recipient_name: string | null; email_idempotency_key: string;
     code_ciphertext: string | null; code_nonce: string | null; code_key_version: number | null;
     attempt_count: number;
   }>();
@@ -152,9 +205,13 @@ async function deliverOne(args: {
     const account = await args.database.prepare(`SELECT issued_amount_minor, currency_code FROM gift_card_accounts WHERE id = ?`)
       .bind(args.giftCardId).first<{ issued_amount_minor: number; currency_code: string }>();
     if (!account) throw new Error('Gift-card account is missing');
+    const giftMessage = await giftMessageFor({
+      database: args.database, orderId: claimed.order_id, orderLineId: claimed.order_line_id,
+    });
     const message = deliveryMessage({
       code, amount: Money.fromMinor(account.issued_amount_minor, account.currency_code),
       ...(claimed.recipient_name ? { recipientName: claimed.recipient_name } : {}),
+      ...(giftMessage ? { giftMessage } : {}),
     });
     // The drain runs from the scheduled (cron) handler, where there is no
     // request context for the sender to read bindings from; hand it the
