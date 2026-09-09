@@ -14,6 +14,8 @@ vi.mock('@/lib/store-config', () => ({
 }));
 
 import { drainGiftCardDeliveries, fulfillPaidGiftCards } from '@/lib/services/gift-card-fulfillment';
+import { TELEMETRY_MARKER } from '@/lib/observability/telemetry';
+import { TAIL_CRITICAL_EVENTS } from '@/workers/observability-tail/src/core';
 import type { Order } from '@/lib/types/order';
 
 const now = 1_800_000_000;
@@ -190,7 +192,8 @@ describe('gift-card issuance and durable delivery on real D1', () => {
     const order = giftOrder();
     await insertOrder(order);
     mocks.send.mockResolvedValue({
-      success: false, error: 'permanent bounce', errorCode: 'E_PROVIDER_CONFIG',
+      success: false, provider: 'cloudflare', error: 'permanent bounce',
+      errorCode: 'E_PROVIDER_CONFIG',
     });
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
@@ -200,20 +203,33 @@ describe('gift-card issuance and durable delivery on real D1', () => {
       await drainGiftCardDeliveries({ environment: runtimeEnvironment(), now: now + attempt });
     }
 
-    // Every attempt records why it failed, bounded and secret-free: a permanent
-    // config error must be distinguishable from a bouncing address.
+    // Every attempt emits a telemetry envelope the tail consumer can see:
+    // the marker, a registered critical event, and closed-enum fields only.
     const logged = errorSpy.mock.calls.map((call) => JSON.parse(String(call[0])));
     expect(logged).toHaveLength(8);
     expect(logged[0]).toEqual({
+      marker: TELEMETRY_MARKER,
       event: 'gift_card.delivery_failed',
-      giftCardId: expect.stringMatching(/^gift_card_/),
-      attempt: 1,
-      outcome: 'retry_scheduled',
-      errorCode: 'E_PROVIDER_CONFIG',
-      detail: 'permanent bounce',
+      area: 'gift_card',
+      severity: 'critical',
+      timestamp: expect.any(String),
+      fields: {
+        operation: 'send',
+        outcome: 'failed',
+        provider: 'cloudflare_email',
+        trigger: 'recovery',
+        retryable: true,
+        attempt: 1,
+      },
     });
-    expect(logged.at(-1)).toMatchObject({ attempt: 8, outcome: 'needs_review' });
+    // The last attempt is the one that parks the row for a human.
+    expect(logged.at(-1)?.fields).toMatchObject({ attempt: 8, retryable: false });
+    // The tail worker only alerts on events in its critical list.
+    expect(TAIL_CRITICAL_EVENTS).toContain('gift_card.delivery_failed');
+    // Nothing free-text survives sanitizeTelemetryFields, so the provider's own
+    // message ('permanent bounce') must not appear anywhere in the envelope.
     const serialized = JSON.stringify(logged);
+    expect(serialized).not.toContain('permanent bounce');
     expect(serialized).not.toContain(order.items[0].gift_card!.recipientEmail);
     expect(serialized).not.toMatch(/GC-[A-Z0-9]{4}/);
     errorSpy.mockRestore();
@@ -245,6 +261,16 @@ describe('gift-card issuance and durable delivery on real D1', () => {
     expect(sent.html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(sent.html).not.toContain('<script>');
     expect(sent.html).toContain('<blockquote>');
+
+    // WR-08: the note is the only part of this email the store did not write.
+    // It must be attributed, and it must sit below the code block so nothing
+    // buyer-authored is ever framed as instructions about the code.
+    expect(sent.text).toContain('Message from the sender:');
+    expect(sent.html).toContain('<p>Message from the sender:</p>');
+    expect(sent.text.indexOf('Message from the sender:'))
+      .toBeGreaterThan(sent.text.indexOf('Keep this code private.'));
+    expect(sent.html.indexOf('<blockquote>'))
+      .toBeGreaterThan(sent.html.indexOf('Keep this code private.'));
   });
 
   it('sends without a quote block when the buyer left no gift message', async () => {
@@ -265,6 +291,7 @@ describe('gift-card issuance and durable delivery on real D1', () => {
     await insertOrder(order);
     mocks.send.mockResolvedValueOnce({ success: false, error: 'temporary provider failure' });
     await fulfillPaidGiftCards(order, { environment: runtimeEnvironment(), now });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     await env.DB.prepare(`UPDATE gift_card_deliveries SET code_ciphertext = NULL,
       code_nonce = NULL, code_key_version = NULL
       WHERE order_id = ?`).bind(order.id).run();
@@ -274,5 +301,57 @@ describe('gift-card issuance and durable delivery on real D1', () => {
     expect(mocks.send).toHaveBeenCalledTimes(1);
     await expect(env.DB.prepare(`SELECT status, completed_at FROM gift_card_deliveries WHERE order_id = ?`)
       .bind(order.id).first()).resolves.toMatchObject({ status: 'needs_review', completed_at: now + 1 });
+
+    // WR-10: terminal on the first attempt, so it never reaches the retry
+    // budget that would otherwise surface it. A paid card that can never be
+    // delivered has to page someone.
+    const parked = errorSpy.mock.calls
+      .map((call) => JSON.parse(String(call[0])))
+      .filter((entry) => entry.event === 'gift_card.delivery_failed');
+    expect(parked).toHaveLength(1);
+    expect(parked[0]).toMatchObject({
+      severity: 'critical',
+      fields: { outcome: 'failed', provider: 'd1', retryable: false },
+    });
+    errorSpy.mockRestore();
+  });
+
+  // IN-06: the fail-soft branch the CR-02 fix relies on -- every other test in
+  // this file reads a well-formed snapshot, so none of them exercised it. The
+  // order row itself cannot be deleted (gift_card_deliveries.order_id and
+  // gift_card_accounts.issued_order_id are both ON DELETE RESTRICT), so this
+  // corrupts the snapshot instead, which is the same catch.
+  it('still delivers the card when the order snapshot cannot be read', async () => {
+    const order = giftOrder('Happy birthday!');
+    await insertOrder(order);
+    mocks.send.mockResolvedValueOnce({ success: false, error: 'temporary provider failure' });
+    await fulfillPaidGiftCards(order, { environment: runtimeEnvironment(), now });
+    await env.DB.prepare('UPDATE orders SET items = ? WHERE id = ?')
+      .bind('{ not json', order.id).run();
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mocks.send.mockResolvedValueOnce({ success: true, id: 'no-snapshot' });
+    await expect(drainGiftCardDeliveries({ environment: runtimeEnvironment(), now: now + 1 }))
+      .resolves.toEqual({ attempted: 1 });
+
+    // The card still goes out -- a card without its note beats no card.
+    const sent = mocks.send.mock.calls.at(-1)?.[0] as { text: string; html: string };
+    expect(sent.text).toContain('Code: ');
+    expect(sent.text).not.toContain('Message from the sender:');
+    expect(sent.html).not.toContain('<blockquote>');
+    await expect(env.DB.prepare(`SELECT status FROM gift_card_deliveries WHERE order_id = ?`)
+      .bind(order.id).first()).resolves.toMatchObject({ status: 'sent' });
+
+    // IN-05: fail soft, but not in silence -- the article states as fact that
+    // the note is included, so a snapshot that stops being readable has to say so.
+    const dropped = errorSpy.mock.calls
+      .map((call) => JSON.parse(String(call[0])))
+      .filter((entry) => entry.event === 'gift_card.delivery_failed');
+    expect(dropped).toHaveLength(1);
+    expect(dropped[0]).toMatchObject({
+      fields: { provider: 'd1', retryable: true },
+      error_class: 'SyntaxError',
+    });
+    errorSpy.mockRestore();
   });
 });

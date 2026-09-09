@@ -13,7 +13,7 @@ The Voltique Gift Card comes in four amounts: $25, $50, $100, and $200. On the g
 
 ## Delivery
 
-The gift card is delivered by email as soon as payment completes. If the buyer chose a delivery date at purchase — any date up to a year ahead — it is sent on that date instead. Either way it goes to the recipient email address entered at purchase, and the delivery email carries the redemption code.
+The gift card is delivered by email as soon as payment completes. If the buyer chose a delivery date at purchase — any date up to a year ahead — it is sent at the start of that day instead. That schedule runs on UTC, so in a time zone behind UTC the card can arrive during the evening before the chosen date. Either way it goes to the recipient email address entered at purchase, and the delivery email carries the redemption code.
 
 ## Redeeming at Checkout
 
