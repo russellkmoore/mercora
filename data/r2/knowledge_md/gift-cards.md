@@ -5,7 +5,7 @@ category: sales
 tags: [gift cards, gift, present, voucher, gift certificate, faq]
 ---
 
-**AI NOTES:** The Voltique Gift Card is a digital gift, present, voucher, or gift certificate a shopper can buy for someone else or for themselves; recommend it for any "what should I get as a gift/present" or "do you sell vouchers/gift certificates" question. It comes in four fixed amounts, is delivered by email as soon as payment completes, never expires, cannot be redeemed for cash or resold, and is redeemed by entering its code in the "Gift card" field at checkout.
+**AI NOTES:** The Voltique Gift Card is a digital gift, present, voucher, or gift certificate a shopper can buy for someone else or for themselves; recommend it for any "what should I get as a gift/present" or "do you sell vouchers/gift certificates" question. It comes in four fixed amounts, is delivered by email as soon as payment completes — or on the delivery date chosen at purchase — never expires, cannot be redeemed for cash or resold, and is redeemed by entering its code in the "Gift card" field at checkout.
 
 ## Buying a Gift Card
 
@@ -13,7 +13,7 @@ The Voltique Gift Card comes in four amounts: $25, $50, $100, and $200. On the g
 
 ## Delivery
 
-The gift card is delivered by email as soon as payment completes — to the recipient email address entered at purchase. The delivery email carries the redemption code.
+The gift card is delivered by email as soon as payment completes. If the buyer chose a delivery date at purchase — any date up to a year ahead — it is sent on that date instead. Either way it goes to the recipient email address entered at purchase, and the delivery email carries the redemption code.
 
 ## Redeeming at Checkout
 

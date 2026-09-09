@@ -248,7 +248,7 @@ export default function GiftCardRecipientForm({ available, onAdd }: GiftCardReci
           </p>
         )}
         <p className="mt-1 text-xs text-muted-foreground">
-          Delivered by email as soon as payment completes. This date is shown on the card, not a scheduled send date.
+          Leave blank to send as soon as payment completes, or pick a date to send it then.
         </p>
       </div>
 

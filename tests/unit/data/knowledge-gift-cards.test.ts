@@ -60,9 +60,17 @@ describe("gift-cards knowledge article: promises match what ships", () => {
     expect(content).toMatch(/tags:.*\bvoucher\b/i);
   });
 
-  it("does not promise a scheduled or future send date", () => {
-    expect(content).not.toMatch(/schedule(d)? (a |for |the )?(send|delivery|future)/i);
-    expect(content).not.toMatch(/deliver(y|ed)? (on |at )a (future|later|chosen) date/i);
-    expect(content).not.toMatch(/delivery date/i);
+  // The fulfillment code honours a chosen delivery date: issueLine maps it to
+  // gift_card_deliveries.deliver_after, and the claim query holds the row until
+  // then. The article must say so rather than promise an unconditional
+  // immediate send.
+  it("states that a chosen delivery date defers the send to that date", () => {
+    expect(content).toMatch(/delivery date chosen at purchase/i);
+    expect(content).toMatch(/chose a delivery date at purchase[^.]*sent on that date/i);
+  });
+
+  it("does not promise a send window the code cannot honour", () => {
+    expect(content).not.toMatch(/within \\d+ (minute|hour|day)/i);
+    expect(content).not.toMatch(/instantl?y|immediately/i);
   });
 });
