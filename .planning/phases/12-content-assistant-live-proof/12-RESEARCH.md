@@ -382,10 +382,14 @@ POST /api/payment-intent
 ```
 POST https://api.stripe.com/v1/payment_intents/{paymentIntentId}/confirm
 Authorization: Bearer pk_test_...   (or -u pk_test_...: as HTTP Basic auth)
+client_secret=<clientSecret from the /api/payment-intent response>
 payment_method=pm_card_visa
 return_url=https://voltique.russellkmoore.me/checkout
 → 200 { status: "succeeded", ... }
 ```
+**CORRECTION (planning, 2026-09-09):** the original form of this example omitted `client_secret`, which would have failed. A publishable key alone does not authorize a confirm — the `client_secret` returned by `POST /api/payment-intent` is the credential that does, and it must be sent in the form body alongside `payment_method` and `return_url`. Re-verified against current Stripe documentation this session: under the default `confirmation_method: automatic`, client SDKs complete payment "using the client_secret" with the publishable key, which is exactly the browser path this script reproduces. `[CITED: docs.stripe.com/api/payment_intents — confirmation_method attribute; docs.stripe.com/api/payment_intents/update — client secret attribute]`
+
+The same source states the client secret "must never be stored, logged, or exposed to anyone other than the customer." Plan `12-05` Task 1 step 7 therefore holds it in memory only: never written to `12-PROOF-ORDER.md`, never printed, never passed as a shell argument where it would appear in a process listing.
 The PaymentIntent is created with `automatic_payment_methods: { enabled: true }` and no explicit `payment_method_types`. `[VERIFIED: app/api/payment-intent/route.ts:178]` Stripe's official example for `POST /v1/payment_intents/{id}/confirm` includes `return_url` even for a plain card confirm; recommend always sending one (the app's own production URL is a safe value) rather than relying on `pm_card_visa` never triggering `requires_action`. `[CITED: https://docs.stripe.com/api/payment_intents/confirm]` Publishable-key auth for this specific endpoint is standard Stripe behavior (it's the same call Stripe.js makes client-side) — CONTEXT.md's framing is correct; this research did not find a documented exception for it.
 
 ```
@@ -436,15 +440,17 @@ wrangler d1 execute mercora-db --remote --json --command \
 
 ## Open Questions
 
-1. **Will the planner/Russell accept Pitfall 2's structural finding, or does it change D-04/D-05/D-06's scope?**
+1. **RESOLVED** — **Will the planner/Russell accept Pitfall 2's structural finding, or does it change D-04/D-05/D-06's scope?**
    - What we know: a guest-purchased card's `purchaser_customer_id` is `NULL` and can never match any signed-in user's query, verified against the exact source of both the write and read paths.
    - What's unclear: whether this changes the phase's scope (e.g., adding a signed-in purchase step) or is accepted as a known, documented gap for `/gsd-verify-work 10`/11 to carry forward.
    - Recommendation: surface this explicitly in planning rather than silently absorbing it into D-06's existing "human check" framing, since it is a stronger and different claim (structurally impossible vs. merely unverifiable by this run).
+   - **Resolution (planning, 2026-09-09):** accepted as a documented gap per D-06; scope unchanged, no signed-in purchase step added. Plan `12-05` Task 3 writes the gap into `12-PROOF-ORDER.md` with the `NULL` purchaser id as its evidence, states plainly that the Account → Gift Cards clause is not provable by any purchase whose recipient is not the buyer, and hands Russell one decision: change the product, or correct SHOP-07's wording. It is deliberately not recorded as a pending human check, because a person signing in would find nothing.
 
-2. **Exact production `EMAIL_PROVIDER` value.**
+2. **RESOLVED** — **Exact production `EMAIL_PROVIDER` value.**
    - What we know: both a Cloudflare `EMAIL` binding and a `RESEND_API_KEY` secret exist in production; the code throws if both are present and `EMAIL_PROVIDER` is unset; `EMAIL_PROVIDER` is not in the committed `wrangler.jsonc`.
    - What's unclear: the actual dashboard-only Build variable value.
    - Recommendation: read it opportunistically from the live delivery's `provider` field or tail-worker output during the SHOP-07 proof; no separate investigation needed.
+   - **Resolution (planning, 2026-09-09):** answered by measurement rather than investigation, as recommended. Plan `12-05` Task 2 assertion 5 joins `gift_card_deliveries.email_idempotency_key` to `email_deliveries.idempotency_key` and reads that row's `provider` and `status`. The `email_deliveries` table was confirmed to exist in production during planning with a `provider` column constrained to `cloudflare` or `resend`, so the join returns the provider actually used for this delivery. No dashboard access is needed.
 
 ## Environment Availability
 
