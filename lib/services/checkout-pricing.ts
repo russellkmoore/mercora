@@ -734,8 +734,16 @@ export async function priceCheckout(
     // zero on the provider path, so it must be zero here too: the fallback
     // rate applies only to the taxable lines, and the per-line allocation
     // gives those lines zero weight.
+    //
+    // The tax code alone is not enough to lean on. It resolves from
+    // variant.tax_category || product.tax_category || store.default_tax_code,
+    // all three merchant-editable — clear the category on a gift-card variant
+    // and product and the line silently falls through to the default code and
+    // starts being taxed. isGiftCardOrderLine reads fulfillment_type and the
+    // gift_card block, both enforced at line construction and not editable in
+    // the admin, so a mis-tagged card still cannot be taxed.
     const taxableLineMinor = netLineMinor.map((amount, index) =>
-      taxCodes[index] === NONTAXABLE_TAX_CODE ? 0 : amount
+      taxCodes[index] === NONTAXABLE_TAX_CODE || isGiftCardOrderLine(orderItems[index]) ? 0 : amount
     );
     const taxableMerchandise = Money.fromMinor(
       taxableLineMinor.reduce((sum, amount) => sum + amount, 0),

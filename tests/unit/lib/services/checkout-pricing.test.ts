@@ -424,6 +424,56 @@ describe('server-authoritative checkout pricing', () => {
     expect(mixed.lineAllocations.map((line) => line.tax.amount)).toEqual([200, 0]);
   });
 
+  it('charges no fallback tax on a gift-card line mis-tagged with a taxable code', async () => {
+    // A tax category is merchant-editable: clearing it on the gift-card variant
+    // and product drops the line through to store.default_tax_code. The
+    // structural gift-card signal (digital fulfillment + a gift_card block) is
+    // enforced at line construction and cannot be edited away, so stored value
+    // must still be zero-rated here.
+    const products: Record<string, unknown> = {
+      prod_1: {
+        id: 'prod_1', name: 'Catalog name', status: 'active', categories: ['category-1'],
+        tax_category: 'txcd_99999999', default_variant_id: 'var_1',
+      },
+      gift_product: {
+        id: 'gift_product', name: 'Gift card', type: 'gift_card', fulfillment_type: 'digital',
+        status: 'active', tax_category: 'txcd_99999999', default_variant_id: 'gift_variant',
+      },
+    };
+    const variants: Record<string, unknown> = {
+      var_1: {
+        id: 'var_1', product_id: 'prod_1', sku: 'SKU-1', status: 'active',
+        option_values: [], price: Money.fromMinor(2_000).toJSON(),
+      },
+      gift_variant: {
+        id: 'gift_variant', product_id: 'gift_product', sku: 'GIFT', status: 'active',
+        option_values: [], shipping_required: false, tax_category: 'txcd_99999999',
+        price: Money.fromMinor(2_500).toJSON(),
+      },
+    };
+    const fallbackDeps = dependencies({
+      getProduct: vi.fn(async (id: string) => products[id]),
+      getProductVariant: vi.fn(async (id: string) => variants[id]),
+      calculateTax: vi.fn(async () => { throw new Error('offline'); }),
+    });
+
+    const mistagged = await priceCheckout({
+      items: [
+        { productId: 'prod_1', variantId: 'var_1', quantity: 1 },
+        {
+          productId: 'gift_product', variantId: 'gift_variant', quantity: 1,
+          giftCardCustomization: { recipientEmail: 'recipient@example.test' },
+        },
+      ],
+      shippingAddress: address,
+      shippingMethodId: 'standard',
+    }, { dependencies: fallbackDeps as any });
+
+    expect(mistagged.taxSource).toBe('configured_fallback');
+    expect(mistagged.lineAllocations.map((line) => line.tax.amount)).toEqual([200, 0]);
+    expect(mistagged.tax).toEqual({ amount: 200, currency: 'USD' });
+  });
+
   it('emits a checkout.tax_fallback telemetry envelope when the tax provider fails', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const fallbackDeps = dependencies({ calculateTax: vi.fn(async () => { throw new Error('offline'); }) });
