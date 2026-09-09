@@ -381,6 +381,9 @@ async function resolveDiscounts(
   };
 }
 
+/** Stripe's "nontaxable" product tax code; lines carrying it owe no tax on either path. */
+const NONTAXABLE_TAX_CODE = 'txcd_00000000';
+
 function configuredRate(value: unknown): number | null {
   const percentage = Number(value);
   return Number.isFinite(percentage) && percentage >= 0 && percentage <= 100
@@ -726,10 +729,22 @@ export async function priceCheckout(
     const netLineMinor = pricedCatalog.map(({ lineTotal }, index) =>
       lineTotal.subtract(discounts.perLine[index]).toMinorUnits()
     );
-    const merchandiseTax = discountedMerchandise.applyRate(fallbackRate);
+    // The configured rate stands in for what the provider would have charged.
+    // A line classified nontaxable (txcd_00000000 — the gift card's code) is
+    // zero on the provider path, so it must be zero here too: the fallback
+    // rate applies only to the taxable lines, and the per-line allocation
+    // gives those lines zero weight.
+    const taxableLineMinor = netLineMinor.map((amount, index) =>
+      taxCodes[index] === NONTAXABLE_TAX_CODE ? 0 : amount
+    );
+    const taxableMerchandise = Money.fromMinor(
+      taxableLineMinor.reduce((sum, amount) => sum + amount, 0),
+      currency
+    );
+    const merchandiseTax = taxableMerchandise.applyRate(fallbackRate);
     lineTaxes = allocateLargestRemainder(
       merchandiseTax.toMinorUnits(),
-      netLineMinor
+      taxableLineMinor
     ).map((amount) => Money.fromMinor(amount, currency));
     shippingTax = storeSettings['store.tax_shipping'] === true
       ? chargedShipping.applyRate(fallbackRate)
