@@ -5,16 +5,16 @@ milestone_name: Gift Card Product
 current_phase: 12
 current_phase_name: Content, Assistant & Live Proof
 status: executing
-stopped_at: Phase 11 complete; Phase 10 verification deferred; ready to plan Phase 12
-last_updated: "2026-09-09T20:20:37.967Z"
+stopped_at: Completed 12-01-PLAN.md
+last_updated: "2026-09-09T20:28:40.731Z"
 last_activity: 2026-09-09
 last_activity_desc: Phase 11 complete, transitioned to Phase 10
-state_head: b75bfc64d412608e0bbdd44d91d3b735284d1d37
+state_head: 2102380915137d48c96b3726f2e21b69dbf57a6c
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 20
-  completed_plans: 14
+  completed_plans: 15
   percent: 25
 ---
 
@@ -137,6 +137,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 11 P03 | 2min | 2 tasks | 2 files |
 | Phase 11 P04 | 19min | 3 tasks | 2 files |
 | Phase 11 P05 | 22min | 3 tasks | 3 files |
+| Phase 12 P01 | 7min | 3 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -272,6 +273,8 @@ Decisions locked for v2:
 - [Phase 11]: D-07: Russell chose enable-anyway — enabled gift-card acquisition in production accepting Phase 10's deferred human verification, reversible by flag
 - [Phase 11]: Both gift-card flags now true in production (reconciliation + acquisition); OPS-02 fully complete; gift cards purchasable on the live site
 - [Phase 11]: [Phase 11] Unattended decision (2026-09-09): Phase 11's two human-verification items (signed-in GET /api/gift-cards; live checkout code-field rejection) were accepted on code-level and live read-only evidence rather than a browser session, per Russell's standing instruction to proceed on best assumptions. — Russell was away; he asked for best-assumption decisions on the demo site and a list at the end. Evidence: PDP 200 with form, /checkout 200, bogus balance code -> 200 {valid:false}, unauthenticated /api/gift-cards -> 401, 11-04 cron cycle clean.
+- [Phase 12]: Phase 12 remote-binding harness stays in the session scratch dir, not promoted to scripts/ (D-01 discretion; committed script is a Deferred Idea)
+- [Phase 12]: 12-04 stays upsert-only: prod_33 already carries a healthy gift/present/voucher product vector, so no destructive clear-and-rebuild is needed
 
 ### Pending Todos
 
@@ -343,8 +346,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-09T19:21:22.638Z
-Stopped at: Phase 11 complete; Phase 10 verification deferred; ready to plan Phase 12
+Last session: 2026-09-09T20:28:40.708Z
+Stopped at: Completed 12-01-PLAN.md
 Resume file: None
 
 Next: `/gsd-plan-phase 12` (then `/gsd-verify-work 10`)
