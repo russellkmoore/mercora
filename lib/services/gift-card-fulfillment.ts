@@ -9,7 +9,7 @@ import {
 } from '@/lib/gift-cards/encryption';
 import { parseGiftCardCodeKeyRing, parseGiftCardDeliveryKeyRing } from '@/lib/gift-cards/config';
 import { isGiftCardOrderLine } from '@/lib/gift-cards/checkout';
-import { sendEmail } from '@/lib/email/sender';
+import { sendEmail, type EmailSendOptions } from '@/lib/email/sender';
 import { getStoreConfig } from '@/lib/store-config';
 import type { Order } from '@/lib/types/order';
 import { escapeHtmlText } from '@/lib/utils/maintenance-html';
@@ -21,6 +21,18 @@ const DELIVERY_LEASE_SECONDS = 10 * 60;
 const MAX_DELIVERY_ATTEMPTS = 8;
 
 interface GiftCardFulfillmentEnvironment extends Record<string, unknown> { DB?: D1Database }
+
+/** The subset of the worker env the email sender needs, taken from the drain's environment. */
+function emailEnvironmentFrom(environment: GiftCardFulfillmentEnvironment): EmailSendOptions['env'] {
+  const provider = environment.EMAIL_PROVIDER;
+  const resendKey = environment.RESEND_API_KEY;
+  return {
+    ...(environment.EMAIL ? { EMAIL: environment.EMAIL as CloudflareEnv['EMAIL'] } : {}),
+    ...(environment.DB ? { DB: environment.DB } : {}),
+    ...(typeof provider === 'string' ? { EMAIL_PROVIDER: provider } : {}),
+    ...(typeof resendKey === 'string' ? { RESEND_API_KEY: resendKey } : {}),
+  };
+}
 
 function epochSeconds(): number { return Math.floor(Date.now() / 1_000); }
 
@@ -103,6 +115,7 @@ async function deliverOne(args: {
   giftCardId: string;
   keys: GiftCardEncryptionKeyRing;
   now: number;
+  emailEnvironment: EmailSendOptions['env'];
 }): Promise<void> {
   const token = crypto.randomUUID();
   const claimed = await args.database.prepare(`UPDATE gift_card_deliveries
@@ -143,7 +156,13 @@ async function deliverOne(args: {
       code, amount: Money.fromMinor(account.issued_amount_minor, account.currency_code),
       ...(claimed.recipient_name ? { recipientName: claimed.recipient_name } : {}),
     });
-    const result = await sendEmail({ ...message, to: claimed.recipient_email }, { idempotencyKey: claimed.email_idempotency_key });
+    // The drain runs from the scheduled (cron) handler, where there is no
+    // request context for the sender to read bindings from; hand it the
+    // worker env explicitly or it cannot find the EMAIL binding or the DB.
+    const result = await sendEmail({ ...message, to: claimed.recipient_email }, {
+      idempotencyKey: claimed.email_idempotency_key,
+      env: args.emailEnvironment,
+    });
     const status = result.success ? 'sent' : (result.needsReview || exhausted) ? 'needs_review' : 'pending';
     await args.database.prepare(`UPDATE gift_card_deliveries SET status = ?, claim_token = NULL,
       lease_expires_at = NULL, completed_at = ?, updated_at = ? WHERE id = ? AND claim_token = ?`)
@@ -183,7 +202,10 @@ export async function fulfillPaidGiftCards(order: Order, options: {
   }
   // Cards with a future scheduled date are claimed only once due; the scheduler
   // drain picks them up. Immediate cards send here.
-  for (const giftCardId of cards) await deliverOne({ database, giftCardId, keys: deliveryKeys, now });
+  const emailEnvironment = emailEnvironmentFrom(environment);
+  for (const giftCardId of cards) {
+    await deliverOne({ database, giftCardId, keys: deliveryKeys, now, emailEnvironment });
+  }
 }
 
 /** Retry durable pending/expired delivery claims without reissuing any card. */
@@ -202,8 +224,9 @@ export async function drainGiftCardDeliveries(options: {
       AND (status = 'pending' OR (status = 'processing' AND lease_expires_at <= ?))
     ORDER BY updated_at, id LIMIT ?`).bind(now, now, limit).all<{ gift_card_id: string }>();
   const keys = parseGiftCardDeliveryKeyRing(environment);
+  const emailEnvironment = emailEnvironmentFrom(environment);
   for (const row of rows.results ?? []) {
-    await deliverOne({ database: environment.DB, giftCardId: row.gift_card_id, keys, now });
+    await deliverOne({ database: environment.DB, giftCardId: row.gift_card_id, keys, now, emailEnvironment });
   }
   return { attempted: rows.results?.length ?? 0 };
 }
