@@ -115,3 +115,13 @@ the task that verifies with it (11-02-02) and lands under an include glob that a
 manual-only visual/interactive verifications in the table above this section remain open —
 they are not part of the automated Nyquist contract and are carried forward to
 `/gsd-verify-work 11` (and, for the still-open half, `/gsd-verify-work 10`) per D-07.
+
+## Validation Audit 2026-09-09
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
+
+OPS-01..OPS-04 each have a green automated row or a recorded read-only production verification; audit by gsd-validate-phase (State A, no auditor spawn).
