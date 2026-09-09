@@ -21,7 +21,7 @@ const deliveryKey = 'base64:AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=';
 const hmacKey = 'gift-card-hmac-key-material-for-worker-tests-0001';
 let sequence = 0;
 
-function giftOrder(): Order {
+function giftOrder(giftMessage?: string): Order {
   sequence += 1;
   const id = `gift-fulfillment-order-${sequence}`;
   return {
@@ -43,6 +43,7 @@ function giftOrder(): Order {
       gift_card: {
         recipientEmail: `recipient-${sequence}@example.test`,
         recipientName: 'Recipient',
+        ...(giftMessage === undefined ? {} : { message: giftMessage }),
       },
     }],
   };
@@ -201,6 +202,36 @@ describe('gift-card issuance and durable delivery on real D1', () => {
     await expect(drainGiftCardDeliveries({ environment: runtimeEnvironment(), now: now + 8 }))
       .resolves.toEqual({ attempted: 0 });
     expect(mocks.send).toHaveBeenCalledTimes(sends);
+  });
+
+  it("carries the buyer's gift message into the delivery email, HTML-escaped", async () => {
+    const order = giftOrder('Happy birthday!\n<script>alert(1)</script>');
+    await insertOrder(order);
+    mocks.send.mockResolvedValueOnce({ success: true, id: 'provider-message-note' });
+
+    await fulfillPaidGiftCards(order, { environment: runtimeEnvironment(), now });
+
+    const sent = mocks.send.mock.calls.at(-1)?.[0] as { text: string; html: string };
+    expect(sent.text).toContain('Happy birthday!');
+    expect(sent.text).toContain('<script>alert(1)</script>');
+    expect(sent.html).toContain('Happy birthday!');
+    // The note is shopper-controlled text: it must reach the HTML escaped.
+    expect(sent.html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(sent.html).not.toContain('<script>');
+    expect(sent.html).toContain('<blockquote>');
+  });
+
+  it('sends without a quote block when the buyer left no gift message', async () => {
+    const order = giftOrder();
+    await insertOrder(order);
+    mocks.send.mockResolvedValueOnce({ success: true, id: 'provider-message-none' });
+
+    await fulfillPaidGiftCards(order, { environment: runtimeEnvironment(), now });
+
+    const sent = mocks.send.mock.calls.at(-1)?.[0] as { text: string; html: string };
+    expect(sent.html).not.toContain('<blockquote>');
+    expect(sent.text).not.toMatch(/""/);
+    expect(sent.text).toContain('Code: ');
   });
 
   it('moves corrupted retry material to review without rendering or sending a bearer code', async () => {

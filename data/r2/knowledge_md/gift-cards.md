@@ -9,7 +9,7 @@ tags: [gift cards, gift, present, voucher, gift certificate, faq]
 
 ## Buying a Gift Card
 
-The Voltique Gift Card comes in four amounts: $25, $50, $100, and $200. On the gift card product page the shopper picks an amount, enters the recipient's email address, and can optionally add the recipient's name and a personal message. It can be bought as a guest or while signed in.
+The Voltique Gift Card comes in four amounts: $25, $50, $100, and $200. On the gift card product page the shopper picks an amount, enters the recipient's email address, and can optionally add the recipient's name, a personal message, and a delivery date. The personal message is included in the delivery email. It can be bought as a guest or while signed in.
 
 ## Delivery
 
