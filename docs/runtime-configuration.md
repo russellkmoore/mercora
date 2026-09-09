@@ -80,9 +80,10 @@ present, and the ring is bounded to four keys. Store these values in local
 are intentionally absent from `StoreConfig`, browser configuration,
 committed deployment files, telemetry, and errors. Unlike the HMAC ring, the
 delivery ring is parsed on every scheduled delivery drain once reconciliation
-is enabled, and that parse happens before the drain checks whether anything
-is pending — so a malformed value fails the recovery cron every five minutes
-rather than failing one request when someone finally buys a card.
+is enabled — immediately after the pending-deliveries query and before any
+row is processed, regardless of how many rows came back — so a malformed
+value fails the recovery cron every five minutes rather than failing one
+request when someone finally buys a card.
 
 Core one-time checkout never interprets catalog products as subscription
 acquisition. Products that also have subscription plans remain available for a
