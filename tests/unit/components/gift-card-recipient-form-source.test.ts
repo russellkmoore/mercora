@@ -68,7 +68,7 @@ describe('GiftCardRecipientForm source contract', () => {
 
   it('carries the verbatim delivery-date helper sentence from the Copywriting Contract', () => {
     expect(form).toContain(
-      'Delivered by email as soon as payment completes. This date is shown on the card, not a scheduled send date.',
+      'Leave blank to send as soon as payment completes, or pick a date to send it then.',
     );
   });
 
