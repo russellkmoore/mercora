@@ -28,7 +28,7 @@ Requirements for this milestone. Each maps to a roadmap phase.
 
 ### Production enablement
 
-- [ ] **OPS-01**: The code HMAC key ring (`GIFT_CARD_CODE_HMAC_CURRENT_VERSION`, `GIFT_CARD_CODE_HMAC_KEYS_JSON`) and the delivery key ring (`GIFT_CARD_DELIVERY_CURRENT_VERSION`, `GIFT_CARD_DELIVERY_KEYS_JSON`) are generated with at least 32-byte secrets and stored only as Worker secrets and in local `.dev.vars`; nothing lands in `wrangler.jsonc`, source, docs, or git history
+- [x] **OPS-01**: The code HMAC key ring (`GIFT_CARD_CODE_HMAC_CURRENT_VERSION`, `GIFT_CARD_CODE_HMAC_KEYS_JSON`) and the delivery key ring (`GIFT_CARD_DELIVERY_CURRENT_VERSION`, `GIFT_CARD_DELIVERY_KEYS_JSON`) are generated with at least 32-byte secrets and stored only as Worker secrets and in local `.dev.vars`; nothing lands in `wrangler.jsonc`, source, docs, or git history
 - [ ] **OPS-02**: `STORE_FEATURE_GIFT_CARD_RECONCILIATION` is enabled and deployed first, then `STORE_FEATURE_GIFT_CARD_ACQUISITION`, in `wrangler.jsonc` `vars`, with `cloudflare-env.d.ts` regenerated and `cf-typecheck` passing
 - [x] **OPS-03**: `docs/runtime-configuration.md` documents the delivery key ring alongside the code HMAC ring, and `docs/DEPLOYMENT_SETUP.md` carries a step-by-step enablement recipe (generate keys, put secrets, enable reconciliation, verify, enable acquisition)
 - [x] **OPS-04**: `.env.example` shows the shape of all four gift card secrets with placeholder values so a developer can exercise the full flow locally
@@ -82,7 +82,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SHOP-05 | Phase 10 | Complete |
 | SHOP-06 | Phase 10 | Complete |
 | SHOP-07 | Phase 12 | Pending |
-| OPS-01 | Phase 11 | Pending |
+| OPS-01 | Phase 11 | Complete |
 | OPS-02 | Phase 11 | Pending |
 | OPS-03 | Phase 11 | Complete |
 | OPS-04 | Phase 11 | Complete |
