@@ -19,9 +19,9 @@ provides:
 affects: [milestone-v2.1-completion, audit-milestone, next-milestone-planning]
 
 actuals:
-  tokens: 7100
+  tokens: 8200
   tasks: 3
-  commits: 2
+  commits: 4
 
 plan_head_before: c6a826658eddfa9b7821b65ac8d5659ff666cf09
 
@@ -362,6 +362,12 @@ phase range was already deployed during 12-05.
 
 Afterwards: `git rev-list --count origin/main..HEAD` -> **0**, `git status --porcelain
 --untracked-files=no` -> **empty** — `PHASE_CLOSED`.
+
+Two further docs-only commits followed and were pushed: `3d52d37` (recording the deployment id,
+which only exists after the push) and the commit carrying this correction. Each triggers its own
+no-op Workers rebuild. The `commits: 4` figure in this SUMMARY's frontmatter is measured from
+`git rev-list --count` against the plan's recorded `plan_head_before` and includes them, rather
+than reporting the smaller number that was true at first write.
 
 **Workers Builds deployment:** version `8b818bfe-1e44-4846-9edb-e276c99093b3`, deployment created
 **2026-09-09T22:39:43.477Z**, at 100%. It supersedes `720e9abb-7dee-4b65-97b2-f1d135809877`
