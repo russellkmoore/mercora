@@ -28,6 +28,7 @@ export const TAIL_CRITICAL_EVENTS = [
   'refund.provider_inconsistent',
   'refund.settlement_failed',
   'fulfillment.transition_failed',
+  'gift_card.delivery_failed',
   'recommendation.rebuild_failed',
   'cron.recovery_failed',
   'cron.analytics_failed',
