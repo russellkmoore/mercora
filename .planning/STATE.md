@@ -6,10 +6,10 @@ current_phase: 12
 current_phase_name: Content, Assistant & Live Proof
 current_plan: 6
 status: verifying
-stopped_at: Completed 12-06-PLAN.md — phase 12 gate green, milestone v2.1 closed
+stopped_at: Milestone v2.1 audited (gaps_found) — Phases 10 and 12 verification deferred to Russell; complete-milestone not run
 last_updated: "2026-09-09T22:35:23.230Z"
 last_activity: 2026-09-09
-last_activity_desc: Phase 12 plan 12-05 complete — live gift-card purchase, issuance and delivery proven on production
+last_activity_desc: Phase 12 executed, reviewed (3 iterations) and fixed; milestone v2.1 audit written (.planning/v2.1-MILESTONE-AUDIT.md)
 state_head: 658337630ad0a60cb69cb4447603ccb4beb0ef91
 progress:
   total_phases: 4
@@ -26,7 +26,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-09 after Phase 11)
 
 **Core value:** A customer or an external AI agent can find the right product through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** Phase 11 — Production Enablement
+**Current focus:** Milestone v2.1 close-out — Russell: /gsd-verify-work 10, /gsd-verify-work 12, decide SHOP-07 clause + acquisition-flag semantics, sign 12-SECURITY.md AR-12-01..03, then /gsd-complete-milestone v2.1
 
 ## Current Position
 
@@ -34,7 +34,7 @@ Phase: 12 (Content, Assistant & Live Proof) — IN PROGRESS
 Current Plan: 6
 Total Plans in Phase: 6
 Status: Phase complete — ready for verification
-Last activity: 2026-09-09 — Phase 12 wave 2 (12-02, 12-03) complete
+Last activity: 2026-09-09 — Phase 12 complete (verification deferred); milestone audit gaps_found
 
 Progress: [░░░░░░░░░░] 0%
 
