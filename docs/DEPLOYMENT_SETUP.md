@@ -542,9 +542,9 @@ Do not proceed to Step 4 until all three checks pass.
 1. The new version appears in `npx wrangler deployments list`.
 2. One five-minute recovery cron cycle completes cleanly: watch the Worker's tail and expect
    the recovery-drain success log, with no `cron.recovery_failed` telemetry event in the same
-   window. This is the sharp check — the delivery ring is parsed on every tick before the drain
-   checks whether anything is pending, so a malformed ring shows up within one cycle even with
-   zero deliveries queued.
+   window. This is the sharp check — the delivery ring is parsed immediately after the
+   pending-deliveries query and before any row is processed, regardless of how many rows came
+   back, so a malformed ring still fails the cycle even with zero deliveries queued.
 3. A signed-in request to the account gift-card listing endpoint (`GET /api/gift-cards`)
    returns a `cards` array; a 503 there means the ring or the database is unhealthy. The public
    balance endpoint (`POST /api/gift-cards/balance`) answers identically for a bad code, an
