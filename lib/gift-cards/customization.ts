@@ -13,6 +13,35 @@ const ALLOWED_KEYS = new Set([
 const EMAIL_PATTERN = /^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$/i;
 const CONTROL_CHARACTERS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u;
 
+/**
+ * URL-like shapes rejected in a gift message.
+ *
+ * The note is rendered into a transactional email sent from the store's own
+ * sending domain, in a message that also carries a redemption code. Most mail
+ * clients autolink a bare URL in the text/plain part, so a buyer-authored link
+ * there is a ready-made phishing frame on a domain with passing SPF and DKIM.
+ * The only cost of sending one is a paid gift card.
+ *
+ * Three shapes are rejected, deliberately blunt rather than clever:
+ *
+ *   1. an explicit scheme      -- http:// or https://
+ *   2. a www. host prefix      -- www.example.com
+ *   3. a bare host with a path -- example.com/anything
+ *
+ * A bare host with no path (example.com) is allowed on purpose: requiring the
+ * trailing slash keeps ordinary prose out of the net ("see you at 5.30pm",
+ * "U.S./Canada"), and without a path most clients do not autolink it.
+ */
+const URL_LIKE_PATTERNS: readonly RegExp[] = [
+  /https?:\/\//iu,
+  /\bwww\./iu,
+  /\b[a-z0-9][a-z0-9-]*\.[a-z]{2,}\//iu,
+];
+
+function containsUrlLike(value: string): boolean {
+  return URL_LIKE_PATTERNS.some((pattern) => pattern.test(value));
+}
+
 export class GiftCardCustomizationValidationError extends Error {
   constructor() {
     super('Invalid gift-card customization');
@@ -50,7 +79,11 @@ function normalizedMessage(value: unknown): string | undefined {
     .map((line) => line.trim().replace(/[\t ]+/gu, ' '))
     .join('\n')
     .trim();
-  if (normalized.length === 0 || normalized.length > GIFT_CARD_MESSAGE_MAX_LENGTH) {
+  if (
+    normalized.length === 0 ||
+    normalized.length > GIFT_CARD_MESSAGE_MAX_LENGTH ||
+    containsUrlLike(normalized)
+  ) {
     throw new GiftCardCustomizationValidationError();
   }
   return normalized;
@@ -166,7 +199,9 @@ export function validateGiftCardMessage(value: string): GiftCardFieldError | nul
     normalizedMessage(value);
     return null;
   } catch {
-    return CONTROL_CHARACTERS.test(value) ? 'control_characters' : 'too_long';
+    if (CONTROL_CHARACTERS.test(value)) return 'control_characters';
+    if (containsUrlLike(value)) return 'invalid_format';
+    return 'too_long';
   }
 }
 

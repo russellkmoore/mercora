@@ -27,6 +27,9 @@ describe('gift-card customization', () => {
     { recipientEmail: 'recipient@example.com', deliveryDate: '2026-02-29' },
     { recipientEmail: 'recipient@example.com', recipientName: 'x'.repeat(101) },
     { recipientEmail: 'recipient@example.com', message: 'x'.repeat(501) },
+    { recipientEmail: 'recipient@example.com', message: 'Claim at https://evil.test/gift' },
+    { recipientEmail: 'recipient@example.com', message: 'Visit www.evil.test today' },
+    { recipientEmail: 'recipient@example.com', message: 'Go to evil.test/claim now' },
     Object.assign(Object.create({}), { recipientEmail: 'recipient@example.com' }),
   ])('rejects malformed, oversized, or extra-key input', (value) => {
     expect(() => parseGiftCardCustomization(value)).toThrow(

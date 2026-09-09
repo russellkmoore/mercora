@@ -43,9 +43,9 @@ function nameErrorCopy(code: GiftCardFieldError): string {
 }
 
 function messageErrorCopy(code: GiftCardFieldError): string {
-  return code === "too_long"
-    ? "Message must be 500 characters or fewer."
-    : "Remove unsupported characters and try again.";
+  if (code === "too_long") return "Message must be 500 characters or fewer.";
+  if (code === "invalid_format") return "Remove any web links and try again.";
+  return "Remove unsupported characters and try again.";
 }
 
 function dateErrorCopy(): string {
@@ -225,6 +225,9 @@ export default function GiftCardRecipientForm({ available, onAdd }: GiftCardReci
             {messageErrorCopy(messageError as GiftCardFieldError)}
           </p>
         )}
+        <p className="mt-1 text-xs text-muted-foreground">
+          Included in the delivery email the recipient receives. Links are not allowed.
+        </p>
       </div>
 
       <div>
@@ -248,7 +251,7 @@ export default function GiftCardRecipientForm({ available, onAdd }: GiftCardReci
           </p>
         )}
         <p className="mt-1 text-xs text-muted-foreground">
-          Leave blank to send as soon as payment completes, or pick a date to send it then.
+          Leave blank to send as soon as payment completes, or pick a date to send it at the start of that day, UTC.
         </p>
       </div>
 
