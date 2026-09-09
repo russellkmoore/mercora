@@ -126,7 +126,25 @@ Plans:
   3. `docs/runtime-configuration.md` documents the delivery key ring alongside the code HMAC ring, and `docs/DEPLOYMENT_SETUP.md` carries a step-by-step enablement recipe (generate keys, put secrets, enable reconciliation, verify, enable acquisition)
   4. `.env.example` shows the shape of all four gift card secrets with placeholder values so a developer can exercise the full flow locally
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 11-01-PLAN.md — Prove the key-ring pipeline locally: generate a dev ring into `.dev.vars`, prove git cannot see it, pin both parser shapes (tracer)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 11-02-PLAN.md — Delivery-ring placeholders and the `.dev.vars` read-path comment in `.env.example`, pinned by a source-contract test
+- [ ] 11-03-PLAN.md — Delivery-ring contract in `docs/runtime-configuration.md` and the five-step enablement recipe in `docs/DEPLOYMENT_SETUP.md` §9
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 11-04-PLAN.md — Put the four production secrets, enable reconciliation, deploy, and prove one clean cron cycle
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 11-05-PLAN.md — D-07 blocking-human gate, enable acquisition, deploy, and run the full CI gate suite
 
 ### Phase 12: Content, Assistant & Live Proof
 
@@ -150,5 +168,5 @@ Plans:
 | 5-8.2 (v2 Themeable Storefront) | 44/44 | Complete | 2026-09-05 |
 | 9. Gift Card Catalogue | 4/4 | Complete    | 2026-09-08 |
 | 10. Gift Card Purchase Flow | 5/5 | In Progress|  |
-| 11. Production Enablement | 0/TBD | Not started | - |
+| 11. Production Enablement | 0/5 | Planned | - |
 | 12. Content, Assistant & Live Proof | 0/TBD | Not started | - |
