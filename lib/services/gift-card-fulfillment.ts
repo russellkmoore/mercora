@@ -12,6 +12,7 @@ import { GIFT_CARD_MESSAGE_MAX_LENGTH } from '@/lib/gift-cards/customization';
 import { isGiftCardOrderLine } from '@/lib/gift-cards/checkout';
 import { sendEmail, type EmailSendOptions } from '@/lib/email/sender';
 import { getStoreConfig } from '@/lib/store-config';
+import { recordTelemetry } from '@/lib/observability/telemetry';
 import type { Order } from '@/lib/types/order';
 import { escapeHtmlText } from '@/lib/utils/maintenance-html';
 
@@ -37,7 +38,13 @@ interface GiftCardFulfillmentEnvironment extends Record<string, unknown> { DB?: 
 function emailEnvironmentFrom(
   environment: GiftCardFulfillmentEnvironment,
 ): EmailSendOptions['env'] | undefined {
-  const provider = typeof environment.EMAIL_PROVIDER === 'string' ? environment.EMAIL_PROVIDER : undefined;
+  // Resolve the provider the way the sender does — workerEnv first, then
+  // process.env (sender.ts:77). Reading only the handed env would still forward
+  // a Resend key on a worker whose vars block pins EMAIL_PROVIDER=cloudflare but
+  // whose env object happens not to carry it: the exact case WR-07 closed.
+  const provider = typeof environment.EMAIL_PROVIDER === 'string'
+    ? environment.EMAIL_PROVIDER
+    : process.env.EMAIL_PROVIDER;
   // Check the binding's shape, not its truthiness. A misconfigured EMAIL var
   // (a plain string rather than a binding) would otherwise cast cleanly out of
   // Record<string, unknown>, then throw 'send is not a function' deep inside
@@ -67,32 +74,47 @@ function emailEnvironmentFrom(
 
 function epochSeconds(): number { return Math.floor(Date.now() / 1_000); }
 
-const MAX_LOGGED_DETAIL_CHARS = 200;
-
-function boundedDetail(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined;
-  const trimmed = value.trim();
-  return trimmed.length === 0 ? undefined : trimmed.slice(0, MAX_LOGGED_DETAIL_CHARS);
+/**
+ * Record a failed delivery attempt through the project's telemetry contract.
+ *
+ * Everything here is a closed enum or a bounded number, so
+ * `sanitizeTelemetryFields` keeps all of it and nothing free-text can reach the
+ * log stream. Three consequences of routing through `recordTelemetry` rather
+ * than a bespoke console line:
+ *
+ *   - the envelope carries the `commerce.telemetry.v1` marker, so the tail
+ *     consumer sees it at all;
+ *   - `gift_card.delivery_failed` is registered critical and listed in
+ *     `TAIL_CRITICAL_EVENTS`, so a permanent misconfiguration now pages someone
+ *     instead of quietly burning the eight-attempt budget;
+ *   - a throwable is reduced to an `error_class` from a fixed allowlist.
+ *
+ * There is deliberately no gift-card id: the contract has no identifier field,
+ * and `sanitizeTelemetryFields` would drop one anyway. There is also no
+ * provider error code — the contract has no slot for it, and the previous
+ * bespoke line carried up to 200 characters of unfiltered third-party text
+ * (which could include the recipient address on a rejection).
+ */
+function recordDeliveryFailure(fields: {
+  provider: 'cloudflare_email' | 'resend' | 'd1';
+  retryable: boolean;
+  attempt?: number;
+}, error?: unknown): void {
+  recordTelemetry('gift_card.delivery_failed', {
+    operation: 'send',
+    outcome: 'failed',
+    provider: fields.provider,
+    retryable: fields.retryable,
+    trigger: 'recovery',
+    ...(fields.attempt === undefined ? {} : { attempt: fields.attempt }),
+  }, error);
 }
 
-/**
- * Bounded, secret-free record of why one delivery attempt failed.
- *
- * Deliberately narrow: the gift-card id, the attempt number, what happens
- * next, and a clipped error class/message. Never the bearer code, never the
- * recipient address, never the rendered body. Without it a permanent
- * E_PROVIDER_CONFIG misconfiguration looks exactly like a bouncing address,
- * and burns the whole eight-attempt budget before anyone can see which it is.
- */
-function logDeliveryFailure(fields: {
-  giftCardId: string;
-  attempt: number;
-  outcome: 'retry_scheduled' | 'needs_review';
-  errorName?: string;
-  errorCode?: string;
-  detail?: string;
-}): void {
-  console.error(JSON.stringify({ event: 'gift_card.delivery_failed', ...fields }));
+/** Map the sender's own provider name onto the telemetry provider enum. */
+function telemetryProvider(provider: unknown): 'cloudflare_email' | 'resend' | 'd1' {
+  if (provider === 'cloudflare') return 'cloudflare_email';
+  if (provider === 'resend') return 'resend';
+  return 'd1';
 }
 
 /** Midnight-UTC epoch second of a validated YYYY-MM-DD scheduled delivery date. */
@@ -140,7 +162,11 @@ async function giftMessageFor(args: {
     // parseGiftCardCustomization caps this on the way in; re-clamp because this
     // is a value read back out of storage, not one that just passed the gate.
     return trimmed.length === 0 ? undefined : trimmed.slice(0, GIFT_CARD_MESSAGE_MAX_LENGTH);
-  } catch {
+  } catch (error) {
+    // Fail soft -- a card without its note beats no card -- but not in silence.
+    // The article states as fact that the note is included, so a schema drift on
+    // orders.items or a purged order row must not silently stop delivering them.
+    recordDeliveryFailure({ provider: 'd1', retryable: true }, error);
     return undefined;
   }
 }
@@ -154,11 +180,20 @@ function deliveryMessage(args: {
   const store = getStoreConfig();
   const greeting = args.recipientName ? `Hello ${args.recipientName},` : 'Hello,';
   const subject = `${store.identity.name} gift card`;
-  // The buyer's note is untrusted shopper text. It is quoted as its own block
-  // and HTML-escaped line by line — never interpolated raw into the markup.
-  const noteText = args.giftMessage ? `\n\n"${args.giftMessage}"` : '';
+  // The buyer's note is untrusted shopper text, and it is the only part of this
+  // email the store did not write. Three things keep it contained:
+  //
+  //   1. It is attributed, so it can never read as store copy.
+  //   2. It sits *below* the code block and its "keep this private" line, so
+  //      nothing buyer-authored is ever framed as instructions about the code.
+  //   3. It is HTML-escaped line by line, never interpolated raw. Links are
+  //      rejected upstream by parseGiftCardCustomization (text/plain clients
+  //      autolink bare URLs, so escaping alone would not be enough there).
+  const noteText = args.giftMessage
+    ? `\n\nMessage from the sender:\n\n"${args.giftMessage}"`
+    : '';
   const noteHtml = args.giftMessage
-    ? `<blockquote>${args.giftMessage.split('\n')
+    ? `<p>Message from the sender:</p><blockquote>${args.giftMessage.split('\n')
         .filter((line) => line.trim().length > 0)
         .map((line) => `<p>${escapeHtmlText(line)}</p>`)
         .join('')}</blockquote>`
@@ -167,8 +202,8 @@ function deliveryMessage(args: {
     from: store.contact.senderEmail,
     to: '',
     subject,
-    text: `${greeting}\n\nYou received a ${args.amount.format()} gift card.${noteText}\n\nCode: ${args.code}\n\nKeep this code private.`,
-    html: `<p>${escapeHtmlText(greeting)}</p><p>You received a ${escapeHtmlText(args.amount.format())} gift card.</p>${noteHtml}<p><strong>${escapeHtmlText(args.code)}</strong></p><p>Keep this code private.</p>`,
+    text: `${greeting}\n\nYou received a ${args.amount.format()} gift card.\n\nCode: ${args.code}\n\nKeep this code private.${noteText}`,
+    html: `<p>${escapeHtmlText(greeting)}</p><p>You received a ${escapeHtmlText(args.amount.format())} gift card.</p><p><strong>${escapeHtmlText(args.code)}</strong></p><p>Keep this code private.</p>${noteHtml}`,
   };
 }
 
@@ -247,6 +282,12 @@ async function deliverOne(args: {
   // non-terminal failure has exhausted the retry budget, park for review.
   const exhausted = claimed.attempt_count >= MAX_DELIVERY_ATTEMPTS;
   if (!claimed.code_ciphertext || !claimed.code_nonce || !claimed.code_key_version) {
+    // Terminal on the first attempt, so it never reaches the retry budget that
+    // would eventually surface it: a paid card whose encrypted code material is
+    // gone needs a human to reissue it, and nobody was being told.
+    recordDeliveryFailure({
+      provider: 'd1', retryable: false, attempt: claimed.attempt_count,
+    });
     await args.database.prepare(`UPDATE gift_card_deliveries SET status = 'needs_review',
       claim_token = NULL, lease_expires_at = NULL, completed_at = ?, updated_at = ?
       WHERE id = ? AND claim_token = ?`).bind(args.now, args.now, claimed.id, token).run();
@@ -280,14 +321,11 @@ async function deliverOne(args: {
     });
     const status = result.success ? 'sent' : (result.needsReview || exhausted) ? 'needs_review' : 'pending';
     if (!result.success) {
-      // The sender already diagnosed this; record its verdict instead of
-      // discarding it. The retry/status decision above is unchanged.
-      logDeliveryFailure({
-        giftCardId: args.giftCardId,
+      // The retry/status decision above is unchanged; this only records it.
+      recordDeliveryFailure({
+        provider: telemetryProvider(result.provider),
+        retryable: status !== 'needs_review',
         attempt: claimed.attempt_count,
-        outcome: status === 'needs_review' ? 'needs_review' : 'retry_scheduled',
-        ...(result.errorCode ? { errorCode: result.errorCode } : {}),
-        ...(boundedDetail(result.error) ? { detail: boundedDetail(result.error)! } : {}),
       });
     }
     await args.database.prepare(`UPDATE gift_card_deliveries SET status = ?, claim_token = NULL,
@@ -295,15 +333,9 @@ async function deliverOne(args: {
       .bind(status, status === 'sent' || status === 'needs_review' ? args.now : null, args.now, claimed.id, token).run();
   } catch (error) {
     const status = exhausted ? 'needs_review' : 'pending';
-    logDeliveryFailure({
-      giftCardId: args.giftCardId,
-      attempt: claimed.attempt_count,
-      outcome: exhausted ? 'needs_review' : 'retry_scheduled',
-      ...(error instanceof Error ? { errorName: error.name } : {}),
-      ...(boundedDetail(error instanceof Error ? error.message : error)
-        ? { detail: boundedDetail(error instanceof Error ? error.message : error)! }
-        : {}),
-    });
+    recordDeliveryFailure({
+      provider: 'd1', retryable: !exhausted, attempt: claimed.attempt_count,
+    }, error);
     await args.database.prepare(`UPDATE gift_card_deliveries SET status = ?, claim_token = NULL,
       lease_expires_at = NULL, completed_at = ?, updated_at = ? WHERE id = ? AND claim_token = ?`)
       .bind(status, exhausted ? args.now : null, args.now, claimed.id, token).run();

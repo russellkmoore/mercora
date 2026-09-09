@@ -42,6 +42,17 @@ describe('validateGiftCardMessage', () => {
     { value: 'x'.repeat(501), expected: 'too_long' },
     { value: 'Enjoy\u0000this', expected: 'control_characters' },
     { value: 'Enjoy this!\r\nFrom us', expected: null },
+    // WR-08: the note is emailed from the store's own sending domain, so
+    // buyer-authored links are rejected rather than escaped.
+    { value: 'Enjoy! https://evil.test/claim', expected: 'invalid_format' },
+    { value: 'Enjoy! HTTP://EVIL.TEST', expected: 'invalid_format' },
+    { value: 'Enjoy! www.evil.test', expected: 'invalid_format' },
+    { value: 'Enjoy! evil.test/claim', expected: 'invalid_format' },
+    // Ordinary prose that merely contains a dot or a slash stays valid.
+    { value: 'See you at 5.30pm', expected: null },
+    { value: 'Crossing the U.S./Canada border', expected: null },
+    { value: 'Pick a size and/or colour', expected: null },
+    { value: 'Happy birthday! Love, Mum', expected: null },
   ])('validateGiftCardMessage(%j) -> $expected', ({ value, expected }) => {
     expect(validateGiftCardMessage(value)).toBe(expected);
   });
