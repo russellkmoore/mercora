@@ -82,6 +82,24 @@ describe('provider-neutral email sender', () => {
     expect(result.needsReview).toBeUndefined();
   });
 
+  // The production failure the gift-card drain hit was inside resolveRuntime,
+  // not inside deliver(): the cron handler has no request context, so the
+  // sender has to find the EMAIL binding in the env it is handed. Every other
+  // test here passes cloudflareBinding directly, which skips that path.
+  it('resolves the Cloudflare binding out of the env it is handed', async () => {
+    const send = vi.fn(async () => ({ messageId: 'cf-env-1' }));
+    await expect(sendEmail(message, {
+      env: { EMAIL: { send } as unknown as CloudflareEnv['EMAIL'], EMAIL_PROVIDER: 'cloudflare' },
+    })).resolves.toEqual({ success: true, id: 'cf-env-1', provider: 'cloudflare' });
+    expect(send).toHaveBeenCalledOnce();
+  });
+
+  it('reports E_PROVIDER_CONFIG when a cloudflare env carries no EMAIL binding', async () => {
+    const result = await sendEmail(message, { env: { EMAIL_PROVIDER: 'cloudflare' } });
+    expect(result).toMatchObject({ success: false, errorCode: 'E_PROVIDER_CONFIG' });
+    expect(result.error).toContain('EMAIL binding');
+  });
+
   it('fails closed when Cloudflare idempotency lacks D1', async () => {
     const send = vi.fn();
     const result = await sendEmail(message, {

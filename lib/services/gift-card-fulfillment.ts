@@ -37,14 +37,31 @@ interface GiftCardFulfillmentEnvironment extends Record<string, unknown> { DB?: 
 function emailEnvironmentFrom(
   environment: GiftCardFulfillmentEnvironment,
 ): EmailSendOptions['env'] | undefined {
-  const provider = environment.EMAIL_PROVIDER;
-  const resendKey = environment.RESEND_API_KEY;
-  if (!environment.EMAIL && typeof resendKey !== 'string') return undefined;
+  const provider = typeof environment.EMAIL_PROVIDER === 'string' ? environment.EMAIL_PROVIDER : undefined;
+  // Check the binding's shape, not its truthiness. A misconfigured EMAIL var
+  // (a plain string rather than a binding) would otherwise cast cleanly out of
+  // Record<string, unknown>, then throw 'send is not a function' deep inside
+  // the sender — a config typo turned into an indefinite retry loop.
+  const emailBinding = environment.EMAIL;
+  const hasSend = typeof (emailBinding as { send?: unknown } | undefined)?.send === 'function';
+  // A Resend key is unusable on the Cloudflare path, and sender.ts constructs a
+  // client from it before it even checks the provider. Do not carry a secret
+  // through a call tree that cannot use it.
+  const resendKey = provider !== 'cloudflare' && typeof environment.RESEND_API_KEY === 'string'
+    ? environment.RESEND_API_KEY
+    : undefined;
+  if (!hasSend && resendKey === undefined) return undefined;
   return {
-    ...(environment.EMAIL ? { EMAIL: environment.EMAIL as CloudflareEnv['EMAIL'] } : {}),
+    ...(hasSend ? { EMAIL: emailBinding as CloudflareEnv['EMAIL'] } : {}),
     ...(environment.DB ? { DB: environment.DB } : {}),
-    ...(typeof provider === 'string' ? { EMAIL_PROVIDER: provider } : {}),
-    ...(typeof resendKey === 'string' ? { RESEND_API_KEY: resendKey } : {}),
+    // sender.ts also falls back to process.env.EMAIL_PROVIDER, which
+    // nodejs_compat_populate_process_env fills from the same wrangler vars
+    // block, so this forwarding is not load-bearing in production — it is here
+    // so the provider choice matches the env this drain actually holds. The
+    // sender address is not threaded at all: deliveryMessage() reads it from
+    // getStoreConfig(), which goes straight to process.env.
+    ...(provider !== undefined ? { EMAIL_PROVIDER: provider } : {}),
+    ...(resendKey !== undefined ? { RESEND_API_KEY: resendKey } : {}),
   };
 }
 

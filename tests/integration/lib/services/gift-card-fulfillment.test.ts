@@ -121,11 +121,16 @@ describe('gift-card issuance and durable delivery on real D1', () => {
 
     // The drain runs from the cron handler, where the sender has no request
     // context to read bindings from: the worker env must be handed over.
-    const sendOptions = mocks.send.mock.calls.at(-1)?.[1];
+    const sendOptions = mocks.send.mock.calls.at(-1)?.[1] as {
+      idempotencyKey: string; env: Record<string, unknown>;
+    };
     expect(sendOptions).toMatchObject({
       idempotencyKey: expect.stringMatching(/^gift-card-delivery\//),
       env: { EMAIL: emailBinding, DB: env.DB, EMAIL_PROVIDER: 'cloudflare' },
     });
+    // toMatchObject matches the nested env partially, so name the whole key set:
+    // a Resend key must never ride along on the Cloudflare path.
+    expect(Object.keys(sendOptions.env).sort()).toEqual(['DB', 'EMAIL', 'EMAIL_PROVIDER']);
 
     const persisted = await env.DB.prepare(`SELECT
       (SELECT COUNT(*) FROM gift_card_accounts WHERE issued_order_id = ?) AS accounts,
