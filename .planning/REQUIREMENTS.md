@@ -81,7 +81,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SHOP-04 | Phase 10 | Complete |
 | SHOP-05 | Phase 10 | Complete |
 | SHOP-06 | Phase 10 | Complete |
-| SHOP-07 | Phase 12 | Complete |
+| SHOP-07 | Phase 12 | Complete (issuance + delivery proven live; the "appears under Account → Gift Cards for the recipient" clause is a documented product gap — listing filters by purchaser_customer_id, see 12-05-SUMMARY) |
 | OPS-01 | Phase 11 | Complete |
 | OPS-02 | Phase 11 | Complete |
 | OPS-03 | Phase 11 | Complete |
