@@ -37,7 +37,7 @@ Requirements for this milestone. Each maps to a roadmap phase.
 
 - [x] **CONTENT-01**: The gift card support article in `data/r2/knowledge_md/` describes what actually ships (four denominations, immediate email delivery after payment, no expiry, no cash redemption, how to redeem at checkout, where to check a balance) and is uploaded to R2
 - [ ] **CONTENT-02**: Volt is re-indexed and recommends the gift card when a shopper asks about gifts, presents, or vouchers
-- [ ] **CONTENT-03**: The Terms of Service page gains a gift card section (email delivery, no expiry, no cash redemption, not transferable for resale) published through Admin → Pages
+- [x] **CONTENT-03**: The Terms of Service page gains a gift card section (email delivery, no expiry, no cash redemption, not transferable for resale) published through Admin → Pages
 
 ## v2 Requirements
 
@@ -88,7 +88,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | OPS-04 | Phase 11 | Complete |
 | CONTENT-01 | Phase 12 | Complete |
 | CONTENT-02 | Phase 12 | Pending |
-| CONTENT-03 | Phase 12 | Pending |
+| CONTENT-03 | Phase 12 | Complete |
 
 **Coverage:**
 
