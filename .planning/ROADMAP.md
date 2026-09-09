@@ -158,7 +158,29 @@ Plans:
   3. The Terms of Service page has a gift card section (email delivery, no expiry, no cash redemption, not transferable for resale), published through Admin → Pages
   4. A gift-card-only order paid in Stripe test mode on production results in an issued gift card, a delivery email to the recipient, and the card appearing under Account → Gift Cards for the recipient's account
 
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 12-01-PLAN.md — Prove the remote-binding tool chain reads production D1, R2, Vectorize and AI from one local process (tracer)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 12-02-PLAN.md — Rewrite the gift-card support article to match what ships, pin it with a test, upload it to R2
+- [ ] 12-03-PLAN.md — Add the gift card section to the Terms of Service page and prove the live page serves it
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 12-04-PLAN.md — Re-index Volt's knowledge articles upsert-only and prove three gift questions surface the card
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 12-05-PLAN.md — Buy one gift card in Stripe test mode on production and gather the issuance and delivery evidence
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 12-06-PLAN.md — Run the full CI gate suite, fill the validation contract, prove scope held, and push main
 
 ## Progress
 
@@ -169,4 +191,4 @@ Plans:
 | 9. Gift Card Catalogue | 4/4 | Complete    | 2026-09-08 |
 | 10. Gift Card Purchase Flow | 5/5 | In Progress|  |
 | 11. Production Enablement | 5/5 | Complete    | 2026-09-09 |
-| 12. Content, Assistant & Live Proof | 0/TBD | Not started | - |
+| 12. Content, Assistant & Live Proof | 0/6 | Planned | - |
