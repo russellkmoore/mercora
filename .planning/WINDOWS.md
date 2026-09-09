@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 4
+open_count: 5
 waived_count: 0
 fixed_count: 2
-total_count: 6
-last_updated: 2026-09-05T22:07:40.268Z
+total_count: 7
+last_updated: 2026-09-09T20:37:10.407Z
 ---
 
 # Broken Windows Ledger
@@ -21,6 +21,7 @@ last_updated: 2026-09-05T22:07:40.268Z
 | 4 | 07 | deviation | app/product/[slug]/ProductDisplay.tsx |  | Defaults-parity screenshot comparison (07-05 Task 2) found 1 of 12 compared home/category/product rows non-identical: product\|390\|resting differs from the pre-extraction baseline by exactly 2 pixels at +/-1/255 intensity (anti-aliased thumbnail border edge), reproduced identically across two independent recaptures. Source-level parity test (product-gallery-variants.test.ts) proves the component's JSX is byte-for-byte unchanged; attributed to headless-Chromium sub-pixel rendering variance between separate browser launches, not a code regression. Registered as snap S-07-01 with full pixel-diff evidence in 07-SCREENSHOTS.md. | open |  | 2026-09-05T09:12:07.856Z |  |
 | 5 | 08.1 | deviation | docs/CLAUDE.md |  | Gates/Testing sections still claim scan:tokens is local-only, not CI-wired — stale after 08.1-03 added the CI step; out of this plan's declared files_modified scope | open |  | 2026-09-05T20:22:36.784Z |  |
 | 6 | 08.1 | deviation | .planning/phases/08.1-v2-tech-debt-closure/08.1-07-PLAN.md |  | Task 3's automated verify includes a whole-file check that REQUIREMENTS.md has zero unchecked bold requirement lines; DOCS-04 and DOCS-05 (Phase 8.2, not yet executed) remain unchecked as intended, so this specific sub-check fails as literally written. DEBT-01's own checkbox and traceability row were verified directly instead; no other requirement's state was changed. | open |  | 2026-09-05T22:07:40.268Z |  |
+| 7 | 12 | deviation | N/A (CDN edge cache, not a repo file) |  | Public CDN URL https://voltique-images.russellkmoore.me/knowledge_md/gift-cards.md served a stale cached GET body (old article, TTL max-age=14400) for ~13min+ after the 12-02 upload while HEAD/ETag and the direct R2 object read already showed the correct new content; self-resolves by cache TTL expiry, no wrangler purge command exists, and plan 12-04's re-index reads via the R2 binding directly so is unaffected | open |  | 2026-09-09T20:37:10.407Z |  |
 
 ````json
 [
@@ -94,6 +95,18 @@ last_updated: 2026-09-05T22:07:40.268Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-05T22:07:40.268Z",
+    "resolved_at": null
+  },
+  {
+    "id": 7,
+    "kind": "deviation",
+    "phase": "12",
+    "file": "N/A (CDN edge cache, not a repo file)",
+    "line": null,
+    "description": "Public CDN URL https://voltique-images.russellkmoore.me/knowledge_md/gift-cards.md served a stale cached GET body (old article, TTL max-age=14400) for ~13min+ after the 12-02 upload while HEAD/ETag and the direct R2 object read already showed the correct new content; self-resolves by cache TTL expiry, no wrangler purge command exists, and plan 12-04's re-index reads via the R2 binding directly so is unaffected",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-09T20:37:10.407Z",
     "resolved_at": null
   }
 ]
