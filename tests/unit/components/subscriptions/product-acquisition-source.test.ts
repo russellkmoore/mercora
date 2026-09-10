@@ -80,6 +80,11 @@ describe("product subscription acquisition integration", () => {
     expect(source).toContain("useEffect(() => () => refreshControllerRef.current?.abort(), []);");
     // A saved address the subscription filter drops is reported, never silent.
     expect(region).toContain("if (saved.id && nextId !== saved.id)");
+    // A refresh failure after a successful save is worded as such and clears
+    // the selection rather than keeping a stale id.
+    expect(region).toContain("Your address was saved, but the list could not be refreshed.");
+    expect(region).not.toContain("Saved addresses could not be loaded");
+    expect(region).toContain('setAddressId("");');
     // The modal is attempt-scoped UI state: an owner change closes it.
     expect(source).toMatch(/setStateOwner\(currentOwner\);[\s\S]*?setAddressDialogOpen\(false\);[\s\S]*?setAccepted\(false\);/);
 
