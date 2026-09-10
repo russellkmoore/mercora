@@ -2,6 +2,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdminPermissions } from '@/lib/auth/admin-middleware';
 import { listAdminGiftCardPresentations } from '@/lib/gift-cards/presentations';
+import { honorIsEffectivelyOn } from '@/lib/gift-cards/honor-guard';
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -33,10 +34,19 @@ export async function GET(request: NextRequest) {
   try {
     const { env } = await getCloudflareContext({ async: true });
     const environment = env as unknown as Record<string, unknown> & { DB?: D1Database };
-    if (String(environment.STORE_FEATURE_GIFT_CARD_RECONCILIATION ?? '').trim().toLowerCase() !== 'true') {
-      return NextResponse.json({ cards: [], total: 0, meta: { limit, offset } });
-    }
     if (!environment.DB) throw new Error('D1 binding unavailable');
+    const giftCardAcquisition = String(environment.STORE_FEATURE_GIFT_CARD_ACQUISITION ?? '').trim().toLowerCase() === 'true';
+    const giftCardReconciliation = String(environment.STORE_FEATURE_GIFT_CARD_RECONCILIATION ?? '').trim().toLowerCase() === 'true';
+    // Both flags off: the surface exists only while the honor guard is
+    // active (money still outstanding) — D-17. Either flag on renders as
+    // today, unchanged.
+    if (!giftCardAcquisition && !giftCardReconciliation) {
+      const nowSeconds = Math.floor(Date.now() / 1_000);
+      const guardActive = await honorIsEffectivelyOn(environment.DB, false, nowSeconds);
+      if (!guardActive) {
+        return NextResponse.json({ code: 'gift_cards_unavailable', error: 'Gift cards are not available' }, { status: 404 });
+      }
+    }
     const result = await listAdminGiftCardPresentations({
       database: environment.DB,
       now: Math.floor(Date.now() / 1_000),
