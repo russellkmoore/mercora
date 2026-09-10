@@ -9,7 +9,10 @@ import {
   MAX_GIFT_CARD_CODE_KEY_VERSIONS,
   digestGiftCardCode,
   generateGiftCardCode,
+  giftCardCodeSuffix,
   giftCardLookupCandidates,
+  maskGiftCardCode,
+  maskGiftCardCodeSuffix,
   normalizeGiftCardCode,
   type GiftCardKeyRing,
 } from "@/lib/gift-cards/code";
@@ -255,4 +258,42 @@ describe("gift-card key-ring validation", () => {
     await expect(giftCardLookupCandidates("invalid", { currentVersion: 1, keys: {} }))
       .rejects.toBeInstanceOf(GiftCardCodeConfigurationError);
   });
+});
+
+describe("gift-card code suffix (D-02)", () => {
+  it("returns the final code group, uppercased, for a well-formed code", () => {
+    expect(giftCardCodeSuffix(CODE)).toBe("STUV");
+    expect(giftCardCodeSuffix(CODE.toLowerCase())).toBe("STUV");
+  });
+
+  it.each([
+    undefined,
+    null,
+    42,
+    "",
+    "GC-2345-6789-ABCD-EFGH-JKLM-NPQR-STU",
+    "GC-2345-6789-ABCD-EFGH-JKLM-NPQR-STUVW",
+    "XX-2345-6789-ABCD-EFGH-JKLM-NPQR-STUV",
+    "GC-0123-6789-ABCD-EFGH-JKLM-NPQR-STUV",
+  ])("returns null for anything normalizeGiftCardCode rejects: %#", (value) => {
+    expect(giftCardCodeSuffix(value)).toBeNull();
+  });
+
+  it("masks a suffix to the same string maskGiftCardCode produces for a full code ending in it", () => {
+    const suffix = giftCardCodeSuffix(CODE);
+    expect(suffix).not.toBeNull();
+    expect(maskGiftCardCodeSuffix(suffix)).toBe(maskGiftCardCode(CODE));
+    expect(maskGiftCardCodeSuffix(suffix)).toBe("GC-****-****-****-****-****-****-STUV");
+  });
+
+  it("accepts lowercase suffix input the same way normalizeGiftCardCode does", () => {
+    expect(maskGiftCardCodeSuffix("stuv")).toBe("GC-****-****-****-****-****-****-STUV");
+  });
+
+  it.each([undefined, null, 42, "", "STU", "STUVW", "0TUV", "ST1V"])(
+    "returns null for a null or malformed suffix: %#",
+    (value) => {
+      expect(maskGiftCardCodeSuffix(value)).toBeNull();
+    },
+  );
 });
