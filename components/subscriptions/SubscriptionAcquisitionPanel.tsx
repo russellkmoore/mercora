@@ -305,9 +305,13 @@ export default function SubscriptionAcquisitionPanel({
         // say so instead of silently selecting a different address.
         setAddressError("The new address was saved but cannot be used for this subscription. Edit it under Account > Addresses.");
       }
-    } catch (error) {
+    } catch {
       if (live()) {
-        setAddressError(error instanceof Error ? error.message : "Saved addresses could not be loaded");
+        // The POST already succeeded; this must not read as a failed save
+        // (which invites a duplicate), and the stale selection is cleared so
+        // nothing proceeds against an address that may no longer match.
+        setAddressId("");
+        setAddressError("Your address was saved, but the list could not be refreshed. Reload the page to select it.");
       }
     } finally {
       if (live()) setLoadingAddresses(false);
