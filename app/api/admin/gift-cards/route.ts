@@ -2,7 +2,8 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdminPermissions } from '@/lib/auth/admin-middleware';
 import { listAdminGiftCardPresentations } from '@/lib/gift-cards/presentations';
-import { honorIsEffectivelyOn } from '@/lib/gift-cards/honor-guard';
+import { resolveHonorEffective } from '@/lib/gift-cards/honor-guard';
+import { giftCardSurfacesHidden } from '@/lib/gift-cards/visibility';
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -40,9 +41,17 @@ export async function GET(request: NextRequest) {
     // Both flags off: the surface exists only while the honor guard is
     // active (money still outstanding) — D-17. Either flag on renders as
     // today, unchanged.
-    if (!giftCardAcquisition && !giftCardReconciliation) {
+    //
+    // Through `resolveHonorEffective`, the single owner of that decision
+    // (D-18), and not through `honorIsEffectivelyOn` one layer down. This route
+    // is the queue that `/admin/gift-cards` fetches, so the page and its data
+    // must reach the same answer by the same route — the two agree today only
+    // because this gate runs solely under both-off, where the two functions
+    // reduce to the same thing. That is a coincidence, not a contract.
+    const flags = { giftCardAcquisition, giftCardReconciliation };
+    if (giftCardSurfacesHidden(flags)) {
       const nowSeconds = Math.floor(Date.now() / 1_000);
-      const guardActive = await honorIsEffectivelyOn(environment.DB, false, nowSeconds);
+      const guardActive = await resolveHonorEffective(environment.DB, flags, nowSeconds);
       if (!guardActive) {
         return NextResponse.json({ code: 'gift_cards_unavailable', error: 'Gift cards are not available' }, { status: 404 });
       }

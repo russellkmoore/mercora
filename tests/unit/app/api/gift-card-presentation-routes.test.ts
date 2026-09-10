@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   rateLimit: vi.fn(),
   adminCards: vi.fn(),
   adminAuth: vi.fn(),
-  honorIsEffectivelyOn: vi.fn(),
+  resolveHonorEffective: vi.fn(),
 }));
 
 vi.mock('@clerk/nextjs/server', () => ({ auth: mocks.auth }));
@@ -17,8 +17,10 @@ vi.mock('@/lib/gift-cards/presentations', () => ({
   listAdminGiftCardPresentations: mocks.adminCards,
 }));
 vi.mock('@/lib/auth/admin-middleware', () => ({ checkAdminPermissions: mocks.adminAuth }));
+// The admin queue asks the single owner of the money decision (D-18), the same
+// function `/admin/gift-cards` asks, rather than reaching a layer lower.
 vi.mock('@/lib/gift-cards/honor-guard', () => ({
-  honorIsEffectivelyOn: mocks.honorIsEffectivelyOn,
+  resolveHonorEffective: mocks.resolveHonorEffective,
 }));
 
 import { GET as adminGet } from '@/app/api/admin/gift-cards/route';
@@ -46,7 +48,7 @@ beforeEach(() => {
   mocks.context.mockResolvedValue({ env: { DB: {} } });
   mocks.adminAuth.mockResolvedValue({ success: true, userId: 'admin_one' });
   mocks.adminCards.mockResolvedValue({ cards: [{ ...safeCard, issuedOrderId: 'WEB-1', issuedLineId: 'line_1' }], total: 1 });
-  mocks.honorIsEffectivelyOn.mockResolvedValue(true);
+  mocks.resolveHonorEffective.mockResolvedValue(true);
 });
 
 describe('gift-card presentation routes', () => {
@@ -78,7 +80,7 @@ describe('gift-card presentation routes', () => {
 
   it('404s the admin queue when both flags are off and the honor guard is clear (D-17)', async () => {
     mocks.context.mockResolvedValue({ env: { DB: {} } });
-    mocks.honorIsEffectivelyOn.mockResolvedValue(false);
+    mocks.resolveHonorEffective.mockResolvedValue(false);
     const response = await adminGet(new NextRequest('https://store.example/api/admin/gift-cards'));
     expect(response.status).toBe(404);
     expect(mocks.adminCards).not.toHaveBeenCalled();
@@ -86,7 +88,7 @@ describe('gift-card presentation routes', () => {
 
   it('keeps the admin queue reachable at 200 when honoring is off but the guard is active (D-17)', async () => {
     mocks.context.mockResolvedValue({ env: { DB: {} } });
-    mocks.honorIsEffectivelyOn.mockResolvedValue(true);
+    mocks.resolveHonorEffective.mockResolvedValue(true);
     const response = await adminGet(new NextRequest('https://store.example/api/admin/gift-cards'));
     expect(response.status).toBe(200);
     expect(mocks.adminCards).toHaveBeenCalled();
@@ -98,6 +100,23 @@ describe('gift-card presentation routes', () => {
     const response = await adminGet(new NextRequest('https://store.example/api/admin/gift-cards'));
     expect(response.status).toBe(401);
     expect(mocks.context).not.toHaveBeenCalled();
+  });
+
+  it('passes both flags to the decision rather than a bare honor=false (WR-18)', async () => {
+    // The route used to call honorIsEffectivelyOn(DB, false, now) — a fifth
+    // implementation of the money question, agreeing with the owner only
+    // because this gate runs solely under both-off, where the two reduce to the
+    // same thing. That was a coincidence, not a contract.
+    mocks.context.mockResolvedValue({ env: { DB: {} } });
+    mocks.resolveHonorEffective.mockResolvedValue(true);
+
+    await adminGet(new NextRequest('https://store.example/api/admin/gift-cards'));
+
+    expect(mocks.resolveHonorEffective).toHaveBeenCalledWith(
+      expect.anything(),
+      { giftCardAcquisition: false, giftCardReconciliation: false },
+      expect.any(Number),
+    );
   });
 
   it('lists cards to an admin with sell on and honor off, which is deliberate (WR-12, D-14)', async () => {
@@ -117,7 +136,7 @@ describe('gift-card presentation routes', () => {
     expect(response.status).toBe(200);
     // The honor guard is not consulted at all: the both-off gate is the only
     // thing that reads it, and sell is on here.
-    expect(mocks.honorIsEffectivelyOn).not.toHaveBeenCalled();
+    expect(mocks.resolveHonorEffective).not.toHaveBeenCalled();
   });
 
   it('surfaces a configuration throw as a 503 rather than a stack trace', async () => {
