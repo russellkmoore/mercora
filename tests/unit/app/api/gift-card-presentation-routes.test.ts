@@ -267,30 +267,25 @@ describe('gift-card presentation routes', () => {
       const response = await adminPost(createRequest({ ...validCreateBody, recipientEmail: '  Shopper@Example.COM ' }));
       expect(response.status).toBe(201);
       expect(mocks.issueAdminGiftCard).toHaveBeenCalledWith(expect.objectContaining({ recipientEmail: 'shopper@example.com' }));
-      expect(mocks.appendGiftCardEvent).toHaveBeenCalledWith(expect.objectContaining({
-        details: expect.objectContaining({ recipient_email: 'shopper@example.com' }),
-      }));
     });
 
-    it('issues a card, writes one admin_created event, and returns the new card id', async () => {
+    it('issues a card with the actor and reason for its batched admin_created event, and returns the new card id (A-3)', async () => {
       mocks.context.mockResolvedValue({ env: { DB: {}, STORE_FEATURE_GIFT_CARD_RECONCILIATION: 'true' } });
       const response = await adminPost(createRequest(validCreateBody));
       expect(response.status).toBe(201);
       expect(await response.json()).toMatchObject({ giftCardId: 'gift_card_new', created: true });
-      expect(mocks.appendGiftCardEvent).toHaveBeenCalledTimes(1);
-      expect(mocks.appendGiftCardEvent).toHaveBeenCalledWith(expect.objectContaining({
-        giftCardId: 'gift_card_new',
-        eventType: 'admin_created',
+      expect(mocks.issueAdminGiftCard).toHaveBeenCalledWith(expect.objectContaining({
+        requestId: 'req_1',
+        recipientEmail: 'shopper@example.com',
         actor: { type: 'admin', id: 'admin_one' },
-        details: expect.objectContaining({
-          reason: 'Customer service credit',
-          amount_minor: 2_500,
-          recipient_email: 'shopper@example.com',
-        }),
+        reason: 'Customer service credit',
       }));
+      // The event lands inside the service's issuance batch — the route
+      // never appends one on a separate connection.
+      expect(mocks.appendGiftCardEvent).not.toHaveBeenCalled();
     });
 
-    it('converges two identical requestId posts into one card and one event', async () => {
+    it('converges two identical requestId posts into one card, appending no event of its own either time', async () => {
       mocks.context.mockResolvedValue({ env: { DB: {}, STORE_FEATURE_GIFT_CARD_RECONCILIATION: 'true' } });
       mocks.issueAdminGiftCard.mockResolvedValueOnce({ giftCardId: 'gift_card_new', created: true });
       mocks.issueAdminGiftCard.mockResolvedValueOnce({ giftCardId: 'gift_card_new', created: false });
@@ -298,9 +293,9 @@ describe('gift-card presentation routes', () => {
       const first = await adminPost(createRequest(validCreateBody));
       const second = await adminPost(createRequest(validCreateBody));
 
-      expect(await first.json()).toMatchObject({ giftCardId: 'gift_card_new' });
-      expect(await second.json()).toMatchObject({ giftCardId: 'gift_card_new' });
-      expect(mocks.appendGiftCardEvent).toHaveBeenCalledTimes(1);
+      expect(await first.json()).toMatchObject({ giftCardId: 'gift_card_new', created: true });
+      expect(await second.json()).toMatchObject({ giftCardId: 'gift_card_new', created: false });
+      expect(mocks.appendGiftCardEvent).not.toHaveBeenCalled();
     });
 
     it('503s on a write failure with gift_cards_write_failed', async () => {

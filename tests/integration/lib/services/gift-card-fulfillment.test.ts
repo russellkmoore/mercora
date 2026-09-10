@@ -404,6 +404,8 @@ describe('gift-card issuance and durable delivery on real D1', () => {
   });
 });
 
+const ADMIN_ACTOR = { type: 'admin', id: 'user_admin' } as const;
+
 describe('admin-created gift card (D-07, D-19)', () => {
   const adminMaxMinor = 20_000;
 
@@ -413,6 +415,8 @@ describe('admin-created gift card (D-07, D-19)', () => {
       amount: Money.fromMinor(5_000, 'USD'),
       recipientEmail: 'admin-recipient-1@example.test',
       recipientName: 'Admin Recipient',
+      actor: ADMIN_ACTOR,
+      reason: 'test issuance',
       environment: runtimeEnvironment(),
       now,
     });
@@ -435,11 +439,109 @@ describe('admin-created gift card (D-07, D-19)', () => {
     expect(row?.code_suffix).toMatch(/^[23456789A-HJ-NP-Z]{4}$/);
   });
 
+  it('writes exactly one admin_created event in the same batch as the card, naming the actor, reason, amount and recipient (A-3, D-07)', async () => {
+    const result = await issueAdminGiftCard({
+      requestId: 'admin-request-event-1',
+      amount: Money.fromMinor(3_000, 'USD'),
+      recipientEmail: ' Admin-Recipient-Event@Example.test ',
+      actor: { type: 'admin', id: 'user_creator' },
+      reason: 'goodwill credit',
+      environment: runtimeEnvironment(),
+      now,
+    });
+    const events = await env.DB.prepare(`SELECT event_type, actor_type, actor_id, details, created_at
+      FROM gift_card_events WHERE gift_card_id = ?`).bind(result.giftCardId)
+      .all<{ event_type: string; actor_type: string; actor_id: string; details: string; created_at: number }>();
+    expect(events.results).toHaveLength(1);
+    expect({ ...events.results[0], details: JSON.parse(events.results[0].details) }).toEqual({
+      event_type: 'admin_created',
+      actor_type: 'admin',
+      actor_id: 'user_creator',
+      details: { reason: 'goodwill credit', amount_minor: 3_000, recipient_email: 'admin-recipient-event@example.test' },
+      created_at: now,
+    });
+
+    // A retry converges on the same card and adds no second event.
+    await issueAdminGiftCard({
+      requestId: 'admin-request-event-1',
+      amount: Money.fromMinor(3_000, 'USD'),
+      recipientEmail: 'admin-recipient-event@example.test',
+      actor: { type: 'admin', id: 'user_creator' },
+      reason: 'goodwill credit',
+      environment: runtimeEnvironment(),
+      now: now + 1,
+    });
+    const after = await env.DB.prepare(`SELECT COUNT(*) AS count FROM gift_card_events WHERE gift_card_id = ?`)
+      .bind(result.giftCardId).first<{ count: number }>();
+    expect(after?.count).toBe(1);
+  });
+
+  it('leaves neither the card nor its event behind when the issuance batch fails (A-3)', async () => {
+    // Inject a failure into the batch itself: the delivery id collides with a
+    // delivery row that already exists, so the third INSERT raises and D1
+    // rolls the whole batch back — including the admin_created row.
+    const seeded = await issueAdminGiftCard({
+      requestId: 'admin-request-batch-seed',
+      amount: Money.fromMinor(1_000, 'USD'),
+      recipientEmail: 'admin-recipient-seed@example.test',
+      actor: ADMIN_ACTOR,
+      reason: 'seed',
+      environment: runtimeEnvironment(),
+      now,
+    });
+    const seededDelivery = await env.DB.prepare(`SELECT id FROM gift_card_deliveries WHERE gift_card_id = ?`)
+      .bind(seeded.giftCardId).first<{ id: string }>();
+    const collidingDatabase = new Proxy(env.DB, {
+      get(target, property, receiver) {
+        if (property === 'prepare') {
+          return (query: string) => {
+            const statement = target.prepare(query);
+            if (!query.includes('INSERT INTO gift_card_deliveries')) return statement;
+            // Rebind the delivery INSERT's first placeholder (the delivery id)
+            // to the seeded card's delivery id.
+            return new Proxy(statement, {
+              get(inner, key, innerReceiver) {
+                if (key === 'bind') {
+                  return (...values: unknown[]) => inner.bind(seededDelivery?.id, ...values.slice(1));
+                }
+                const value = Reflect.get(inner, key, innerReceiver);
+                return typeof value === 'function' ? value.bind(inner) : value;
+              },
+            });
+          };
+        }
+        const value = Reflect.get(target, property, receiver);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+
+    await expect(issueAdminGiftCard({
+      requestId: 'admin-request-batch-collide',
+      amount: Money.fromMinor(1_000, 'USD'),
+      recipientEmail: 'admin-recipient-collide@example.test',
+      actor: ADMIN_ACTOR,
+      reason: 'collide',
+      environment: { ...runtimeEnvironment(), DB: collidingDatabase },
+      now,
+    })).rejects.toThrow();
+
+    const orphanEvents = await env.DB.prepare(`SELECT COUNT(*) AS count FROM gift_card_events event
+      WHERE event.event_type = 'admin_created'
+        AND NOT EXISTS (SELECT 1 FROM gift_card_accounts account WHERE account.id = event.gift_card_id)`)
+      .first<{ count: number }>();
+    expect(orphanEvents?.count).toBe(0);
+    const collidedEvents = await env.DB.prepare(`SELECT COUNT(*) AS count FROM gift_card_events WHERE details LIKE '%collide%'`)
+      .first<{ count: number }>();
+    expect(collidedEvents?.count).toBe(0);
+  });
+
   it('converges two calls with the same requestId into one account', async () => {
     const args = {
       requestId: 'admin-request-idempotent-1',
       amount: Money.fromMinor(2_500, 'USD'),
       recipientEmail: 'admin-recipient-2@example.test',
+      actor: ADMIN_ACTOR,
+      reason: 'test issuance',
       environment: runtimeEnvironment(),
       now,
     };
@@ -457,6 +559,8 @@ describe('admin-created gift card (D-07, D-19)', () => {
     const base = {
       amount: Money.fromMinor(2_500, 'USD'),
       recipientEmail: 'admin-recipient-3@example.test',
+      actor: ADMIN_ACTOR,
+      reason: 'test issuance',
       environment: runtimeEnvironment(),
       now,
     };
@@ -480,6 +584,8 @@ describe('admin-created gift card (D-07, D-19)', () => {
         requestId: `admin-request-invalid-${index}`,
         amount,
         recipientEmail: 'admin-recipient-invalid@example.test',
+        actor: ADMIN_ACTOR,
+        reason: 'test issuance',
         environment: runtimeEnvironment(),
         now,
       })).rejects.toThrow();
@@ -516,6 +622,8 @@ describe('admin-created gift card (D-07, D-19)', () => {
         requestId: 'admin-request-ceiling-accepted',
         amount: Money.fromMinor(50_000, 'USD'),
         recipientEmail: 'admin-recipient-ceiling@example.test',
+        actor: ADMIN_ACTOR,
+        reason: 'test issuance',
         environment: runtimeEnvironment(),
         now,
       });
@@ -525,6 +633,8 @@ describe('admin-created gift card (D-07, D-19)', () => {
         requestId: 'admin-request-ceiling-refused',
         amount: Money.fromMinor(50_001, 'USD'),
         recipientEmail: 'admin-recipient-ceiling@example.test',
+        actor: ADMIN_ACTOR,
+        reason: 'test issuance',
         environment: runtimeEnvironment(),
         now,
       })).rejects.toThrow(RangeError);
@@ -539,6 +649,8 @@ describe('admin-created gift card (D-07, D-19)', () => {
       requestId: 'admin-request-reveal-branches',
       amount: Money.fromMinor(2_500, 'USD'),
       recipientEmail: 'admin-recipient-reveal@example.test',
+      actor: ADMIN_ACTOR,
+      reason: 'test issuance',
       environment: runtimeEnvironment(),
       now,
     });
@@ -570,11 +682,24 @@ describe('admin-created gift card (D-07, D-19)', () => {
       .rejects.toBeInstanceOf(GiftCardDecryptionError);
   });
 
+  it('never leaves an admin-created card without its admin_created event, across everything this suite issued (A-3)', async () => {
+    const orphans = await env.DB.prepare(`SELECT account.id FROM gift_card_accounts account
+      WHERE account.issued_order_id IS NULL AND account.purchaser_customer_id IS NULL
+        AND NOT EXISTS (SELECT 1 FROM gift_card_events event
+          WHERE event.gift_card_id = account.id AND event.event_type = 'reissued_from')
+        AND (SELECT COUNT(*) FROM gift_card_events event
+          WHERE event.gift_card_id = account.id AND event.event_type = 'admin_created') <> 1`)
+      .all<{ id: string }>();
+    expect(orphans.results).toEqual([]);
+  });
+
   it('delivers an admin-created card through the existing cron drain', async () => {
     const created = await issueAdminGiftCard({
       requestId: 'admin-request-drain-1',
       amount: Money.fromMinor(10_000, 'USD'),
       recipientEmail: 'admin-recipient-drain@example.test',
+      actor: ADMIN_ACTOR,
+      reason: 'test issuance',
       environment: runtimeEnvironment(),
       now,
     });
