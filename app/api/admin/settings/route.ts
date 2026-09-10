@@ -16,7 +16,29 @@ import { getDbAsync } from "@/lib/db";
 import { admin_settings, defaultSettings } from "@/lib/db/schema/settings";
 import { checkAdminPermissions, isSuperAdminActor } from "@/lib/auth/admin-middleware";
 import { CUSTOM_JS_ENABLED_SETTING, logCustomJsAudit } from "@/lib/cms/custom-js-guard";
+import {
+  HONOR_GUARD_SETTING_CATEGORY,
+  HONOR_GUARD_SETTING_KEY,
+} from "@/lib/gift-cards/honor-guard";
 import { eq, inArray } from "drizzle-orm";
+
+/**
+ * The gift-card honor guard is written by the five-minute cron and by nothing
+ * else (D-15). This route takes an arbitrary key from the request body, so
+ * without an explicit rejection any admin could upsert a zeroed measurement,
+ * switch honoring off while cards still carry money, and strand every pending
+ * redemption and refund until the next tick — or permanently, by dating the
+ * forged record into the future.
+ *
+ * Both the key and its category are refused: the category is what an operator
+ * UI would page through, and nothing else legitimately writes under it.
+ */
+function writesTheHonorGuard(update: unknown): boolean {
+  if (!update || typeof update !== "object") return false;
+  const candidate = update as Record<string, unknown>;
+  return candidate.key === HONOR_GUARD_SETTING_KEY
+    || candidate.category === HONOR_GUARD_SETTING_CATEGORY;
+}
 
 /**
  * GET /api/admin/settings - Load current settings
@@ -112,6 +134,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Updates array is required' },
         { status: 400 }
+      );
+    }
+
+    if (updates.some(writesTheHonorGuard)) {
+      return NextResponse.json(
+        {
+          error: "The gift-card honor guard is written only by the scheduled "
+            + "measurement and cannot be set through this endpoint.",
+          code: "honor_guard_read_only",
+        },
+        { status: 400 },
       );
     }
 
