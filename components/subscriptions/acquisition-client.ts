@@ -210,6 +210,31 @@ export async function fetchSavedAddressesForPlan(
   });
 }
 
+// Select-only sentinel for "add a new address" — never a real address id and
+// never sent to a server.
+export const ADD_NEW_ADDRESS_VALUE = "__add_new__";
+
+/**
+ * The single rule for which address the shipping-address select should show,
+ * used both on address-list load and immediately after a successful save.
+ * `preferredId` is used only when it names an entry in `addresses`; the
+ * sentinel is explicitly rejected even though `ID_PATTERN`'s alphanumeric
+ * first-character rule already makes a collision with a real id impossible.
+ */
+export function nextAddressSelection(
+  addresses: readonly SavedSubscriptionAddress[],
+  preferredId?: string,
+): string {
+  if (
+    preferredId
+    && preferredId !== ADD_NEW_ADDRESS_VALUE
+    && addresses.some((entry) => entry.id === preferredId)
+  ) {
+    return preferredId;
+  }
+  return addresses.find((entry) => entry.is_default)?.id ?? addresses[0]?.id ?? "";
+}
+
 export function shippingAddressFromSaved(value: SavedSubscriptionAddress): Address {
   const address = value.address;
   const localized = (
