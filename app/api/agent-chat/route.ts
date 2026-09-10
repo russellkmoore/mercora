@@ -70,6 +70,11 @@ import {
 } from "@/lib/models/mach/product-serializer";
 import { getStoreConfig } from "@/lib/store-config";
 import {
+  GIFT_CARD_PRODUCT_TYPE,
+  filterListedProducts,
+  hidesGiftCardsFromListings,
+} from "@/lib/gift-cards/visibility";
+import {
   canonicalFactsFromConfig,
   type CanonicalFacts,
 } from "@/lib/ai/canonical-facts";
@@ -227,6 +232,32 @@ async function resolvePurchasedNames(orders: PromptOrder[]): Promise<Map<string,
   } catch {
     console.error("Purchased product-name lookup failed");
     return new Map();
+  }
+}
+
+/**
+ * Catalogue ids of gift-card products that are currently hidden from every
+ * listing surface, for stripping Vectorize matches before they reach the model.
+ *
+ * Returns an empty set — and runs no query at all — while selling is on, which
+ * is the ordinary case. This is a best-effort filter on retrieved *copy*; the
+ * authoritative filter on what a shopper is actually shown is
+ * `filterListedProducts` over the hydrated rows, which needs no lookup because
+ * it reads `products.type` directly.
+ */
+async function hiddenGiftCardProductIds(giftCardAcquisition: boolean): Promise<Set<string>> {
+  if (!hidesGiftCardsFromListings({ giftCardAcquisition })) return new Set();
+
+  try {
+    const db = await getDbAsync();
+    const rows = await db
+      .select({ id: products.id })
+      .from(products)
+      .where(eq(products.type, GIFT_CARD_PRODUCT_TYPE));
+    return new Set(rows.map((row) => row.id));
+  } catch {
+    console.error("Gift-card visibility lookup failed");
+    return new Set();
   }
 }
 
@@ -599,31 +630,48 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        if (vectorResults && Array.isArray(vectorResults.matches)) {
-          // Extract text snippets to provide context to the AI
-          contextSnippets = vectorResults.matches
-            .slice(0, 7)
-            .map((match) => {
-              const text = match?.metadata?.text ?? match?.id ?? "";
-              return typeof text === "string" ? cleanPromptText(text, 4_000) : "";
-            })
-            .filter(Boolean)
-            .join("\n\n")
-            .slice(0, 20_000);
-
-          // Extract product IDs for fetching full product data later
-          productIds = vectorResults.matches
-            .slice(0, 20)
-            .map((match) => match?.metadata?.productId)
-            .filter((id: unknown): id is string => typeof id === "string" && id.length <= 128)
-            .map((id: string) => cleanPromptText(id, 128));
-        }
       } else {
         console.warn("Vectorize or AI binding not available");
       }
     } catch {
       console.error("Vectorize query failed");
       // Continue without vector context if Vectorize fails
+    }
+
+    // === GIFT-CARD VISIBILITY (D-07, D-14) ===
+    // Volt is a listing surface, and Vectorize is not. Semantic search returns
+    // ids and catalogue copy with no idea what the store is currently selling,
+    // so with sell off a shopper can ask "what should I get someone as a gift?"
+    // and be handed the gift card — under both flags off, a card whose product
+    // page now 404s. The retrieved copy matters as much as the card: fed the
+    // gift-card text, the model will happily describe a product the store says
+    // does not exist. Both are filtered here, before the prompt is built.
+    const { giftCardAcquisition } = getStoreConfig().commerce.features;
+    const hiddenGiftCardIds = await hiddenGiftCardProductIds(giftCardAcquisition);
+
+    if (vectorResults && Array.isArray(vectorResults.matches)) {
+      const visibleMatches = vectorResults.matches.filter((match) => {
+        const id = match?.metadata?.productId;
+        return typeof id !== "string" || !hiddenGiftCardIds.has(id);
+      });
+
+      // Extract text snippets to provide context to the AI
+      contextSnippets = visibleMatches
+        .slice(0, 7)
+        .map((match) => {
+          const text = match?.metadata?.text ?? match?.id ?? "";
+          return typeof text === "string" ? cleanPromptText(text, 4_000) : "";
+        })
+        .filter(Boolean)
+        .join("\n\n")
+        .slice(0, 20_000);
+
+      // Extract product IDs for fetching full product data later
+      productIds = visibleMatches
+        .slice(0, 20)
+        .map((match) => match?.metadata?.productId)
+        .filter((id: unknown): id is string => typeof id === "string" && id.length <= 128)
+        .map((id: string) => cleanPromptText(id, 128));
     }
 
     const purchasedNames = await resolvePurchasedNames(orders);
@@ -787,8 +835,14 @@ ${userName !== "Guest" ? fenced("USER NAME", userName, 100) : ""}`;
           .from(products)
           .where(and(inArray(products.id, finalProductIds), eq(products.status, "active")));
 
+        // The authoritative filter: `products.type` on the hydrated row, the
+        // same signal every other listing surface keys on (D-08). The vector
+        // filter above cannot cover this, because the model's own bold-name
+        // picks never went through Vectorize.
+        const visibleResults = filterListedProducts(productResults, { giftCardAcquisition });
+
         // Fetch variants for each product and build complete Product objects
-        relatedProducts = await Promise.all(productResults.map(async (productRecord) => {
+        relatedProducts = await Promise.all(visibleResults.map(async (productRecord) => {
           try {
             // Get variants for this product
             const variants = await db

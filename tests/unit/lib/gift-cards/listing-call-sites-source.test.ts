@@ -6,12 +6,19 @@ const root = process.cwd();
 const read = (path: string) => readFileSync(join(root, path), 'utf8');
 
 /**
- * The nine public listing call sites this plan (13-02) routes through the
- * shared predicate. Every entry here must import from the visibility module
- * — none may re-derive `product.type === 'gift_card'` inline (T-13-07).
+ * The public listing call sites routed through the shared predicate. Every
+ * entry here must import from the visibility module — none may re-derive
+ * `product.type === 'gift_card'` inline (T-13-07).
+ *
+ * This list is hard-coded, which means it can only ever catch a call site
+ * that stops using the predicate, never one that was never added. `app/api/
+ * agent-chat/route.ts` was exactly that miss: D-07 names "Volt's product
+ * results", and Volt is the drawer a shopper actually talks to, but it
+ * hydrates from Drizzle directly and was not in the original nine.
  */
 const PUBLIC_LISTING_CALL_SITES = [
   'app/api/products/route.ts',
+  'app/api/agent-chat/route.ts',
   'app/page.tsx',
   'app/category/[slug]/page.tsx',
   'lib/recommendations/index.ts',
