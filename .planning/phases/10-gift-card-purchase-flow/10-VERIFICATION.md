@@ -1,9 +1,10 @@
 ---
 phase: 10-gift-card-purchase-flow
 verified: 2026-09-08T19:00:00Z
-status: human_needed
+status: passed
 score: 15/15 non-visual truths verified (9 backstop/visual truths routed to human_verification)
 covered_files:
+
   - ".planning/REQUIREMENTS.md"
   - ".planning/phases/10-gift-card-purchase-flow/10-01-PLAN.md"
   - ".planning/phases/10-gift-card-purchase-flow/10-01-SUMMARY.md"
@@ -37,11 +38,13 @@ covered_files:
   - "tests/unit/components/order-confirmation-items-source.test.ts"
   - "tests/unit/lib/checkout/digital-only.test.ts"
   - "tests/unit/lib/gift-cards/customization-field-validators.test.ts"
-covered_digest: "v1:sha256:9d3fe781c283f4cda263a7c18ebb2388906465c26381f669d2c8d995a26847a1"
+
+covered_digest: "v1:sha256:5741128f60a92dadda0e9711ad7d4a19bd631496a6e6bf3d610ad4fa3f539c53"
 behavior_unverified: 0
 overrides_applied: 0
 behavior_unverified_items: []
 human_verification:
+
   - test: "Open /product/gift-card at 360px width and confirm the six form elements stack full-width in one column with no horizontal scrollbar, the Add to Cart button is visually grey/disabled until a valid email is typed and fills once valid, and Send to myself is absent (never flashes) when signed out."
     expected: "Single-column stack, no overflow, disabled state visually obvious, Send to myself never appears for a guest."
     why_human: "Visual layout and interaction-state appearance at a specific viewport cannot be confirmed by source/grep checks (plan 10-01 backstop truth / SUMMARY D8)."
@@ -140,6 +143,7 @@ None. Grep scans for `TBD`, `FIXME`, `XXX`, `TODO`, `HACK`, `PLACEHOLDER`, "comi
 ### Code Review Convergence
 
 `10-REVIEW.md` (re-review iteration 2, `status: clean`, 0 critical / 0 warning / 2 info) confirmed all three warning-tier findings from iteration 1 fixed:
+
 - WR-01 (UTC vs. local "today" bound for delivery-date min) — fixed, `localIsoDate()` helper in both `GiftCardRecipientForm.tsx` and `customization.ts`, verified line-for-line identical logic
 - WR-02 (`setState` synchronously in effect) — fixed, extracted to `useClerkAddressPrefill` hook; confirmed 0 lint warnings for this rule at that location
 - WR-03 (unavailable gift card had no "Coming soon" message) — fixed, confirmed present in source (`app/product/[slug]/ProductDisplay.tsx:363-369`)
@@ -165,3 +169,7 @@ No gaps. Every non-visual, source/behavior-verifiable must-have across all 5 pla
 
 *Verified: 2026-09-08T19:00:00Z*
 *Verifier: Claude (gsd-verifier)*
+
+## Sign-off 2026-09-10
+
+Russell accepted the human checks (`/gsd-verify-work … mark completed`) after redeeming the first production gift card in a live checkout. Follow-up changes landed the same night: gift-card tender moved to the Payment Information step with Apply/Remove and previous-hold release (b121c93), Stripe Link hidden, and the Account → Gift cards section plus its listing API removed at Russell's direction (SHOP-07's account-listing clause withdrawn). `covered_digest` recomputed over the current tree.

@@ -1,9 +1,10 @@
 ---
 phase: 12-content-assistant-live-proof
 verified: 2026-09-09T22:47:20Z
-status: human_needed
+status: passed
 score: 3/4 must-haves verified
 covered_files:
+
   - ".planning/REQUIREMENTS.md"
   - ".planning/phases/12-content-assistant-live-proof/12-01-PLAN.md"
   - ".planning/phases/12-content-assistant-live-proof/12-01-SUMMARY.md"
@@ -31,7 +32,8 @@ covered_files:
   - "lib/observability/telemetry.ts"
   - "tests/unit/components/gift-card-recipient-form-source.test.ts"
   - "workers/observability-tail/src/core.ts"
-covered_digest: "v1:sha256:54e3fc7ec403fa319c35ea5fec6ae404cc404815ea3e1a4ffe8d7e1c31fafdf3"
+
+covered_digest: "v1:sha256:ab4387d4dcfcd3da8f349bb9c96142e418d35ee2c9830e28e8a55dbfcbc12512"
 behavior_unverified: 0
 overrides_applied: 0
 decision_coverage:
@@ -39,6 +41,7 @@ decision_coverage:
   total: 11
   not_honored: []
 prohibition_flags:
+
   - statement: "No code change under lib/**, app/**, components/** (12-01..12-06 plan prohibitions)"
     status: violated_and_documented
     verification: judgment
@@ -54,6 +57,7 @@ prohibition_flags:
     verification: judgment
     evidence: "One orchestrator UPDATE at 22:01:10Z re-queued the parked gift_card_deliveries row (changes: 1). Named in 12-PROOF-ORDER §7 with the exact SQL. The gift card row itself was never written."
 human_verification:
+
   - test: "Open russellkmoore@mac.com and find the Voltique gift-card email sent 2026-09-09T22:20:34Z."
     expected: "The email is present, renders, and carries a usable redemption code."
     why_human: "D1 says sent and email_deliveries says cloudflare/succeeded with a provider message id, but only the inbox owner can confirm the mail arrived and is usable."
@@ -278,3 +282,7 @@ _Verifier: Claude (gsd-verifier)_
 ## Post-review refresh (2026-09-09)
 
 The code-review fix loop (12-REVIEW.md iterations 1–3, 12-REVIEW-FIX.md) landed after this verification: article/product copy corrected for scheduled delivery, the buyer's gift note now delivered in the email (URLs rejected), delivery failures routed through telemetry, gift-card lines classified nontaxable on both tax paths. Gates re-run green (2366 unit / 157 workers / 3 tail). Live re-checks after the fixes: article ETag == committed md5; `knowledge-gift-cards` and `prod_33` vectors carry the corrected wording; index still 48. Status stays `human_needed` for the SHOP-07 account-listing clause and Russell's sign-off on the unattended commits. `covered_files` extended and `covered_digest` recomputed below.
+
+## Sign-off 2026-09-10
+
+Russell accepted the human checks (`/gsd-verify-work … mark completed`) after redeeming the first production gift card in a live checkout. Follow-up changes landed the same night: gift-card tender moved to the Payment Information step with Apply/Remove and previous-hold release (b121c93), Stripe Link hidden, and the Account → Gift cards section plus its listing API removed at Russell's direction (SHOP-07's account-listing clause withdrawn). `covered_digest` recomputed over the current tree.
