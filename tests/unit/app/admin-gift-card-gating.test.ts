@@ -171,7 +171,7 @@ describe("admin gift-card page with selling on and honoring off (WR-17)", () => 
     mocks.balancesMayExist.mockReturnValue(true);
 
     const text = textOf(GiftCardHonorBanner(
-      findBannerProps(await render()) as Parameters<typeof GiftCardHonorBanner>[0],
+      findBannerProps(await render()) as unknown as Parameters<typeof GiftCardHonorBanner>[0],
     ));
 
     expect(text).not.toContain("no outstanding balances");
@@ -185,7 +185,7 @@ describe("admin gift-card page with selling on and honoring off (WR-17)", () => 
     mocks.balancesMayExist.mockReturnValue(false);
 
     const text = textOf(GiftCardHonorBanner(
-      findBannerProps(await render()) as Parameters<typeof GiftCardHonorBanner>[0],
+      findBannerProps(await render()) as unknown as Parameters<typeof GiftCardHonorBanner>[0],
     ));
 
     expect(text).toContain("no outstanding balances");
