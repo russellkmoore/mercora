@@ -1,67 +1,77 @@
 /**
- * === Checkout Page Component ===
+ * === Checkout Page ===
  *
- * A server-side rendered checkout page that provides authentication
- * context and renders the checkout flow. Handles user authentication
- * state and passes it to the client-side checkout component.
+ * A server component whose only job is to resolve, once per request, the two
+ * things the checkout flow cannot work out for itself: whether gift-card
+ * balances are actually being honored right now, and where to hand off to the
+ * client.
  *
- * === Features ===
- * - **Server Authentication**: Uses Clerk for server-side auth checking
- * - **User Context**: Passes authenticated user ID to checkout flow
- * - **Clean Layout**: Consistent page structure with proper spacing
- * - **Responsive Design**: Mobile-first approach with desktop optimization
- * - **Security**: Server-side auth validation before checkout access
+ * === Why the honor value is resolved here ===
+ * The redemption panel used to be gated on `commerce.features.
+ * giftCardReconciliation`, the raw `STORE_FEATURE_GIFT_CARD_RECONCILIATION`
+ * env var. That flag is the *configured* value, and the honor guard exists
+ * precisely because the configured value can be wrong: with honor off and
+ * balances still outstanding, the server keeps honoring (D-04), the cron pages
+ * on-call every five minutes, and the admin banner names the total — while a
+ * shopper holding a card had no input to type it into. The panel has to follow
+ * the *effective* value, and only a server component can read it.
  *
- * === Technical Implementation ===
- * - **Server Component**: Leverages Next.js 14 app router for SSR
- * - **Clerk Integration**: Server-side authentication with auth() helper
- * - **Client Handoff**: Passes auth state to client-side checkout component
- * - **Layout Consistency**: Matches global page styling patterns
+ * A failed read means "keep honoring" (D-04). Showing a redemption input the
+ * server would have accepted is the correct failure; hiding one it would have
+ * accepted is not.
  *
- * === Authentication Flow ===
- * - Checks authentication status on server
- * - Passes userId (or null) to client component
- * - Client component handles authenticated vs guest checkout flows
- * - Maintains security boundaries between server and client
+ * === Why the client half is a separate file ===
+ * `dynamic(..., { ssr: false })` is a client-only construct, and the Stripe
+ * Elements tree still must not server-render. `CheckoutPageClient` keeps that
+ * boundary — and the client-side Clerk `useAuth()` read — exactly as it was.
  *
- * === Usage ===
- * Rendered at "/checkout" route for cart completion flow
- * 
- * @returns Server-rendered checkout page with auth context
+ * @returns Server-rendered checkout page with the effective honor decision
  */
 
-"use client";
-
-import dynamic from "next/dynamic";
-import { useAuth } from "@clerk/nextjs";
-
-// Dynamically import CheckoutClient with no SSR to prevent hydration issues
-const CheckoutClient = dynamic(
-  () => import("@/components/checkout/CheckoutClient"),
-  { 
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-foreground">Loading checkout...</div>
-      </div>
-    )
-  }
-);
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { honorIsEffectivelyOn } from "@/lib/gift-cards/honor-guard";
+import CheckoutPageClient from "./CheckoutPageClient";
 
 /**
- * Checkout page component with client-side authentication
- * 
- * @returns JSX element with checkout client component and auth context
+ * The guard is a per-request decision about money in flight. Caching it would
+ * let a shopper be shown a stale answer for the life of the cache entry.
  */
-export default function CheckoutPage() {
-  // Get authenticated user ID from Clerk on client-side
-  const { userId } = useAuth();
-  
+export const dynamic = "force-dynamic";
+
+function flagOn(value: unknown): boolean {
+  return String(value ?? "").trim().toLowerCase() === "true";
+}
+
+/**
+ * Whether redemption is live right now. Configured honor short-circuits
+ * without touching D1; configured-off reads the single `admin_settings` row the
+ * cron maintains — never a balance query on the request path (D-06).
+ */
+async function resolveHonorEffective(): Promise<boolean> {
+  try {
+    const { env } = await getCloudflareContext({ async: true });
+    const environment = env as unknown as Record<string, unknown> & { DB?: D1Database };
+    const configuredHonor = flagOn(environment.STORE_FEATURE_GIFT_CARD_RECONCILIATION);
+    if (configuredHonor) return true;
+    if (!environment.DB) return true;
+    return await honorIsEffectivelyOn(
+      environment.DB,
+      false,
+      Math.floor(Date.now() / 1_000),
+    );
+  } catch {
+    // Fail open: the server would still honor a code typed into the panel.
+    return true;
+  }
+}
+
+export default async function CheckoutPage() {
+  const honorEffective = await resolveHonorEffective();
+
   return (
     <div className="bg-surface-elevated text-foreground min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
       <div className="max-w-6xl mx-auto p-4 sm:p-6">
-        {/* Use dynamic import with SSR disabled to prevent hydration issues */}
-        <CheckoutClient userId={userId || null} />
+        <CheckoutPageClient honorEffective={honorEffective} />
       </div>
     </div>
   );

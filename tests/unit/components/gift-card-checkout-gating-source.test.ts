@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 const root = process.cwd();
 const cart = readFileSync(join(root, 'components/cart/CartItemCard.tsx'), 'utf8');
 const checkout = readFileSync(join(root, 'components/checkout/CheckoutClient.tsx'), 'utf8');
+const checkoutPage = readFileSync(join(root, 'app/checkout/page.tsx'), 'utf8');
+const checkoutPageClient = readFileSync(join(root, 'app/checkout/CheckoutPageClient.tsx'), 'utf8');
 
 /**
  * Comments are not behaviour. Every assertion below runs against the stripped
@@ -36,16 +38,53 @@ describe('gift-card checkout gating source contract (GCF-01, GCF-03, D-09, D-16)
     expect(source).not.toContain('giftCardReconciliation');
   });
 
-  it('renders the apply panel only inside a conditional on the honor flag', () => {
+  it('renders the apply panel only inside a conditional on the effective honor value', () => {
     const source = withoutComments(checkout);
-    expect(source).toMatch(/import \{[^}]*useStoreConfig[^}]*\} from ["']@\/lib\/store["']/);
-    expect(source).toMatch(/giftCardReconciliation[\s\S]{0,120}?<GiftCardApplyPanel/);
+    expect(source).toMatch(/honorEffective[\s\S]{0,120}?<GiftCardApplyPanel/);
     // Exactly one render site, so there is no second, ungated call site.
     expect((source.match(/<GiftCardApplyPanel/g) ?? []).length).toBe(1);
     expect(source).toMatch(/import GiftCardApplyPanel from/);
     // Sell must not reach this decision: a shopper holding a balance can still
     // redeem after the store stops selling (GCF-01, D-03).
     expect(source).not.toContain('giftCardAcquisition');
+  });
+
+  it('takes the honor decision as a prop rather than reading the configured flag', () => {
+    // CR-03: the configured flag is not the answer. With honor off and
+    // balances outstanding the server keeps accepting codes (D-04), so a panel
+    // gated on `commerce.features.giftCardReconciliation` disappears in exactly
+    // the state the guard exists for, leaving the shopper nowhere to type.
+    const source = withoutComments(checkout);
+    expect(source).toContain('honorEffective: boolean');
+    expect(source).not.toContain('giftCardReconciliation');
+    expect(source).not.toContain('useStoreConfig');
+  });
+
+  it('resolves the effective honor value on the server, once per request', () => {
+    const source = withoutComments(checkoutPage);
+    // A client component cannot read the guard row, so the page must be a
+    // server component that awaits it.
+    expect(source).not.toContain("'use client'");
+    expect(source).not.toContain('"use client"');
+    expect(source).toMatch(/import \{[^}]*honorIsEffectivelyOn[^}]*\} from ["']@\/lib\/gift-cards\/honor-guard["']/);
+    expect(source).toMatch(/await honorIsEffectivelyOn\(/);
+    // Per request, not per build: a cached decision could show a stale answer
+    // about money in flight.
+    expect(source).toMatch(/export const dynamic = ["']force-dynamic["']/);
+    // Failure to read the guard means "keep honoring" (D-04): the server would
+    // still accept a code typed into the panel.
+    expect(source).toMatch(/catch[\s\S]{0,80}?return true/);
+  });
+
+  it('keeps the Stripe tree behind the no-SSR dynamic import', () => {
+    // Moving the page to the server must not start server-rendering Elements.
+    const source = withoutComments(checkoutPageClient);
+    expect(source).toMatch(/["']use client["']/);
+    expect(source).toMatch(/ssr:\s*false/);
+    expect(source).toMatch(/dynamic\(\s*\(\)\s*=>\s*import\(["']@\/components\/checkout\/CheckoutClient["']\)/);
+    // The value only passes through; it is never re-derived on the client.
+    expect(source).toContain('honorEffective={honorEffective}');
+    expect(source).not.toContain('useStoreConfig');
   });
 
   it('says nothing in place of the panel when honoring is off', () => {

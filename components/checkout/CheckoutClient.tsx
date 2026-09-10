@@ -22,7 +22,7 @@
  *
  * === Usage ===
  * ```tsx
- * <CheckoutClient userId={userId} />
+ * <CheckoutClient userId={userId} honorEffective={honorEffective} />
  * ```
  */
 
@@ -49,10 +49,19 @@ import {
   isDigitalOnlyCart,
 } from '@/lib/checkout/digital-only';
 import type { StableCartItem } from '@/lib/types/cartitem';
-import { useStoreConfig } from '@/lib/store';
 
 interface CheckoutClientProps {
   userId: string | null;
+  /**
+   * Whether gift-card balances are being honored right now. This is the
+   * *effective* value the checkout page resolved from the honor guard, not the
+   * configured `STORE_FEATURE_GIFT_CARD_RECONCILIATION` flag: with honor
+   * configured off but balances still outstanding the server keeps accepting
+   * codes (D-04), and the shopper holding one of those cards needs somewhere
+   * to type it. Gating on the raw flag hid the panel in exactly the state the
+   * guard exists to protect.
+   */
+  honorEffective: boolean;
 }
 
 type CheckoutStep = 'shipping' | 'payment' | 'confirmation';
@@ -87,7 +96,7 @@ function useClerkAddressPrefill(
   }, [isLoaded, isSignedIn, user, setAddress]);
 }
 
-export default function CheckoutClient({ userId }: CheckoutClientProps) {
+export default function CheckoutClient({ userId, honorEffective }: CheckoutClientProps) {
   const {
     items,
     shippingAddress,
@@ -101,8 +110,6 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
     clearCart,
   } = useCartStore();
 
-  // Honor governs redemption. With it off the panel is simply absent (D-16).
-  const { commerce } = useStoreConfig();
 
   // The cart's fulfilment mix, derived once per render (D-01, D-02).
   const isDigitalOnly = isDigitalOnlyCart(items);
@@ -510,7 +517,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
           {currentStep === 'payment' && clientSecret && (
             <div className="bg-surface-elevated p-4 sm:p-6 rounded-xl w-full min-h-[400px]">
               <h3 className="text-lg font-semibold mb-4 text-foreground">Payment Information</h3>
-              {commerce.features.giftCardReconciliation && (
+              {honorEffective && (
                 <GiftCardApplyPanel
                   value={giftCardToken}
                   onChange={setGiftCardToken}

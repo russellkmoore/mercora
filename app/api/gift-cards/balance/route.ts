@@ -4,6 +4,7 @@ import { toWireMoney } from '@/lib/money';
 import { parseGiftCardCodeKeyRing } from '@/lib/gift-cards/config';
 import { giftCardLookupCandidates } from '@/lib/gift-cards/code';
 import { createGiftCardRepository } from '@/lib/gift-cards/repository';
+import { honorIsEffectivelyOn } from '@/lib/gift-cards/honor-guard';
 import { enforceRateLimit, getClientIp } from '@/lib/rate-limit';
 import { isBoundedString, isPlainRecord } from '@/lib/public-request-validation';
 
@@ -32,7 +33,20 @@ export async function POST(request: NextRequest) {
     }
     // Existing-card redemption and balance checks remain available during a
     // sales rollback; only new issuance is controlled by acquisition.
-    if (!giftCardReconciliation || !raw.DB) {
+    //
+    // The *effective* honor value, not the configured flag. With honor off and
+    // balances still outstanding the runtime keeps redeeming and settling
+    // (D-04), so answering `{ valid: false }` for a card the checkout would
+    // accept is a lie to the one shopper the guard exists for. Configured-on
+    // short-circuits inside `honorIsEffectivelyOn` without reading D1, and any
+    // failure reading the guard row answers "keep honoring".
+    if (!raw.DB) return NextResponse.json({ valid: false });
+    const honorEffective = await honorIsEffectivelyOn(
+      raw.DB,
+      giftCardReconciliation,
+      Math.floor(Date.now() / 1_000),
+    );
+    if (!honorEffective) {
       return NextResponse.json({ valid: false });
     }
     const keyRing = parseGiftCardCodeKeyRing(raw);
