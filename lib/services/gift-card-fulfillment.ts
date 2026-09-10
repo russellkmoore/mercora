@@ -1,14 +1,24 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { Money } from '@/lib/money';
 import { createGiftCardRepository } from '@/lib/gift-cards/repository';
-import { digestGiftCardCode, generateGiftCardCode, type GiftCardKeyRing } from '@/lib/gift-cards/code';
+import {
+  digestGiftCardCode,
+  generateGiftCardCode,
+  giftCardCodeSuffix,
+  type GiftCardKeyRing,
+} from '@/lib/gift-cards/code';
 import {
   decryptGiftCardDeliveryCode,
   encryptGiftCardDeliveryCode,
   type GiftCardEncryptionKeyRing,
 } from '@/lib/gift-cards/encryption';
 import { parseGiftCardCodeKeyRing, parseGiftCardDeliveryKeyRing } from '@/lib/gift-cards/config';
-import { GIFT_CARD_MESSAGE_MAX_LENGTH } from '@/lib/gift-cards/customization';
+import { assertGiftCardId, assertGiftCardMoney } from '@/lib/gift-cards/domain';
+import {
+  GIFT_CARD_MESSAGE_MAX_LENGTH,
+  parseGiftCardCustomization,
+  validateGiftCardRecipientEmail,
+} from '@/lib/gift-cards/customization';
 import { isGiftCardOrderLine } from '@/lib/gift-cards/checkout';
 import { sendEmail, type EmailSendOptions } from '@/lib/email/sender';
 import { getStoreConfig } from '@/lib/store-config';
@@ -136,8 +146,17 @@ function scheduledDeliverAfter(deliveryDate: string | undefined): number {
   return Math.floor(Date.UTC(year, month - 1, day) / 1_000);
 }
 
-async function stableId(prefix: string, orderId: string, lineId: string): Promise<string> {
-  const bytes = new TextEncoder().encode(`${prefix}\u0000v1\u0000${orderId}\u0000${lineId}`);
+/**
+ * Deterministic id derivation shared by every gift-card issuance path.
+ * Existing callers pass two discriminators (orderId, lineId); admin-create
+ * (D-07, D-19) passes one (a request id). Widened to variadic rather than
+ * adding a second helper, so there is exactly one derivation in this file:
+ * `parts.join('\u0000')` over the original two-argument shape reproduces
+ * `${orderId}\u0000${lineId}` exactly, so every existing call site's
+ * output is byte-identical to before.
+ */
+async function stableId(prefix: string, ...parts: string[]): Promise<string> {
+  const bytes = new TextEncoder().encode(`${prefix}\u0000v1\u0000${parts.join('\u0000')}`);
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
   return `${prefix}_${Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
 }
@@ -276,13 +295,26 @@ export interface IssueAdminGiftCardResult {
 }
 
 /**
- * RED scaffold (Task 1, 14-05) — replaced by the real implementation in
- * GREEN. Deliberately does not validate or write anything, so every RED
- * assertion fails for the actual missing behavior rather than vacuously
- * (an unconditional throw would make the "invalid amount rejects" case pass
- * for the wrong reason).
+ * D-07: the ceiling on an amount admin-create can mint. There is no
+ * STORE_GIFT_CARD_MAX_MINOR constant anywhere in this repository, so this is
+ * D-07's stated fallback — the gift-card product's highest configured
+ * denomination (the "Voltique Gift Card" product `prod_33`, variant
+ * `variant_33`, $200 = 20,000 minor units — see data/d1/seed.sql).
  */
-export async function issueAdminGiftCard(_args: {
+const GIFT_CARD_ADMIN_ISSUE_MAX_MINOR = 20_000;
+
+/**
+ * D-07/D-19: issue a gift card with no order behind it, through the exact
+ * machinery `issueLine` uses for a purchased one — same code generation, same
+ * AAD-bound encryption, same `issueAccount` call, same pending-delivery row
+ * the existing cron drain later claims and sends with no change to the
+ * drain. `issueAccount` derives its own `issuance_business_key` from the id
+ * it is given (RESEARCH Pitfall 2), so idempotency here comes from a
+ * deterministic card id derived from the caller's `requestId`: the same
+ * `requestId` always re-derives the same id, and `findAccountById`
+ * short-circuits a retry the same way `issueLine` does.
+ */
+export async function issueAdminGiftCard(args: {
   requestId: string;
   amount: Money;
   recipientEmail: string;
@@ -290,7 +322,60 @@ export async function issueAdminGiftCard(_args: {
   environment: GiftCardFulfillmentEnvironment;
   now?: number;
 }): Promise<IssueAdminGiftCardResult> {
-  return { giftCardId: 'issue-admin-gift-card-not-implemented', created: false };
+  assertGiftCardId(args.requestId, 'gift-card admin request id');
+  if (!args.environment.DB) throw new Error('Gift-card database is unavailable');
+  const database = args.environment.DB;
+  const repository = createGiftCardRepository(database);
+  const now = args.now ?? epochSeconds();
+
+  const giftCardId = await stableId('gift_card_admin', args.requestId);
+  const existing = await repository.findAccountById(giftCardId);
+  if (existing) return { giftCardId, created: false };
+
+  assertGiftCardMoney(args.amount, { positive: true });
+  if (args.amount.toMinorUnits() > GIFT_CARD_ADMIN_ISSUE_MAX_MINOR) {
+    throw new RangeError('Gift-card admin issuance amount exceeds the configured maximum');
+  }
+  // Reuses the same whole-object validator checkout uses (parseGiftCardCustomization)
+  // rather than a second email regex; it also normalizes (trims, lowercases) the
+  // address the same way a checkout-issued card's recipient is normalized.
+  const recipient = parseGiftCardCustomization({
+    recipientEmail: args.recipientEmail,
+    ...(args.recipientName ? { recipientName: args.recipientName } : {}),
+  });
+
+  const deliveryId = await stableId('gift_delivery_admin', args.requestId);
+  const code = generateGiftCardCode();
+  try {
+    const codeHash = await digestGiftCardCode(code, parseGiftCardCodeKeyRing(args.environment));
+    if (!codeHash) throw new Error('Generated gift-card code is invalid');
+    const encrypted = await encryptGiftCardDeliveryCode({
+      giftCardId, deliveryId, code, keyRing: parseGiftCardDeliveryKeyRing(args.environment),
+    });
+    await repository.issueAccount({
+      id: giftCardId,
+      codeHash,
+      amount: args.amount,
+      createdAt: now,
+      codeSuffix: giftCardCodeSuffix(code) ?? undefined,
+      delivery: {
+        id: deliveryId,
+        recipientEmail: recipient.recipientEmail,
+        ...(recipient.recipientName ? { recipientName: recipient.recipientName } : {}),
+        emailIdempotencyKey: `gift-card-delivery/${giftCardId}/v1`,
+        codeCiphertext: encrypted.ciphertext,
+        codeNonce: encrypted.nonce,
+        codeKeyVersion: encrypted.keyVersion,
+        // deliverAfter intentionally unset (defaults to 0): an admin-created
+        // card sends immediately once the cron drain next runs, exactly like
+        // an unscheduled checkout purchase.
+      },
+    });
+  } finally {
+    // Strings cannot be reliably zeroized in JS; keep this scope minimal and
+    // never return, store, log, or attach the bearer code to an error.
+  }
+  return { giftCardId, created: true };
 }
 
 async function deliverOne(args: {
