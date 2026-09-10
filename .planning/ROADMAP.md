@@ -171,8 +171,16 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 15-01-PLAN.md — Extract the shared AddressForm and saveAddress helper; refactor AddressManager (SUB-02)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 15-02-PLAN.md — Sentinel select option, AddAddressDialog, post-save refresh and pre-select (SUB-01, SUB-03)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 15-03-PLAN.md — Gate suite, scope assertions, deploy, read-only production check, human list
 
 **UI hint**: yes
