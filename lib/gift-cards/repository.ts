@@ -383,8 +383,9 @@ export function createGiftCardRepository(database: D1Database) {
         database.prepare(`INSERT INTO gift_card_accounts (
           id, code_hash, code_hash_version, currency_code, status,
           issuance_entry_id, issuance_business_key, issued_amount_minor,
-          issued_order_id, issued_line_id, purchaser_customer_id, created_at, disabled_at
-        ) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, NULL)
+          issued_order_id, issued_line_id, purchaser_customer_id, created_at, disabled_at,
+          code_suffix
+        ) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, NULL, ?)
         ON CONFLICT DO NOTHING`).bind(
           input.id,
           input.codeHash.digest,
@@ -397,6 +398,7 @@ export function createGiftCardRepository(database: D1Database) {
           input.issuedLineId ?? null,
           input.purchaserCustomerId ?? null,
           input.createdAt,
+          input.codeSuffix ?? null,
         ),
         database.prepare(`INSERT INTO gift_card_ledger_entries (
           id, gift_card_id, currency_code, entry_type, amount_delta_minor,

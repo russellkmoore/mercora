@@ -90,6 +90,8 @@ export interface IssueGiftCardInput {
   issuedLineId?: string;
   purchaserCustomerId?: string;
   createdAt: number;
+  /** Display/search material only (D-02) — the last four characters of the code. */
+  codeSuffix?: string;
   delivery?: {
     id: string;
     recipientEmail: string;
@@ -186,6 +188,54 @@ export function giftCardRestorationBusinessKey(redemptionEntryId: string, refund
   return key;
 }
 
+/** D-06: the business key for the negative adjustment that drains a reissued card. */
+export function giftCardReissueAdjustmentBusinessKey(oldGiftCardId: string): string {
+  assertGiftCardId(oldGiftCardId, "gift-card id");
+  const key = `gift-card-reissue-out/${oldGiftCardId}`;
+  assertGiftCardBusinessKey(key);
+  return key;
+}
+
+/**
+ * D-19: `issueAccount` derives its own `issuance_business_key` from the id it is
+ * given, so reissue idempotency comes from a deterministic new-card id instead of
+ * a custom business key. Same old card id always yields the same new card id;
+ * different old ids never collide (SHA-256 over a purpose-scoped, versioned
+ * message, same style as `stableId` in
+ * `lib/services/gift-card-fulfillment.ts`).
+ */
+export async function giftCardReissueId(oldGiftCardId: string): Promise<string> {
+  assertGiftCardId(oldGiftCardId, "gift-card id");
+  const bytes = new TextEncoder().encode(`gift-card-reissue/v1/${oldGiftCardId}`);
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  const hex = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const id = `gift_card_reissue_${hex}`;
+  assertGiftCardId(id, "gift-card reissue id");
+  return id;
+}
+
+// Uppercase symbols with the most common lookalike pairs removed: 0/O and 1/I.
+// Mirrors CODE_ALPHABET_PATTERN in ./code.ts (not exported there); the suffix
+// is display/search material sliced from a code generated with that alphabet.
+const GIFT_CARD_CODE_SUFFIX_PATTERN = /^[23456789A-HJ-NP-Z]{4}$/;
+
+/** D-02: the last four characters of a gift-card code, uppercase, alphabet-restricted. */
+export function assertGiftCardCodeSuffix(value: unknown): asserts value is string {
+  assertBoundedText(value, "gift-card code suffix", 4, 4);
+  if (!GIFT_CARD_CODE_SUFFIX_PATTERN.test(value)) {
+    throw new TypeError("gift-card code suffix must be four characters from the gift-card code alphabet");
+  }
+}
+
+/**
+ * Shared bounds check for the phase's free-text admin inputs: a disable reason
+ * (D-05, max 500), an admin-create reason (D-07, max 500), and a note (D-11,
+ * max 2000). Callers supply the label and the maximum; minimum is always 1.
+ */
+export function assertGiftCardReason(value: unknown, label: string, maximum: number): asserts value is string {
+  assertBoundedText(value, label, 1, maximum);
+}
+
 export function assertIssueGiftCardInput(input: IssueGiftCardInput): void {
   assertGiftCardId(input.id);
   assertGiftCardCodeHash(input.codeHash);
@@ -200,6 +250,9 @@ export function assertIssueGiftCardInput(input: IssueGiftCardInput): void {
   }
   if (input.purchaserCustomerId !== undefined) {
     assertGiftCardId(input.purchaserCustomerId, "gift-card purchaser customer id");
+  }
+  if (input.codeSuffix !== undefined) {
+    assertGiftCardCodeSuffix(input.codeSuffix);
   }
   if (input.delivery !== undefined) {
     assertGiftCardId(input.delivery.id, 'gift-card delivery id');
