@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { checkAdminPermissions } from '@/lib/auth/admin-middleware';
 import { actorFrom, giftCardAdminFlags, jsonError, readBoundedJsonBody } from '@/lib/gift-cards/admin-http';
 import { assertGiftCardReason } from '@/lib/gift-cards/domain';
-import { appendGiftCardEvent } from '@/lib/gift-cards/events';
 import { resolveHonorEffective } from '@/lib/gift-cards/honor-guard';
 import { listAdminGiftCardPresentations } from '@/lib/gift-cards/presentations';
 import { giftCardSurfacesHidden } from '@/lib/gift-cards/visibility';
@@ -91,7 +90,9 @@ export async function GET(request: NextRequest) {
 /**
  * D-07/D-13/D-19: create a card by hand with a required, audited reason. The
  * client-supplied `requestId` is what makes a double-submit converge on one
- * card — `issueAdminGiftCard` derives the new card's id from it.
+ * card — `issueAdminGiftCard` derives the new card's id from it, and writes
+ * the `admin_created` event in the same batch as the card (A-3), so this
+ * route never appends an event of its own.
  */
 export async function POST(request: NextRequest) {
   const auth = await checkAdminPermissions(request);
@@ -179,6 +180,8 @@ export async function POST(request: NextRequest) {
         amount,
         recipientEmail,
         ...(typeof recipientName === 'string' && recipientName.trim() ? { recipientName } : {}),
+        actor: actorFrom(auth),
+        reason,
         environment,
         now: nowSeconds,
       });
@@ -191,19 +194,6 @@ export async function POST(request: NextRequest) {
         return jsonError('invalid_body', error.message, 400);
       }
       throw error;
-    }
-
-    if (result.created) {
-      // D-07: the audit event carries the reason, amount, and recipient — and
-      // nothing else — written once, only for a genuinely new card. An
-      // idempotent retry (created: false) must not duplicate the event.
-      await appendGiftCardEvent({
-        giftCardId: result.giftCardId,
-        eventType: 'admin_created',
-        actor: actorFrom(auth),
-        details: { reason, amount_minor: amountMinor, recipient_email: recipientEmail },
-        createdAt: nowSeconds,
-      });
     }
 
     return NextResponse.json(

@@ -14,7 +14,8 @@ import {
   type GiftCardEncryptionKeyRing,
 } from '@/lib/gift-cards/encryption';
 import { parseGiftCardCodeKeyRing, parseGiftCardDeliveryKeyRing } from '@/lib/gift-cards/config';
-import { assertGiftCardId, assertGiftCardMoney } from '@/lib/gift-cards/domain';
+import { assertGiftCardId, assertGiftCardMoney, assertGiftCardReason } from '@/lib/gift-cards/domain';
+import type { Actor } from '@/lib/fulfillment/types';
 import {
   GIFT_CARD_MESSAGE_MAX_LENGTH,
   parseGiftCardCustomization,
@@ -340,16 +341,27 @@ export async function resolveGiftCardAdminIssueMaxMinor(
  * deterministic card id derived from the caller's `requestId`: the same
  * `requestId` always re-derives the same id, and `findAccountById`
  * short-circuits a retry the same way `issueLine` does.
+ *
+ * A-3: the `admin_created { reason, amount_minor, recipient_email }` audit
+ * row (D-07) is written in the same D1 batch as the account, its issuance
+ * ledger entry and its delivery row, through `issueAccountWithEvents`, so an
+ * admin-created card can never exist without the event naming who made it
+ * and why — a failure anywhere in the batch leaves neither.
  */
 export async function issueAdminGiftCard(args: {
   requestId: string;
   amount: Money;
   recipientEmail: string;
   recipientName?: string;
+  /** Who is creating the card; lands on the `admin_created` event. */
+  actor: Actor;
+  /** D-07: required, 1-500 characters; lands on the `admin_created` event. */
+  reason: string;
   environment: GiftCardFulfillmentEnvironment;
   now?: number;
 }): Promise<IssueAdminGiftCardResult> {
   assertGiftCardId(args.requestId, 'gift-card admin request id');
+  assertGiftCardReason(args.reason, 'gift-card admin-create reason', 500);
   if (!args.environment.DB) throw new Error('Gift-card database is unavailable');
   const database = args.environment.DB;
   const repository = createGiftCardRepository(database);
@@ -381,7 +393,7 @@ export async function issueAdminGiftCard(args: {
   const encrypted = await encryptGiftCardDeliveryCode({
     giftCardId, deliveryId, code, keyRing: parseGiftCardDeliveryKeyRing(args.environment),
   });
-  await repository.issueAccount({
+  await repository.issueAccountWithEvents({
     id: giftCardId,
     codeHash,
     amount: args.amount,
@@ -399,7 +411,16 @@ export async function issueAdminGiftCard(args: {
       // card sends immediately once the cron drain next runs, exactly like
       // an unscheduled checkout purchase.
     },
-  });
+  }, [{
+    eventType: 'admin_created',
+    actor: args.actor,
+    details: {
+      reason: args.reason,
+      amount_minor: args.amount.toMinorUnits(),
+      recipient_email: recipient.recipientEmail,
+    },
+    createdAt: now,
+  }]);
   return { giftCardId, created: true };
 }
 

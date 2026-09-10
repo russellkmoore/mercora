@@ -76,6 +76,17 @@ interface BalanceRow {
   held_amount_minor: number;
 }
 
+/** An audit row written inside an issuance batch (see `issueAccountWithEvents`). */
+export interface GiftCardBatchedEvent {
+  eventType: GiftCardEventType;
+  actor: Actor;
+  details: Record<string, unknown>;
+  /** Defaults to the issuance's `createdAt`. */
+  createdAt?: number;
+  /** Defaults to true: skip the INSERT if the card already has this event type. */
+  onceOnly?: boolean;
+}
+
 export class GiftCardConflictError extends Error {}
 export class GiftCardUnavailableError extends Error {}
 
@@ -725,6 +736,8 @@ export function createGiftCardRepository(database: D1Database) {
    * row `appendGiftCardEvent` (`./events`) writes, but as a prepared statement
    * so it can share a transaction with the money it describes. Details are
    * run through the same forbidden-key check before binding (D-03/D-14).
+   * `onceOnly` makes the INSERT a no-op when the card already carries an
+   * event of that type, so an idempotent issuance retry cannot double it.
    */
   const giftCardEventStatement = (args: {
     giftCardId: string;
@@ -732,11 +745,11 @@ export function createGiftCardRepository(database: D1Database) {
     actor: Actor;
     details: Record<string, unknown>;
     createdAt: number;
+    onceOnly?: boolean;
   }): D1PreparedStatement => {
     assertGiftCardEventDetails(args.details);
-    return database.prepare(`INSERT INTO gift_card_events (
-      id, gift_card_id, event_type, actor_type, actor_id, details, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)`).bind(
+    assertGiftCardActor(args.actor);
+    const values = [
       crypto.randomUUID(),
       args.giftCardId,
       args.eventType,
@@ -744,7 +757,46 @@ export function createGiftCardRepository(database: D1Database) {
       args.actor.id,
       JSON.stringify(args.details),
       args.createdAt,
-    );
+    ];
+    if (args.onceOnly) {
+      return database.prepare(`INSERT INTO gift_card_events (
+        id, gift_card_id, event_type, actor_type, actor_id, details, created_at
+      ) SELECT ?, ?, ?, ?, ?, ?, ?
+      WHERE NOT EXISTS (
+        SELECT 1 FROM gift_card_events existing
+        WHERE existing.gift_card_id = ? AND existing.event_type = ?
+      )`).bind(...values, args.giftCardId, args.eventType);
+    }
+    return database.prepare(`INSERT INTO gift_card_events (
+      id, gift_card_id, event_type, actor_type, actor_id, details, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)`).bind(...values);
+  };
+
+  /**
+   * A-3: an issuance whose audit events land in the same D1 batch as the
+   * account, ledger and delivery rows, so a card can never exist without the
+   * event that says where it came from (`admin_created`), nor the event
+   * without the card. Same shape `reissue` uses for its pair.
+   */
+  const issueAccountWithEvents = async (
+    input: IssueGiftCardInput,
+    events: readonly GiftCardBatchedEvent[],
+  ): Promise<{ created: boolean; account: GiftCardAccount; issuance: GiftCardLedgerEntry }> => {
+    assertIssueGiftCardInput(input);
+    const businessKey = giftCardIssuanceBusinessKey(input.id);
+    const result = await database.batch([
+      ...issueAccountStatements(input, businessKey),
+      ...events.map((event) => giftCardEventStatement({
+        giftCardId: input.id,
+        eventType: event.eventType,
+        actor: event.actor,
+        details: event.details,
+        createdAt: event.createdAt ?? input.createdAt,
+        onceOnly: event.onceOnly ?? true,
+      })),
+    ]);
+    const { account, issuance } = await verifyIssuedAccount(input, businessKey);
+    return { created: (result[0]?.meta.changes ?? 0) === 1, account, issuance };
   };
 
   /**
@@ -916,6 +968,7 @@ export function createGiftCardRepository(database: D1Database) {
     },
 
     issueAccount,
+    issueAccountWithEvents,
     readBalance,
     disableAccount,
     findDeliveryByGiftCardId,
