@@ -3,7 +3,11 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import GiftCardQueue from "@/components/admin/GiftCardQueue";
 import GiftCardHonorBanner from "@/components/admin/GiftCardHonorBanner";
 import { giftCardSurfacesHidden } from "@/lib/gift-cards/visibility";
-import { readHonorGuard, resolveHonorEffective } from "@/lib/gift-cards/honor-guard";
+import {
+  balancesMayExist,
+  readHonorGuard,
+  resolveHonorEffective,
+} from "@/lib/gift-cards/honor-guard";
 
 function flagOn(value: unknown): boolean {
   return String(value ?? "").trim().toLowerCase() === "true";
@@ -27,25 +31,35 @@ export default async function AdminGiftCardsPage() {
   const giftCardAcquisition = flagOn(environment.STORE_FEATURE_GIFT_CARD_ACQUISITION);
   const giftCardReconciliation = flagOn(environment.STORE_FEATURE_GIFT_CARD_RECONCILIATION);
 
-  // Two reads, deliberately. The record is for *display* — the banner names
-  // the total and the reservation count — and the decision comes from
-  // `resolveHonorEffective`, the single owner of it (D-18). Deriving the
-  // decision from the record here instead would put a fifth implementation of
-  // it in the tree, which is what CR-05 came out of.
+  // Two questions that look like one, and conflating them told an operator the
+  // opposite of the truth in the state they most need it.
+  //
+  // **Does this page exist?** That is the money decision, and
+  // `resolveHonorEffective` is its single owner (D-18). It is what the 404 gate
+  // reads.
+  //
+  // **What does the banner say?** That is a *display* fact, and it has to come
+  // from the record, because `resolveHonorEffective` deliberately answers
+  // "no" for sell-on/honor-off **without reading the guard** — that
+  // short-circuit is what protects GCF-04. Feeding that "no" to the banner made
+  // it print "the last measurement found no outstanding balances" on a store
+  // that is selling cards it cannot redeem and may well owe money. The page had
+  // the record in hand and ignored it.
   //
   // Fail open on a read error, exactly as `/api/admin/gift-cards` does.
   // Without the catch a D1 error propagates out of this server component and
   // 500s the page — and this is the page an operator opens when gift-card
   // money is already in a state they need to see. `null` is the shape the
-  // banner reads as "measurement unavailable".
+  // banner reads as "measurement unavailable", which is honest.
   const flags = { giftCardAcquisition, giftCardReconciliation };
   const guardRecord = !giftCardReconciliation && environment.DB
     ? await readHonorGuard(environment.DB).catch(() => null)
     : null;
   const guardActive = !giftCardReconciliation
-    && await resolveHonorEffective(environment.DB, flags, currentSeconds());
+    && balancesMayExist(guardRecord, currentSeconds());
 
-  if (giftCardSurfacesHidden(flags) && !guardActive) {
+  if (giftCardSurfacesHidden(flags)
+    && !await resolveHonorEffective(environment.DB, flags, currentSeconds())) {
     notFound();
   }
 

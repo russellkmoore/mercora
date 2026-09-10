@@ -11,14 +11,17 @@ vi.mock("next/navigation", () => ({
 const mocks = vi.hoisted(() => ({
   context: vi.fn(),
   readHonorGuard: vi.fn(),
+  balancesMayExist: vi.fn(),
   resolveHonorEffective: vi.fn(),
 }));
 
 vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext: mocks.context }));
-// The page reads the record for *display* and asks `resolveHonorEffective` for
-// the decision (D-18). Both are stubbed here; both are collaborators.
+// Three collaborators, and the split matters: `resolveHonorEffective` answers
+// "does this page exist" (D-18), while `balancesMayExist` reads the record the
+// banner displays. They deliberately disagree in sell-on/honor-off.
 vi.mock("@/lib/gift-cards/honor-guard", () => ({
   readHonorGuard: mocks.readHonorGuard,
+  balancesMayExist: mocks.balancesMayExist,
   resolveHonorEffective: mocks.resolveHonorEffective,
   HONOR_GUARD_STALE_SECONDS: 900,
   HONOR_GUARD_MIXED_CURRENCY: "MIXED",
@@ -63,6 +66,7 @@ function findBannerProps(node: unknown): Record<string, unknown> | undefined {
 beforeEach(() => {
   mocks.context.mockResolvedValue({ env: { DB: {} } });
   mocks.readHonorGuard.mockResolvedValue(RECORD);
+  mocks.balancesMayExist.mockReturnValue(false);
   mocks.resolveHonorEffective.mockResolvedValue(false);
 });
 
@@ -79,6 +83,7 @@ describe("admin gift-card page gating (D-17)", () => {
 
   it("renders with the banner wired to the guard record when honoring is off and the guard is active", async () => {
     mocks.context.mockResolvedValue({ env: { DB: {} } });
+    mocks.balancesMayExist.mockReturnValue(true);
     mocks.resolveHonorEffective.mockResolvedValue(true);
     const tree = await render();
     const bannerProps = findBannerProps(tree);
@@ -91,6 +96,7 @@ describe("admin gift-card page gating (D-17)", () => {
     // that page. `/api/admin/gift-cards` already swallows the same error.
     mocks.context.mockResolvedValue({ env: { DB: {} } });
     mocks.readHonorGuard.mockRejectedValue(new Error("D1_ERROR: no such table"));
+    mocks.balancesMayExist.mockReturnValue(true);
     mocks.resolveHonorEffective.mockResolvedValue(true);
 
     const tree = await render();
@@ -123,6 +129,66 @@ describe("admin gift-card page gating (D-17)", () => {
     expect(filterBody).toContain("/admin/gift-cards");
     expect(filterBody).toContain("giftCardAcquisition");
     expect(filterBody).toContain("giftCardReconciliation");
+  });
+});
+
+describe("admin gift-card page with selling on and honoring off (WR-17)", () => {
+  // The invalid configuration (GCF-04). Every checkout is throwing, which is
+  // why an operator is on this page at all, and the WR-12 decision keeps the
+  // admin surfaces open here precisely so they can see what is outstanding.
+  function sellingWithoutHonoring() {
+    mocks.context.mockResolvedValue({
+      env: { DB: {}, STORE_FEATURE_GIFT_CARD_ACQUISITION: "true" },
+    });
+    // What the real function returns in this state, and why it must: it
+    // short-circuits on the sell flag *without reading the guard*, which is
+    // what protects GCF-04. That answer is about the 404 gate, not about money.
+    mocks.resolveHonorEffective.mockResolvedValue(false);
+  }
+
+  it("renders rather than 404ing, because a gift-card surface still exists", async () => {
+    sellingWithoutHonoring();
+    mocks.balancesMayExist.mockReturnValue(true);
+
+    await expect(render()).resolves.toBeDefined();
+  });
+
+  it("takes the banner's signal from the record, not from the 404 decision", async () => {
+    // The regression: reusing resolveHonorEffective as the display signal made
+    // the banner print "the last measurement found no outstanding balances" on
+    // a store that may well owe money. The page has the record in hand.
+    sellingWithoutHonoring();
+    mocks.balancesMayExist.mockReturnValue(true);
+
+    const bannerProps = findBannerProps(await render());
+
+    expect(bannerProps).toEqual({ record: RECORD, honorConfigured: false, guardActive: true });
+    expect(mocks.balancesMayExist).toHaveBeenCalledWith(RECORD, expect.any(Number));
+  });
+
+  it("does not tell an operator the store owes nothing while the record says otherwise", async () => {
+    sellingWithoutHonoring();
+    mocks.balancesMayExist.mockReturnValue(true);
+
+    const text = textOf(GiftCardHonorBanner(
+      findBannerProps(await render()) as Parameters<typeof GiftCardHonorBanner>[0],
+    ));
+
+    expect(text).not.toContain("no outstanding balances");
+    expect(text).toContain("keep being honored regardless");
+  });
+
+  it("still goes quiet when the record genuinely reads clear", async () => {
+    // The quiet state has to remain reachable, or the fix just trades one
+    // wrong answer for another.
+    sellingWithoutHonoring();
+    mocks.balancesMayExist.mockReturnValue(false);
+
+    const text = textOf(GiftCardHonorBanner(
+      findBannerProps(await render()) as Parameters<typeof GiftCardHonorBanner>[0],
+    ));
+
+    expect(text).toContain("no outstanding balances");
   });
 });
 
