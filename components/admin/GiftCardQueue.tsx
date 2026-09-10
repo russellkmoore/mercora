@@ -1,9 +1,13 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Money, type MachMoney } from '@/lib/money';
+import { maskGiftCardCodeSuffix } from '@/lib/gift-cards/code';
 
 interface AdminGiftCard {
+  id: string;
+  codeSuffix?: string;
   issuedAmount: MachMoney;
   availableBalance: MachMoney;
   status: 'active' | 'disabled';
@@ -45,5 +49,5 @@ export default function GiftCardQueue() {
   }, []);
   if (loading) return <div role="status" className="rounded-lg border border-neutral-700 bg-neutral-900 p-6 text-sm text-gray-300">Loading gift cards…</div>;
   if (error) return <div role="alert" className="rounded-lg border border-red-900 bg-red-950/30 p-5 text-sm text-red-100"><p>{error}</p><button type="button" onClick={() => { setLoading(true); setError(''); void load(); }} className="mt-4 rounded-md border border-red-700 px-3 py-2 hover:border-red-500">Try again</button></div>;
-  return <div className="overflow-x-auto rounded-lg border border-neutral-700"><table className="w-full min-w-[680px] text-left text-sm"><thead className="bg-neutral-900 text-xs uppercase tracking-wide text-gray-500"><tr><th className="p-4">Issued</th><th className="p-4">Available</th><th className="p-4">Status</th><th className="p-4">Delivery</th><th className="p-4">Order reference</th></tr></thead><tbody>{cards.map((card, index) => <tr key={`${card.createdAt}-${index}`} className="border-t border-neutral-800 text-gray-200"><td className="p-4">{money(card.issuedAmount)}</td><td className="p-4">{money(card.availableBalance)}</td><td className="p-4">{card.status}</td><td className="p-4">{card.delivery ? `${card.delivery.status}${card.delivery.attempts ? ` (${card.delivery.attempts} attempts)` : ''}` : 'Not queued'}</td><td className="p-4 text-gray-400">{card.issuedOrderId ?? '—'}</td></tr>)}</tbody></table>{cards.length === 0 && <p className="p-6 text-sm text-gray-400">No gift cards match this queue.</p>}</div>;
+  return <div className="overflow-x-auto rounded-lg border border-neutral-700"><table className="w-full min-w-170 text-left text-sm"><thead className="bg-neutral-900 text-xs uppercase tracking-wide text-gray-500"><tr><th className="p-4">Code</th><th className="p-4">Issued</th><th className="p-4">Available</th><th className="p-4">Status</th><th className="p-4">Delivery</th><th className="p-4">Order reference</th></tr></thead><tbody>{cards.map((card) => <tr key={card.id} className="border-t border-neutral-800 text-gray-200 hover:bg-neutral-900/60"><td className="p-4 font-mono"><Link href={`/admin/gift-cards/${card.id}`} className="text-orange-400 hover:underline">{maskGiftCardCodeSuffix(card.codeSuffix ?? null) ?? '—'}</Link></td><td className="p-4">{money(card.issuedAmount)}</td><td className="p-4">{money(card.availableBalance)}</td><td className="p-4">{card.status}</td><td className="p-4">{card.delivery ? `${card.delivery.status}${card.delivery.attempts ? ` (${card.delivery.attempts} attempts)` : ''}` : 'Not queued'}</td><td className="p-4 text-gray-400">{card.issuedOrderId ?? '—'}</td></tr>)}</tbody></table>{cards.length === 0 && <p className="p-6 text-sm text-gray-400">No gift cards match this queue.</p>}</div>;
 }

@@ -134,7 +134,8 @@ describe("honor decision ownership (D-18, WR-18)", () => {
       // existence decision the list route does.
       join("app", "api", "admin", "gift-cards", "[id]", "route.ts"),
       join("app", "api", "admin", "gift-cards", "[id]", "events", "route.ts"),
-      // Plan 14-08 adds the detail page path here once it exists.
+      // Plan 14-08: the detail page makes the same existence decision.
+      join("app", "admin", "gift-cards", "[id]", "page.tsx"),
     ];
     for (const file of askers) {
       expect(sources.get(file), file).toContain("resolveHonorEffective");
