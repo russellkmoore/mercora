@@ -126,6 +126,7 @@ export default function SubscriptionAcquisitionPanel({
   const [addressId, setAddressId] = useState("");
   const [loadingAddresses, setLoadingAddresses] = useState(false);
   const [addressError, setAddressError] = useState("");
+  const [addressNotice, setAddressNotice] = useState("");
   const [addressDialogOpen, setAddressDialogOpen] = useState(false);
   // True while keyboard traversal has landed on the sentinel option but the
   // shopper has not committed it (Enter/Space); `addressId` is untouched.
@@ -303,6 +304,7 @@ export default function SubscriptionAcquisitionPanel({
     const live = () => !controller.signal.aborted && ownerRef.current === owner;
     setLoadingAddresses(true);
     setAddressError("");
+    setAddressNotice("");
     try {
       const next = await fetchSavedAddressesForPlan(fetch, selectedPlan, controller.signal);
       if (!live()) return;
@@ -314,6 +316,9 @@ export default function SubscriptionAcquisitionPanel({
         // The account API accepted it but the subscription filter did not:
         // say so instead of silently selecting a different address.
         setAddressError("The new address was saved but cannot be used for this subscription. Edit it under Account > Addresses.");
+      } else {
+        // Announce the silent value change for screen-reader users.
+        setAddressNotice("Address added and selected.");
       }
     } catch {
       if (live()) {
@@ -411,6 +416,7 @@ export default function SubscriptionAcquisitionPanel({
               onChange={(event) => {
                 setSelectedPlanId(event.target.value);
                 setAddressId("");
+                setAddressNotice("");
                 setAccepted(false);
                 setSetup(null);
                 setCheckoutError("");
@@ -504,6 +510,7 @@ export default function SubscriptionAcquisitionPanel({
                       return;
                     }
                     setAddNewPending(false);
+                    setAddressNotice("");
                     setAddressId(value);
                     setSetup(null);
                     setCheckoutError("");
@@ -520,7 +527,8 @@ export default function SubscriptionAcquisitionPanel({
                   <option value={ADD_NEW_ADDRESS_VALUE}>Add a new address…</option>
                 </select>
               </label>
-              {loadingAddresses ? <p className="mt-2 text-xs text-muted-foreground">Loading saved addresses…</p> : null}
+              {loadingAddresses ? <p className="mt-2 text-xs text-muted-foreground" role="status">Loading saved addresses…</p> : null}
+              {!loadingAddresses && addressNotice ? <p className="mt-2 text-xs text-muted-foreground" role="status">{addressNotice}</p> : null}
               {addressError ? <p className="mt-2 text-sm text-danger" role="alert">{addressError}</p> : null}
             </div>
           ) : null}
