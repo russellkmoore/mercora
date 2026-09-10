@@ -18,6 +18,7 @@ vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext: mocks.context }
 vi.mock("@/lib/gift-cards/honor-guard", () => ({
   readHonorGuard: mocks.readHonorGuard,
   balancesMayExist: mocks.balancesMayExist,
+  HONOR_GUARD_STALE_SECONDS: 900,
 }));
 vi.mock("@/components/admin/GiftCardQueue", () => ({
   default: () => null,
@@ -26,7 +27,15 @@ vi.mock("@/components/admin/GiftCardQueue", () => ({
 import AdminGiftCardsPage from "@/app/admin/gift-cards/page";
 import GiftCardHonorBanner from "@/components/admin/GiftCardHonorBanner";
 
-const RECORD = { outstanding_minor: 500, currency: "USD", open_reservations: 1, measured_at: 1_700_000_000 };
+// measured_at is relative to the real clock (not mocked here) so the banner-content
+// tests below see a fresh record — GiftCardHonorBanner computes staleness with the
+// real Date.now(), independent of the page-level honor-guard mocks.
+const RECORD = {
+  outstanding_minor: 500,
+  currency: "USD",
+  open_reservations: 1,
+  measured_at: Math.floor(Date.now() / 1_000) - 120,
+};
 
 function render() {
   return AdminGiftCardsPage();
@@ -89,5 +98,45 @@ describe("admin gift-card page gating (D-17)", () => {
     expect(filterBody).toContain("/admin/gift-cards");
     expect(filterBody).toContain("giftCardAcquisition");
     expect(filterBody).toContain("giftCardReconciliation");
+  });
+});
+
+/** Collects the text content of a returned React element tree, without a DOM. */
+function textOf(node: unknown): string {
+  if (node == null) return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join("");
+  const element = node as { props?: { children?: unknown } };
+  if (element.props && "children" in element.props) return textOf(element.props.children);
+  return "";
+}
+
+describe("GiftCardHonorBanner content (D-05, GCF-02)", () => {
+  it("names the outstanding total, the open-reservation count and the measurement time", () => {
+    const text = textOf(GiftCardHonorBanner({ record: RECORD, honorConfigured: false }));
+    expect(text).toContain(new Intl.NumberFormat("en-US", { style: "currency", currency: RECORD.currency }).format(5));
+    expect(text).toContain("1 open reservation");
+    expect(text).toContain(new Date(RECORD.measured_at * 1_000).toLocaleString());
+  });
+
+  it("renders nothing when honoring is configured on", () => {
+    expect(GiftCardHonorBanner({ record: RECORD, honorConfigured: true })).toBeNull();
+  });
+
+  it("says the measurement is unavailable, without printing a misleading zero, when the record is missing", () => {
+    const text = textOf(GiftCardHonorBanner({ record: null, honorConfigured: false }));
+    expect(text).toContain("unavailable");
+    expect(text).not.toMatch(/\$0\.00/);
+  });
+
+  it("says the measurement is out of date when the record is stale", () => {
+    const stale = { ...RECORD, measured_at: 0 };
+    const text = textOf(GiftCardHonorBanner({ record: stale, honorConfigured: false }));
+    expect(text).toContain("out of date");
+  });
+
+  it("names no card identity, code, hash, ciphertext, nonce or recipient", () => {
+    const text = textOf(GiftCardHonorBanner({ record: RECORD, honorConfigured: false }));
+    expect(text).not.toMatch(/code|hash|cipher|nonce|recipient|@/i);
   });
 });
