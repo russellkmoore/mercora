@@ -257,39 +257,36 @@ async function issueLine(args: {
   if (existing) return giftCardId;
   const deliveryId = await stableId('gift_delivery', args.order.id, args.line.id);
   const deliverAfter = scheduledDeliverAfter(recipient.deliveryDate);
+  // Strings cannot be reliably zeroized in JS; keep the code's scope minimal
+  // and never return, store, log, or attach the bearer code to an error.
   const code = generateGiftCardCode();
-  try {
-    const codeHash = await digestGiftCardCode(code, args.resolveHmac());
-    if (!codeHash) throw new Error('Generated gift-card code is invalid');
-    const encrypted = await encryptGiftCardDeliveryCode({
-      giftCardId, deliveryId, code, keyRing: args.deliveryKeys,
-    });
-    await args.repository.issueAccount({
-      id: giftCardId,
-      codeHash,
-      amount: Money.fromStored(args.line.unit_price, args.order.currency_code),
-      issuedOrderId: args.order.id,
-      issuedLineId: args.line.id,
-      purchaserCustomerId: args.order.customer_id,
-      createdAt: args.now,
-      // D-02: the second of the two issuance paths that carry a code suffix —
-      // issueAdminGiftCard is the first. Pre-0024 cards stay NULL (no backfill).
-      codeSuffix: giftCardCodeSuffix(code) ?? undefined,
-      delivery: {
-        id: deliveryId,
-        recipientEmail: recipient.recipientEmail,
-        ...(recipient.recipientName ? { recipientName: recipient.recipientName } : {}),
-        emailIdempotencyKey: `gift-card-delivery/${giftCardId}/v1`,
-        codeCiphertext: encrypted.ciphertext,
-        codeNonce: encrypted.nonce,
-        codeKeyVersion: encrypted.keyVersion,
-        ...(deliverAfter > 0 ? { deliverAfter } : {}),
-      },
-    });
-  } finally {
-    // Strings cannot be reliably zeroized in JS; keep this scope minimal and
-    // never return, store, log, or attach the bearer code to an error.
-  }
+  const codeHash = await digestGiftCardCode(code, args.resolveHmac());
+  if (!codeHash) throw new Error('Generated gift-card code is invalid');
+  const encrypted = await encryptGiftCardDeliveryCode({
+    giftCardId, deliveryId, code, keyRing: args.deliveryKeys,
+  });
+  await args.repository.issueAccount({
+    id: giftCardId,
+    codeHash,
+    amount: Money.fromStored(args.line.unit_price, args.order.currency_code),
+    issuedOrderId: args.order.id,
+    issuedLineId: args.line.id,
+    purchaserCustomerId: args.order.customer_id,
+    createdAt: args.now,
+    // D-02: the second of the two issuance paths that carry a code suffix —
+    // issueAdminGiftCard is the first. Pre-0024 cards stay NULL (no backfill).
+    codeSuffix: giftCardCodeSuffix(code) ?? undefined,
+    delivery: {
+      id: deliveryId,
+      recipientEmail: recipient.recipientEmail,
+      ...(recipient.recipientName ? { recipientName: recipient.recipientName } : {}),
+      emailIdempotencyKey: `gift-card-delivery/${giftCardId}/v1`,
+      codeCiphertext: encrypted.ciphertext,
+      codeNonce: encrypted.nonce,
+      codeKeyVersion: encrypted.keyVersion,
+      ...(deliverAfter > 0 ? { deliverAfter } : {}),
+    },
+  });
   return giftCardId;
 }
 
@@ -375,36 +372,33 @@ export async function issueAdminGiftCard(args: {
   });
 
   const deliveryId = await stableId('gift_delivery_admin', args.requestId);
+  // Strings cannot be reliably zeroized in JS; keep the code's scope minimal
+  // and never return, store, log, or attach the bearer code to an error.
   const code = generateGiftCardCode();
-  try {
-    const codeHash = await digestGiftCardCode(code, parseGiftCardCodeKeyRing(args.environment));
-    if (!codeHash) throw new Error('Generated gift-card code is invalid');
-    const encrypted = await encryptGiftCardDeliveryCode({
-      giftCardId, deliveryId, code, keyRing: parseGiftCardDeliveryKeyRing(args.environment),
-    });
-    await repository.issueAccount({
-      id: giftCardId,
-      codeHash,
-      amount: args.amount,
-      createdAt: now,
-      codeSuffix: giftCardCodeSuffix(code) ?? undefined,
-      delivery: {
-        id: deliveryId,
-        recipientEmail: recipient.recipientEmail,
-        ...(recipient.recipientName ? { recipientName: recipient.recipientName } : {}),
-        emailIdempotencyKey: `gift-card-delivery/${giftCardId}/v1`,
-        codeCiphertext: encrypted.ciphertext,
-        codeNonce: encrypted.nonce,
-        codeKeyVersion: encrypted.keyVersion,
-        // deliverAfter intentionally unset (defaults to 0): an admin-created
-        // card sends immediately once the cron drain next runs, exactly like
-        // an unscheduled checkout purchase.
-      },
-    });
-  } finally {
-    // Strings cannot be reliably zeroized in JS; keep this scope minimal and
-    // never return, store, log, or attach the bearer code to an error.
-  }
+  const codeHash = await digestGiftCardCode(code, parseGiftCardCodeKeyRing(args.environment));
+  if (!codeHash) throw new Error('Generated gift-card code is invalid');
+  const encrypted = await encryptGiftCardDeliveryCode({
+    giftCardId, deliveryId, code, keyRing: parseGiftCardDeliveryKeyRing(args.environment),
+  });
+  await repository.issueAccount({
+    id: giftCardId,
+    codeHash,
+    amount: args.amount,
+    createdAt: now,
+    codeSuffix: giftCardCodeSuffix(code) ?? undefined,
+    delivery: {
+      id: deliveryId,
+      recipientEmail: recipient.recipientEmail,
+      ...(recipient.recipientName ? { recipientName: recipient.recipientName } : {}),
+      emailIdempotencyKey: `gift-card-delivery/${giftCardId}/v1`,
+      codeCiphertext: encrypted.ciphertext,
+      codeNonce: encrypted.nonce,
+      codeKeyVersion: encrypted.keyVersion,
+      // deliverAfter intentionally unset (defaults to 0): an admin-created
+      // card sends immediately once the cron drain next runs, exactly like
+      // an unscheduled checkout purchase.
+    },
+  });
   return { giftCardId, created: true };
 }
 

@@ -98,6 +98,8 @@ export async function POST(
   const now = Math.floor(Date.now() / 1_000);
   const newGiftCardId = await giftCardReissueId(id);
   const newDeliveryId = await giftCardReissueDeliveryId(id);
+  // Strings cannot be reliably zeroized in JS; keep the code's scope minimal
+  // and never return, store, log, or attach the bearer code to an error.
   const code = generateGiftCardCode();
   try {
     const codeHash = await digestGiftCardCode(code, parseGiftCardCodeKeyRing(environment));
@@ -138,8 +140,5 @@ export async function POST(
       return jsonError("gift_card_reissue_blocked", error.message, 409);
     }
     return jsonError("gift_cards_write_failed", "Failed to reissue gift card", 503);
-  } finally {
-    // Strings cannot be reliably zeroized in JS; keep this scope minimal and
-    // never return, store, log, or attach the bearer code to an error.
   }
 }
