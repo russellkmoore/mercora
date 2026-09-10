@@ -130,6 +130,11 @@ describe("honor decision ownership (D-18, WR-18)", () => {
       join("app", "api", "gift-cards", "balance", "route.ts"),
       join("app", "admin", "gift-cards", "page.tsx"),
       join("app", "api", "admin", "gift-cards", "route.ts"),
+      // Plan 14-06: the card detail and timeline routes make the same
+      // existence decision the list route does.
+      join("app", "api", "admin", "gift-cards", "[id]", "route.ts"),
+      join("app", "api", "admin", "gift-cards", "[id]", "events", "route.ts"),
+      // Plan 14-08 adds the detail page path here once it exists.
     ];
     for (const file of askers) {
       expect(sources.get(file), file).toContain("resolveHonorEffective");
