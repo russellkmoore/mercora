@@ -791,3 +791,199 @@ _Reviewed: 2026-09-10_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
 _Iteration: 2_
+
+---
+
+## Iteration 3
+
+**Reviewed:** 2026-09-10 (re-review)
+**Scope:** the three fix commits `52f25c2`, `b1f56b5`, `469cd55`
+**Depth:** standard, plus cross-file tracing on every caller of the honor decision and a probe of the new write contract's regexes
+**Smoke check:** `vitest run tests/unit/lib/gift-cards tests/integration/lib/gift-cards tests/unit/components tests/unit/app` — 120 files, 1116 tests, all passing
+**New findings:** 0 Critical, 3 Warning, 1 Info
+
+### Iteration-2 findings: all five closed
+
+| Finding | Verified how | Status |
+| --- | --- | --- |
+| CR-05 | `app/checkout/page.tsx:74` applies `giftCardSurfacesHidden(flags)` and returns `false` before `resolveHonorEffective` is reached at `:75`. `tests/unit/app/checkout-honor-gate.test.ts` pins both-off (absent, explicit false, guard saying money exists, no `DB`) to `false` and asserts the decision is never called. The source contract at `gift-card-checkout-gating-source.test.ts:63-69` pins the order. | Closed |
+| WR-13 | `resolveHonorEffective` exists at `lib/gift-cards/honor-guard.ts:317-326`. The four named callers all use it: `lib/commerce/runtime.ts:44`, `app/checkout/page.tsx:75`, `app/api/gift-cards/balance/route.ts:48`, `app/admin/gift-cards/page.tsx:46`. Sell-on/honor-off returns `false` at `:323` before `database` is touched; the integration case at `honor-guard.test.ts:547-557` proves it with a database that throws on any read. The balance route gates on D-10 at `:35` before the decision at `:48`. | Closed, with one leftover caller — see WR-18 |
+| WR-14 | `lib/gift-cards/repository.ts:324` reads `(account.status = 'active' OR reservation.committed_at IS NOT NULL)`. The commit→disable→unsettled case at `honor-guard.test.ts:260-302` asserts `openReservations: 1`, `heldMinor: 600`, and `resolveHonorEffective(...) === true`; the uncommitted-on-disabled case at `:304-319` asserts the exclusion. Both pass. | Closed |
+| WR-15 | `held_minor` is measured at `repository.ts:321`, carried on the record at `honor-guard.ts:73`, validated at `:136-137`, written by the cron at `:359`. `GiftCardHonorBanner.tsx:80` prints a bare total only when `count === 0`; otherwise "available plus held" or "unmeasured amount held". `admin-gift-card-gating.test.ts` asserts `not.toMatch(/\$0\.00 outstanding/)` beside a nonzero count. | Closed |
+| WR-16 | `admin-settings-writer-source.test.ts` scans `app/`, `lib/`, `workers/` for Drizzle `insert/update/delete` and raw `INSERT INTO`/`UPDATE`/`DELETE FROM`. The two-tier allowlist is as described. I re-ran the negative control's shape against the patterns: `await db.update(admin_settings).set(...)` is caught. The "cannot rot" case confirms the patterns match the three real writers. | Closed, with regex gaps — see WR-19 |
+
+Regression checks on the two test changes the fixer flagged:
+
+- **Settle-in-`beforeEach` isolation** (`honor-guard.test.ts:78-98`, `honor-guard-cron.test.ts:53-73`): runs before the disable, requires `committed_order_id IS NOT NULL` (always true for a committed row), and settles with the new `now`. `settleReservation` has no `account.status` check, so settling against an already-disabled card from a prior case works. Sound.
+- **Mocked collaborator in `runtime-honor-override.test.ts`**: the whole module is replaced with only `resolveHonorEffective`. `lib/commerce/runtime.ts` imports nothing else from it and `lib/gift-cards/runtime.ts` does not import the module at all, so no missing export is reachable. The sell-on case at `:103-122` is tautological under the mock (the stub returns `false`, so the throw follows), but the real short-circuit is covered by the integration suite. Acceptable. The comment pointing at where that coverage lives is wrong — see IN-01.
+
+### WR-17: The admin page tells an operator "no outstanding balances" in the one state where selling is misconfigured
+
+**File:** `app/admin/gift-cards/page.tsx:45-46`, `components/admin/GiftCardHonorBanner.tsx:104-111`
+**Severity:** WARNING
+
+**Issue:** This is a regression from `52f25c2`. Before that commit the page computed
+`guardActive = !honor && balancesMayExist(guardRecord, now)` — a display fact read from the record.
+Now it computes `guardActive = !honor && await resolveHonorEffective(DB, flags, now)`, and
+`resolveHonorEffective` returns `false` for sell-on/honor-off **without reading the guard** (that is
+its second rule, and it is deliberate). The banner then takes `!guardActive` as "the last measurement
+was fresh, readable and empty" and prints:
+
+> Gift-card honoring is off, and the last measurement found no outstanding balances.
+
+In sell-on/honor-off that sentence is false whenever the record holds money. The page even has the
+record in hand — `guardRecord` at `:42-44` was read for display — and ignores it, because the
+banner's `!guardActive` branch never looks at `record`.
+
+The state is reachable on this page. `giftCardSurfacesHidden(flags)` is false with sell on, so the
+page renders, and the WR-12 skip decision keeps the admin surfaces open in exactly this configuration
+so an operator can see what is outstanding. That operator opens the page because every checkout is
+throwing `CommerceCapabilityConfigurationError`, and the page tells them the store owes nobody
+anything.
+
+`tests/unit/app/admin-gift-card-gating.test.ts` has no sell-on case at all (zero matches for
+`ACQUISITION` or `sell`), which is why the regression was not caught.
+
+**Fix:** keep `resolveHonorEffective` for the 404 decision and stop reusing it as the banner's
+display signal. The invalid configuration is a third banner state, not "clear":
+
+```tsx
+// app/admin/gift-cards/page.tsx
+const sellsWithoutHonoring = giftCardAcquisition && !giftCardReconciliation;
+<GiftCardHonorBanner
+  record={guardRecord}
+  honorConfigured={giftCardReconciliation}
+  guardActive={guardActive}
+  sellsWithoutHonoring={sellsWithoutHonoring}
+/>
+
+// GiftCardHonorBanner.tsx, before the `!guardActive` branch
+if (sellsWithoutHonoring) {
+  return ( /* red state: "Selling is on and honoring is off. Checkout is refusing every
+              order (GCF-04). Turn honoring back on." + outstandingSummary(record) if present */ );
+}
+```
+
+Add a sell-on/honor-off case to `admin-gift-card-gating.test.ts` with a record showing a nonzero
+total and assert the banner does not say "found no outstanding balances".
+
+---
+
+### WR-18: D-18's "single owner" is not true yet, and nothing pins it
+
+**File:** `app/api/admin/gift-cards/route.ts:5,45`
+**Severity:** WARNING
+
+**Issue:** `/api/admin/gift-cards` still calls `honorIsEffectivelyOn(environment.DB, false, nowSeconds)`
+directly. It is a fifth call site of the money decision and was not touched by `52f25c2`. Today it
+agrees with `resolveHonorEffective` because it only runs under both-off, where the two functions
+reduce to the same thing. But `/admin/gift-cards` (the page) and `/api/admin/gift-cards` (the queue
+it fetches) now make the same decision through two different functions with two different
+preconditions — which is the shape WR-13 was raised to remove.
+
+`honorIsEffectivelyOn`, `balancesMayExist` and `readHonorGuard` are all still exported with no
+source contract restricting who calls them. The checkout source test forbids `balancesMayExist` and
+`readHonorGuard` in one file (`gift-card-checkout-gating-source.test.ts:78-79`); nothing forbids
+them anywhere else. The next surface someone adds will pick one of the five and be wrong again.
+
+**Fix:** switch the route to the owner and pin ownership:
+
+```ts
+// app/api/admin/gift-cards/route.ts
+const flags = { giftCardAcquisition, giftCardReconciliation };
+if (giftCardSurfacesHidden(flags)) {
+  const guardActive = await resolveHonorEffective(environment.DB, flags, nowSeconds);
+  if (!guardActive) return NextResponse.json({ code: 'gift_cards_unavailable', ... }, { status: 404 });
+}
+```
+
+Then add a source contract (same shape as `honor-guard-writer-source.test.ts`) asserting that under
+`app/`, `lib/` and `workers/` only `lib/gift-cards/honor-guard.ts` references `honorIsEffectivelyOn`
+or `balancesMayExist`, and only `honor-guard.ts` plus `app/admin/gift-cards/page.tsx` reference
+`readHonorGuard`. Also update the D-18 sentence in `13-CONTEXT.md` to name the admin API route.
+
+---
+
+### WR-19: The new write contract misses SQLite's `INSERT OR REPLACE` and any aliased table reference
+
+**File:** `tests/unit/lib/gift-cards/admin-settings-writer-source.test.ts:32-39`
+**Severity:** WARNING
+
+**Issue:** I ran the six patterns against likely writer shapes. Results:
+
+| Shape | Result |
+| --- | --- |
+| `await db.update(admin_settings).set(...)` (the negative control) | caught |
+| `` db.prepare(`INSERT OR REPLACE INTO admin_settings ...`) `` | **missed** |
+| `REPLACE INTO admin_settings ...` | **missed** |
+| `INSERT OR IGNORE INTO admin_settings ...` | **missed** |
+| `import { admin_settings as settingsTable }` then `db.update(settingsTable)` | **missed** |
+| `const t = admin_settings; db.update(t)` | **missed** |
+
+`INSERT OR REPLACE INTO` is the idiomatic D1 upsert and the most likely form a future cron or
+migration-adjacent helper would reach for. `INSERT\s+INTO` does not match it because `OR REPLACE`
+sits between the two words. The Drizzle patterns key on the literal identifier `admin_settings`
+appearing inside the call parentheses, so any rename on import evades them. The contract's own header
+says it exists because CR-02 slipped past an identifier scan; this is the same class of gap one layer
+down.
+
+**Fix:** widen the raw-SQL patterns and forbid aliasing the table:
+
+```ts
+const WRITE_PATTERNS = [
+  /\.insert\(\s*admin_settings/,
+  /\.update\(\s*admin_settings/,
+  /\.delete\(\s*admin_settings/,
+  /INSERT\s+(OR\s+(REPLACE|IGNORE|ABORT|FAIL|ROLLBACK)\s+)?INTO\s+admin_settings/i,
+  /REPLACE\s+INTO\s+admin_settings/i,
+  /UPDATE\s+(OR\s+\w+\s+)?admin_settings/i,
+  /DELETE\s+FROM\s+admin_settings/i,
+];
+// And a separate assertion: no file under the scanned roots may match
+// /admin_settings\s+as\s+\w+/ on an import line, so the identifier the
+// write patterns key on cannot be renamed away.
+```
+
+Add both a caught and a missed shape to the test itself as literal fixtures (strings passed to
+`writesAdminSettings`), so the regexes are tested rather than only applied.
+
+---
+
+### IN-01: Three comments point at the wrong place or describe the old shape
+
+**File:** `tests/unit/lib/commerce/runtime-honor-override.test.ts:14-15,109-110`, `lib/gift-cards/honor-guard.ts:52-53,168`
+**Severity:** Info
+
+**Issue:**
+- `runtime-honor-override.test.ts` says twice that the sell-on short-circuit is "asserted against the
+  real function in `tests/unit/lib/gift-cards/honor-guard.test.ts`". That file has zero references
+  to `resolveHonorEffective`. The assertion is in
+  `tests/integration/lib/gift-cards/honor-guard.test.ts:547-570`. A reader following the comment
+  finds nothing and concludes the coverage is missing.
+- `honor-guard.ts:52-53` still says the record is "Four fields, no more"; `held_minor` at `:73` is
+  the fifth.
+- `honor-guard.ts:168` still says the writer contract "asserts no file under `app/` imports it"; the
+  scan has walked three roots since `a69f6c4`.
+
+**Fix:** correct the three paths and the field count. No behaviour change.
+
+---
+
+## REVIEW COMPLETE
+
+| Severity | New this iteration |
+| --- | --- |
+| Critical | 0 |
+| Warning | 3 (WR-17, WR-18, WR-19) |
+| Info | 1 (IN-01) |
+| **Total** | **4** |
+
+Iteration-2 findings: 5 (1 Critical, 4 Warning) — all 5 closed. WR-17 is a regression introduced by
+the WR-13 fix; WR-18 and WR-19 are completeness gaps in the WR-13 and WR-16 fixes. Nothing in this
+iteration touches money-moving behaviour; the runtime, checkout and balance paths are correct.
+
+_Reviewed: 2026-09-10_
+_Reviewer: Claude (gsd-code-reviewer)_
+_Depth: standard_
+_Iteration: 3_
+
