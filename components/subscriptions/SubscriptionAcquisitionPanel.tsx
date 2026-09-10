@@ -5,13 +5,17 @@ import { PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js"
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import StripeProvider from "@/components/checkout/StripeProvider";
+import AddAddressDialog from "@/components/subscriptions/AddAddressDialog";
+import type { MACHCustomerAddress } from "@/lib/types/mach/Customer";
 import {
+  ADD_NEW_ADDRESS_VALUE,
   attemptFactsKey,
   confirmSubscriptionSetup,
   createOwnerBoundSubscriptionSetupAttempt,
   fetchSavedAddressesForPlan,
   fetchSubscriptionPlans,
   finalizeSubscriptionSetup,
+  nextAddressSelection,
   recurringTotal,
   shippingAddressFromSaved,
   type PublicSubscriptionPlan,
@@ -117,6 +121,7 @@ export default function SubscriptionAcquisitionPanel({
   const [addressId, setAddressId] = useState("");
   const [loadingAddresses, setLoadingAddresses] = useState(false);
   const [addressError, setAddressError] = useState("");
+  const [addressDialogOpen, setAddressDialogOpen] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [setup, setSetup] = useState<{
     acquisitionId: string;
@@ -219,7 +224,7 @@ export default function SubscriptionAcquisitionPanel({
         .then((next) => {
           setAddresses(next);
           setAddressesOwner(userId);
-          setAddressId(next.find((entry) => entry.is_default)?.id ?? next[0]?.id ?? "");
+          setAddressId(nextAddressSelection(next));
         })
         .catch((error) => {
           if (!controller.signal.aborted) {
@@ -260,6 +265,32 @@ export default function SubscriptionAcquisitionPanel({
     shippingAddress: selectedPlan.shippingRequired ? selectedShippingAddress : undefined,
     termsVersion,
   }) : "", [quantity, selectedPlan, selectedShippingAddress, termsVersion]);
+
+  // address-save-region:start
+  async function handleAddressSaved(saved: MACHCustomerAddress) {
+    setAddressDialogOpen(false);
+    const owner = currentOwner;
+    if (!owner || !selectedPlan) return;
+    setLoadingAddresses(true);
+    setAddressError("");
+    try {
+      const next = await fetchSavedAddressesForPlan(fetch, selectedPlan);
+      if (ownerRef.current !== owner) return;
+      setAddresses(next);
+      setAddressesOwner(owner);
+      setAddressId(nextAddressSelection(next, saved.id));
+      setSetup(null);
+      setCheckoutError("");
+      setCompletedOwner(null);
+    } catch (error) {
+      if (ownerRef.current === owner) {
+        setAddressError(error instanceof Error ? error.message : "Saved addresses could not be loaded");
+      }
+    } finally {
+      if (ownerRef.current === owner) setLoadingAddresses(false);
+    }
+  }
+  // address-save-region:end
 
   if (!enabled || !termsVersion) return null;
   if (completedOwner === currentOwner && currentOwner) {
@@ -403,31 +434,38 @@ export default function SubscriptionAcquisitionPanel({
                 Shipping address
                 <select
                   value={addressId}
-                  disabled={loadingAddresses || visibleAddresses.length === 0}
+                  disabled={loadingAddresses}
                   onChange={(event) => {
-                    setAddressId(event.target.value);
+                    const value = event.target.value;
+                    if (value === ADD_NEW_ADDRESS_VALUE) {
+                      setAddressDialogOpen(true);
+                      return;
+                    }
+                    setAddressId(value);
                     setSetup(null);
                     setCheckoutError("");
                     setCompletedOwner(null);
                   }}
                   className="mt-1 block w-full rounded border border-border bg-surface-elevated px-3 py-2 text-foreground disabled:opacity-50"
                 >
-                  <option value="">Select an address</option>
+                  <option value="">
+                    {visibleAddresses.length === 0 ? "Add an address to continue" : "Select an address"}
+                  </option>
                   {visibleAddresses.map((address) => (
                     <option key={address.id} value={address.id}>{addressLabel(address)}</option>
                   ))}
+                  <option value={ADD_NEW_ADDRESS_VALUE}>Add a new address…</option>
                 </select>
               </label>
               {loadingAddresses ? <p className="mt-2 text-xs text-muted-foreground">Loading saved addresses…</p> : null}
               {addressError ? <p className="mt-2 text-sm text-danger" role="alert">{addressError}</p> : null}
-              {!loadingAddresses && visibleAddresses.length === 0 ? (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  A saved shipping address is required.{" "}
-                  <Link className="text-primary underline" href="/account/addresses">Manage addresses</Link>
-                </p>
-              ) : null}
             </div>
           ) : null}
+          <AddAddressDialog
+            open={addressDialogOpen}
+            onOpenChange={setAddressDialogOpen}
+            onSaved={handleAddressSaved}
+          />
 
           {quantity === null || total === null ? (
             <p className="text-sm text-danger" role="alert">Enter a valid quantity and recurring amount.</p>
