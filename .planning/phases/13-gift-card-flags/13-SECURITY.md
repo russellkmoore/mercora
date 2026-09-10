@@ -74,7 +74,7 @@ Declared threats come from the `<threat_model>` blocks in 13-01..13-09 PLAN.md. 
 | T-13-39 | Denial of Service | product missing after deploy | high | mitigate | `13-09-SUMMARY.md:62,105` `prod_33` present in the live listing | closed |
 | T-13-40 | Tampering | `wrangler.jsonc` flags changed | high | mitigate | File absent from the phase diff; both flags `"true"` at `:131-132` | closed |
 | T-13-41 | Repudiation | alarm quiet unproven | medium | mitigate | `13-09-SUMMARY.md:41,76-82` live tail plus a fresh zero record; alarm fires only on the measured condition | closed |
-| T-13-42 | Information Disclosure | `/admin/*` pages server-render data behind a client-only guard (audit UF-1) | medium | mitigate | `app/admin/layout.tsx` is now an async server component: `checkAdminSession()` (extracted from `checkAdminPermissions`, `lib/auth/admin-middleware.ts`) mounts `children` only for an admin Clerk session; anonymous requests get the chrome and the sign-in UI, no page output. `tests/unit/app/admin-layout-server-gate-source.test.ts` | closed |
+| T-13-42 | Information Disclosure | `/admin/*` pages server-render data behind a client-only guard (audit UF-1) | medium | mitigate | **Amended 2026-09-10 (Phase 14 audit UF-14-1):** the `app/admin/layout.tsx` gate added here only decides whether to *mount* a page; the App Router streams the page segment in the RSC payload regardless, so on its own it did not stop an anonymous read. The real closure is Phase 14's T-14-63: `middleware.ts` redirects anonymous `/admin` page requests to sign-in before any segment renders, and every async `app/admin/**/page.tsx` calls `requireAdminSession()` (`lib/auth/admin-session.ts`) first and 404s for a non-admin session. `tests/unit/app/admin-pages-server-gate-source.test.ts`, `admin-guard-middleware.test.ts` | closed (via T-14-63) |
 
 Informational (no action): UF-2 agent-chat and sitemap listing surfaces map to T-13-07; UF-3 `CheckoutPageClient` carries `honorEffective` as advice only, the server enforces; N-4 the cron path honors without the `!sell` short-circuit, which only settles money already taken (D-04) while new sales still throw.
 
@@ -87,7 +87,7 @@ Informational (no action): UF-2 agent-chat and sitemap listing surfaces map to T
 | AR-13-01 | T-13-08 | An agent holding a stale gift-card reference cannot buy: the product page and `priceCheckout` reject independently. | Claude (autonomous run, Russell's standing instruction) | 2026-09-10 |
 | AR-13-02 | T-13-14 | `gift_card_sales_disabled` reveals only a public flag state the product page already shows. | Claude (autonomous run) | 2026-09-10 |
 | AR-13-03 | T-13-16 | Reservation, settlement, release and restore untouched (repository diff additive only); ADR-CTB-10 locked and unchanged; 53 D1 integration tests pass. | Claude (autonomous run) | 2026-09-10 |
-| AR-13-04 | T-13-21 | The guard record is an aggregate total, held total, count and timestamp; no card identity, code or recipient. Both API routes are admin-gated and, since T-13-42, so is the page render. | Claude (autonomous run) | 2026-09-10 |
+| AR-13-04 | T-13-21 | The guard record is an aggregate total, held total, count and timestamp; no card identity, code or recipient. Both API routes are admin-gated; the page render is gated by middleware sign-in plus `requireAdminSession()` since Phase 14's T-14-63 (the T-13-42 layout gate alone was not sufficient). | Claude (autonomous run) | 2026-09-10 |
 
 ---
 
@@ -97,6 +97,7 @@ Informational (no action): UF-2 agent-chat and sitemap listing surfaces map to T
 |------------|---------------|--------|------|--------|
 | 2026-09-10 | 41 | 41 | 0 (UF-1 flagged, non-blocking) | gsd-security-auditor (L1; money paths traced at L2; 448 unit + 53 integration tests run) |
 | 2026-09-10 | 42 | 42 | 0 | Orchestrator registered and closed T-13-42; added the T-13-11 and T-13-19 grep pins |
+| 2026-09-10 | 42 | 42 | 0 | Phase 14 audit (UF-14-1) showed the T-13-42 layout gate insufficient; re-closed via T-14-63 (middleware + per-page `requireAdminSession`) |
 
 ---
 
