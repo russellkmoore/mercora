@@ -123,7 +123,12 @@ describe("commerce capability resolution", () => {
   describe("gift-card tender follows honor, not sell", () => {
     function giftCardSpies() {
       return {
-        resolveTender: vi.fn(),
+        // A capability-shaped stub: resolveTender answers with the amount it
+        // covered, so a delegating call is observable in its resolved value and
+        // not only in the spy's call log.
+        resolveTender: vi.fn(async ({ currency }: { currency: string }) => ({
+          amount: Money.zero(currency),
+        })),
         verifyReservedTender: vi.fn(async () => undefined),
         applyTender: vi.fn(async () => undefined),
         releaseTender: vi.fn(async () => undefined),
@@ -170,7 +175,7 @@ describe("commerce capability resolution", () => {
         token: "GC-NOT-USED",
         currency: "USD",
         amountDue: Money.fromMinor(100, "USD"),
-      })).resolves.toBeUndefined();
+      })).resolves.toEqual({ amount: Money.zero("USD") });
       expect(capability.resolveTender).toHaveBeenCalledWith(
         expect.objectContaining({ token: "GC-NOT-USED" }),
       );

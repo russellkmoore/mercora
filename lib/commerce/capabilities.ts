@@ -178,43 +178,21 @@ export function resolveCommerceCapabilities(
         },
       };
 
+  // Tender resolution follows honor (giftCardReconciliation), never sell
+  // (giftCardAcquisition) — a shopper redeems a card they already paid for
+  // even after the store stops selling new ones (D-03). The condition below
+  // decides only whether a capability object exists at all: with both flags
+  // off the no-op capability is installed and it already rejects a nonempty
+  // bearer token. Selling without honoring never reaches here — it throws at
+  // the configuration boundary above (D-02, GCF-04).
   const giftCards = resolve(
     flags.giftCardAcquisition || flags.giftCardReconciliation,
     factories.giftCards,
     noOpCommerceCapabilities.giftCards,
     "Gift cards",
   );
-  const gatedGiftCards: GiftCardCheckoutCapability = (
-    giftCards === noOpCommerceCapabilities.giftCards || flags.giftCardAcquisition
-  ) ? giftCards : {
-      async resolveTender({ token, currency }) {
-        if (token !== undefined && token !== "") {
-          throw new CommerceCapabilityDisabledError();
-        }
-        return { amount: Money.zero(currency) };
-      },
-      verifyReservedTender: (args) => giftCards.verifyReservedTender(args),
-      applyTender: (args) => giftCards.applyTender(args),
-      releaseTender: async (args) => {
-        if (!giftCards.releaseTender) {
-          throw new CommerceCapabilityConfigurationError(
-            "Gift-card reconciliation release is not configured",
-          );
-        }
-        await giftCards.releaseTender(args);
-      },
-      restoreTender: async (args) => {
-        if (!giftCards.restoreTender) {
-          throw new CommerceCapabilityConfigurationError(
-            "Gift-card reconciliation restoration is not configured",
-          );
-        }
-        await giftCards.restoreTender(args);
-      },
-    };
-
   return {
-    giftCards: gatedGiftCards,
+    giftCards,
     subscriptions: gatedSubscriptions,
   };
 }
