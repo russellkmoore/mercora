@@ -91,8 +91,8 @@ describe("gift-card events on real D1", () => {
     hash = testSequence.toString(16).padStart(64, "0");
   });
 
-  it("has exactly the D-03 event vocabulary plus the WR-02 reveal-failure event", () => {
-    expect(GIFT_CARD_EVENT_TYPES).toHaveLength(10);
+  it("has exactly the D-03 event vocabulary plus the WR-02 / A-2 failure events", () => {
+    expect(GIFT_CARD_EVENT_TYPES).toHaveLength(11);
     expect(GIFT_CARD_EVENT_TYPES).toEqual([
       "note",
       "disabled",
@@ -104,6 +104,7 @@ describe("gift-card events on real D1", () => {
       "admin_created",
       "code_revealed",
       "code_reveal_failed",
+      "delivery_resend_failed",
     ]);
   });
 

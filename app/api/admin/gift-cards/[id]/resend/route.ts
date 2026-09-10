@@ -89,6 +89,36 @@ export async function POST(
   const effectiveTo = to ?? delivery.recipientEmail;
   const eventId = crypto.randomUUID();
   const now = Math.floor(Date.now() / 1_000);
+
+  // A-2: audit the attempt and its destination BEFORE anything leaves the
+  // building, the way reveal writes `code_revealed` before decrypting. A
+  // fraud-recovery resend to a new address must be on the record even if the
+  // provider call then fails or the worker dies mid-send — if this write
+  // fails, nothing is sent. The pre-minted event id is what the sender's
+  // idempotency key is built from (D-08), so the row and the key agree.
+  try {
+    await appendGiftCardEvent({
+      id: eventId,
+      giftCardId: id,
+      eventType: "delivery_resent",
+      actor,
+      details: { to: effectiveTo },
+      createdAt: now,
+    });
+  } catch {
+    return jsonError("gift_cards_write_failed", "Failed to record the resend", 503);
+  }
+
+  // Best-effort: a failed audit write must not turn a failed send into a
+  // different failure.
+  const recordFailure = (reason: string) => appendGiftCardEvent({
+    giftCardId: id,
+    eventType: "delivery_resend_failed",
+    actor,
+    details: { to: effectiveTo, reason },
+    createdAt: now,
+  }).catch(() => undefined);
+
   try {
     const result = await resendGiftCardDelivery({
       deliveryId: delivery.id,
@@ -98,6 +128,7 @@ export async function POST(
       now,
     });
     if (!result.sent) {
+      await recordFailure(result.reason);
       if (result.reason === "not_resendable") {
         return jsonError("delivery_not_resendable", "Delivery is not resendable", 409);
       }
@@ -106,16 +137,9 @@ export async function POST(
       }
       return jsonError("gift_cards_write_failed", "Failed to resend gift-card delivery", 503);
     }
-    await appendGiftCardEvent({
-      id: eventId,
-      giftCardId: id,
-      eventType: "delivery_resent",
-      actor,
-      details: { to: effectiveTo },
-      createdAt: now,
-    });
     return NextResponse.json({ status: "sent", to: effectiveTo });
   } catch {
+    await recordFailure("exception");
     return jsonError("gift_cards_write_failed", "Failed to resend gift-card delivery", 503);
   }
 }

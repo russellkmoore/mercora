@@ -381,10 +381,13 @@ describe("POST /api/admin/gift-cards/[id]/resend", () => {
     expect(mocks.appendGiftCardEvent).not.toHaveBeenCalled();
   });
 
-  it("resends to the original recipient and writes one delivery_resent event, with an idempotency key naming both the delivery id and the new event id", async () => {
-    mocks.resendGiftCardDelivery.mockResolvedValue({ sent: true });
+  it("writes delivery_resent BEFORE sending, with the address and an id the idempotency key is built from (A-2, D-08)", async () => {
+    const order: string[] = [];
+    mocks.appendGiftCardEvent.mockImplementation(async () => { order.push("event"); return "event_1"; });
+    mocks.resendGiftCardDelivery.mockImplementation(async () => { order.push("send"); return { sent: true }; });
     const response = await resend(postRequest("resend", {}), context);
     expect(response.status).toBe(200);
+    expect(order).toEqual(["event", "send"]);
     const call = mocks.resendGiftCardDelivery.mock.calls[0][0];
     expect(call.deliveryId).toBe("gift_delivery_1");
     expect(mocks.appendGiftCardEvent).toHaveBeenCalledTimes(1);
@@ -392,6 +395,30 @@ describe("POST /api/admin/gift-cards/[id]/resend", () => {
     expect(eventCall.eventType).toBe("delivery_resent");
     expect(eventCall.details).toEqual({ to: "buyer@example.com" });
     expect(call.idempotencyKey).toBe(`gift-card-resend/gift_delivery_1/${eventCall.id}`);
+  });
+
+  it("sends nothing when the delivery_resent write fails (A-2)", async () => {
+    mocks.appendGiftCardEvent.mockRejectedValue(new Error("D1 unavailable"));
+    const response = await resend(postRequest("resend", { to: "fraud-recovery@example.com" }), context);
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ code: "gift_cards_write_failed" });
+    expect(mocks.resendGiftCardDelivery).not.toHaveBeenCalled();
+  });
+
+  it("records delivery_resend_failed with the address and reason when the sender throws (A-2)", async () => {
+    mocks.resendGiftCardDelivery.mockRejectedValue(new Error("provider down"));
+    const response = await resend(postRequest("resend", { to: "fraud-recovery@example.com" }), context);
+    expect(response.status).toBe(503);
+    expect(mocks.appendGiftCardEvent).toHaveBeenCalledTimes(2);
+    expect(mocks.appendGiftCardEvent).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      eventType: "delivery_resent", details: { to: "fraud-recovery@example.com" },
+    }));
+    expect(mocks.appendGiftCardEvent).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      giftCardId: "gift_card_1",
+      eventType: "delivery_resend_failed",
+      actor: { type: "admin", id: "user_admin" },
+      details: { to: "fraud-recovery@example.com", reason: "exception" },
+    }));
   });
 
   it("sends to an admin-supplied address and records it on the event", async () => {
@@ -421,16 +448,27 @@ describe("POST /api/admin/gift-cards/[id]/resend", () => {
     expect(call.environment).toMatchObject({ EMAIL_PROVIDER: "cloudflare" });
   });
 
-  it("maps not_resendable and code_unavailable to 409, and send_failed to 503", async () => {
+  it("maps not_resendable and code_unavailable to 409, and send_failed to 503, auditing each failure with its reason (A-2)", async () => {
+    const cases: Array<[string, number]> = [["not_resendable", 409], ["code_unavailable", 409], ["send_failed", 503]];
+    for (const [reason, status] of cases) {
+      mocks.appendGiftCardEvent.mockClear();
+      mocks.resendGiftCardDelivery.mockResolvedValue({ sent: false, reason });
+      expect((await resend(postRequest("resend", {}), context)).status).toBe(status);
+      // The attempt is on the record first, then the failure with its reason.
+      expect(mocks.appendGiftCardEvent).toHaveBeenCalledTimes(2);
+      expect(mocks.appendGiftCardEvent).toHaveBeenNthCalledWith(1, expect.objectContaining({ eventType: "delivery_resent" }));
+      expect(mocks.appendGiftCardEvent).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        eventType: "delivery_resend_failed", details: { to: "buyer@example.com", reason },
+      }));
+    }
+  });
+
+  it("does not let a failed delivery_resend_failed write change the answer (A-2)", async () => {
     mocks.resendGiftCardDelivery.mockResolvedValue({ sent: false, reason: "not_resendable" });
-    expect((await resend(postRequest("resend", {}), context)).status).toBe(409);
-
-    mocks.resendGiftCardDelivery.mockResolvedValue({ sent: false, reason: "code_unavailable" });
-    expect((await resend(postRequest("resend", {}), context)).status).toBe(409);
-
-    mocks.resendGiftCardDelivery.mockResolvedValue({ sent: false, reason: "send_failed" });
-    expect((await resend(postRequest("resend", {}), context)).status).toBe(503);
-    expect(mocks.appendGiftCardEvent).not.toHaveBeenCalled();
+    mocks.appendGiftCardEvent.mockResolvedValueOnce("event_1").mockRejectedValueOnce(new Error("D1 unavailable"));
+    const response = await resend(postRequest("resend", {}), context);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: "delivery_not_resendable" });
   });
 
   it("returns 404 delivery_not_found when the card has no delivery row", async () => {
