@@ -19,7 +19,12 @@ import {
   issueAdminGiftCard,
   resolveGiftCardAdminIssueMaxMinor,
   resendGiftCardDelivery,
+  revealGiftCardDeliveryCode,
 } from '@/lib/services/gift-card-fulfillment';
+import {
+  GiftCardDecryptionError,
+  GiftCardEncryptionConfigurationError,
+} from '@/lib/gift-cards/encryption';
 import { TELEMETRY_MARKER } from '@/lib/observability/telemetry';
 import { TAIL_CRITICAL_EVENTS } from '@/workers/observability-tail/src/core';
 import type { Order } from '@/lib/types/order';
@@ -527,6 +532,42 @@ describe('admin-created gift card (D-07, D-19)', () => {
       await env.DB.prepare(`DELETE FROM product_variants WHERE product_id = 'prod_gc_ceiling'`).run();
       await env.DB.prepare(`DELETE FROM products WHERE id = 'prod_gc_ceiling'`).run();
     }
+  });
+
+  it('reveal tells a rotated-out key version (configuration) apart from a real decrypt failure (WR-08)', async () => {
+    const { giftCardId } = await issueAdminGiftCard({
+      requestId: 'admin-request-reveal-branches',
+      amount: Money.fromMinor(2_500, 'USD'),
+      recipientEmail: 'admin-recipient-reveal@example.test',
+      environment: runtimeEnvironment(),
+      now,
+    });
+
+    // Happy path against the ring the card was encrypted under: a code comes
+    // back. Only its shape is asserted — the value is never printed.
+    const code = await revealGiftCardDeliveryCode({ giftCardId, environment: runtimeEnvironment() });
+    expect(code).toMatch(/^GC-/);
+
+    // Operator problem: version 1 rotated out of the ring, only version 2
+    // remains. Must surface as configuration, not "code unavailable".
+    const rotatedRing = {
+      ...runtimeEnvironment(),
+      GIFT_CARD_DELIVERY_CURRENT_VERSION: '2',
+      GIFT_CARD_DELIVERY_KEYS_JSON: JSON.stringify({ 2: deliveryKey }),
+    };
+    await expect(revealGiftCardDeliveryCode({ giftCardId, environment: rotatedRing }))
+      .rejects.toBeInstanceOf(GiftCardEncryptionConfigurationError);
+
+    // Card problem: the ring is intact but the stored ciphertext no longer
+    // authenticates. That — and only that — is a decrypt failure.
+    const stored = await env.DB.prepare(`SELECT code_ciphertext FROM gift_card_deliveries WHERE gift_card_id = ?`)
+      .bind(giftCardId).first<{ code_ciphertext: string }>();
+    const original = stored?.code_ciphertext ?? '';
+    const tampered = (original[0] === 'A' ? 'B' : 'A') + original.slice(1);
+    await env.DB.prepare(`UPDATE gift_card_deliveries SET code_ciphertext = ? WHERE gift_card_id = ?`)
+      .bind(tampered, giftCardId).run();
+    await expect(revealGiftCardDeliveryCode({ giftCardId, environment: runtimeEnvironment() }))
+      .rejects.toBeInstanceOf(GiftCardDecryptionError);
   });
 
   it('delivers an admin-created card through the existing cron drain', async () => {

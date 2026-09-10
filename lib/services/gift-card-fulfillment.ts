@@ -8,6 +8,7 @@ import {
   type GiftCardKeyRing,
 } from '@/lib/gift-cards/code';
 import {
+  GiftCardEncryptionConfigurationError,
   decryptGiftCardDeliveryCode,
   encryptGiftCardDeliveryCode,
   type GiftCardEncryptionKeyRing,
@@ -625,6 +626,17 @@ export async function giftCardDeliveryHasStoredCode(args: {
  * written the `code_revealed` audit event — this function does the one thing
  * left, and does it last. Never logs, stores, or attaches the returned code
  * to an error; `decryptGiftCardDeliveryCode` zeroizes its own key material.
+ *
+ * WR-08: the two ways this can fail are told apart *before* decrypting.
+ * `decryptGiftCardDeliveryCode` deliberately collapses every failure —
+ * including a key version absent from the ring — into
+ * `GiftCardDecryptionError`, which is right for the delivery drain but wrong
+ * for reveal: a delivery whose `code_key_version` has been rotated out of
+ * `GIFT_CARD_DELIVERY_KEYS_JSON` is an operator problem, not a bad card. So
+ * the stored version is checked against the parsed ring here and a gap is
+ * thrown as `GiftCardEncryptionConfigurationError`; only a genuine decrypt
+ * failure (tampered or foreign ciphertext) reaches the caller as
+ * `GiftCardDecryptionError`.
  */
 export async function revealGiftCardDeliveryCode(args: {
   giftCardId: string;
@@ -639,11 +651,15 @@ export async function revealGiftCardDeliveryCode(args: {
   if (!row || !row.code_ciphertext || !row.code_nonce || !row.code_key_version) {
     throw new Error('Gift-card delivery has no retained code to reveal');
   }
+  const keyRing = parseGiftCardDeliveryKeyRing(args.environment);
+  if (!Object.hasOwn(keyRing.keys, row.code_key_version)) {
+    throw new GiftCardEncryptionConfigurationError();
+  }
   return decryptGiftCardDeliveryCode({
     giftCardId: args.giftCardId,
     deliveryId: row.id,
     encrypted: { keyVersion: row.code_key_version, nonce: row.code_nonce, ciphertext: row.code_ciphertext },
-    keyRing: parseGiftCardDeliveryKeyRing(args.environment),
+    keyRing,
   });
 }
 

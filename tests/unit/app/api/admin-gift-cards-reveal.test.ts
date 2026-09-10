@@ -30,7 +30,10 @@ vi.mock("@/lib/services/gift-card-fulfillment", () => ({
 }));
 
 import { POST as reveal } from "@/app/api/admin/gift-cards/[id]/reveal/route";
-import { GiftCardDecryptionError } from "@/lib/gift-cards/encryption";
+import {
+  GiftCardDecryptionError,
+  GiftCardEncryptionConfigurationError,
+} from "@/lib/gift-cards/encryption";
 
 const context = { params: Promise.resolve({ id: "gift_card_1" }) };
 
@@ -182,8 +185,12 @@ describe("POST /api/admin/gift-cards/[id]/reveal", () => {
     }));
   });
 
-  it("reports a key-ring misconfiguration as 503, audited with reason configuration, never as code_unavailable (WR-02)", async () => {
-    mocks.revealGiftCardDeliveryCode.mockRejectedValue(new Error("GIFT_CARD_DELIVERY_KEYS_JSON is missing version 3"));
+  it("reports a rotated-out key version as 503, audited with reason configuration, never as code_unavailable (WR-02, WR-08)", async () => {
+    // The real error class `revealGiftCardDeliveryCode` throws when the
+    // delivery's code_key_version is absent from the parsed ring — proven
+    // against the real function in
+    // tests/integration/lib/services/gift-card-fulfillment.test.ts.
+    mocks.revealGiftCardDeliveryCode.mockRejectedValue(new GiftCardEncryptionConfigurationError());
     const response = await reveal(revealRequest({ confirm: true }), context);
     expect(response.status).toBe(503);
     const body = await response.json();
