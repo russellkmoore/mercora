@@ -49,6 +49,7 @@ import {
   isDigitalOnlyCart,
 } from '@/lib/checkout/digital-only';
 import type { StableCartItem } from '@/lib/types/cartitem';
+import { useStoreConfig } from '@/lib/store';
 
 interface CheckoutClientProps {
   userId: string | null;
@@ -99,6 +100,9 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
     appliedDiscounts,
     clearCart,
   } = useCartStore();
+
+  // Honor governs redemption. With it off the panel is simply absent (D-16).
+  const { commerce } = useStoreConfig();
 
   // The cart's fulfilment mix, derived once per render (D-01, D-02).
   const isDigitalOnly = isDigitalOnlyCart(items);
@@ -506,14 +510,16 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
           {currentStep === 'payment' && clientSecret && (
             <div className="bg-surface-elevated p-4 sm:p-6 rounded-xl w-full min-h-[400px]">
               <h3 className="text-lg font-semibold mb-4 text-foreground">Payment Information</h3>
-              <GiftCardApplyPanel
-                value={giftCardToken}
-                onChange={setGiftCardToken}
-                appliedCode={appliedGiftCard || undefined}
-                onApply={handleApplyGiftCard}
-                onRemove={handleRemoveGiftCard}
-                busy={isLoading}
-              />
+              {commerce.features.giftCardReconciliation && (
+                <GiftCardApplyPanel
+                  value={giftCardToken}
+                  onChange={setGiftCardToken}
+                  appliedCode={appliedGiftCard || undefined}
+                  onApply={handleApplyGiftCard}
+                  onRemove={handleRemoveGiftCard}
+                  busy={isLoading}
+                />
+              )}
               <div className="w-full">
                 {/* Keyed on the client secret: Elements cannot change secrets
                     after mount, so a re-quote must remount the form. */}
