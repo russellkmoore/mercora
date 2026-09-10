@@ -100,6 +100,42 @@ describe('gift-card presentation routes', () => {
     expect(mocks.context).not.toHaveBeenCalled();
   });
 
+  it('lists cards to an admin with sell on and honor off, which is deliberate (WR-12, D-14)', async () => {
+    // The old gate was `reconciliation !== true -> empty`, so this state used
+    // to return nothing. Opening it up is the right call and not an accident:
+    // this is the admin queue behind checkAdminPermissions, D-14 keeps the card
+    // visible to the people who administer it regardless of the flags, and
+    // Phase 14's management depends on that. The combination is invalid and
+    // should never be deployed (capability resolution throws for anything that
+    // resolves capabilities), but hiding an operator's view of outstanding
+    // cards is not how an invalid config should be surfaced.
+    mocks.context.mockResolvedValue({
+      env: { DB: {}, STORE_FEATURE_GIFT_CARD_ACQUISITION: 'true' },
+    });
+    const response = await adminGet(new NextRequest('https://store.example/api/admin/gift-cards'));
+
+    expect(response.status).toBe(200);
+    // The honor guard is not consulted at all: the both-off gate is the only
+    // thing that reads it, and sell is on here.
+    expect(mocks.honorIsEffectivelyOn).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a configuration throw as a 503 rather than a stack trace', async () => {
+    // Whatever throws under this route — a capability configuration error, a
+    // D1 failure — an operator gets one fail-closed status and a message that
+    // names no internals.
+    mocks.context.mockResolvedValue({ env: { DB: {}, STORE_FEATURE_GIFT_CARD_RECONCILIATION: 'true' } });
+    mocks.adminCards.mockRejectedValue(new Error('CommerceCapabilityConfigurationError'));
+
+    const response = await adminGet(new NextRequest('https://store.example/api/admin/gift-cards'));
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      code: 'gift_cards_read_failed',
+      error: 'Gift cards are temporarily unavailable',
+    });
+  });
+
   it('404s the public balance route when both flags are off', async () => {
     mocks.context.mockResolvedValue({ env: { DB: {} } });
     const response = await balancePost(balanceRequest('ABC123'));
