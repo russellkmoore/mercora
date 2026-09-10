@@ -74,6 +74,10 @@ describe("product subscription acquisition integration", () => {
     // a SetupIntent in the gap.
     expect(region.indexOf("setCompletedOwner(null)")).toBeLessThan(region.indexOf("await fetchSavedAddressesForPlan("));
     expect(source).toContain("disabled={working || loadingAddresses || !accepted");
+    // The refresh is abortable like every other async path in the panel.
+    expect(region).toContain("fetchSavedAddressesForPlan(fetch, selectedPlan, controller.signal)");
+    expect(region).toContain("refreshControllerRef.current = controller");
+    expect(source).toContain("useEffect(() => () => refreshControllerRef.current?.abort(), []);");
 
     // D-06: the signed-out branch is untouched -- exactly one sign-in button.
     expect(source.split('<SignInButton mode="modal">').length - 1).toBe(1);
