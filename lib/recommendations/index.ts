@@ -4,6 +4,8 @@ import { getRecommendationSettings } from "@/lib/utils/settings";
 import { blendRecommendations } from "./blend";
 import { getProvider } from "./providers/registry";
 import type { RecsUserContext } from "./types";
+import { getStoreConfig } from "@/lib/store-config";
+import { filterListedProducts } from "@/lib/gift-cards/visibility";
 
 export async function getRecommendationsForProduct(
   product: Product,
@@ -13,7 +15,11 @@ export async function getRecommendationsForProduct(
     const settings = await getRecommendationSettings();
     const requestedLimit = options.limit ?? settings.limit;
     const limit = Math.max(1, Math.min(6, Math.trunc(requestedLimit)));
-    const allProducts = await listProducts({ status: ["active"] });
+    const { giftCardAcquisition } = getStoreConfig().commerce.features;
+    const allProducts = filterListedProducts(
+      await listProducts({ status: ["active"] }),
+      { giftCardAcquisition },
+    );
     const provider = getProvider(settings.strategy);
 
     let base: Product[] = [];

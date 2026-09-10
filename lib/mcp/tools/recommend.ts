@@ -6,6 +6,8 @@ import { Money } from '../../money';
 import { toPublicProduct, toWireProduct, type WireProduct } from '../../models/mach/product-serializer';
 import { genericBundleSuggestions } from '../catalog';
 import { isBoundedString, isPlainRecord } from '../../public-request-validation';
+import { getStoreConfig } from '../../store-config';
+import { filterListedProducts } from '../../gift-cards/visibility';
 
 export async function getRecommendations(
   request: RecommendRequest,
@@ -45,7 +47,11 @@ export async function getRecommendations(
       // General recommendations based on user context
       recommendations = await getGeneralRecommendations(userContext);
     }
-    
+
+    // Hide the gift card while selling is off (D-14).
+    const { giftCardAcquisition } = getStoreConfig().commerce.features;
+    recommendations = filterListedProducts(recommendations, { giftCardAcquisition });
+
     // Filter by budget if provided
     if (context.budget || userContext.budget) {
       const budget = context.budget || userContext.budget;

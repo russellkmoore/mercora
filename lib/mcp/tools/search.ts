@@ -4,6 +4,8 @@ import { enhanceUserContext } from '../context';
 import { toPublicProduct, toWireProduct, type WireProduct } from '../../models/mach/product-serializer';
 import { isBoundedString, isPlainRecord } from '../../public-request-validation';
 import { Money } from '../../money';
+import { getStoreConfig } from '../../store-config';
+import { filterListedProducts } from '../../gift-cards/visibility';
 
 export async function searchProductsWithContext(
   request: SearchRequest,
@@ -47,7 +49,11 @@ export async function searchProductsWithContext(
     const products = await searchProducts(request.query);
     
     // Filter by user preferences if provided
-    let filteredProducts = products.filter((product) => product.status === 'active');
+    const { giftCardAcquisition } = getStoreConfig().commerce.features;
+    let filteredProducts = filterListedProducts(
+      products.filter((product) => product.status === 'active'),
+      { giftCardAcquisition },
+    );
     if (options.category) {
       const category = options.category.toLowerCase();
       filteredProducts = filteredProducts.filter((product) =>
