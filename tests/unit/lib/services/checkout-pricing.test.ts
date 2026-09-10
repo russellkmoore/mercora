@@ -49,6 +49,7 @@ function dependencies(overrides: Record<string, unknown> = {}) {
         ? { amount: params.shipping_cost.amount, amount_tax: 0 }
         : null,
     })),
+    giftCardSalesEnabled: vi.fn(() => true),
     ...overrides,
   };
 }
@@ -906,5 +907,122 @@ describe('server-authoritative checkout pricing', () => {
     }, { dependencies: deps as any });
     expect(quote.discount).toEqual({ amount: 0, currency: 'USD' });
     expect(quote.discountCodes).toEqual([]);
+  });
+});
+
+describe('gift-card sales flag (sell) at pricing time', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /**
+   * Sell is off. The dependency is injected rather than read from the
+   * environment so the assertion is about `priceCheckout`'s decision, not
+   * about how a test process happens to be configured.
+   */
+  function sellOffDependencies(overrides: Record<string, unknown> = {}) {
+    return dependencies({
+      giftCardSalesEnabled: vi.fn(() => false),
+      getProduct: vi.fn(async (id: string) => id === 'gift_product'
+        ? {
+            id, name: 'Gift card', type: 'gift_card', fulfillment_type: 'digital',
+            status: 'active', tax_category: 'txcd_99999999', default_variant_id: 'gift_variant',
+          }
+        : {
+            id, name: 'Catalog name', status: 'active', categories: ['category-1'],
+            tax_category: 'txcd_99999999', default_variant_id: 'var_1',
+          }),
+      getProductVariant: vi.fn(async (id: string) => id === 'gift_variant'
+        ? {
+            id, product_id: 'gift_product', sku: 'GIFT', status: 'active',
+            option_values: [], shipping_required: false, price: Money.fromMinor(2_500).toJSON(),
+          }
+        : {
+            id, product_id: 'prod_1', sku: 'SKU-1', status: 'active',
+            option_values: [], price: Money.fromMinor(2_000).toJSON(),
+          }),
+      ...overrides,
+    });
+  }
+
+  const giftLine = {
+    lineId: 'line_0123456789abcdef', productId: 'gift_product', variantId: 'gift_variant', quantity: 1,
+    giftCardCustomization: { recipientEmail: 'recipient@example.test' },
+  };
+
+  async function rejection(promise: Promise<unknown>): Promise<unknown> {
+    return promise.then(() => null, (error: unknown) => error);
+  }
+
+  it('refuses to price a gift-card line while selling is off', async () => {
+    const error = await rejection(priceCheckout({
+      items: [giftLine],
+      shippingAddress: address,
+      shippingMethodId: '',
+    }, { dependencies: sellOffDependencies() as any }));
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).name).toBe('GiftCardSalesDisabledError');
+    expect((error as Error).message).toBe('Gift-card sales are disabled');
+  });
+
+  it('prices a cart with no gift-card line normally while selling is off', async () => {
+    const quote = await priceCheckout({
+      items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],
+      shippingAddress: address,
+      shippingMethodId: 'standard',
+    }, { dependencies: sellOffDependencies() as any });
+
+    expect(quote.total).toEqual({ amount: 2_700, currency: 'USD' });
+  });
+
+  it('refuses the sale before considering tender when a gift-card line arrives with a code', async () => {
+    // A shopper holding a balance still cannot buy a new card while selling is
+    // off, and the refusal names the sale — not the tender — as the reason.
+    const resolveTender = vi.fn(async ({ currency }: { currency: string }) => ({
+      amount: Money.zero(currency),
+    }));
+    const error = await rejection(priceCheckout({
+      items: [giftLine],
+      shippingAddress: address,
+      shippingMethodId: '',
+      giftCardToken: 'GC-2345-2345-2345-2345-2345-2345-2345',
+      giftCardRequestKey: 'checkout-gift-1',
+    }, {
+      dependencies: sellOffDependencies() as any,
+      capabilities: {
+        giftCards: { resolveTender, verifyReservedTender: vi.fn(), applyTender: vi.fn() },
+        subscriptions: { orderPaid: vi.fn() },
+      },
+    }));
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).name).toBe('GiftCardSalesDisabledError');
+    expect(resolveTender).not.toHaveBeenCalled();
+  });
+
+  it('still redeems a gift-card code against a non-gift cart while selling is off', async () => {
+    // Redemption is honor's business, not sell's (D-03): stopping sales must
+    // not strand a balance the shopper already paid for.
+    const resolveTender = vi.fn(async ({ currency }: { currency: string }) => ({
+      amount: Money.fromMinor(500, currency),
+    }));
+    const quote = await priceCheckout({
+      items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],
+      shippingAddress: address,
+      shippingMethodId: 'standard',
+      giftCardToken: 'GC-2345-2345-2345-2345-2345-2345-2345',
+      giftCardRequestKey: 'checkout-gift-2',
+    }, {
+      dependencies: sellOffDependencies() as any,
+      capabilities: {
+        giftCards: { resolveTender, verifyReservedTender: vi.fn(), applyTender: vi.fn() },
+        subscriptions: { orderPaid: vi.fn() },
+      },
+    });
+
+    expect(resolveTender).toHaveBeenCalledOnce();
+    expect(quote.tender).toEqual({ amount: 500, currency: 'USD' });
+    expect(quote.total).toEqual({ amount: 2_200, currency: 'USD' });
   });
 });
