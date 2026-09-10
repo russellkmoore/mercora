@@ -213,12 +213,20 @@ export interface OutstandingGiftCardBalances {
   openReservations: number;
   /** `null` when there are no active cards; callers pick their own default. */
   currency: string | null;
+  /**
+   * How many distinct currencies the active cards span. `outstandingMinor` is
+   * a bare SUM of minor units, so it is only a real total when this is 1 —
+   * above that it is a signal that money exists, not an amount anyone can
+   * format. Callers must not print it as `currency`.
+   */
+  currencyCount: number;
 }
 
 interface OutstandingTotalsRow {
   outstanding_minor: number | null;
   cards_with_balance: number | null;
   currency: string | null;
+  currency_count: number | null;
 }
 
 interface OpenReservationsRow {
@@ -240,6 +248,13 @@ function toCount(value: unknown): number {
  * The balance half reuses `availableBalanceExpression`, the same SQL
  * `readBalance` and the reservation guard trigger use, so there is exactly one
  * definition of "available" in the codebase.
+ *
+ * `outstandingMinor` sums minor units across every active card without
+ * grouping, and `currency` is whichever code sorts first. In a single-currency
+ * store — which is what `storeDefaults.commerce.currency` describes — that is a
+ * real total. In a store holding both USD and EUR cards it is not a total of
+ * anything, so `currencyCount` is reported alongside it and callers are
+ * expected to refuse to format the number when it is above 1.
  */
 export async function sumOutstandingGiftCardBalances(
   database: D1Database,
@@ -253,7 +268,8 @@ export async function sumOutstandingGiftCardBalances(
     database.prepare(`SELECT
         COALESCE(SUM(${balance}), 0) AS outstanding_minor,
         COALESCE(SUM(CASE WHEN ${balance} > 0 THEN 1 ELSE 0 END), 0) AS cards_with_balance,
-        MIN(account.currency_code) AS currency
+        MIN(account.currency_code) AS currency,
+        COUNT(DISTINCT account.currency_code) AS currency_count
       FROM gift_card_accounts account
       WHERE account.status = 'active'`)
       .bind(/* SUM(...) */ nowSeconds, /* CASE WHEN ... */ nowSeconds),
@@ -292,6 +308,7 @@ export async function sumOutstandingGiftCardBalances(
     cardsWithBalance: toCount(totals?.cards_with_balance),
     openReservations: toCount(open?.open_reservations),
     currency: typeof totals?.currency === "string" ? totals.currency : null,
+    currencyCount: toCount(totals?.currency_count),
   };
 }
 

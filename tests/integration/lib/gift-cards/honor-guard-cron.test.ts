@@ -4,6 +4,7 @@ import { applyTestMigrations } from "../../helpers/d1";
 import { Money } from "@/lib/money";
 import { createGiftCardRepository } from "@/lib/gift-cards/repository";
 import {
+  HONOR_GUARD_MIXED_CURRENCY,
   HONOR_GUARD_SETTING_KEY,
   readHonorGuard,
   runGiftCardHonorGuard,
@@ -106,6 +107,26 @@ describe("runGiftCardHonorGuard on real D1", () => {
       measured_at: now,
     });
     expect(alarms).toEqual([]);
+  });
+
+  it("marks the currency mixed rather than formatting a cross-currency sum", async () => {
+    // MIN(currency_code) used to name whichever code sorted first, so a store
+    // holding USD and EUR cards got a number that is not a total of anything
+    // formatted as if it were. The total still answers "is there money out
+    // there", so it is kept; the currency is what becomes untrustworthy.
+    await issueCardWorth(2_500);
+    await createGiftCardRepository(env.DB).issueAccount({
+      id: `${giftCardId}_eur`,
+      codeHash: { keyVersion: 1, digest: (testSequence + 0x3000).toString(16).padStart(64, "0") },
+      amount: Money.fromMinor(500, "EUR"),
+      createdAt: now,
+    });
+
+    const { result } = await tick(true);
+
+    expect(result.record.currency).toBe(HONOR_GUARD_MIXED_CURRENCY);
+    expect(result.record.outstanding_minor).toBe(3_000);
+    expect(result.honorEffective).toBe(true);
   });
 
   it("writes the measurement under the fixed key rather than a second row", async () => {

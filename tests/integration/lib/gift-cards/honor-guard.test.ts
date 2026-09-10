@@ -89,6 +89,7 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
       cardsWithBalance: 0,
       openReservations: 0,
       currency: null,
+      currencyCount: 0,
     });
   });
 
@@ -100,6 +101,7 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
       cardsWithBalance: 1,
       openReservations: 0,
       currency: "USD",
+      currencyCount: 1,
     });
   });
 
@@ -113,6 +115,7 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
       cardsWithBalance: 1,
       openReservations: 1,
       currency: "USD",
+      currencyCount: 1,
     });
   });
 
@@ -130,6 +133,7 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
       cardsWithBalance: 1,
       openReservations: 0,
       currency: "USD",
+      currencyCount: 1,
     });
   });
 
@@ -154,6 +158,7 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
       cardsWithBalance: 1,
       openReservations: 0,
       currency: "USD",
+      currencyCount: 1,
     });
   });
 
@@ -180,6 +185,7 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
       cardsWithBalance: 0,
       openReservations: 1,
       currency: "USD",
+      currencyCount: 1,
     });
 
     // The whole point: with the card reading zero, the reservation count is
@@ -204,6 +210,27 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
       cardsWithBalance: 1,
       openReservations: 0,
       currency: "USD",
+      currencyCount: 1,
+    });
+  });
+
+  it("reports the currency span so a mixed-currency sum is never printed as money", async () => {
+    // `outstandingMinor` is a bare SUM with no GROUP BY. Two currencies make it
+    // a number that is not a total of anything, formatted under whichever code
+    // sorts first. It is still a valid answer to "is there money out there", so
+    // it is kept and the span is reported alongside it.
+    const repository = createGiftCardRepository(env.DB);
+    await repository.issueAccount(issuance());
+    await repository.issueAccount(issuance({
+      id: `${giftCardId}_eur`,
+      codeHash: { keyVersion: 1, digest: (testSequence + 0x2000).toString(16).padStart(64, "0") },
+      amount: Money.fromMinor(500, "EUR"),
+    }));
+
+    await expect(sumOutstandingGiftCardBalances(env.DB, now)).resolves.toMatchObject({
+      outstandingMinor: 1_500,
+      cardsWithBalance: 2,
+      currencyCount: 2,
     });
   });
 
@@ -218,6 +245,7 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
       cardsWithBalance: 0,
       openReservations: 0,
       currency: null,
+      currencyCount: 0,
     });
   });
 });
