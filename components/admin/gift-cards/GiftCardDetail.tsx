@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import { Money, type MachMoney } from "@/lib/money";
 import { maskGiftCardCodeSuffix } from "@/lib/gift-cards/code";
+import GiftCardActionBar from "./GiftCardActionBar";
 import GiftCardTimeline, { type GiftCardTimelineEntry } from "./GiftCardTimeline";
 
 export interface GiftCardDetailCard {
@@ -61,11 +64,17 @@ function formatDate(epochSeconds: number | null): string {
   return epochSeconds ? new Date(epochSeconds * 1_000).toLocaleString() : "—";
 }
 
+const NOTE_MAX_LENGTH = 2_000;
+
 export default function GiftCardDetail({ giftCardId }: { giftCardId: string }) {
   const [card, setCard] = useState<GiftCardDetailCard | null>(null);
+  const [reservations, setReservations] = useState<GiftCardReservationView[]>([]);
+  const [capabilities, setCapabilities] = useState<{ codeRevealEnabled: boolean }>({ codeRevealEnabled: false });
   const [events, setEvents] = useState<GiftCardTimelineEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [noteText, setNoteText] = useState("");
+  const [noteSaving, setNoteSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -84,6 +93,8 @@ export default function GiftCardDetail({ giftCardId }: { giftCardId: string }) {
         throw new Error(eventsPayload.error ?? "Gift-card history could not be loaded");
       }
       setCard(cardPayload.card);
+      setReservations(cardPayload.reservations ?? []);
+      setCapabilities(cardPayload.capabilities ?? { codeRevealEnabled: false });
       setEvents(eventsPayload.events ?? []);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Gift card could not be loaded");
@@ -93,6 +104,30 @@ export default function GiftCardDetail({ giftCardId }: { giftCardId: string }) {
   }, [giftCardId]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // D-11/GCA-03: a 1-2000 character CSR note, prepended to the timeline on
+  // success by refetching it via `load()`.
+  const submitNote = useCallback(async () => {
+    const text = noteText.trim();
+    if (!text) return;
+    setNoteSaving(true);
+    try {
+      const response = await fetch(`/api/admin/gift-cards/${encodeURIComponent(giftCardId)}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "Failed to save note");
+      toast.success("Note added");
+      setNoteText("");
+      await load();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Failed to save note");
+    } finally {
+      setNoteSaving(false);
+    }
+  }, [giftCardId, noteText, load]);
 
   if (loading) {
     return <div role="status" className="rounded-lg border border-neutral-700 bg-neutral-900 p-6 text-sm text-gray-300">Loading gift card…</div>;
@@ -177,6 +212,33 @@ export default function GiftCardDetail({ giftCardId }: { giftCardId: string }) {
                 : "Not queued"}
             </p>
           </div>
+        </div>
+      </Card>
+
+      <GiftCardActionBar
+        giftCardId={giftCardId}
+        card={card}
+        reservations={reservations}
+        capabilities={capabilities}
+        onChanged={() => void load()}
+      />
+
+      <Card className="admin-card space-y-3 p-6">
+        <h2 className="text-lg font-semibold text-white">Add a note</h2>
+        <Textarea
+          value={noteText}
+          maxLength={NOTE_MAX_LENGTH}
+          disabled={noteSaving}
+          onChange={(event) => setNoteText(event.target.value)}
+          placeholder="Add context for future admins…"
+          rows={3}
+        />
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-gray-500">{NOTE_MAX_LENGTH - noteText.length} characters remaining</span>
+          <Button size="sm" onClick={() => void submitNote()} disabled={noteSaving || !noteText.trim()}>
+            {noteSaving ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Save note
+          </Button>
         </div>
       </Card>
 
