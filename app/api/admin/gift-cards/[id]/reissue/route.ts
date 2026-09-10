@@ -12,7 +12,6 @@ import { parseGiftCardCodeKeyRing, parseGiftCardDeliveryKeyRing } from "@/lib/gi
 import { parseGiftCardCustomization } from "@/lib/gift-cards/customization";
 import { giftCardReissueDeliveryId, giftCardReissueId } from "@/lib/gift-cards/domain";
 import { encryptGiftCardDeliveryCode } from "@/lib/gift-cards/encryption";
-import { appendGiftCardEvent } from "@/lib/gift-cards/events";
 import { resolveHonorEffective } from "@/lib/gift-cards/honor-guard";
 import {
   GiftCardConflictError,
@@ -24,9 +23,11 @@ import { giftCardSurfacesHidden } from "@/lib/gift-cards/visibility";
 /**
  * D-06/D-13/D-19: drain a disabled card's remaining balance into a new card,
  * once only. `repository.reissue` owns the status/reservation/balance checks
- * and the drain-and-issue ordering; this route generates the new card's
- * bearer material the way `issueAdminGiftCard` does and writes the paired
- * `reissued`/`reissued_from` audit events (T-14-44, T-14-45).
+ * and writes the drain adjustment, the new card, its delivery row and the
+ * paired `reissued`/`reissued_from` audit events in one D1 batch, so nothing
+ * here runs after the money moves; this route only generates the new card's
+ * bearer material the way `issueAdminGiftCard` does and hands the actor in
+ * (T-14-44, T-14-45).
  */
 export async function POST(
   request: NextRequest,
@@ -102,6 +103,7 @@ export async function POST(
     const result = await repository.reissue({
       oldGiftCardId: id,
       now,
+      actor,
       codeHash,
       codeSuffix: giftCardCodeSuffix(code) ?? undefined,
       delivery: {
@@ -112,25 +114,6 @@ export async function POST(
         codeNonce: encrypted.nonce,
         codeKeyVersion: encrypted.keyVersion,
       },
-    });
-
-    await appendGiftCardEvent({
-      giftCardId: id,
-      eventType: "reissued",
-      actor,
-      details: {
-        to_gift_card_id: result.newGiftCardId,
-        amount_minor: result.amount.toMinorUnits(),
-        recipient_email: recipientEmail,
-      },
-      createdAt: now,
-    });
-    await appendGiftCardEvent({
-      giftCardId: result.newGiftCardId,
-      eventType: "reissued_from",
-      actor,
-      details: { from_gift_card_id: id },
-      createdAt: now,
     });
 
     return NextResponse.json({

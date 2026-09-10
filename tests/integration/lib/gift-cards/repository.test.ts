@@ -13,6 +13,7 @@ import type { IssueGiftCardInput, ReserveGiftCardInput } from "@/lib/gift-cards/
 
 const now = 1_800_000_000;
 const quote = "b".repeat(64);
+const ADMIN_ACTOR = { type: "admin", id: "user_admin" } as const;
 let testSequence = 0;
 let giftCardId = "gift_uninitialized";
 let hash = "0".repeat(64);
@@ -659,6 +660,7 @@ describe("gift-card repository on real D1", () => {
     const result = await repository.reissue({
       oldGiftCardId: giftCardId,
       now: now + 2,
+      actor: ADMIN_ACTOR,
       codeHash: { keyVersion: 1, digest: altDigest(1) },
       codeSuffix: "4A7K",
     });
@@ -676,6 +678,100 @@ describe("gift-card repository on real D1", () => {
       status: "active",
       issuedAmount: Money.fromMinor(1_000, "USD"),
     });
+
+    // WR-01: the paired audit rows are part of the same batch as the money.
+    const events = await env.DB.prepare(`SELECT gift_card_id, event_type, actor_type, actor_id, details
+      FROM gift_card_events WHERE gift_card_id IN (?, ?) ORDER BY event_type`)
+      .bind(giftCardId, expectedNewId)
+      .all<{ gift_card_id: string; event_type: string; actor_type: string; actor_id: string; details: string }>();
+    expect(events.results.map((row) => ({ ...row, details: JSON.parse(row.details) }))).toEqual([
+      {
+        gift_card_id: giftCardId,
+        event_type: "reissued",
+        actor_type: "admin",
+        actor_id: "user_admin",
+        details: { to_gift_card_id: expectedNewId, amount_minor: 1_000 },
+      },
+      {
+        gift_card_id: expectedNewId,
+        event_type: "reissued_from",
+        actor_type: "admin",
+        actor_id: "user_admin",
+        details: { from_gift_card_id: giftCardId },
+      },
+    ]);
+  });
+
+  it("rolls back the drain when a later write in the same batch fails, and a clean retry then succeeds (D-19)", async () => {
+    // CR-01: inject a failure *after* the adjustment statement — the new card's
+    // delivery row reuses a delivery id that already exists, so its INSERT
+    // violates the primary key. Before the fix the adjustment had already
+    // committed on its own and every retry was stuck at "no available balance".
+    const repository = createGiftCardRepository(env.DB);
+    await repository.issueAccount(issuance({
+      delivery: {
+        id: `${giftCardId}_delivery`,
+        recipientEmail: "buyer@example.test",
+        emailIdempotencyKey: `gift-card-delivery/${giftCardId}/v1`,
+        codeCiphertext: "ciphertext-placeholder",
+        codeNonce: "nonce-placeholder",
+        codeKeyVersion: 1,
+      },
+    }));
+    await repository.disableAccount({ giftCardId, disabledAt: now + 1 });
+    const expectedNewId = await giftCardReissueId(giftCardId);
+
+    await expect(repository.reissue({
+      oldGiftCardId: giftCardId,
+      now: now + 2,
+      actor: ADMIN_ACTOR,
+      codeHash: { keyVersion: 1, digest: altDigest(1) },
+      delivery: {
+        id: `${giftCardId}_delivery`, // collides with the old card's delivery row
+        recipientEmail: "buyer@example.test",
+        emailIdempotencyKey: `gift-card-delivery/${expectedNewId}/v1`,
+        codeCiphertext: "ciphertext-placeholder",
+        codeNonce: "nonce-placeholder",
+        codeKeyVersion: 1,
+      },
+    })).rejects.toThrow();
+
+    // Nothing landed: the old card still holds its full balance, no
+    // adjustment, no new account, no audit rows.
+    await expect(repository.readBalance(giftCardId, now + 2)).resolves.toMatchObject({
+      availableBalance: Money.fromMinor(1_000, "USD"),
+    });
+    const adjustments = await env.DB.prepare(`SELECT COUNT(*) AS count FROM gift_card_ledger_entries
+      WHERE gift_card_id = ? AND entry_type = 'adjustment'`).bind(giftCardId).first<{ count: number }>();
+    expect(adjustments?.count).toBe(0);
+    await expect(repository.findAccountById(expectedNewId)).resolves.toBeUndefined();
+    const events = await env.DB.prepare(`SELECT COUNT(*) AS count FROM gift_card_events
+      WHERE gift_card_id IN (?, ?)`).bind(giftCardId, expectedNewId).first<{ count: number }>();
+    expect(events?.count).toBe(0);
+
+    // A clean retry — with a fresh code, exactly as the route would mint one —
+    // succeeds from the untouched state.
+    const retry = await repository.reissue({
+      oldGiftCardId: giftCardId,
+      now: now + 3,
+      actor: ADMIN_ACTOR,
+      codeHash: { keyVersion: 1, digest: altDigest(2) },
+      delivery: {
+        id: `${expectedNewId}_delivery`,
+        recipientEmail: "buyer@example.test",
+        emailIdempotencyKey: `gift-card-delivery/${expectedNewId}/v1`,
+        codeCiphertext: "ciphertext-placeholder",
+        codeNonce: "nonce-placeholder",
+        codeKeyVersion: 1,
+      },
+    });
+    expect(retry).toMatchObject({ created: true, newGiftCardId: expectedNewId, amount: Money.fromMinor(1_000, "USD") });
+    await expect(repository.readBalance(giftCardId, now + 3)).resolves.toMatchObject({
+      availableBalance: Money.zero("USD"),
+    });
+    await expect(repository.readBalance(expectedNewId, now + 3)).resolves.toMatchObject({
+      availableBalance: Money.fromMinor(1_000, "USD"),
+    });
   });
 
   it("fails a second reissue attempt on the same card and leaves no partial state", async () => {
@@ -684,12 +780,14 @@ describe("gift-card repository on real D1", () => {
     await repository.disableAccount({ giftCardId, disabledAt: now + 1 });
     await repository.reissue({
       oldGiftCardId: giftCardId,
+      actor: ADMIN_ACTOR,
       now: now + 2,
       codeHash: { keyVersion: 1, digest: altDigest(1) },
     });
 
     await expect(repository.reissue({
       oldGiftCardId: giftCardId,
+      actor: ADMIN_ACTOR,
       now: now + 3,
       codeHash: { keyVersion: 1, digest: altDigest(2) },
     })).rejects.toBeInstanceOf(GiftCardConflictError);
@@ -709,6 +807,7 @@ describe("gift-card repository on real D1", () => {
     await repository.issueAccount(issuance());
     await expect(repository.reissue({
       oldGiftCardId: giftCardId,
+      actor: ADMIN_ACTOR,
       now: now + 1,
       codeHash: { keyVersion: 1, digest: altDigest(1) },
     })).rejects.toBeInstanceOf(GiftCardConflictError);
@@ -726,6 +825,7 @@ describe("gift-card repository on real D1", () => {
     await repository.disableAccount({ giftCardId: openBlockedId, disabledAt: now + 1 });
     await expect(repository.reissue({
       oldGiftCardId: openBlockedId,
+      actor: ADMIN_ACTOR,
       now: now + 2,
       codeHash: { keyVersion: 1, digest: altDigest(1) },
     })).rejects.toBeInstanceOf(GiftCardConflictError);
@@ -751,6 +851,7 @@ describe("gift-card repository on real D1", () => {
     await repository.disableAccount({ giftCardId: committedBlockedId, disabledAt: now + 2 });
     await expect(repository.reissue({
       oldGiftCardId: committedBlockedId,
+      actor: ADMIN_ACTOR,
       now: now + 3,
       codeHash: { keyVersion: 1, digest: altDigest(3) },
     })).rejects.toBeInstanceOf(GiftCardConflictError);
