@@ -22,6 +22,18 @@ export class GiftCardSalesDisabledError extends Error {
   }
 }
 
+/**
+ * What to tell a caller whose cart holds a gift card the store has stopped
+ * selling. It names the one action that clears the problem, because "check your
+ * gift-card code" is useless advice to someone who has not typed one (D-16).
+ *
+ * Shared rather than duplicated so the browser client and an MCP agent are told
+ * the same thing about the same state; the code beside it is what an agent
+ * actually branches on.
+ */
+export const GIFT_CARD_SALES_DISABLED_MESSAGE =
+  "Gift cards aren't on sale right now. Remove the gift card from your cart to continue checking out.";
+
 export interface GiftCardOrderLineSnapshot {
   lineId: string;
   recipientEmail: string;
