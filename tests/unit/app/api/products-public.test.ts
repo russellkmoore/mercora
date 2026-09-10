@@ -9,12 +9,29 @@ vi.mock('@/lib/models/mach/products', () => ({
   updateProduct: vi.fn(),
   deleteProduct: vi.fn(),
 }));
+vi.mock('@/lib/store-config', () => ({ getStoreConfig: vi.fn() }));
 
 import { NextRequest } from 'next/server';
 import { GET as getProducts } from '@/app/api/products/route';
 import { GET as getProductDetail } from '@/app/api/products/[id]/route';
 import { checkAdminPermissions } from '@/lib/auth/admin-middleware';
 import { getProduct, getProductsByCategory, listProducts } from '@/lib/models/mach/products';
+import { getStoreConfig } from '@/lib/store-config';
+
+/** Defaults both gift-card flags on so the existing cases keep passing unchanged. */
+function setGiftCardFeatures(
+  overrides: Partial<{ giftCardAcquisition: boolean; giftCardReconciliation: boolean }> = {},
+) {
+  vi.mocked(getStoreConfig).mockReturnValue({
+    commerce: {
+      features: {
+        giftCardAcquisition: true,
+        giftCardReconciliation: true,
+        ...overrides,
+      },
+    },
+  } as never);
+}
 
 const activeProduct = {
   id: 'active-product',
@@ -43,6 +60,13 @@ const inactiveProduct = {
   status: 'inactive',
 };
 
+const giftCardProduct = {
+  ...activeProduct,
+  id: 'gift-card-product',
+  name: 'Gift card',
+  type: 'gift_card',
+};
+
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
 describe('public product endpoints', () => {
@@ -52,6 +76,7 @@ describe('public product endpoints', () => {
       success: false,
       error: 'Authentication required. Please sign in.',
     });
+    setGiftCardFeatures();
   });
 
   it('keeps list GET public but returns active products only with public fields', async () => {
@@ -146,5 +171,43 @@ describe('public product endpoints', () => {
     expect(body.data.variants[0]).toHaveProperty('cost');
     expect(body.data.variants[0]).toHaveProperty('inventory');
     expect(body.data).toHaveProperty('extensions.secret', 'internal-value');
+  });
+
+  it('omits the gift card from an anonymous listing with sell off (GCF-01, GCF-03, D-14)', async () => {
+    setGiftCardFeatures({ giftCardAcquisition: false });
+    vi.mocked(listProducts).mockResolvedValue([activeProduct, giftCardProduct] as never);
+
+    const response = await getProducts(new NextRequest('http://localhost/api/products'));
+    const body = await response.json() as any;
+
+    expect(body.data.map((product: any) => product.id)).toEqual(['active-product']);
+    expect(body.meta.total).toBe(1);
+  });
+
+  it('still returns the gift card to an authenticated admin with sell off (D-14)', async () => {
+    setGiftCardFeatures({ giftCardAcquisition: false });
+    vi.mocked(checkAdminPermissions).mockResolvedValue({ success: true, userId: 'admin-1' });
+    vi.mocked(listProducts).mockResolvedValue([activeProduct, giftCardProduct] as never);
+
+    const response = await getProducts(new NextRequest('http://localhost/api/products'));
+    const body = await response.json() as any;
+
+    expect(body.data.map((product: any) => product.id).sort()).toEqual(
+      ['active-product', 'gift-card-product'].sort()
+    );
+    expect(body.meta.total).toBe(2);
+  });
+
+  it('returns the gift card to an anonymous caller with sell on', async () => {
+    setGiftCardFeatures({ giftCardAcquisition: true });
+    vi.mocked(listProducts).mockResolvedValue([activeProduct, giftCardProduct] as never);
+
+    const response = await getProducts(new NextRequest('http://localhost/api/products'));
+    const body = await response.json() as any;
+
+    expect(body.data.map((product: any) => product.id).sort()).toEqual(
+      ['active-product', 'gift-card-product'].sort()
+    );
+    expect(body.meta.total).toBe(2);
   });
 });
