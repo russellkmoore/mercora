@@ -262,6 +262,16 @@ describe('gift-card presentation routes', () => {
       expect(call.amount.toMinorUnits()).toBe(2_500);
     });
 
+    it('normalizes the recipient once so the event and the delivery agree on the address (IN-05)', async () => {
+      mocks.context.mockResolvedValue({ env: { DB: {}, STORE_FEATURE_GIFT_CARD_RECONCILIATION: 'true' } });
+      const response = await adminPost(createRequest({ ...validCreateBody, recipientEmail: '  Shopper@Example.COM ' }));
+      expect(response.status).toBe(201);
+      expect(mocks.issueAdminGiftCard).toHaveBeenCalledWith(expect.objectContaining({ recipientEmail: 'shopper@example.com' }));
+      expect(mocks.appendGiftCardEvent).toHaveBeenCalledWith(expect.objectContaining({
+        details: expect.objectContaining({ recipient_email: 'shopper@example.com' }),
+      }));
+    });
+
     it('issues a card, writes one admin_created event, and returns the new card id', async () => {
       mocks.context.mockResolvedValue({ env: { DB: {}, STORE_FEATURE_GIFT_CARD_RECONCILIATION: 'true' } });
       const response = await adminPost(createRequest(validCreateBody));
