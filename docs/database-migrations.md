@@ -39,3 +39,13 @@ The script verifies migration status after apply and aborts a failed/unknown
 status. Keep migrations additive (expand first, deploy compatible code, then
 contract in a later release) and take a durable backup before a destructive or
 data-changing production migration.
+
+## 0024_add_gift_card_events.sql
+
+Applied on deploy like every other tracked migration — a push to `main` runs
+`npm run deploy:ci` on Cloudflare Workers Builds, which applies pending remote
+migrations before uploading the new Worker (see `docs/DEPLOYMENT_SETUP.md` §6
+Step 1b and §9). It creates the gift-card event log and adds one nullable
+column, and is expand-only like every migration in this repository. Gift
+cards issued before it carry no code suffix and are not searchable by one —
+there is no backfill.
