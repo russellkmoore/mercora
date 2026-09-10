@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { requireAdminSession } from "@/lib/auth/admin-session";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import GiftCardDetail from "@/components/admin/gift-cards/GiftCardDetail";
 import { giftCardSurfacesHidden } from "@/lib/gift-cards/visibility";
@@ -26,6 +27,7 @@ export default async function AdminGiftCardDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireAdminSession();
   const { id } = await params;
   const { env } = await getCloudflareContext({ async: true });
   const environment = env as unknown as Record<string, unknown> & { DB?: D1Database };

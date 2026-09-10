@@ -92,6 +92,19 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     return NextResponse.next();
   }
 
+  // Admin *pages* need a signed-in Clerk session before any page segment
+  // renders: the admin layout only decides whether to mount a page, and the
+  // App Router streams the segment regardless (Phase 14 audit UF-14-1). API
+  // routes keep their own `checkAdminPermissions` (service tokens allowed).
+  if (pathname === '/admin' || pathname.startsWith('/admin/')) {
+    const session = typeof auth === 'function' ? await auth() : null;
+    if (!session?.userId) {
+      const signIn = new URL('/sign-in', req.url);
+      signIn.searchParams.set('redirect_url', pathname + req.nextUrl.search);
+      return NextResponse.redirect(signIn);
+    }
+  }
+
   // Skip maintenance check for admin routes and MCP API - always accessible
   if (pathname.startsWith('/admin') || 
       pathname.startsWith('/api/admin') || 

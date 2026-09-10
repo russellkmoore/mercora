@@ -1,7 +1,9 @@
 import { Suspense } from "react";
+import { requireAdminSession } from "@/lib/auth/admin-session";
 import CategoryDetail from "./CategoryDetail";
 
 export default async function CategoryDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdminSession();
   const { id } = await params;
   
   return (

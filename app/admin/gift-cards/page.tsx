@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { requireAdminSession } from "@/lib/auth/admin-session";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import GiftCardQueue from "@/components/admin/GiftCardQueue";
 import GiftCardHonorBanner from "@/components/admin/GiftCardHonorBanner";
@@ -26,6 +27,7 @@ function currentSeconds(): number {
  * page reads the guard record; it never writes it.
  */
 export default async function AdminGiftCardsPage() {
+  await requireAdminSession();
   const { env } = await getCloudflareContext({ async: true });
   const environment = env as unknown as Record<string, unknown> & { DB?: D1Database };
   const giftCardAcquisition = flagOn(environment.STORE_FEATURE_GIFT_CARD_ACQUISITION);
