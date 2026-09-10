@@ -60,10 +60,47 @@ export interface HonorGuardRecord {
   measured_at: number;
 }
 
+/**
+ * Recorded in place of a currency code when the active cards span more than
+ * one currency.
+ *
+ * `outstandingMinor` is a bare SUM of minor units with no GROUP BY, so a store
+ * holding both USD and EUR cards produces a number that is not a total of
+ * anything. It is still a perfectly good answer to the only question this
+ * record has to answer — is there money out there — so it is kept, and the
+ * currency is replaced with a sentinel that cannot be mistaken for an ISO code.
+ * The banner refuses to format a total marked this way rather than printing a
+ * mixed sum under whichever code happened to sort first.
+ */
+export const HONOR_GUARD_MIXED_CURRENCY = 'MIXED';
+
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+/**
+ * A currency this record may carry: an ISO 4217 alphabetic code, or the mixed
+ * sentinel. Anything else — an empty string, a two-letter code, a symbol — is a
+ * value `Money` and `Intl.NumberFormat` throw on, and the banner formats these
+ * straight into an admin server component.
+ */
+function isUsableCurrency(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  return value === HONOR_GUARD_MIXED_CURRENCY || /^[A-Z]{3}$/i.test(value);
+}
+
+/**
+ * Validate hard enough that the banner can format what comes back.
+ *
+ * "Finite number" is not enough for a value that reaches
+ * `Money.fromMinor(...).format()`: a fractional total trips
+ * `assertSafeMinorUnits`, an empty-string currency throws `TypeError` in the
+ * `Money` constructor, and a non-ISO code throws `RangeError` out of
+ * `Intl.NumberFormat`. Each of those takes down the admin page an operator
+ * opens precisely when something is wrong. `null` is a shape both
+ * `balancesMayExist` and the banner already handle, and it fails toward
+ * honoring, so it is the right answer for anything we cannot use.
+ */
 function parseRecord(raw: string): HonorGuardRecord | null {
   let parsed: unknown;
   try {
@@ -74,15 +111,16 @@ function parseRecord(raw: string): HonorGuardRecord | null {
   if (typeof parsed !== 'object' || parsed === null) return null;
   const candidate = parsed as Partial<Record<keyof HonorGuardRecord, unknown>>;
   if (
-    !isFiniteNumber(candidate.outstanding_minor)
-    || !isFiniteNumber(candidate.open_reservations)
+    !Number.isSafeInteger(candidate.outstanding_minor)
+    || !Number.isSafeInteger(candidate.open_reservations)
+    || (candidate.open_reservations as number) < 0
     || !isFiniteNumber(candidate.measured_at)
-    || typeof candidate.currency !== 'string'
+    || !isUsableCurrency(candidate.currency)
   ) return null;
   return {
-    outstanding_minor: candidate.outstanding_minor,
+    outstanding_minor: candidate.outstanding_minor as number,
     currency: candidate.currency,
-    open_reservations: candidate.open_reservations,
+    open_reservations: candidate.open_reservations as number,
     measured_at: candidate.measured_at,
   };
 }
@@ -159,11 +197,18 @@ export function reportHonorDisabledWithBalances(
 }
 
 /**
- * Could there still be gift-card money out there? Pure, no I/O.
+ * Could there still be gift-card money out there?
  *
  * True unless we hold a fresh, readable record that says zero on both counts.
  * Note that a record measured in the future is not stale — a clock that ran
  * ahead is not a reason to distrust the number.
+ *
+ * "Says zero" means exactly zero, not "not positive". A negative total can only
+ * come from ledger corruption or a forged record, and neither is a reason to
+ * believe the store owes nobody anything — the stated rule is that the only way
+ * honoring turns off is a fresh, readable record that says zero, and a negative
+ * number is not zero. That case is logged, which is the one bit of I/O here: a
+ * silently impossible number is how a real accounting bug stays invisible.
  */
 export function balancesMayExist(
   record: HonorGuardRecord | null,
@@ -176,7 +221,18 @@ export function balancesMayExist(
     || !isFiniteNumber(record.measured_at)
   ) return true;
   if (nowSeconds - record.measured_at > HONOR_GUARD_STALE_SECONDS) return true;
-  return record.outstanding_minor > 0 || record.open_reservations > 0;
+  if (record.outstanding_minor < 0 || record.open_reservations < 0) {
+    console.warn(
+      '[gift-cards] honor guard measured a negative outstanding balance; keeping honoring on',
+      JSON.stringify({
+        outstanding_minor: record.outstanding_minor,
+        open_reservations: record.open_reservations,
+        measured_at: record.measured_at,
+      }),
+    );
+    return true;
+  }
+  return record.outstanding_minor !== 0 || record.open_reservations !== 0;
 }
 
 /**
@@ -208,19 +264,6 @@ export async function honorIsEffectivelyOn(
  */
 const HONOR_GUARD_DEFAULT_CURRENCY = 'USD';
 
-/**
- * Recorded in place of a currency code when the active cards span more than
- * one currency.
- *
- * `outstandingMinor` is a bare SUM of minor units with no GROUP BY, so a store
- * holding both USD and EUR cards produces a number that is not a total of
- * anything. It is still a perfectly good answer to the only question this
- * record has to answer — is there money out there — so it is kept, and the
- * currency is replaced with a sentinel that cannot be mistaken for an ISO code.
- * The banner refuses to format a total marked this way rather than printing a
- * mixed sum under whichever code happened to sort first.
- */
-export const HONOR_GUARD_MIXED_CURRENCY = 'MIXED';
 
 /**
  * One five-minute tick of the honor guard: measure, store, decide, and page.

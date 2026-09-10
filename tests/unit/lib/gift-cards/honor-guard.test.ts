@@ -84,9 +84,18 @@ describe("balancesMayExist", () => {
       expected: false,
     },
     {
-      name: "a negative outstanding total is not read as a positive balance",
+      // A negative total can only come from ledger corruption or a forged
+      // record. Neither is evidence that the store owes nobody anything, and
+      // the module's own rule is that honoring turns off only on a fresh,
+      // readable record that says zero — which a negative number is not.
+      name: "a negative outstanding total is treated as money that may still exist",
       record: record({ outstanding_minor: -5 }),
-      expected: false,
+      expected: true,
+    },
+    {
+      name: "a negative open-reservation count is treated as money that may still exist",
+      record: record({ open_reservations: -1 }),
+      expected: true,
     },
   ];
 
