@@ -11,6 +11,12 @@ export function AddressForm(props: {
   mode: "create" | "edit";
   addressId?: string;
   onSaved: (address: MACHCustomerAddress) => void;
+  /**
+   * Hand feedback to the parent. When set, the form renders no message of its
+   * own: failures arrive here, success is implied by `onSaved`. Leave unset to
+   * keep the inline `role="alert"` / `role="status"` message.
+   */
+  onError?: (message: string) => void;
   onCancel?: () => void;
   lockType?: "shipping" | "billing";
   submitLabel?: string;
@@ -22,6 +28,7 @@ export function AddressForm(props: {
   });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<FormMessage>(null);
+  const inlineFeedback = props.onError === undefined;
 
   const input = "w-full rounded-md border border-border bg-surface px-3 py-2 text-foreground";
 
@@ -35,12 +42,11 @@ export function AddressForm(props: {
       if (props.mode !== "edit") {
         setForm({ ...emptyAddressForm, ...(props.lockType ? { type: props.lockType } : {}) });
       }
-      setMessage({ kind: "success", text: "Address saved." });
+      if (inlineFeedback) setMessage({ kind: "success", text: "Address saved." });
     } catch (error) {
-      setMessage({
-        kind: "error",
-        text: error instanceof Error ? error.message : "Address could not be saved",
-      });
+      const text = error instanceof Error ? error.message : "Address could not be saved";
+      if (props.onError) props.onError(text);
+      else setMessage({ kind: "error", text });
     } finally {
       setBusy(false);
     }
