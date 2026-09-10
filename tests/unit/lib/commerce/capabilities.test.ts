@@ -115,40 +115,111 @@ describe("commerce capability resolution", () => {
     })).toThrow("requires reservation reconciliation");
   });
 
-  it("keeps reconciliation installed while acquisition rejects nonempty tokens", async () => {
-    const capability = {
-      resolveTender: vi.fn(),
-      verifyReservedTender: vi.fn(async () => undefined),
-      applyTender: vi.fn(async () => undefined),
-      releaseTender: vi.fn(async () => undefined),
-      restoreTender: vi.fn(async () => undefined),
-    };
-    const factory = vi.fn(() => capability);
-    const resolved = resolveCommerceCapabilities({
-      giftCardAcquisition: false,
-      giftCardReconciliation: true,
-      subscriptionAcquisition: false,
-      subscriptionReconciliation: false,
-    }, { giftCards: factory });
+  // The two gift-card flags in sell/honor language (D-01): sell is
+  // STORE_FEATURE_GIFT_CARD_ACQUISITION (giftCardAcquisition), honor is
+  // STORE_FEATURE_GIFT_CARD_RECONCILIATION (giftCardReconciliation). Tender
+  // resolution follows honor, never sell (D-03) — a shopper redeems a card they
+  // already paid for even after the store stops selling new ones.
+  describe("gift-card tender follows honor, not sell", () => {
+    function giftCardSpies() {
+      return {
+        resolveTender: vi.fn(),
+        verifyReservedTender: vi.fn(async () => undefined),
+        applyTender: vi.fn(async () => undefined),
+        releaseTender: vi.fn(async () => undefined),
+        restoreTender: vi.fn(async () => undefined),
+      };
+    }
 
-    expect(factory).toHaveBeenCalledOnce();
-    await expect(resolved.giftCards.resolveTender({
-      currency: "USD",
-      amountDue: Money.fromMinor(100, "USD"),
-    })).resolves.toEqual({ amount: Money.zero("USD") });
-    expect(capability.resolveTender).not.toHaveBeenCalled();
-    await expect(resolved.giftCards.resolveTender({
-      token: "GC-NOT-USED",
-      currency: "USD",
-      amountDue: Money.fromMinor(100, "USD"),
-    })).rejects.toThrow("disabled");
-    await resolved.giftCards.applyTender({ order: paidOrder() });
-    expect(capability.applyTender).toHaveBeenCalledOnce();
-    await resolved.giftCards.restoreTender!({
-      order: paidOrder(), state: { v: 1, reservationId: 'gift_reservation_one' },
-      refundKey: 'refund-one', amount: Money.fromMinor(100, 'USD'),
+    it("delegates tender to the capability with sell on and honor on", async () => {
+      const capability = giftCardSpies();
+      const factory = vi.fn(() => capability);
+      const resolved = resolveCommerceCapabilities({
+        giftCardAcquisition: true,
+        giftCardReconciliation: true,
+        subscriptionAcquisition: false,
+        subscriptionReconciliation: false,
+      }, { giftCards: factory });
+
+      expect(factory).toHaveBeenCalledOnce();
+      expect(resolved.giftCards).toBe(capability);
+      await resolved.giftCards.resolveTender({
+        token: "GC-NOT-USED",
+        currency: "USD",
+        amountDue: Money.fromMinor(100, "USD"),
+      });
+      expect(capability.resolveTender).toHaveBeenCalledWith(
+        expect.objectContaining({ token: "GC-NOT-USED" }),
+      );
     });
-    expect(capability.restoreTender).toHaveBeenCalledOnce();
+
+    it("keeps redeeming an already-paid-for card with sell off and honor on", async () => {
+      const capability = giftCardSpies();
+      const factory = vi.fn(() => capability);
+      const resolved = resolveCommerceCapabilities({
+        giftCardAcquisition: false,
+        giftCardReconciliation: true,
+        subscriptionAcquisition: false,
+        subscriptionReconciliation: false,
+      }, { giftCards: factory });
+
+      expect(factory).toHaveBeenCalledOnce();
+      // No wrapper stands between checkout and the honored capability.
+      expect(resolved.giftCards).toBe(capability);
+      await expect(resolved.giftCards.resolveTender({
+        token: "GC-NOT-USED",
+        currency: "USD",
+        amountDue: Money.fromMinor(100, "USD"),
+      })).resolves.toBeUndefined();
+      expect(capability.resolveTender).toHaveBeenCalledWith(
+        expect.objectContaining({ token: "GC-NOT-USED" }),
+      );
+      await resolved.giftCards.applyTender({ order: paidOrder() });
+      expect(capability.applyTender).toHaveBeenCalledOnce();
+      await resolved.giftCards.releaseTender!({
+        state: { v: 1, reservationId: 'gift_reservation_one' }, reason: 'abandoned',
+      });
+      expect(capability.releaseTender).toHaveBeenCalledOnce();
+      await resolved.giftCards.restoreTender!({
+        order: paidOrder(), state: { v: 1, reservationId: 'gift_reservation_one' },
+        refundKey: 'refund-one', amount: Money.fromMinor(100, 'USD'),
+      });
+      expect(capability.restoreTender).toHaveBeenCalledOnce();
+    });
+
+    it("installs the no-op without constructing a factory with sell off and honor off", () => {
+      const capability = giftCardSpies();
+      const factory = vi.fn(() => capability);
+      const resolved = resolveCommerceCapabilities({
+        giftCardAcquisition: false,
+        giftCardReconciliation: false,
+        subscriptionAcquisition: false,
+        subscriptionReconciliation: false,
+      }, { giftCards: factory });
+
+      expect(factory).not.toHaveBeenCalled();
+      expect(resolved.giftCards).toBe(noOpCommerceCapabilities.giftCards);
+      // A nonempty token rejecting with "disabled" through that no-op path is
+      // asserted once, below, in "rejects disabled bearer input and protected
+      // nonzero settlement" — not duplicated here.
+    });
+
+    it("throws before any factory runs with sell on and honor off", () => {
+      const capability = giftCardSpies();
+      const factory = vi.fn(() => capability);
+      const flags = {
+        giftCardAcquisition: true,
+        giftCardReconciliation: false,
+        subscriptionAcquisition: false,
+        subscriptionReconciliation: false,
+      };
+
+      expect(() => resolveCommerceCapabilities(flags, { giftCards: factory }))
+        .toThrow(CommerceCapabilityConfigurationError);
+      expect(() => resolveCommerceCapabilities(flags, { giftCards: factory }))
+        .toThrow("requires reservation reconciliation");
+      expect(factory).not.toHaveBeenCalled();
+    });
   });
 
   it("rejects disabled bearer input and protected nonzero settlement", async () => {
