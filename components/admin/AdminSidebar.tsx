@@ -138,6 +138,14 @@ export default function AdminSidebar() {
   const store = useStoreConfig();
   const { sidebarCollapsed, toggleSidebar, isMobile } = useAdminLayout();
 
+  // Drop the gift-card entry entirely (not just hidden with CSS) when
+  // neither configured flag is on (D-10, D-17). Matched by href, not label,
+  // so the entry survives a future relabel.
+  const visibleNavItems = navItems.filter((item) => {
+    if (item.href !== "/admin/gift-cards") return true;
+    return store.commerce.features.giftCardAcquisition || store.commerce.features.giftCardReconciliation;
+  });
+
   // Check if a nav item is active
   const isActive = (href: string) => {
     if (href === "/admin") {
@@ -195,7 +203,7 @@ export default function AdminSidebar() {
 
         {/* Navigation Menu */}
         <nav className="flex-1 p-4 space-y-2">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
             
