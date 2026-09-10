@@ -27,8 +27,14 @@ export default async function AdminGiftCardsPage() {
   const giftCardAcquisition = flagOn(environment.STORE_FEATURE_GIFT_CARD_ACQUISITION);
   const giftCardReconciliation = flagOn(environment.STORE_FEATURE_GIFT_CARD_RECONCILIATION);
 
+  // Fail open on a read error, exactly as `honorIsEffectivelyOn` does for
+  // `/api/admin/gift-cards`. Without the catch a D1 error propagates out of
+  // this server component and 500s the page — and this is the page an operator
+  // opens when gift-card money is already in a state they need to see. `null`
+  // is the shape both `balancesMayExist` and the banner already read as
+  // "measurement unavailable", which keeps honoring on.
   const guardRecord = !giftCardReconciliation && environment.DB
-    ? await readHonorGuard(environment.DB)
+    ? await readHonorGuard(environment.DB).catch(() => null)
     : null;
   const guardActive = !giftCardReconciliation
     && balancesMayExist(guardRecord, currentSeconds());
@@ -39,7 +45,11 @@ export default async function AdminGiftCardsPage() {
 
   return (
     <div className="space-y-6">
-      <GiftCardHonorBanner record={guardRecord} honorConfigured={giftCardReconciliation} />
+      <GiftCardHonorBanner
+        record={guardRecord}
+        honorConfigured={giftCardReconciliation}
+        guardActive={guardActive}
+      />
       <div>
         <h1 className="text-2xl font-bold text-white">Gift cards</h1>
         <p className="mt-1 max-w-3xl text-gray-400">Operational gift-card status and delivery queue. Bearer codes, hashes, encryption material, recipient details, and internal card identities are intentionally unavailable.</p>
