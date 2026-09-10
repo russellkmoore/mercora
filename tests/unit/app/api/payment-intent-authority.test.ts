@@ -79,6 +79,7 @@ vi.mock('@/lib/commerce/runtime', () => ({
 
 import { POST } from '@/app/api/payment-intent/route';
 import { GiftCardTenderUnavailableError } from '@/lib/gift-cards/capability';
+import { GiftCardSalesDisabledError } from '@/lib/gift-cards/checkout';
 
 const quote = {
   currency: 'USD',
@@ -419,5 +420,30 @@ describe('payment-intent durable authority boundary', () => {
     expect(json.code).toBe('gift_card_unavailable');
     expect(json.error).toMatch(/gift card couldn't be applied/i);
     expect(json.error).not.toContain('Checkout details are invalid');
+  });
+
+  it('names a gift card we have stopped selling instead of the generic pricing error', async () => {
+    mocks.priceCheckout.mockRejectedValueOnce(new GiftCardSalesDisabledError());
+    const res = await POST(request());
+
+    expect(res.status).toBe(400);
+    const json = await res.json() as { error: string; code?: string };
+    expect(json.code).toBe('gift_card_sales_disabled');
+    expect(json.error).not.toContain('Checkout details are invalid');
+  });
+
+  it('tells a stopped sale apart from a code that did not work', async () => {
+    // Two different problems, two different things to tell the shopper: remove
+    // the line, or check the code. One shared code would collapse them.
+    mocks.priceCheckout.mockRejectedValueOnce(new GiftCardSalesDisabledError());
+    const sale = await (await POST(request())).json() as { error: string; code?: string };
+
+    mocks.priceCheckout.mockRejectedValueOnce(new GiftCardTenderUnavailableError());
+    const tender = await (await POST(request())).json() as { error: string; code?: string };
+
+    expect(sale.code).toBe('gift_card_sales_disabled');
+    expect(sale.code).not.toBe(tender.code);
+    expect(sale.error).not.toBe(tender.error);
+    expect(tender.code).toBe('gift_card_unavailable');
   });
 });
