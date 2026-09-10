@@ -493,6 +493,13 @@ controls whether existing cards redeem, settle, and refund. The four states:
 | off | off | Gift cards do not exist. Every surface is absent or 404s. | If a balance or open reservation still exists, the runtime keeps honoring it anyway — hiding is presentation, honoring is money. |
 | on | off | Invalid. Capability resolution throws on the first request or cron tick after a deploy in this state. | Never deploy this combination. |
 
+The recovery cron measures outstanding gift-card balances on every five-minute tick regardless of
+either flag, by design: the measurement is what tells the runtime whether it is safe to *stop*
+honoring, so it cannot be gated on the flag it exists to overrule. Apply the gift-card migrations
+before the first tick after this section. Until they are applied the tick logs `[cron] gift-card
+honor guard unavailable` every five minutes and carries on — the recovery drains still run, and the
+noise stops once the tables exist.
+
 ### **Step 1: Generate and Store the Four Secrets**
 
 Each value is generated and piped straight into Cloudflare in a single command, so it is
@@ -563,7 +570,10 @@ Do not proceed to Step 4 until all four checks pass.
    above is what catches a malformed ring.
 4. The honor-guard row (`admin_settings` key `gift_cards.honor_guard`) appears after that same
    cron cycle. Until it does, the runtime behaves as if balances exist — which is harmless with
-   honor on, but is the reason Step 5's rollback can take up to five minutes to quiet down.
+   honor on, but is the reason Step 5's rollback can take up to five minutes to quiet down. That
+   row is written by the cron and by nothing else: `POST /api/admin/settings` refuses any write
+   naming that key or the `gift_cards` category, so a forged measurement cannot switch honoring
+   off while cards still carry money.
 
 ### **Step 4: Enable Sell (Acquisition)**
 

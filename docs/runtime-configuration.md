@@ -57,9 +57,22 @@ then enable the acquisition flag.
 Two independent flags gate gift cards. Code, tests, and this doc call them **sell**
 (`STORE_FEATURE_GIFT_CARD_ACQUISITION`) — can a shopper buy a new card — and **honor**
 (`STORE_FEATURE_GIFT_CARD_RECONCILIATION`) — are existing cards redeemed, settled, and refunded.
-The env var names never change; only the words used to describe them do. Before installing the
-additive schema and runtime factory, leave both off — that path opens no D1 connection and parses
-no bearer-code keys. Enable honor first, then sell.
+The env var names never change; only the words used to describe them do. Enable honor first, then
+sell.
+
+Leaving both flags off does not mean the deploy is inert. The recovery cron measures outstanding
+gift-card balances on every five-minute tick regardless of either flag, by design (D-05): the
+measurement is what tells the runtime whether it is safe to *stop* honoring, so a cron that only ran
+while honoring was on could never produce the reading that turns honoring off. The measurement is
+also the only thing that would notice a balance nobody remembered. Two consequences worth knowing
+before you deploy:
+
+- The gift-card tables must exist before that tick runs. On a deploy that has not yet applied the
+  additive gift-card migrations, the tick logs `[cron] gift-card honor guard unavailable` every five
+  minutes and carries on — the three recovery drains still run, and honoring stays wherever the flag
+  left it. It is noise, not damage, and it stops as soon as the migrations are applied.
+- The request path is a different story, and is genuinely inert with both flags off: it opens no D1
+  connection for gift cards and parses no bearer-code keys.
 
 The four states:
 
@@ -72,7 +85,9 @@ The four states:
 
 **Honor off does not always mean honor off.** Turning honor off while a balance or open
 reservation exists is ignored: redemption, settlement, and refunds keep running exactly as if
-honor were on. This is measured once every five minutes by the recovery cron, never per request,
+honor were on. The measurement counts committed reservations whose redemption ledger entry has not
+landed yet, so an order that is mid-settlement when the flag flips keeps honoring rather than
+stranding. This is measured once every five minutes by the recovery cron, never per request,
 and the measurement is written to `admin_settings` under the key `gift_cards.honor_guard`. A
 missing or stale record — older than 15 minutes, three missed cron ticks, `HONOR_GUARD_STALE_SECONDS`
 = 900 seconds — is treated as "balances may exist," so the runtime never guesses that honoring is
@@ -80,6 +95,12 @@ safe to stop. Every cron tick this condition holds fires the critical telemetry 
 `gift_card.honor_disabled_with_balances`; the admin gift-card page shows a banner naming the
 outstanding total and open-reservation count for the same condition — that banner is the
 operator-facing view of the same measurement the cron writes.
+
+Both flags are deploy-time Worker variables, so changing one is a deploy. That is what keeps the
+hour-long ISR window on the home page from ever serving a stale visibility decision: a new deploy
+invalidates the incremental cache, so the first render after a flag change is a fresh one. There is
+no path by which a flag flips without a deploy, and so none by which a cached page outlives the
+decision it was rendered under.
 
 **Rollback recipe:** set sell (`STORE_FEATURE_GIFT_CARD_ACQUISITION`) to `false` and deploy to stop
 new sales. Leave honor (`STORE_FEATURE_GIFT_CARD_RECONCILIATION`) on until every card balance is
