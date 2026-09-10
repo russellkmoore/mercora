@@ -191,6 +191,58 @@ describe("GiftCardHonorBanner does not alarm on a state that is working (WR-04)"
   });
 });
 
+describe("GiftCardHonorBanner never understates money in flight (WR-15)", () => {
+  it("names the held amount beside the available total", () => {
+    // The available-balance expression subtracts a committed-but-unsettled
+    // reservation, so during a settlement burst the total reads zero while
+    // money is plainly in flight. Printing only the total said the store owed
+    // nothing, one clause away from a sentence saying it did.
+    const settling = { ...RECORD, outstanding_minor: 0, open_reservations: 1, held_minor: 600 };
+    const text = textOf(GiftCardHonorBanner({
+      record: settling, honorConfigured: false, guardActive: true,
+    }));
+
+    expect(text).toContain("available plus");
+    expect(text).toContain("held across 1 open reservation");
+    // The two figures appear together or not at all.
+    const zero = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(0);
+    const held = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(6);
+    expect(text).toContain(zero);
+    expect(text).toContain(held);
+  });
+
+  it("never prints a bare outstanding total beside a nonzero reservation count", () => {
+    const settling = { ...RECORD, outstanding_minor: 0, open_reservations: 1, held_minor: 600 };
+    const text = textOf(GiftCardHonorBanner({
+      record: settling, honorConfigured: false, guardActive: true,
+    }));
+
+    expect(text).not.toMatch(/\$0\.00 outstanding/);
+  });
+
+  it("says the held amount is unmeasured on a record written before the field existed", () => {
+    // Older rows are still readable — a missing field must not turn a usable
+    // measurement into "unknown" — but the total must not stand alone either.
+    const legacy = { ...RECORD, outstanding_minor: 0, open_reservations: 2 };
+    const text = textOf(GiftCardHonorBanner({
+      record: legacy, honorConfigured: false, guardActive: true,
+    }));
+
+    expect(text).toContain("unmeasured amount held across 2 open reservations");
+    expect(text).not.toMatch(/\$0\.00 outstanding/);
+  });
+
+  it("says plain 'outstanding' when nothing is held", () => {
+    const settled = { ...RECORD, outstanding_minor: 500, open_reservations: 0, held_minor: 0 };
+    const text = textOf(GiftCardHonorBanner({
+      record: settled, honorConfigured: false, guardActive: true,
+    }));
+
+    expect(text).toContain("outstanding");
+    expect(text).not.toContain("held across");
+  });
+});
+
 describe("GiftCardHonorBanner never formats an untrusted total (WR-02, WR-06)", () => {
   it("describes a mixed-currency total instead of printing it under one code", () => {
     // A cross-currency sum of minor units is not an amount. Formatting it under

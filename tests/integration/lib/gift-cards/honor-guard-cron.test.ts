@@ -39,6 +39,39 @@ async function issueCardWorth(minor: number): Promise<void> {
   });
 }
 
+/**
+ * Close out any committed-but-unsettled reservation left by a previous case.
+ *
+ * The suites below isolate cases by advancing the clock and disabling leftover
+ * accounts. That is no longer enough: a committed reservation never expires,
+ * and the measurement now counts one against a *disabled* card too (WR-14) —
+ * deliberately, because that is still money. Releasing is not an option either;
+ * `gift_card_reservations_transition_guard` refuses to release anything already
+ * committed. Settling is the only way to close one, which is exactly what
+ * production does, so that is what this does.
+ */
+async function settleStrandedReservations(): Promise<void> {
+  const stranded = await env.DB.prepare(
+    `SELECT id, committed_order_id FROM gift_card_reservations
+     WHERE released_at IS NULL AND committed_at IS NOT NULL
+       AND committed_order_id IS NOT NULL
+       AND NOT EXISTS (
+         SELECT 1 FROM gift_card_ledger_entries entry
+         WHERE entry.reservation_id = gift_card_reservations.id
+           AND entry.entry_type = 'redemption'
+       )`,
+  ).all<{ id: string; committed_order_id: string }>();
+
+  const repository = createGiftCardRepository(env.DB);
+  for (const row of stranded.results ?? []) {
+    await repository.settleReservation({
+      reservationId: row.id,
+      orderId: row.committed_order_id,
+      settledAt: now,
+    });
+  }
+}
+
 describe("runGiftCardHonorGuard on real D1", () => {
   beforeAll(async () => {
     await applyTestMigrations();
@@ -52,6 +85,7 @@ describe("runGiftCardHonorGuard on real D1", () => {
     now = epoch + testSequence * 86_400;
     giftCardId = `gift_cron_${testSequence}`;
     hash = (testSequence + 0x2000).toString(16).padStart(64, "0");
+    await settleStrandedReservations();
     await env.DB.prepare(
       "UPDATE gift_card_accounts SET status = 'disabled', disabled_at = ? WHERE status = 'active'",
     ).bind(now).run();
@@ -67,6 +101,7 @@ describe("runGiftCardHonorGuard on real D1", () => {
       outstanding_minor: 2_500,
       currency: "USD",
       open_reservations: 0,
+      held_minor: 0,
       measured_at: now,
     });
     await expect(readHonorGuard(env.DB)).resolves.toEqual(result.record);
@@ -104,6 +139,7 @@ describe("runGiftCardHonorGuard on real D1", () => {
       // record falls back to the store's default.
       currency: "USD",
       open_reservations: 0,
+      held_minor: 0,
       measured_at: now,
     });
     expect(alarms).toEqual([]);
