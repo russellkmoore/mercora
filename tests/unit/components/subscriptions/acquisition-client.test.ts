@@ -416,10 +416,18 @@ describe("nextAddressSelection", () => {
     expect(nextAddressSelection([addrA, addrC], ADD_NEW_ADDRESS_VALUE)).toBe("addr_a");
   });
 
-  it("cannot collide with a real address id, because ID_PATTERN requires an alphanumeric first character", () => {
-    // The sentinel "__add_new__" starts with "_", which ID_PATTERN rejects as a
-    // saved-address id shape, so querying with it through the public surface
-    // always falls through to a real id rather than ever matching an entry.
-    expect(nextAddressSelection([addrC], ADD_NEW_ADDRESS_VALUE)).toBe("addr_c");
+  it("cannot collide with a real address id, because ID_PATTERN requires an alphanumeric first character", async () => {
+    // Prove it through the surface that applies ID_PATTERN: a payload entry
+    // whose id is the sentinel is filtered out before it can ever be listed,
+    // so nextAddressSelection can never find it even without its own guard.
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({
+      addresses: [
+        { id: ADD_NEW_ADDRESS_VALUE, address: { line1: "9 Fake", city: "Nowhere", country: "US" } },
+        { id: "addr_c", address: { line1: "3 Main", city: "Denver", country: "US" } },
+      ],
+    }), { status: 200 })) as unknown as FetchLike;
+    const next = await fetchSavedAddressesForPlan(fetcher, { shippingRequired: true });
+    expect(next.map((entry) => entry.id)).toEqual(["addr_c"]);
+    expect(nextAddressSelection(next, ADD_NEW_ADDRESS_VALUE)).toBe("addr_c");
   });
 });
