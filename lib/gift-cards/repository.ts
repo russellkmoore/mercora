@@ -199,6 +199,77 @@ function availableBalanceExpression(accountAlias: string, nowPlaceholder = "?"):
   ), 0))`;
 }
 
+export interface OutstandingGiftCardBalances {
+  /** Summed available balance across every active card, in minor units. */
+  outstandingMinor: number;
+  /** How many active cards still carry a positive available balance. */
+  cardsWithBalance: number;
+  /** Reservations someone is mid-checkout against: unreleased, uncommitted, unexpired. */
+  openReservations: number;
+  /** `null` when there are no active cards; callers pick their own default. */
+  currency: string | null;
+}
+
+interface OutstandingTotalsRow {
+  outstanding_minor: number | null;
+  cards_with_balance: number | null;
+  currency: string | null;
+}
+
+interface OpenReservationsRow {
+  open_reservations: number | null;
+}
+
+function toCount(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+/**
+ * How much stored value is outstanding right now, in one D1 round trip.
+ *
+ * Read-only. This is the measurement behind the honor guard (D-04, D-05): it
+ * runs from the five-minute cron tick and from the admin gift-card page, never
+ * from a request path — request-time code reads the small `admin_settings`
+ * record this feeds instead (D-06).
+ *
+ * The balance half reuses `availableBalanceExpression`, the same SQL
+ * `readBalance` and the reservation guard trigger use, so there is exactly one
+ * definition of "available" in the codebase.
+ */
+export async function sumOutstandingGiftCardBalances(
+  database: D1Database,
+  nowSeconds: number,
+): Promise<OutstandingGiftCardBalances> {
+  const balance = availableBalanceExpression("account");
+  const batched = await database.batch([
+    // `balance` is interpolated twice, so this statement carries two `?`
+    // placeholders and `nowSeconds` binds twice, left to right: the one
+    // inside the SUM column first, then the one inside the CASE column.
+    database.prepare(`SELECT
+        COALESCE(SUM(${balance}), 0) AS outstanding_minor,
+        COALESCE(SUM(CASE WHEN ${balance} > 0 THEN 1 ELSE 0 END), 0) AS cards_with_balance,
+        MIN(account.currency_code) AS currency
+      FROM gift_card_accounts account
+      WHERE account.status = 'active'`)
+      .bind(/* SUM(...) */ nowSeconds, /* CASE WHEN ... */ nowSeconds),
+    // Deliberately narrower than the reservation clause inside the balance
+    // expression: that clause covers every reservation still holding value,
+    // while this counts only the "someone is mid-checkout right now" rows.
+    database.prepare(`SELECT COUNT(*) AS open_reservations
+      FROM gift_card_reservations
+      WHERE released_at IS NULL AND committed_at IS NULL AND expires_at > ?`)
+      .bind(nowSeconds),
+  ]);
+  const totals = (batched[0]?.results?.[0] ?? null) as OutstandingTotalsRow | null;
+  const open = (batched[1]?.results?.[0] ?? null) as OpenReservationsRow | null;
+  return {
+    outstandingMinor: toCount(totals?.outstanding_minor),
+    cardsWithBalance: toCount(totals?.cards_with_balance),
+    openReservations: toCount(open?.open_reservations),
+    currency: typeof totals?.currency === "string" ? totals.currency : null,
+  };
+}
+
 export function createGiftCardRepository(database: D1Database) {
   const findAccountById = async (id: string): Promise<GiftCardAccount | undefined> => {
     assertGiftCardId(id);
