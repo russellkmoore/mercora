@@ -23,9 +23,16 @@ export async function POST(request: NextRequest) {
   try {
     const { env } = await getCloudflareContext({ async: true });
     const raw = env as unknown as Record<string, unknown> & { DB?: D1Database };
+    const giftCardAcquisition = String(raw.STORE_FEATURE_GIFT_CARD_ACQUISITION ?? '').trim().toLowerCase() === 'true';
+    const giftCardReconciliation = String(raw.STORE_FEATURE_GIFT_CARD_RECONCILIATION ?? '').trim().toLowerCase() === 'true';
+    // Both flags off: gift cards do not exist for a visitor at all (D-10).
+    // Configured flags only — the honor guard never widens a public surface.
+    if (!giftCardAcquisition && !giftCardReconciliation) {
+      return NextResponse.json({ code: 'gift_cards_unavailable', error: 'Gift cards are not available' }, { status: 404 });
+    }
     // Existing-card redemption and balance checks remain available during a
     // sales rollback; only new issuance is controlled by acquisition.
-    if (String(raw.STORE_FEATURE_GIFT_CARD_RECONCILIATION ?? '').trim().toLowerCase() !== 'true' || !raw.DB) {
+    if (!giftCardReconciliation || !raw.DB) {
       return NextResponse.json({ valid: false });
     }
     const keyRing = parseGiftCardCodeKeyRing(raw);
