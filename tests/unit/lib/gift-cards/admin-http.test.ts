@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   actorFrom,
   giftCardAdminFlags,
+  invalidGiftCardIdResponse,
   jsonError,
   MAX_JSON_BODY_BYTES,
   readBoundedJsonBody,
@@ -89,6 +90,24 @@ describe("giftCardAdminFlags", () => {
   it("treats '1' as off — only the literal string 'true' counts", () => {
     expect(giftCardAdminFlags({ STORE_FEATURE_GIFT_CARD_ACQUISITION: "1" }))
       .toMatchObject({ giftCardAcquisition: false });
+  });
+});
+
+describe("invalidGiftCardIdResponse (IN-09, D-13)", () => {
+  it("returns null for a well-formed id", () => {
+    expect(invalidGiftCardIdResponse("gift_card_1")).toBeNull();
+    expect(invalidGiftCardIdResponse("x".repeat(128))).toBeNull();
+  });
+
+  it.each([
+    ["an over-long id", "x".repeat(129)],
+    ["an empty id", ""],
+    ["an id with surrounding whitespace", " gift_card_1 "],
+    ["a non-string", 42],
+  ])("answers 404 gift_card_not_found for %s", async (_name, id) => {
+    const response = invalidGiftCardIdResponse(id);
+    expect(response?.status).toBe(404);
+    expect(await response?.json()).toEqual({ code: "gift_card_not_found", error: "Gift card not found" });
   });
 });
 

@@ -4,6 +4,7 @@ import { checkAdminPermissions, isSuperAdminActor } from "@/lib/auth/admin-middl
 import {
   actorFrom,
   giftCardAdminFlags,
+  invalidGiftCardIdResponse,
   jsonError,
   readBoundedJsonBody,
 } from "@/lib/gift-cards/admin-http";
@@ -45,6 +46,8 @@ export async function POST(
   }
 
   const { id } = await params;
+  const invalidId = invalidGiftCardIdResponse(id);
+  if (invalidId) return invalidId;
 
   let environment: Record<string, unknown> & { DB?: D1Database };
   try {

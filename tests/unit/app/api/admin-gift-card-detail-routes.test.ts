@@ -106,6 +106,14 @@ describe('GET /api/admin/gift-cards/[id]', () => {
     expect(await response.json()).toMatchObject({ code: 'gift_card_not_found' });
   });
 
+  it('404s with gift_card_not_found for an over-long id without reading D1 (IN-09, D-13)', async () => {
+    const { request, params } = detailRequest('x'.repeat(129));
+    const response = await detailGet(request, { params });
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ code: 'gift_card_not_found' });
+    expect(mocks.findAccountById).not.toHaveBeenCalled();
+  });
+
   it('404s with gift_cards_unavailable when both flags are off and the honor guard is clear (D-16)', async () => {
     mocks.context.mockResolvedValue({ env: { DB: {} } });
     mocks.resolveHonorEffective.mockResolvedValue(false);
@@ -215,6 +223,14 @@ describe('GET /api/admin/gift-cards/[id]/events', () => {
     const { request, params } = eventsRequest('gift_card_1');
     const response = await eventsGet(request, { params });
     expect(response.status).toBe(401);
+  });
+
+  it('404s with gift_card_not_found for an over-long id without reading D1 (IN-09, D-13)', async () => {
+    const { request, params } = eventsRequest('x'.repeat(129));
+    const response = await eventsGet(request, { params });
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ code: 'gift_card_not_found' });
+    expect(mocks.findAccountById).not.toHaveBeenCalled();
   });
 
   it('404s with gift_card_not_found for an unknown card id', async () => {

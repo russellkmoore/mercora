@@ -73,6 +73,8 @@ import {
 import { Money } from "@/lib/money";
 
 const context = { params: Promise.resolve({ id: "gift_card_1" }) };
+/** IN-09: 129 characters — one past assertGiftCardId's bound. */
+const overLongContext = { params: Promise.resolve({ id: "x".repeat(129) }) };
 
 function postRequest(path: string, body?: unknown, headers?: Record<string, string>) {
   return new NextRequest(`https://store.test/api/admin/gift-cards/gift_card_1/${path}`, {
@@ -218,6 +220,14 @@ describe("POST /api/admin/gift-cards/[id]/notes", () => {
         details: { text: "Called customer, confirmed identity." },
       }),
     );
+  });
+
+  it("answers 404 gift_card_not_found for an over-long id before any read or write (IN-09, D-13)", async () => {
+    const response = await notes(postRequest("notes", { text: "hi" }), overLongContext);
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ code: "gift_card_not_found" });
+    expect(repository.findAccountById).not.toHaveBeenCalled();
+    expect(mocks.appendGiftCardEvent).not.toHaveBeenCalled();
   });
 
   it("returns 404 gift_card_not_found for an unknown card and writes no event (WR-05, D-13)", async () => {
@@ -520,6 +530,16 @@ describe("POST /api/admin/gift-cards/[id]/reissue", () => {
     const response = await reissue(postRequest("reissue", { to: "fraud-recovery@example.com" }), context);
     expect(response.status).toBe(200);
     expect(repository.findDeliveryByGiftCardId).not.toHaveBeenCalled();
+  });
+
+  it("answers 404 gift_card_not_found for an over-long id, even with an address in the body (IN-09, D-13)", async () => {
+    // With `to` supplied the delivery read is skipped, so before the guard
+    // this reached giftCardReissueId(id) outside the try and escaped as a 500.
+    const response = await reissue(postRequest("reissue", { to: "fraud-recovery@example.com" }), overLongContext);
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ code: "gift_card_not_found" });
+    expect(mocks.giftCardReissueId).not.toHaveBeenCalled();
+    expect(repository.reissue).not.toHaveBeenCalled();
   });
 
   it("returns 401 unauthenticated and 400 for an invalid admin-supplied address", async () => {
