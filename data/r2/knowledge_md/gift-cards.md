@@ -21,9 +21,9 @@ To use a gift card, go to the Payment Information step at checkout, enter the co
 
 ## Checking a Balance
 
-A gift card bought while signed in appears under Account, then Gift cards, with its remaining balance. A card bought as a guest is not listed there, because it was never linked to an account. A card someone received does not appear there either — for safety the code is only ever sent to the recipient's email address.
+A gift card is not listed in your account. The delivery email is the card: keep the code, and treat it like cash. Each time the card is applied at checkout the amount it covers is shown on the order, and whatever is left stays on the card for the next order.
 
-Checkout does not show a card's remaining balance. Entering a code applies the card to that order, and the amount it covers appears in the order summary as a "Gift card" line showing the last four characters of the code.
+Checkout does not show a card's remaining balance up front. Entering a code applies the card to that order, and the amount it covers appears in the order summary as a "Gift card" line showing the last four characters of the code. If the card has less than the order total, it covers what it can and the rest is charged to the payment method.
 
 ## Limits
 

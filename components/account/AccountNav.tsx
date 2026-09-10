@@ -1,15 +1,12 @@
 import Link from "next/link";
 import { getStoreConfig } from "@/lib/store-config";
 
-export function accountLinks(subscriptionReconciliation: boolean, giftCardReconciliation = false) {
+export function accountLinks(subscriptionReconciliation: boolean) {
   return [
     ["Overview", "/account"],
     ["Orders", "/account/orders"],
     ...(subscriptionReconciliation
       ? [["Subscriptions", "/account/subscriptions"] as const]
-      : []),
-    ...(giftCardReconciliation
-      ? [["Gift cards", "/account/gift-cards"] as const]
       : []),
     ["Addresses", "/account/addresses"],
     ["Settings", "/account/settings"],
@@ -17,10 +14,10 @@ export function accountLinks(subscriptionReconciliation: boolean, giftCardReconc
 }
 
 export function AccountNav() {
-  const links = accountLinks(
-    getStoreConfig().commerce.features.subscriptionReconciliation,
-    getStoreConfig().commerce.features.giftCardReconciliation,
-  );
+  // Gift cards are deliberately not listed in the account (Russell,
+  // 2026-09-10): a card is a bearer instrument delivered by email, and the
+  // purchaser-keyed listing could never show the recipient anything.
+  const links = accountLinks(getStoreConfig().commerce.features.subscriptionReconciliation);
   return (
     <nav aria-label="Account" className="mb-8 flex flex-wrap gap-2 md:w-48 md:flex-col">
       {links.map(([label, href]) => (
