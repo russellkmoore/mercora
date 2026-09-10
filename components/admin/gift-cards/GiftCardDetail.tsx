@@ -252,7 +252,7 @@ export default function GiftCardDetail({ giftCardId }: { giftCardId: string }) {
         </div>
       </Card>
 
-      <GiftCardTimeline entries={events} />
+      <GiftCardTimeline entries={events} currency={card.availableBalance.currency} />
     </div>
   );
 }

@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
+import { Money } from "@/lib/money";
 
 export type GiftCardTimelineActorType = "admin" | "service" | "system";
 
@@ -71,10 +73,18 @@ const DETAIL_FIELD_LABELS: Record<string, string> = {
   status: "Status",
 };
 
-function formatDetailValue(key: string, value: unknown): string {
+const AMOUNT_KEYS = new Set(["amountMinor", "amount_minor"]);
+const GIFT_CARD_LINK_KEYS = new Set(["to_gift_card_id", "from_gift_card_id"]);
+
+/**
+ * Amounts are minor units in the card's own currency, so they format through
+ * `Money` like every other figure in the admin UI rather than assuming two
+ * decimals; the two related-card ids link to their detail pages.
+ */
+function formatDetailValue(key: string, value: unknown, currency: string): string {
   if (value === null || value === undefined) return "—";
-  if ((key === "amountMinor" || key === "amount_minor") && typeof value === "number") {
-    return (value / 100).toFixed(2);
+  if (AMOUNT_KEYS.has(key) && typeof value === "number" && Number.isSafeInteger(value)) {
+    return Money.fromMinor(value, currency).format();
   }
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
     return String(value);
@@ -82,7 +92,18 @@ function formatDetailValue(key: string, value: unknown): string {
   return JSON.stringify(value);
 }
 
-function DetailFields({ details }: { details: Record<string, unknown> | null }) {
+function DetailValue({ entryKey, value, currency }: { entryKey: string; value: unknown; currency: string }) {
+  if (GIFT_CARD_LINK_KEYS.has(entryKey) && typeof value === "string" && value.length > 0) {
+    return (
+      <Link className="text-orange-400 hover:underline" href={`/admin/gift-cards/${encodeURIComponent(value)}`}>
+        {value}
+      </Link>
+    );
+  }
+  return <>{formatDetailValue(entryKey, value, currency)}</>;
+}
+
+function DetailFields({ details, currency }: { details: Record<string, unknown> | null; currency: string }) {
   if (!details) return null;
   const entries = Object.entries(details).filter(([, value]) => value !== undefined);
   if (entries.length === 0) return null;
@@ -91,7 +112,7 @@ function DetailFields({ details }: { details: Record<string, unknown> | null }) 
       {entries.map(([key, value]) => (
         <div key={key} className="flex gap-2">
           <dt className="shrink-0 text-gray-500">{DETAIL_FIELD_LABELS[key] ?? key}:</dt>
-          <dd className="text-gray-300">{formatDetailValue(key, value)}</dd>
+          <dd className="text-gray-300"><DetailValue entryKey={key} value={value} currency={currency} /></dd>
         </div>
       ))}
     </dl>
@@ -103,7 +124,7 @@ function DetailFields({ details }: { details: Record<string, unknown> | null }) 
  * presentational — the merge/sort/label-resolution logic lives server-side
  * in `lib/gift-cards/timeline.ts`.
  */
-export default function GiftCardTimeline({ entries }: { entries: GiftCardTimelineEntry[] }) {
+export default function GiftCardTimeline({ entries, currency }: { entries: GiftCardTimelineEntry[]; currency: string }) {
   return (
     <Card className="admin-card p-6">
       <h2 className="mb-4 text-lg font-semibold text-white">History</h2>
@@ -121,7 +142,7 @@ export default function GiftCardTimeline({ entries }: { entries: GiftCardTimelin
                 </time>
               </div>
               <p className="text-xs text-gray-500">By {actorLabel(entry)}</p>
-              <DetailFields details={entry.details} />
+              <DetailFields details={entry.details} currency={currency} />
             </li>
           ))}
         </ol>
