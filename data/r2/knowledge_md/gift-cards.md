@@ -17,7 +17,7 @@ The gift card is delivered by email as soon as payment completes. If the buyer c
 
 ## Redeeming at Checkout
 
-To use a gift card, enter its code in the "Gift card" field on the checkout shipping and billing step. The card's value comes off the order total, and any remaining balance on the order is charged to the order's payment method.
+To use a gift card, enter its code in the "Gift card" field in the order summary at checkout — it sits just under the discount code box on the first step (shipping or billing details), before you continue to payment. The card's value comes off the order total, and any remaining balance on the order is charged to the order's payment method.
 
 ## Checking a Balance
 

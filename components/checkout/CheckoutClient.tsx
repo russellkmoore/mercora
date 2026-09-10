@@ -468,29 +468,15 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
             showDiscountInput={
               currentStep === 'shipping' && !authoritativeQuote && !clientSecret
             }
+            giftCard={{
+              value: giftCardToken,
+              onChange: (value) => {
+                setGiftCardToken(value);
+                giftCardRequestKey.current = undefined;
+              },
+            }}
             authoritativeQuote={authoritativeQuote}
           />
-
-          {currentStep === 'shipping' && (
-            <div className="bg-surface-elevated p-4 rounded-xl text-foreground">
-              <label htmlFor="gift-card-code" className="block text-sm font-medium mb-1">
-                Gift card
-              </label>
-              <input
-                id="gift-card-code"
-                value={giftCardToken}
-                onChange={(event) => {
-                  setGiftCardToken(event.target.value);
-                  giftCardRequestKey.current = undefined;
-                }}
-                autoComplete="off"
-                maxLength={512}
-                className="w-full rounded border border-border px-3 py-2"
-                placeholder="Enter gift card code"
-              />
-              <p className="mt-1 text-xs text-muted-foreground">Applied securely when the checkout quote is created.</p>
-            </div>
-          )}
 
           {/* Payment Form */}
           {currentStep === 'payment' && clientSecret && (
