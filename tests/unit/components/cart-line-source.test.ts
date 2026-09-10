@@ -17,8 +17,10 @@ describe('stable cart-line UI projection', () => {
   it('uses the exact safe checkout-line projection', () => {
     const checkout = readFileSync(join(root, 'components/checkout/CheckoutClient.tsx'), 'utf8');
     expect(checkout).toContain('items: items.map(projectCartLineForCheckout)');
-    expect(checkout).toContain('giftCardToken: giftCardToken.trim()');
-    expect(checkout).toContain('giftCardRequestKey: giftCardRequestKey.current');
+    // The gift-card token is sent only when the shopper applied one, with a
+    // fresh request key per quote (the server releases the previous hold).
+    expect(checkout).toContain('giftCardToken: token');
+    expect(checkout).toContain('giftCardRequestKey: crypto.randomUUID()');
   });
 });
 

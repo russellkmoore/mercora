@@ -42,6 +42,7 @@ import type { Address, ShippingOption } from '@/lib/types';
 import { Money } from '@/lib/money';
 import { clearPendingCheckout, savePendingCheckout } from '@/lib/checkout/order-payload';
 import { projectCartLineForCheckout } from '@/lib/gift-cards/line-identity';
+import GiftCardApplyPanel from './GiftCardApplyPanel';
 import {
   DIGITAL_CHECKOUT_STEPS,
   DIGITAL_SHIPPING_METHOD_ID,
@@ -120,8 +121,13 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
   const [authoritativeQuote, setAuthoritativeQuote] = useState<AuthoritativeCheckoutQuote>();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  // Gift-card tender is applied on the payment step: `giftCardToken` is what
+  // the shopper is typing, `appliedGiftCard` is the code the current quote was
+  // priced with. Each apply re-quotes with a fresh request key; the server
+  // releases the previous quote's hold (previousOrderId) before reserving.
   const [giftCardToken, setGiftCardToken] = useState('');
-  const giftCardRequestKey = useRef<string | undefined>(undefined);
+  const [appliedGiftCard, setAppliedGiftCard] = useState('');
+  const lastQuoteOption = useRef<ShippingOption | undefined>(undefined);
   const [confirmedItems, setConfirmedItems] = useState<StableCartItem[]>([]);
 
   // Prefill a signed-in shopper's name and email from Clerk (D-03).
@@ -232,10 +238,14 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
   // Create Payment Intent with Stripe
   const createPaymentIntent = async (
     selectedShippingOption: ShippingOption,
-    addressOverride?: Address
+    addressOverride?: Address,
+    tender?: { giftCardToken?: string }
   ) => {
+    lastQuoteOption.current = selectedShippingOption;
+    const token = tender?.giftCardToken?.trim() ?? '';
     try {
-      // Create payment intent
+      // Create payment intent. Any earlier quote from this checkout is named
+      // so the server releases its gift-card hold and cancels its intent.
       const res = await fetch('/api/payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -244,10 +254,11 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
           shippingAddress: addressOverride ?? shippingAddress,
           shippingMethodId: selectedShippingOption.id,
           discountCodes: appliedDiscounts.map((discount) => discount.code),
-          ...(giftCardToken.trim() ? {
-            giftCardToken: giftCardToken.trim(),
-            giftCardRequestKey: giftCardRequestKey.current ??= crypto.randomUUID(),
+          ...(token ? {
+            giftCardToken: token,
+            giftCardRequestKey: crypto.randomUUID(),
           } : {}),
+          ...(orderId ? { previousOrderId: orderId } : {}),
         }),
       });
 
@@ -266,13 +277,13 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
       setOrderId(data.orderId);
       setTaxAmount(Money.fromMajor(data.quote.tax.amount, data.quote.tax.currency).toJSON());
       setAuthoritativeQuote(data.quote);
+      setAppliedGiftCard(token);
       if (data.noCash) {
         // Snapshot into confirmedItems before the cart is cleared, so the
         // confirmation modal can still show what was bought (D-11).
         setConfirmedItems(items);
         clearCart();
         setGiftCardToken('');
-        giftCardRequestKey.current = undefined;
         setCurrentStep('confirmation');
       } else {
         savePendingCheckout({ orderId: data.orderId, paymentIntentId: data.paymentIntentId });
@@ -284,6 +295,25 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
       throw err;
     }
   };
+
+  // Apply or remove a gift card on the payment step: re-quote in place and
+  // swap the Stripe form to the new PaymentIntent for the remaining balance.
+  const requoteWithGiftCard = async (token: string) => {
+    const option = lastQuoteOption.current;
+    if (!option) return;
+    setIsLoading(true);
+    setError('');
+    try {
+      await createPaymentIntent(option, undefined, token ? { giftCardToken: token } : undefined);
+      if (!token) setGiftCardToken('');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Could not update the gift card');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  const handleApplyGiftCard = () => requoteWithGiftCard(giftCardToken);
+  const handleRemoveGiftCard = () => requoteWithGiftCard('');
 
   // Handle successful payment
   const handlePaymentSuccess = async (paymentIntentId: string) => {
@@ -468,13 +498,7 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
             showDiscountInput={
               currentStep === 'shipping' && !authoritativeQuote && !clientSecret
             }
-            giftCard={{
-              value: giftCardToken,
-              onChange: (value) => {
-                setGiftCardToken(value);
-                giftCardRequestKey.current = undefined;
-              },
-            }}
+            giftCardCode={appliedGiftCard}
             authoritativeQuote={authoritativeQuote}
           />
 
@@ -482,8 +506,18 @@ export default function CheckoutClient({ userId }: CheckoutClientProps) {
           {currentStep === 'payment' && clientSecret && (
             <div className="bg-surface-elevated p-4 sm:p-6 rounded-xl w-full min-h-[400px]">
               <h3 className="text-lg font-semibold mb-4 text-foreground">Payment Information</h3>
+              <GiftCardApplyPanel
+                value={giftCardToken}
+                onChange={setGiftCardToken}
+                appliedCode={appliedGiftCard || undefined}
+                onApply={handleApplyGiftCard}
+                onRemove={handleRemoveGiftCard}
+                busy={isLoading}
+              />
               <div className="w-full">
-                <StripeProvider clientSecret={clientSecret}>
+                {/* Keyed on the client secret: Elements cannot change secrets
+                    after mount, so a re-quote must remount the form. */}
+                <StripeProvider key={clientSecret} clientSecret={clientSecret}>
                   <PaymentForm
                     clientSecret={clientSecret}
                     onSuccess={handlePaymentSuccess}
