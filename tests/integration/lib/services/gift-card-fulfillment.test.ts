@@ -17,6 +17,7 @@ import {
   drainGiftCardDeliveries,
   fulfillPaidGiftCards,
   issueAdminGiftCard,
+  resolveGiftCardAdminIssueMaxMinor,
   resendGiftCardDelivery,
 } from '@/lib/services/gift-card-fulfillment';
 import { TELEMETRY_MARKER } from '@/lib/observability/telemetry';
@@ -481,6 +482,51 @@ describe('admin-created gift card (D-07, D-19)', () => {
     const after = await env.DB.prepare(`SELECT COUNT(*) AS count FROM gift_card_accounts`)
       .first<{ count: number }>();
     expect(after?.count).toBe(before?.count);
+  });
+
+  it('takes its ceiling from the catalogue\'s highest active gift-card denomination, per currency, and falls back to 20,000 minor units without one (WR-04)', async () => {
+    // The test database carries migrations only, no seed: with no gift-card
+    // product at all the fallback ceiling applies (that is what the case above
+    // exercised). Add a product with a $500 top denomination and the ceiling
+    // follows it; an inactive $1,000 variant and a EUR variant do not count.
+    await env.DB.prepare(`INSERT INTO products (id, name, type, status, fulfillment_type)
+      VALUES ('prod_gc_ceiling', 'Test Gift Card', 'gift_card', 'active', 'digital')`).run();
+    const variants: Array<[string, string, number, string, string]> = [
+      ['variant_gc_ceiling_100', 'GCT-100', 10_000, 'USD', 'active'],
+      ['variant_gc_ceiling_500', 'GCT-500', 50_000, 'USD', 'active'],
+      ['variant_gc_ceiling_1000', 'GCT-1000', 100_000, 'USD', 'inactive'],
+      ['variant_gc_ceiling_eur', 'GCT-EUR', 75_000, 'EUR', 'active'],
+    ];
+    for (const [id, sku, amount, currency, status] of variants) {
+      await env.DB.prepare(`INSERT INTO product_variants (id, product_id, sku, option_values, price, status)
+        VALUES (?, 'prod_gc_ceiling', ?, '[]', ?, ?)`)
+        .bind(id, sku, JSON.stringify({ amount, currency }), status).run();
+    }
+    try {
+      await expect(resolveGiftCardAdminIssueMaxMinor(env.DB, 'USD')).resolves.toBe(50_000);
+      await expect(resolveGiftCardAdminIssueMaxMinor(env.DB, 'EUR')).resolves.toBe(75_000);
+      await expect(resolveGiftCardAdminIssueMaxMinor(env.DB, 'GBP')).resolves.toBe(adminMaxMinor);
+
+      const accepted = await issueAdminGiftCard({
+        requestId: 'admin-request-ceiling-accepted',
+        amount: Money.fromMinor(50_000, 'USD'),
+        recipientEmail: 'admin-recipient-ceiling@example.test',
+        environment: runtimeEnvironment(),
+        now,
+      });
+      expect(accepted.created).toBe(true);
+
+      await expect(issueAdminGiftCard({
+        requestId: 'admin-request-ceiling-refused',
+        amount: Money.fromMinor(50_001, 'USD'),
+        recipientEmail: 'admin-recipient-ceiling@example.test',
+        environment: runtimeEnvironment(),
+        now,
+      })).rejects.toThrow(RangeError);
+    } finally {
+      await env.DB.prepare(`DELETE FROM product_variants WHERE product_id = 'prod_gc_ceiling'`).run();
+      await env.DB.prepare(`DELETE FROM products WHERE id = 'prod_gc_ceiling'`).run();
+    }
   });
 
   it('delivers an admin-created card through the existing cron drain', async () => {
