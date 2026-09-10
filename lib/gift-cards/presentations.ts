@@ -60,22 +60,12 @@ function mapRow(row: PresentationRow, admin: boolean): GiftCardPresentation | Ad
 }
 
 /**
- * Both customer and operational projections deliberately omit bearer-code
- * hashes, encrypted delivery material, account ids, recipient details, and
- * ledger business keys. The database remains the source of the balance.
+ * The operational projection deliberately omits bearer-code hashes, encrypted
+ * delivery material, account ids, recipient details, and ledger business keys.
+ * The database remains the source of the balance. There is no customer-facing
+ * listing: a gift card is a bearer instrument delivered by email, not an
+ * account object (the former purchaser-keyed listing was removed 2026-09-10).
  */
-export async function listCustomerGiftCardPresentations(args: {
-  database: D1Database;
-  customerId: string;
-  now: number;
-  limit: number;
-}): Promise<GiftCardPresentation[]> {
-  const result = await args.database.prepare(`${PRESENTATION_SELECT}
-    WHERE account.purchaser_customer_id = ? ORDER BY account.created_at DESC LIMIT ?`)
-    .bind(args.now, args.customerId, args.limit).all<PresentationRow>();
-  return (result.results ?? []).map((row) => mapRow(row, false) as GiftCardPresentation);
-}
-
 export async function listAdminGiftCardPresentations(args: {
   database: D1Database;
   now: number;
