@@ -204,7 +204,12 @@ export interface OutstandingGiftCardBalances {
   outstandingMinor: number;
   /** How many active cards still carry a positive available balance. */
   cardsWithBalance: number;
-  /** Reservations someone is mid-checkout against: unreleased, uncommitted, unexpired. */
+  /**
+   * Reservations that still hold value: unreleased, not yet settled, and
+   * either committed or unexpired. Committed-but-unsettled rows are counted —
+   * that money is owed even though the available-balance expression has
+   * already subtracted it.
+   */
   openReservations: number;
   /** `null` when there are no active cards; callers pick their own default. */
   currency: string | null;
@@ -252,12 +257,32 @@ export async function sumOutstandingGiftCardBalances(
       FROM gift_card_accounts account
       WHERE account.status = 'active'`)
       .bind(/* SUM(...) */ nowSeconds, /* CASE WHEN ... */ nowSeconds),
-    // Deliberately narrower than the reservation clause inside the balance
-    // expression: that clause covers every reservation still holding value,
-    // while this counts only the "someone is mid-checkout right now" rows.
+    // The same "still holding value" clause the balance expression uses, so
+    // there is one definition of it in the codebase. It has to be the same
+    // one: a reservation that is committed but whose redemption ledger entry
+    // has not landed yet is subtracted from the card's available balance, so
+    // it contributes 0 to `outstanding_minor`. If this count were narrower
+    // than the balance clause, that money would be invisible to both halves
+    // of the measurement and the guard would report "no balances" while an
+    // order is mid-settlement.
+    //
+    // Scoped to active accounts for the same reason the balance half is: a
+    // committed reservation never expires, so without the join a reservation
+    // against a card that has since been disabled would be counted forever.
     database.prepare(`SELECT COUNT(*) AS open_reservations
-      FROM gift_card_reservations
-      WHERE released_at IS NULL AND committed_at IS NULL AND expires_at > ?`)
+      FROM gift_card_reservations reservation
+      JOIN gift_card_accounts account ON account.id = reservation.gift_card_id
+      WHERE account.status = 'active'
+        AND reservation.released_at IS NULL
+        AND (
+          reservation.committed_at IS NOT NULL
+          OR reservation.expires_at > ?
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM gift_card_ledger_entries settlement
+          WHERE settlement.reservation_id = reservation.id
+            AND settlement.entry_type = 'redemption'
+        )`)
       .bind(nowSeconds),
   ]);
   const totals = (batched[0]?.results?.[0] ?? null) as OutstandingTotalsRow | null;

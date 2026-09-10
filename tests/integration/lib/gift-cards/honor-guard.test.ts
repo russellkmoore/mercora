@@ -157,6 +157,42 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
     });
   });
 
+  it("still counts a committed reservation whose redemption has not settled yet", async () => {
+    // Commit and settle are two steps: `commitReservation` marks the order
+    // final, `settleReservation` writes the redemption ledger entry later from
+    // the order-effects drain. In between, the available-balance expression has
+    // already subtracted the reservation, so `outstandingMinor` reads 0 for the
+    // card. The money is still owed, so the guard has to see it in the
+    // reservation count or honoring would switch off mid-settlement.
+    const repository = createGiftCardRepository(env.DB);
+    await repository.issueAccount(issuance({ amount: Money.fromMinor(600, "USD") }));
+    await repository.reserve(reservation("reservation_committed_unsettled"));
+    await insertPendingOrder("order_guard_committed_unsettled");
+    await repository.commitReservation({
+      reservationId: "reservation_committed_unsettled",
+      orderId: "order_guard_committed_unsettled",
+      expectedAmount: Money.fromMinor(600, "USD"),
+      committedAt: now + 5,
+    });
+
+    await expect(sumOutstandingGiftCardBalances(env.DB, now)).resolves.toEqual({
+      outstandingMinor: 0,
+      cardsWithBalance: 0,
+      openReservations: 1,
+      currency: "USD",
+    });
+
+    // The whole point: with the card reading zero, the reservation count is
+    // the only thing keeping honoring on.
+    await writeHonorGuard(env.DB, {
+      outstanding_minor: 0,
+      currency: "USD",
+      open_reservations: 1,
+      measured_at: now,
+    });
+    await expect(honorIsEffectivelyOn(env.DB, false, now)).resolves.toBe(true);
+  });
+
   it("ignores a reservation that expired without being released or committed", async () => {
     const repository = createGiftCardRepository(env.DB);
     await repository.issueAccount(issuance());
