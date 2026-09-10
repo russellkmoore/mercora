@@ -315,6 +315,17 @@ describe("POST /api/admin/gift-cards/[id]/release-hold", () => {
     settled: false,
   };
 
+  it("returns 401 for an unauthenticated caller and touches nothing (A-1)", async () => {
+    mocks.checkAdminPermissions.mockResolvedValue({ success: false, error: "Admin access required" });
+    const response = await releaseHold(postRequest("release-hold", { reservationId: "res_1" }), context);
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ code: "unauthorized" });
+    expect(mocks.context).not.toHaveBeenCalled();
+    expect(repository.findReservations).not.toHaveBeenCalled();
+    expect(repository.releaseReservation).not.toHaveBeenCalled();
+    expect(mocks.appendGiftCardEvent).not.toHaveBeenCalled();
+  });
+
   it("releases an open reservation and writes one hold_released event with the reservation id and amount", async () => {
     repository.findReservations.mockResolvedValue([openReservation]);
     repository.releaseReservation.mockResolvedValue({ released: true, reservation: openReservation });
@@ -357,6 +368,17 @@ describe("POST /api/admin/gift-cards/[id]/resend", () => {
       id: "gift_delivery_1",
       recipientEmail: "buyer@example.com",
     });
+  });
+
+  it("returns 401 for an unauthenticated caller and sends nothing (A-1)", async () => {
+    mocks.checkAdminPermissions.mockResolvedValue({ success: false, error: "Admin access required" });
+    const response = await resend(postRequest("resend", {}), context);
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ code: "unauthorized" });
+    expect(mocks.context).not.toHaveBeenCalled();
+    expect(repository.findDeliveryByGiftCardId).not.toHaveBeenCalled();
+    expect(mocks.resendGiftCardDelivery).not.toHaveBeenCalled();
+    expect(mocks.appendGiftCardEvent).not.toHaveBeenCalled();
   });
 
   it("resends to the original recipient and writes one delivery_resent event, with an idempotency key naming both the delivery id and the new event id", async () => {
