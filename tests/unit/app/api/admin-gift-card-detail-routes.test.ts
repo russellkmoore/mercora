@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   findReservations: vi.fn(),
   getAdminGiftCardPresentation: vi.fn(),
   getSettings: vi.fn(),
+  buildGiftCardTimeline: vi.fn(),
 }));
 
 vi.mock('@opennextjs/cloudflare', () => ({ getCloudflareContext: mocks.context }));
@@ -37,8 +38,10 @@ vi.mock('@/lib/gift-cards/presentations', () => ({
   getAdminGiftCardPresentation: mocks.getAdminGiftCardPresentation,
 }));
 vi.mock('@/lib/utils/settings', () => ({ getSettings: mocks.getSettings }));
+vi.mock('@/lib/gift-cards/timeline', () => ({ buildGiftCardTimeline: mocks.buildGiftCardTimeline }));
 
 import { GET as detailGet } from '@/app/api/admin/gift-cards/[id]/route';
+import { GET as eventsGet } from '@/app/api/admin/gift-cards/[id]/events/route';
 
 function detailRequest(id: string, query = '') {
   return {
@@ -78,6 +81,7 @@ beforeEach(() => {
   mocks.getAdminGiftCardPresentation.mockResolvedValue(samplePresentation);
   mocks.findReservations.mockResolvedValue([]);
   mocks.getSettings.mockResolvedValue({ 'gift_cards.code_reveal_enabled': false });
+  mocks.buildGiftCardTimeline.mockResolvedValue({ entries: [] });
 });
 
 describe('GET /api/admin/gift-cards/[id]', () => {
@@ -171,6 +175,87 @@ describe('GET /api/admin/gift-cards/[id]', () => {
     mocks.findAccountById.mockRejectedValue(new Error('boom'));
     const { request, params } = detailRequest('gift_card_1');
     const response = await detailGet(request, { params });
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ code: 'gift_cards_read_failed' });
+  });
+});
+
+describe('GET /api/admin/gift-cards/[id]/events', () => {
+  function eventsRequest(id: string, query = '') {
+    return {
+      request: new NextRequest(`https://store.example/api/admin/gift-cards/${id}/events${query}`),
+      params: Promise.resolve({ id }),
+    };
+  }
+
+  it('401s an unauthenticated caller', async () => {
+    mocks.adminAuth.mockResolvedValue({ success: false, error: 'Admin access required' });
+    const { request, params } = eventsRequest('gift_card_1');
+    const response = await eventsGet(request, { params });
+    expect(response.status).toBe(401);
+  });
+
+  it('404s with gift_card_not_found for an unknown card id', async () => {
+    mocks.findAccountById.mockResolvedValue(undefined);
+    const { request, params } = eventsRequest('gift_card_missing');
+    const response = await eventsGet(request, { params });
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ code: 'gift_card_not_found' });
+  });
+
+  it('400s with invalid_limit for a non-positive-integer limit', async () => {
+    const { request, params } = eventsRequest('gift_card_1', '?limit=0');
+    const response = await eventsGet(request, { params });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: 'invalid_limit' });
+  });
+
+  it('returns entries oldest first with meta.limit', async () => {
+    mocks.buildGiftCardTimeline.mockResolvedValue({
+      entries: [
+        {
+          id: 'e1', type: 'admin_created', actorType: 'admin', actorId: 'admin_one',
+          actorLabel: 'Jane Admin', details: { reason: 'gift' }, createdAt: 1_700_000_000,
+        },
+        {
+          id: 'e2', type: 'hold', actorType: 'system', actorId: null,
+          actorLabel: null, details: {}, createdAt: 1_700_000_500,
+        },
+      ],
+    });
+    const { request, params } = eventsRequest('gift_card_1', '?limit=50');
+    const response = await eventsGet(request, { params });
+    expect(response.status).toBe(200);
+    const body = await response.json() as { events: Array<Record<string, unknown>>; meta: { limit: number } };
+    expect(body.meta).toEqual({ limit: 50 });
+    expect(body.events.map((entry) => entry.id)).toEqual(['e1', 'e2']);
+    expect(body.events[0]).toMatchObject({ type: 'admin_created', actorLabel: 'Jane Admin' });
+  });
+
+  it('404s with gift_cards_unavailable when both flags are off and the honor guard is clear (D-16)', async () => {
+    mocks.context.mockResolvedValue({ env: { DB: {} } });
+    mocks.resolveHonorEffective.mockResolvedValue(false);
+    const { request, params } = eventsRequest('gift_card_1');
+    const response = await eventsGet(request, { params });
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ code: 'gift_cards_unavailable' });
+  });
+
+  it('contains a direct call to resolveHonorEffective', async () => {
+    mocks.context.mockResolvedValue({ env: { DB: {} } });
+    const { request, params } = eventsRequest('gift_card_1');
+    await eventsGet(request, { params });
+    expect(mocks.resolveHonorEffective).toHaveBeenCalledWith(
+      expect.anything(),
+      { giftCardAcquisition: false, giftCardReconciliation: false },
+      expect.any(Number),
+    );
+  });
+
+  it('returns a typed error rather than an unhandled exception on failure', async () => {
+    mocks.findAccountById.mockRejectedValue(new Error('boom'));
+    const { request, params } = eventsRequest('gift_card_1');
+    const response = await eventsGet(request, { params });
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({ code: 'gift_cards_read_failed' });
   });
