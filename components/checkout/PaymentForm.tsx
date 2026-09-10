@@ -80,6 +80,10 @@ export default function PaymentForm({
     wallets: {
       applePay: 'auto', // Will show only if device supports it and domain is verified
       googlePay: 'auto', // Will show only if device supports it
+      // Link is off: it renders a "Save my information for faster checkout"
+      // box that saves the card to Stripe's Link, not to this store. The
+      // store has no saved-payment-method feature, so the box only misleads.
+      link: 'never',
     },
     fields: {
       billingDetails: {
