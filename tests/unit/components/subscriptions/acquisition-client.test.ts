@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SetupIntent, StripeElements } from "@stripe/stripe-js";
 import {
+  ADD_NEW_ADDRESS_VALUE,
   attemptFactsKey,
   completeStripeSetupRedirect,
   confirmSubscriptionSetup,
@@ -9,12 +10,14 @@ import {
   fetchSavedAddressesForPlan,
   fetchSubscriptionPlans,
   finalizeSubscriptionSetup,
+  nextAddressSelection,
   parseStripeSetupRedirect,
   recurringTotal,
   scrubStripeSetupRedirect,
   shippingAddressFromSaved,
   type FetchLike,
   type PublicSubscriptionPlan,
+  type SavedSubscriptionAddress,
 } from "@/components/subscriptions/acquisition-client";
 
 const plan: PublicSubscriptionPlan = {
@@ -362,5 +365,46 @@ describe("subscription acquisition client", () => {
     }), { status: 200 })) as unknown as FetchLike;
     await expect(fetchSubscriptionPlans(invalidUtf8, "var_one")).rejects.toThrow("invalid");
     expect(canceled).toHaveBeenCalledOnce();
+  });
+});
+
+describe("nextAddressSelection", () => {
+  const addrA: SavedSubscriptionAddress = {
+    id: "addr_a", address: { line1: "1 Main", city: "Denver", country: "US" },
+  };
+  const addrB: SavedSubscriptionAddress = {
+    id: "addr_b", is_default: true, address: { line1: "2 Main", city: "Denver", country: "US" },
+  };
+  const addrC: SavedSubscriptionAddress = {
+    id: "addr_c", is_default: false, address: { line1: "3 Main", city: "Denver", country: "US" },
+  };
+
+  it("returns preferredId when an entry in the list has that id", () => {
+    expect(nextAddressSelection([addrA, addrB], "addr_a")).toBe("addr_a");
+  });
+
+  it("returns the default entry's id when preferredId is absent from the list", () => {
+    expect(nextAddressSelection([addrA, addrB], "missing_id")).toBe("addr_b");
+  });
+
+  it("returns the first entry's id when preferredId is absent and no entry is default", () => {
+    expect(nextAddressSelection([addrA, addrC], "missing_id")).toBe("addr_a");
+  });
+
+  it("returns the empty string for an empty list regardless of preferredId", () => {
+    expect(nextAddressSelection([], "addr_a")).toBe("");
+    expect(nextAddressSelection([])).toBe("");
+  });
+
+  it("never returns the sentinel when called with it as preferredId, falling through to default-then-first", () => {
+    expect(nextAddressSelection([addrA, addrB], ADD_NEW_ADDRESS_VALUE)).toBe("addr_b");
+    expect(nextAddressSelection([addrA, addrC], ADD_NEW_ADDRESS_VALUE)).toBe("addr_a");
+  });
+
+  it("cannot collide with a real address id, because ID_PATTERN requires an alphanumeric first character", () => {
+    // The sentinel "__add_new__" starts with "_", which ID_PATTERN rejects as a
+    // saved-address id shape, so querying with it through the public surface
+    // always falls through to a real id rather than ever matching an entry.
+    expect(nextAddressSelection([addrC], ADD_NEW_ADDRESS_VALUE)).toBe("addr_c");
   });
 });
