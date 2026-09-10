@@ -29,6 +29,12 @@ describe("Blog SEO surfaces", () => {
     mocks.getStoreConfig.mockReturnValue({
       identity: { name: "Example Store" },
       urls: { site: "https://store.example.test", imageCdn: undefined },
+      // The sitemap filters product rows through the gift-card visibility
+      // predicate, so the fixture carries the real config shape rather than the
+      // subset these blog cases happen to read.
+      commerce: {
+        features: { giftCardAcquisition: true, giftCardReconciliation: true },
+      },
     });
     mocks.getPublishedBlogPosts.mockResolvedValue([]);
     mocks.getPublishedBlogSitemapEntries.mockResolvedValue([]);

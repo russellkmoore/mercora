@@ -239,21 +239,29 @@ async function resolvePurchasedNames(orders: PromptOrder[]): Promise<Map<string,
  * Catalogue ids of gift-card products that are currently hidden from every
  * listing surface, for stripping Vectorize matches before they reach the model.
  *
- * Returns an empty set — and runs no query at all — while selling is on, which
- * is the ordinary case. This is a best-effort filter on retrieved *copy*; the
- * authoritative filter on what a shopper is actually shown is
- * `filterListedProducts` over the hydrated rows, which needs no lookup because
- * it reads `products.type` directly.
+ * Bounded to the ids the search actually returned, and skipped entirely when
+ * selling is on or there is nothing to check — so the ordinary chat message
+ * pays for no query at all. This is a best-effort filter on retrieved *copy*;
+ * the authoritative filter on what a shopper is shown is `filterListedProducts`
+ * over the hydrated rows, which needs no lookup because it reads
+ * `products.type` directly.
  */
-async function hiddenGiftCardProductIds(giftCardAcquisition: boolean): Promise<Set<string>> {
+async function hiddenGiftCardProductIds(
+  giftCardAcquisition: boolean,
+  candidateIds: readonly string[],
+): Promise<Set<string>> {
   if (!hidesGiftCardsFromListings({ giftCardAcquisition })) return new Set();
+  if (candidateIds.length === 0) return new Set();
 
   try {
     const db = await getDbAsync();
     const rows = await db
       .select({ id: products.id })
       .from(products)
-      .where(eq(products.type, GIFT_CARD_PRODUCT_TYPE));
+      .where(and(
+        inArray(products.id, [...candidateIds]),
+        eq(products.type, GIFT_CARD_PRODUCT_TYPE),
+      ));
     return new Set(rows.map((row) => row.id));
   } catch {
     console.error("Gift-card visibility lookup failed");
@@ -647,10 +655,18 @@ export async function POST(req: NextRequest) {
     // gift-card text, the model will happily describe a product the store says
     // does not exist. Both are filtered here, before the prompt is built.
     const { giftCardAcquisition } = getStoreConfig().commerce.features;
-    const hiddenGiftCardIds = await hiddenGiftCardProductIds(giftCardAcquisition);
+    const matches = vectorResults && Array.isArray(vectorResults.matches)
+      ? vectorResults.matches
+      : [];
+    const hiddenGiftCardIds = await hiddenGiftCardProductIds(
+      giftCardAcquisition,
+      matches
+        .map((match) => match?.metadata?.productId)
+        .filter((id: unknown): id is string => typeof id === "string" && id.length <= 128),
+    );
 
-    if (vectorResults && Array.isArray(vectorResults.matches)) {
-      const visibleMatches = vectorResults.matches.filter((match) => {
+    if (matches.length > 0) {
+      const visibleMatches = matches.filter((match) => {
         const id = match?.metadata?.productId;
         return typeof id !== "string" || !hiddenGiftCardIds.has(id);
       });

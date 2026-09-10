@@ -185,7 +185,13 @@ describe("agent-chat guarded customer exits", () => {
     expect(query).toHaveBeenCalledOnce();
     expect(body.productIds).toEqual([]);
     expect(body.products).toEqual([]);
-    expect(getDbAsync).not.toHaveBeenCalled();
+    // One database call, and it is not hydration: with selling off, the route
+    // checks which of the retrieved ids are gift cards before the copy reaches
+    // the model (D-07). Hydration is what would turn a match into a
+    // recommendation, and the two empty arrays above are what prove it did not
+    // happen — this fixture never configures a db, so the check degrades to
+    // "nothing hidden" and the route carries on.
+    expect(getDbAsync).toHaveBeenCalledTimes(1);
     expectAnswerMatchesHistory(body);
   });
 
