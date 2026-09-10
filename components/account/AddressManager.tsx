@@ -21,7 +21,10 @@ export function AddressManager({ initial }: { initial: MACHCustomerAddress[] }) 
   async function remove(id: string) {
     setBusy(true); setMessage("");
     try {
-      const response = await fetch(`/api/account/addresses/${id}`, { method: "DELETE" });
+      const response = await fetch(`/api/account/addresses/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
       const body = await response.json() as { error?: string };
       if (!response.ok) throw new Error(body.error || "Address could not be removed");
       setAddresses((current) => current.filter((entry) => entry.id !== id));
