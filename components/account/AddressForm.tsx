@@ -140,11 +140,13 @@ export function AddressForm(props: {
           </button>
         )}
       </div>
-      {message && (
-        <p
-          role={message.kind === "error" ? "alert" : "status"}
-          className={message.kind === "error" ? "text-sm text-danger" : "text-sm text-muted-foreground"}
-        >
+      {message && message.kind === "error" && (
+        <p role="alert" className="text-sm text-danger">
+          {message.text}
+        </p>
+      )}
+      {message && message.kind === "success" && (
+        <p role="status" className="text-sm text-muted-foreground">
           {message.text}
         </p>
       )}
