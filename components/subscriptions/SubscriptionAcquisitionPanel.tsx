@@ -149,6 +149,7 @@ export default function SubscriptionAcquisitionPanel({
     setSetup(null);
     setCheckoutError("");
     setCompletedOwner(null);
+    setAddressDialogOpen(false);
     if (currentOwner !== null && confirmedSetup?.ownerId !== currentOwner) {
       setConfirmedSetup(null);
       setFinalizationWorking(false);

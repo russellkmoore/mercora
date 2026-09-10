@@ -80,6 +80,8 @@ describe("product subscription acquisition integration", () => {
     expect(source).toContain("useEffect(() => () => refreshControllerRef.current?.abort(), []);");
     // A saved address the subscription filter drops is reported, never silent.
     expect(region).toContain("if (saved.id && nextId !== saved.id)");
+    // The modal is attempt-scoped UI state: an owner change closes it.
+    expect(source).toMatch(/setStateOwner\(currentOwner\);[\s\S]*?setAddressDialogOpen\(false\);[\s\S]*?setAccepted\(false\);/);
 
     // D-06: the signed-out branch is untouched -- exactly one sign-in button.
     expect(source.split('<SignInButton mode="modal">').length - 1).toBe(1);
