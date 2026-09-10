@@ -19,6 +19,7 @@ vi.mock("@/lib/gift-cards/honor-guard", () => ({
   readHonorGuard: mocks.readHonorGuard,
   balancesMayExist: mocks.balancesMayExist,
   HONOR_GUARD_STALE_SECONDS: 900,
+  HONOR_GUARD_MIXED_CURRENCY: "MIXED",
 }));
 vi.mock("@/components/admin/GiftCardQueue", () => ({
   default: () => null,
@@ -79,7 +80,27 @@ describe("admin gift-card page gating (D-17)", () => {
     mocks.balancesMayExist.mockReturnValue(true);
     const tree = await render();
     const bannerProps = findBannerProps(tree);
-    expect(bannerProps).toEqual({ record: RECORD, honorConfigured: false });
+    expect(bannerProps).toEqual({ record: RECORD, honorConfigured: false, guardActive: true });
+  });
+
+  it("degrades to a null record instead of 500ing when the guard read throws (WR-03)", async () => {
+    // This is the page an operator opens when gift-card money is already in a
+    // state they need to see, and an uncaught D1 error here is a 500 on exactly
+    // that page. `/api/admin/gift-cards` already swallows the same error.
+    mocks.context.mockResolvedValue({ env: { DB: {} } });
+    mocks.readHonorGuard.mockRejectedValue(new Error("D1_ERROR: no such table"));
+    mocks.balancesMayExist.mockReturnValue(true);
+
+    const tree = await render();
+
+    expect(findBannerProps(tree)).toEqual({
+      record: null,
+      honorConfigured: false,
+      guardActive: true,
+    });
+    // Null is what balancesMayExist reads as "measurement unavailable", which
+    // keeps honoring on rather than guessing it is safe to stop.
+    expect(mocks.balancesMayExist).toHaveBeenCalledWith(null, expect.any(Number));
   });
 
   it("resolves without throwing and passes honorConfigured=true (no banner content) when honoring is on", async () => {
@@ -113,30 +134,68 @@ function textOf(node: unknown): string {
 
 describe("GiftCardHonorBanner content (D-05, GCF-02)", () => {
   it("names the outstanding total, the open-reservation count and the measurement time", () => {
-    const text = textOf(GiftCardHonorBanner({ record: RECORD, honorConfigured: false }));
+    const text = textOf(GiftCardHonorBanner({ record: RECORD, honorConfigured: false, guardActive: true }));
     expect(text).toContain(new Intl.NumberFormat("en-US", { style: "currency", currency: RECORD.currency }).format(5));
     expect(text).toContain("1 open reservation");
     expect(text).toContain(new Date(RECORD.measured_at * 1_000).toLocaleString());
   });
 
   it("renders nothing when honoring is configured on", () => {
-    expect(GiftCardHonorBanner({ record: RECORD, honorConfigured: true })).toBeNull();
+    expect(GiftCardHonorBanner({ record: RECORD, honorConfigured: true, guardActive: false })).toBeNull();
   });
 
   it("says the measurement is unavailable, without printing a misleading zero, when the record is missing", () => {
-    const text = textOf(GiftCardHonorBanner({ record: null, honorConfigured: false }));
+    const text = textOf(GiftCardHonorBanner({ record: null, honorConfigured: false, guardActive: true }));
     expect(text).toContain("unavailable");
     expect(text).not.toMatch(/\$0\.00/);
   });
 
   it("says the measurement is out of date when the record is stale", () => {
     const stale = { ...RECORD, measured_at: 0 };
-    const text = textOf(GiftCardHonorBanner({ record: stale, honorConfigured: false }));
+    const text = textOf(GiftCardHonorBanner({ record: stale, honorConfigured: false, guardActive: true }));
     expect(text).toContain("out of date");
   });
 
   it("names no card identity, code, hash, ciphertext, nonce or recipient", () => {
-    const text = textOf(GiftCardHonorBanner({ record: RECORD, honorConfigured: false }));
+    const text = textOf(GiftCardHonorBanner({ record: RECORD, honorConfigured: false, guardActive: true }));
     expect(text).not.toMatch(/code|hash|cipher|nonce|recipient|@/i);
+  });
+});
+
+describe("GiftCardHonorBanner does not alarm on a state that is working (WR-04)", () => {
+  const clear = { ...RECORD, outstanding_minor: 0, open_reservations: 0 };
+
+  it("says one quiet line, with no warning, when honoring is off and the guard is clear", () => {
+    // The old banner printed "$0.00 outstanding across 0 open reservations"
+    // under a warning header whenever honoring was off. That is the flag doing
+    // exactly what it was set to do, and alarming on it is how an operator
+    // learns to ignore the banner.
+    const rendered = GiftCardHonorBanner({ record: clear, honorConfigured: false, guardActive: false });
+    const text = textOf(rendered);
+
+    expect(text).toContain("no outstanding balances");
+    expect(text).not.toContain("keep being honored regardless");
+    expect(text).not.toMatch(/\$0\.00/);
+    expect(JSON.stringify(rendered)).not.toMatch(/yellow|AlertTriangle/);
+  });
+
+  it("still alarms with the same clear record once the guard reports it active", () => {
+    // Same record, opposite decision: the banner follows the page's guard
+    // reading rather than re-deriving one of its own.
+    const text = textOf(GiftCardHonorBanner({ record: clear, honorConfigured: false, guardActive: true }));
+    expect(text).toContain("keep being honored regardless");
+  });
+});
+
+describe("GiftCardHonorBanner never formats an untrusted total (WR-02, WR-06)", () => {
+  it("describes a mixed-currency total instead of printing it under one code", () => {
+    // A cross-currency sum of minor units is not an amount. Formatting it under
+    // one code understates it in one currency and overstates it in another.
+    const mixed = { ...RECORD, currency: "MIXED", outstanding_minor: 3_000 };
+    const text = textOf(GiftCardHonorBanner({ record: mixed, honorConfigured: false, guardActive: true }));
+
+    expect(text).toContain("more than one currency");
+    expect(text).toContain("1 open reservation");
+    expect(text).not.toMatch(/[$€£]/);
   });
 });
