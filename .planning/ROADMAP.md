@@ -168,7 +168,13 @@ Plans:
   3. Saving posts to the existing account addresses API, closes the modal, refreshes the list and pre-selects the new address, while the chosen plan, quantity and other page state are exactly as the shopper left them
   4. An API error appears inside the modal without closing it, and cancelling restores the address that was selected before
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 15-01-PLAN.md — Extract the shared AddressForm and saveAddress helper; refactor AddressManager (SUB-02)
+- [ ] 15-02-PLAN.md — Sentinel select option, AddAddressDialog, post-save refresh and pre-select (SUB-01, SUB-03)
+- [ ] 15-03-PLAN.md — Gate suite, scope assertions, deploy, read-only production check, human list
+
 **UI hint**: yes
 
 ### Phase 16: Blog Surfacing
