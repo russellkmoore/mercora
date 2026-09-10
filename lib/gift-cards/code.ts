@@ -183,6 +183,19 @@ export function generateGiftCardCode(options: GenerateGiftCardCodeOptions = {}):
  * Normalize only the exact public format. Lowercase ASCII is accepted for
  * human entry, but separator positions, length, prefix, and alphabet are fixed.
  */
+/**
+ * Display form of a bearer code with every group but the last hidden:
+ * `GC-****-****-****-****-****-****-LMS7`. Returns null for anything that is
+ * not a well-formed code, so callers never echo arbitrary input back.
+ */
+export function maskGiftCardCode(value: unknown): string | null {
+  const normalized = normalizeGiftCardCode(value);
+  if (!normalized) return null;
+  const groups = normalized.split("-").slice(1);
+  const hidden = groups.slice(0, -1).map(() => "*".repeat(CODE_GROUP_LENGTH));
+  return `${CODE_PREFIX}-${[...hidden, groups[groups.length - 1]].join("-")}`;
+}
+
 export function normalizeGiftCardCode(value: unknown): string | null {
   if (typeof value !== "string" || value.length !== GIFT_CARD_CODE_LENGTH) return null;
   if (!/^[A-Za-z0-9-]+$/.test(value)) return null;

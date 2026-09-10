@@ -225,7 +225,7 @@ export function generateOrderConfirmationHTML(orderData: OrderData, tokens: Them
             </tr>
             ${orderData.tender && !Money.fromStored(orderData.tender).isZero() ? `
             <tr style="padding: 4px 0;">
-              <td style="color: ${tokens.mutedOnInverse}; font-size: 14px;">Other tender:</td>
+              <td style="color: ${tokens.mutedOnInverse}; font-size: 14px;">Gift card:</td>
               <td style="text-align: right; color: ${tokens.onInverse}; font-size: 14px;">${Money.fromStored(orderData.tender).negate().format()}</td>
             </tr>` : ''}
             <tr style="border-top: 2px solid ${tokens.borderInverse}; padding: 12px 0 0; margin: 12px 0 0;">
