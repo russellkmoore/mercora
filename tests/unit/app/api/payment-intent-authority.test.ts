@@ -58,8 +58,27 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/observability/telemetry', () => ({
   recordTelemetry: mocks.recordTelemetry,
 }));
+const requoteMocks = vi.hoisted(() => ({
+  getOrderById: vi.fn(),
+  releaseTender: vi.fn(),
+}));
+vi.mock('@/lib/models/mach/orders', () => ({
+  getOrderById: requoteMocks.getOrderById,
+}));
+vi.mock('@/lib/commerce/runtime', () => ({
+  resolveRuntimeCommerceCapabilities: vi.fn(async () => ({
+    giftCards: {
+      resolveTender: vi.fn(),
+      verifyReservedTender: vi.fn(),
+      applyTender: vi.fn(),
+      releaseTender: requoteMocks.releaseTender,
+    },
+    subscriptions: { orderPaid: vi.fn() },
+  })),
+}));
 
 import { POST } from '@/app/api/payment-intent/route';
+import { GiftCardTenderUnavailableError } from '@/lib/gift-cards/capability';
 
 const quote = {
   currency: 'USD',
@@ -112,6 +131,10 @@ function request() {
 
 beforeEach(() => {
   mocks.insertError = null;
+  mocks.cancelPaymentIntent.mockClear();
+  mocks.createPaymentIntent.mockClear();
+  requoteMocks.getOrderById.mockReset();
+  requoteMocks.releaseTender.mockReset();
   mocks.auth.mockResolvedValue({ userId: null });
   mocks.currentUser.mockResolvedValue(null);
   mocks.getCustomer.mockResolvedValue(null);
@@ -337,5 +360,64 @@ describe('payment-intent durable authority boundary', () => {
 
     expect(response.status).toBe(400);
     expect(mocks.createPaymentIntent).not.toHaveBeenCalled();
+  });
+  it('releases the previous pending checkout and cancels its intent when re-quoting', async () => {
+    requoteMocks.getOrderById.mockResolvedValue({
+      id: 'WEB-GUEST-previous', status: 'pending', payment_status: 'pending', customer_id: null,
+      extensions: { payment_intent_id: 'pi_previous', checkout_tender_state: { v: 1, reservationId: 'gift_reservation_x' } },
+    });
+    requoteMocks.releaseTender.mockResolvedValue(undefined);
+    const body = JSON.parse(await request().text()) as Record<string, unknown>;
+    const res = await POST(new NextRequest('http://localhost/api/payment-intent', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...body, previousOrderId: 'WEB-GUEST-previous' }),
+    }));
+    expect(res.status).toBe(200);
+    expect(requoteMocks.releaseTender).toHaveBeenCalledWith({
+      state: { v: 1, reservationId: 'gift_reservation_x' }, reason: 'checkout re-quoted',
+    });
+    expect(mocks.cancelPaymentIntent).toHaveBeenCalledWith('pi_previous');
+    // The new quote still goes through the same authority path.
+    expect(mocks.createPaymentIntent).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves a paid or foreign previous order alone', async () => {
+    requoteMocks.getOrderById.mockResolvedValue({
+      id: 'WEB-GUEST-paid', status: 'paid', payment_status: 'paid', customer_id: null,
+      extensions: { payment_intent_id: 'pi_paid', checkout_tender_state: { v: 1, reservationId: 'r' } },
+    });
+    const body = JSON.parse(await request().text()) as Record<string, unknown>;
+    const res = await POST(new NextRequest('http://localhost/api/payment-intent', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...body, previousOrderId: 'WEB-GUEST-paid' }),
+    }));
+    expect(res.status).toBe(200);
+    expect(requoteMocks.releaseTender).not.toHaveBeenCalled();
+    expect(mocks.cancelPaymentIntent).not.toHaveBeenCalled();
+
+    requoteMocks.getOrderById.mockResolvedValue({
+      id: 'WEB-other', status: 'pending', payment_status: 'pending', customer_id: 'user_someone_else',
+      extensions: { payment_intent_id: 'pi_other', checkout_tender_state: { v: 1, reservationId: 'r2' } },
+    });
+    await POST(new NextRequest('http://localhost/api/payment-intent', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...body, previousOrderId: 'WEB-other' }),
+    }));
+    expect(requoteMocks.releaseTender).not.toHaveBeenCalled();
+    expect(mocks.cancelPaymentIntent).not.toHaveBeenCalled();
+  });
+
+  it('names a gift card that cannot be applied instead of the generic pricing error', async () => {
+    mocks.priceCheckout.mockRejectedValueOnce(new GiftCardTenderUnavailableError());
+    const body = JSON.parse(await request().text()) as Record<string, unknown>;
+    const res = await POST(new NextRequest('http://localhost/api/payment-intent', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...body, giftCardToken: 'GC-0000', giftCardRequestKey: 'req-1' }),
+    }));
+    expect(res.status).toBe(400);
+    const json = await res.json() as { error: string; code?: string };
+    expect(json.code).toBe('gift_card_unavailable');
+    expect(json.error).toMatch(/gift card couldn't be applied/i);
+    expect(json.error).not.toContain('Checkout details are invalid');
   });
 });

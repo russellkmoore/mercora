@@ -2,50 +2,68 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Source contract for where a shopper enters a gift-card code at checkout.
+ * Source contract for gift-card tender at checkout.
  *
- * Russell's live check after the first production gift card ("got the email,
- * nowhere to enter it at checkout") found the field: it existed, but as a
- * separate box under the order summary that vanished once the quote was
- * created, and sat below the Continue button on anything narrower than xl.
- * The field now lives inside OrderSummary beside the discount-code input,
- * which is where shoppers look for "a code". These assertions pin that.
+ * History: the field shipped with the v1 backend as a box under the order
+ * summary on step 1, which Russell could not find ("nowhere to enter it at
+ * checkout"); it moved beside the discount code, then — because a gift card
+ * is a form of payment, not a promotion — onto the Payment Information step
+ * with its own Apply. Applying re-quotes the order in place; the server
+ * releases the previous quote's hold so the same card can be re-applied.
  */
+const panel = readFileSync('components/checkout/GiftCardApplyPanel.tsx', 'utf8');
 const summary = readFileSync('components/checkout/OrderSummary.tsx', 'utf8');
 const checkout = readFileSync('components/checkout/CheckoutClient.tsx', 'utf8');
+const route = readFileSync('app/api/payment-intent/route.ts', 'utf8');
 const article = readFileSync('data/r2/knowledge_md/gift-cards.md', 'utf8');
 
-describe('checkout gift-card code field placement', () => {
-  it('renders the gift-card input inside OrderSummary next to the discount code', () => {
-    expect(summary).toContain('id="gift-card-code"');
-    expect(summary).toContain('placeholder="Enter gift card code"');
-    expect(summary).toContain('Have a gift card?');
-    // Same visibility rule as the discount code: only while the quote can still change.
-    expect(summary).toMatch(/\{showDiscountInput && giftCard && \(/);
-    // The discount input comes first so the two "code" fields sit together.
-    expect(summary.indexOf('<DiscountCodeInput />')).toBeLessThan(summary.indexOf('id="gift-card-code"'));
+describe('gift-card tender on the payment step', () => {
+  it('renders the code entry with its own Apply and a Remove once applied', () => {
+    expect(panel).toContain('id="gift-card-code"');
+    expect(panel).toContain('placeholder="Enter gift card code"');
+    expect(panel).toContain('Pay with a gift card');
+    expect(panel).toMatch(/onClick=\{onApply\}/);
+    expect(panel).toMatch(/aria-label="Remove gift card"/);
+    expect(panel).toContain('maskGiftCardCode(appliedCode)');
   });
 
-  it('CheckoutClient no longer renders its own gift-card box and wires the summary instead', () => {
+  it('mounts the panel inside the Payment Information box and remounts Elements per quote', () => {
+    const paymentBox = checkout.slice(
+      checkout.indexOf('Payment Information</h3>'),
+      checkout.indexOf('<PaymentForm'),
+    );
+    expect(paymentBox).toContain('<GiftCardApplyPanel');
+    expect(paymentBox).toMatch(/<StripeProvider key=\{clientSecret\} clientSecret=\{clientSecret\}>/);
+    // Neither the summary nor the client renders its own code input any more.
+    expect(summary).not.toContain('id="gift-card-code"');
     expect(checkout).not.toContain('id="gift-card-code"');
-    expect(checkout).toMatch(/giftCard=\{\{\s*value: giftCardToken,/);
-    // Editing the code resets the idempotent request key so the next quote re-reserves.
-    expect(checkout).toMatch(/onChange: \(value\) => \{\s*setGiftCardToken\(value\);\s*giftCardRequestKey\.current = undefined;/);
-    // The token still travels to the payment-intent request.
-    expect(checkout).toContain('giftCardToken: giftCardToken.trim()');
   });
 
-  it('the support article describes the same place', () => {
-    expect(article).toMatch(/"Gift card" field/);
-    expect(article).toMatch(/order summary|discount code/i);
+  it('re-quotes with a fresh request key and names the previous order so its hold is released', () => {
+    expect(checkout).toMatch(/giftCardRequestKey: crypto\.randomUUID\(\)/);
+    expect(checkout).toMatch(/\.\.\.\(orderId \? \{ previousOrderId: orderId \} : \{\}\)/);
+    expect(checkout).toMatch(/const handleApplyGiftCard = \(\) => requoteWithGiftCard\(giftCardToken\)/);
+    expect(checkout).toMatch(/const handleRemoveGiftCard = \(\) => requoteWithGiftCard\(''\)/);
+    expect(checkout).toContain('setAppliedGiftCard(token)');
   });
-});
 
-describe('checkout gift-card tender line', () => {
+  it('the server releases the previous pending checkout and names gift-card failures', () => {
+    expect(route).toContain('previousOrderId?: string;');
+    expect(route).toMatch(/releaseTender\?\.\(\{\s*state: extensions\.checkout_tender_state, reason: 'checkout re-quoted'/);
+    expect(route).toMatch(/previous\.status !== 'pending' \|\| previous\.payment_status !== 'pending'/);
+    expect(route).toMatch(/previous\.customer_id && previous\.customer_id !== userId/);
+    expect(route).toContain("code: 'gift_card_unavailable'");
+  });
+
   it('labels the applied tender as the gift card, masked to its last group', () => {
-    expect(summary).toContain('maskGiftCardCode(giftCard.value)');
+    expect(summary).toContain('maskGiftCardCode(giftCardCode)');
     expect(summary).toMatch(/Gift card\{maskedGiftCard \? ` \$\{maskedGiftCard\}` : ''\}/);
     expect(summary).not.toContain('Other tender');
     expect(readFileSync('lib/utils/email.ts', 'utf8')).not.toContain('Other tender');
+  });
+
+  it('the support article describes the same place', () => {
+    expect(article).toMatch(/Payment Information step/);
+    expect(article).toMatch(/Pay with a gift card/);
   });
 });

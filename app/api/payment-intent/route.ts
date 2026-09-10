@@ -17,6 +17,9 @@ import { recordTelemetry } from '@/lib/observability/telemetry';
 import { resolveRuntimeCommerceCapabilities } from '@/lib/commerce/runtime';
 import { hasPhysicalCheckoutLines } from '@/lib/gift-cards/checkout';
 import { finalizeZeroCashGiftOrder } from '@/lib/services/order-finalization';
+import { getOrderById } from '@/lib/models/mach/orders';
+import { GiftCardTenderUnavailableError } from '@/lib/gift-cards/capability';
+import { GiftCardConflictError } from '@/lib/gift-cards/repository';
 import {
   noOpCommerceCapabilities,
   type CommerceCapabilities,
@@ -29,6 +32,43 @@ interface PaymentIntentRequest {
   discountCodes?: string[];
   giftCardToken?: string;
   giftCardRequestKey?: string;
+  /**
+   * The order this checkout created on its previous quote, when the shopper
+   * re-quotes (applies or removes a gift card on the payment step). Its
+   * gift-card hold is released and its PaymentIntent cancelled before the new
+   * quote reserves again; otherwise the old hold blocks the same card for 15
+   * minutes. Only a pending, unpaid order owned by this checkout qualifies.
+   */
+  previousOrderId?: string;
+}
+
+const GIFT_CARD_UNAVAILABLE_MESSAGE =
+  "That gift card couldn't be applied. Check the code, or if you just tried it, its hold clears within 15 minutes.";
+
+async function releasePreviousCheckout(
+  previousOrderId: string,
+  userId: string | null,
+  capabilities: CommerceCapabilities,
+): Promise<void> {
+  const previous = await getOrderById(previousOrderId).catch(() => null);
+  if (!previous || previous.status !== 'pending' || previous.payment_status !== 'pending') return;
+  if (previous.customer_id && previous.customer_id !== userId) return;
+  const extensions = (previous.extensions ?? {}) as Record<string, unknown>;
+  if (extensions.checkout_tender_state !== undefined) {
+    await capabilities.giftCards.releaseTender?.({
+      state: extensions.checkout_tender_state, reason: 'checkout re-quoted',
+    }).catch((error) => recordTelemetry('payment.pricing_rejected', {
+      operation: 'validate', outcome: 'degraded', path: '/api/payment-intent',
+    }, error));
+  }
+  if (typeof extensions.payment_intent_id === 'string') {
+    await cancelPaymentIntent(extensions.payment_intent_id).catch((error) => {
+      recordTelemetry('payment.intent_cancel_failed', {
+        operation: 'process', outcome: 'failed', provider: 'stripe',
+        retryable: true, path: '/api/payment-intent',
+      }, error);
+    });
+  }
 }
 
 function normalizeAddress(value: unknown): Address | null {
@@ -90,7 +130,8 @@ export async function POST(request: NextRequest) {
     !shippingAddress ||
     !isBoundedString(input.shippingMethodId, 128) ||
     (input.giftCardToken !== undefined && !isBoundedString(input.giftCardToken, 512)) ||
-    (input.giftCardRequestKey !== undefined && !isBoundedString(input.giftCardRequestKey, 256))
+    (input.giftCardRequestKey !== undefined && !isBoundedString(input.giftCardRequestKey, 256)) ||
+    (input.previousOrderId !== undefined && !isBoundedString(input.previousOrderId, 128))
   ) {
     return NextResponse.json({ error: 'Invalid checkout details' }, { status: 400 });
   }
@@ -99,9 +140,12 @@ export async function POST(request: NextRequest) {
   let quote: Awaited<ReturnType<typeof priceCheckout>>;
   let capabilities: CommerceCapabilities;
   try {
-    capabilities = input.giftCardToken
+    capabilities = input.giftCardToken || input.previousOrderId
       ? await resolveRuntimeCommerceCapabilities()
       : noOpCommerceCapabilities;
+    if (input.previousOrderId) {
+      await releasePreviousCheckout(input.previousOrderId, userId, capabilities);
+    }
     quote = await priceCheckout({
       items: input.items,
       shippingAddress,
@@ -115,6 +159,12 @@ export async function POST(request: NextRequest) {
     recordTelemetry('payment.pricing_rejected', {
       operation: 'validate', outcome: 'rejected', path: '/api/payment-intent',
     }, error);
+    if (error instanceof GiftCardTenderUnavailableError || error instanceof GiftCardConflictError) {
+      return NextResponse.json(
+        { error: GIFT_CARD_UNAVAILABLE_MESSAGE, code: 'gift_card_unavailable' },
+        { status: 400 }
+      );
+    }
     return NextResponse.json(
       { error: 'Checkout details are invalid or unavailable' },
       { status: 400 }
