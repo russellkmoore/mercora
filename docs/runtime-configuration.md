@@ -23,7 +23,7 @@ time.
 | Gift-card delivery encryption secrets | Server-only `GIFT_CARD_DELIVERY_CURRENT_VERSION` plus `GIFT_CARD_DELIVERY_KEYS_JSON` (at most four versioned AES-256 keys, base64-encoded, `base64:`-prefixed; never `NEXT_PUBLIC_*`) |
 | Subscription reconciliation | `STORE_FEATURE_SUBSCRIPTION_RECONCILIATION=true` (defaults off; keep enabled after the first subscription is sold) |
 | Optional subscription acquisition | `STORE_FEATURE_SUBSCRIPTION_ACQUISITION=true` plus a bounded `STORE_SUBSCRIPTION_TERMS_VERSION` matching the published recurring terms (defaults off and requires reconciliation enabled) |
-| Outbound email | `EMAIL_PROVIDER=cloudflare\|resend`; Cloudflare `EMAIL` binding (recommended) or encrypted `RESEND_API_KEY` |
+| Outbound email | `EMAIL_PROVIDER=cloudflare\|resend`; Cloudflare `EMAIL` binding (recommended) or encrypted `RESEND_API_KEY`. `STORE_SENDER_EMAIL` must be an address on a domain onboarded to Email Sending in *your own* Cloudflare account (or verified in Resend) — the committed value is the reference deployment's and will be rejected on any other account |
 
 `NEXT_PUBLIC_*` values are intentionally public. Store credentials (Stripe
 secrets, Clerk secrets, Cloudflare API tokens) belong in `.dev.vars` locally or
