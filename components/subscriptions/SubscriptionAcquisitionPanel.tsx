@@ -141,6 +141,7 @@ export default function SubscriptionAcquisitionPanel({
   const attemptRef = useRef<{ facts: string; key: string } | null>(null);
   const ownerRef = useRef<string | null>(null);
   const beginControllerRef = useRef<AbortController | null>(null);
+  const refreshControllerRef = useRef<AbortController | null>(null);
   const currentOwner = isLoaded && isSignedIn && userId ? userId : null;
   const [stateOwner, setStateOwner] = useState(currentOwner);
   if (stateOwner !== currentOwner) {
@@ -160,8 +161,11 @@ export default function SubscriptionAcquisitionPanel({
   useEffect(() => {
     ownerRef.current = currentOwner;
     beginControllerRef.current?.abort();
+    refreshControllerRef.current?.abort();
     attemptRef.current = null;
   }, [currentOwner]);
+
+  useEffect(() => () => refreshControllerRef.current?.abort(), []);
 
   useEffect(() => {
     if (!confirmedSetup || confirmedSetup.ownerId !== currentOwner) return;
@@ -235,7 +239,12 @@ export default function SubscriptionAcquisitionPanel({
           if (!controller.signal.aborted) setLoadingAddresses(false);
         });
     });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      // A plan or auth change reloads the list; a post-save refresh still in
+      // flight must not race that reload for `addresses`/`addressId`.
+      refreshControllerRef.current?.abort();
+    };
   }, [isLoaded, isSignedIn, selectedPlan, userId]);
 
   const visibleAddresses = useMemo(
@@ -277,20 +286,24 @@ export default function SubscriptionAcquisitionPanel({
     setSetup(null);
     setCheckoutError("");
     setCompletedOwner(null);
+    const controller = new AbortController();
+    refreshControllerRef.current?.abort();
+    refreshControllerRef.current = controller;
+    const live = () => !controller.signal.aborted && ownerRef.current === owner;
     setLoadingAddresses(true);
     setAddressError("");
     try {
-      const next = await fetchSavedAddressesForPlan(fetch, selectedPlan);
-      if (ownerRef.current !== owner) return;
+      const next = await fetchSavedAddressesForPlan(fetch, selectedPlan, controller.signal);
+      if (!live()) return;
       setAddresses(next);
       setAddressesOwner(owner);
       setAddressId(nextAddressSelection(next, saved.id));
     } catch (error) {
-      if (ownerRef.current === owner) {
+      if (live()) {
         setAddressError(error instanceof Error ? error.message : "Saved addresses could not be loaded");
       }
     } finally {
-      if (ownerRef.current === owner) setLoadingAddresses(false);
+      if (live()) setLoadingAddresses(false);
     }
   }
   // address-save-region:end
