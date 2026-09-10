@@ -1,7 +1,7 @@
 ---
 title: Subscription PDP — add a shipping address in place instead of leaving the page
 created: 2026-09-10
-resolves_phase: null
+resolves_phase: 15
 source: Russell, 2026-09-10
 ---
 
