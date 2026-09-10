@@ -2,9 +2,9 @@
 phase: 13-gift-card-flags
 fixed_at: 2026-09-10T00:00:00Z
 review_path: .planning/phases/13-gift-card-flags/13-REVIEW.md
-iteration: 2
-findings_in_scope: 21
-fixed: 19
+iteration: 3
+findings_in_scope: 25
+fixed: 23
 skipped: 2
 status: partial
 ---
@@ -445,3 +445,169 @@ is in a file this iteration touched.
 _Fixed: 2026-09-10_
 _Fixer: Claude (gsd-code-fixer)_
 _Iteration: 2_
+
+
+---
+
+# Iteration 3
+
+**Fixed at:** 2026-09-10
+**Source review:** `13-REVIEW.md` § Iteration 3
+**Iteration:** 3
+
+**Summary:**
+- Findings in scope: 4 (0 Critical, 3 Warning, 1 Info)
+- Fixed: 4
+- Skipped: 0
+
+Four commits, `d878b15`..`ceba2eb`. One of these (WR-17) was a regression I
+introduced in iteration 2, so it is worth being blunt about what went wrong.
+
+## Fixed Issues
+
+### WR-17: The admin banner told an operator the store owed nothing
+
+**Files modified:** `app/admin/gift-cards/page.tsx`, `tests/unit/app/admin-gift-card-gating.test.ts`
+**Commit:** `d878b15`
+
+**This was my regression, from `52f25c2`.** Consolidating onto
+`resolveHonorEffective` looked like exactly what WR-13 asked for, but the page
+was asking two different questions through one value:
+
+- *Does this page exist?* — the money decision, correctly owned by
+  `resolveHonorEffective`.
+- *What does the banner say?* — a display fact, which must come from the record.
+
+`resolveHonorEffective` deliberately returns `false` for sell-on/honor-off
+**without reading the guard**; that short-circuit is what protects GCF-04. The
+banner read that `false` as "the last measurement was fresh, readable and empty"
+and printed *"no outstanding balances"* on a store selling cards it cannot
+redeem — which is the state an operator opens that page in, because every
+checkout is throwing. The record was sitting in the same function, already read,
+ignored.
+
+`guardActive` now comes from `balancesMayExist(guardRecord, now)`;
+`resolveHonorEffective` still owns the 404 gate.
+
+I took the coordinator's narrower fix rather than the review's suggested third
+banner state — the amber "still being honored" branch already says the right
+thing once it is fed the right signal, and a new red state would be new surface
+to get wrong.
+
+**The suite had no sell-on case at all** (zero matches for `ACQUISITION`), which
+is why nothing caught this. It has four now, including one asserting the quiet
+state stays reachable so the fix does not simply trade one wrong answer for
+another. Verified with a negative control: restoring the old wiring fails two of
+them.
+
+### WR-18: The fifth call site, and nothing pinning ownership
+
+**Files modified:** `app/api/admin/gift-cards/route.ts`, `tests/unit/lib/gift-cards/honor-decision-owner-source.test.ts` (new), `tests/unit/app/api/gift-card-presentation-routes.test.ts`
+**Commit:** `c4fe182`
+
+`/api/admin/gift-cards` still called `honorIsEffectivelyOn` directly — missed
+when the other four were consolidated. It agreed with the owner only because its
+gate runs solely under both-off, where the two functions reduce to the same
+thing. A coincidence, not a contract: `/admin/gift-cards` and the queue it
+fetches were reaching the same answer by two routes with two preconditions.
+
+The route now asks the owner, with both flags, behind the same
+`giftCardSurfacesHidden` gate the other public surfaces use.
+
+The new contract asserts nothing under `app/`, `lib/` or `workers/` calls
+`honorIsEffectivelyOn`, `balancesMayExist` or `readHonorGuard` except
+`honor-guard.ts` itself, plus `/admin/gift-cards` for its banner **record**
+read. That exemption is narrow and deliberate: the page may read and interpret
+the record, but not call `honorIsEffectivelyOn`, because that one *is* the
+decision. The test also checks the exemption is still in use, so it cannot decay
+into permission left lying around, and names the five asking surfaces so one
+quietly dropping the call is caught too.
+
+Verified with a negative control: swapping the balance route back to
+`honorIsEffectivelyOn` fails the scan.
+
+### WR-19: The write contract missed `INSERT OR REPLACE` and any alias
+
+**Files modified:** `tests/unit/lib/gift-cards/admin-settings-writer-source.test.ts`
+**Commit:** `5521a2b`
+
+All four shapes the review probed are now caught: SQLite's conflict clauses
+(`INSERT OR REPLACE|IGNORE|ABORT|FAIL|ROLLBACK INTO`), `REPLACE INTO`,
+`UPDATE OR ...`, and `UPSERT INTO`. Renaming the table on import is forbidden
+outright rather than followed — far easier to enforce than dataflow, and there
+is no legitimate reason to rename it. camelCase Drizzle bindings are covered
+against a future schema rename.
+
+The regexes are now **tested** rather than only applied: 22 literal fixtures for
+what must be caught, 4 for what must not.
+
+**One of those immediately earned its keep.** `UPDATE admin_settings_audit`
+matched the `UPDATE ... admin_settings` pattern — a false positive that would
+have dragged an unrelated table's writer onto this allowlist. A contract that
+fires on the wrong file gets muted, and a muted contract is worse than none.
+Every table name now ends in `\b`.
+
+Verified with real-file negative controls: `INSERT OR REPLACE`, `REPLACE INTO`
+and an aliased import each fail the scan; working tree restored after each.
+
+### IN-01: Four stale comments
+
+**Files modified:** `lib/gift-cards/honor-guard.ts`, `tests/unit/lib/commerce/runtime-honor-override.test.ts`, `app/api/gift-cards/balance/route.ts`
+**Commit:** `ceba2eb`
+
+The three named, plus a fourth I found while checking: the balance route's
+comment named `honorIsEffectivelyOn` above a call to `resolveHonorEffective`,
+left over from WR-13. I confirmed the corrected path actually contains the
+assertion it now cites (`tests/integration/lib/gift-cards/honor-guard.test.ts:547`)
+rather than just changing the string.
+
+## Skipped Issues
+
+None this iteration.
+
+## Not done
+
+The review also asked to update the D-18 sentence in `13-CONTEXT.md` to name the
+admin API route. I left `.planning/` alone apart from this report — AGENTS.md
+puts that tree out of scope, and the coordinator owns D-18. **One line to add
+there:** D-18's list of callers should include `app/api/admin/gift-cards/route.ts`.
+
+## Verification
+
+All gates run in the **main checkout** (`workflow.use_worktrees` is `false`).
+
+| Gate | Result |
+| --- | --- |
+| `npm run lint` | 0 errors, 52 warnings — the same pre-existing set as iterations 1 and 2 |
+| `npm run typecheck` | clean |
+| `npm run scan:tokens` | 0 violations |
+| `npm run docs:lint` | 0 violations |
+| `npm test` | 298 files, 2566 tests, all passing |
+| `npm run test:workers` | 29 files, 198 tests, all passing |
+| `npm run test:observability-worker` | 1 file, 3 tests, all passing |
+
+Iteration 2 finished at 2530 unit tests; iteration 3 adds 36. Worker tests are
+unchanged at 198 — nothing this iteration touched the D1-backed paths.
+
+## Notes for a human reviewer
+
+1. **WR-17 is the second bug caused by consolidating this decision.** CR-05 came
+   from four implementations disagreeing; WR-17 came from one implementation
+   being reused for a question it does not answer. The line to hold is that
+   `resolveHonorEffective` returns a *decision*, and anything that needs to
+   *show* a number must read the record. The new ownership contract encodes
+   exactly that split.
+2. **The ownership contract allows one exemption**, `/admin/gift-cards` reading
+   the record. If a second surface ever needs to display the measurement, the
+   right move is a shared presentational helper, not a second exemption.
+3. **The write contract now forbids aliasing `admin_settings` on import.** That
+   is a real constraint on unrelated future code, and it will fire on a rename
+   that has nothing to do with gift cards. It is deliberate, but it is the kind
+   of rule that gets deleted in frustration if nobody knows why it exists — the
+   reason is in the file, next to the patterns.
+
+---
+
+_Fixed: 2026-09-10_
+_Fixer: Claude (gsd-code-fixer)_
+_Iteration: 3_
