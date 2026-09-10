@@ -3,6 +3,7 @@ import type { CartItem } from "@/lib/types/cartitem";
 import OrderItemCard from "./OrderItemCard";
 import DiscountCodeInput from "./DiscountCodeInput";
 import { Gift } from "lucide-react";
+import { maskGiftCardCode } from "@/lib/gift-cards/code";
 import { useCartStore } from "@/lib/stores/cart-store";
 import { Money, cartSubtotal, type MachMoney } from "@/lib/money";
 
@@ -50,6 +51,9 @@ export default function OrderSummary({
   authoritativeQuote,
 }: Props) {
   const { appliedDiscounts } = useCartStore();
+  // The only tender the store accepts is a gift card; show which one, masked
+  // to its last group, from the code the shopper typed (never from the server).
+  const maskedGiftCard = giftCard ? maskGiftCardCode(giftCard.value) : null;
   
   // Calculate totals from cart store if discounts are applied, otherwise use simple calculation
   const subtotal = cartSubtotal(items);
@@ -173,9 +177,11 @@ export default function OrderSummary({
       </div>
 
       {authoritative && !authoritative.tender.isZero() && (
-        <div className="flex justify-between text-sm text-success">
-          <span>Other tender</span>
-          <span>-{authoritative.tender.format()}</span>
+        <div className="flex justify-between gap-4 text-sm text-success">
+          <span className="min-w-0 truncate">
+            Gift card{maskedGiftCard ? ` ${maskedGiftCard}` : ''}
+          </span>
+          <span className="shrink-0">-{authoritative.tender.format()}</span>
         </div>
       )}
 

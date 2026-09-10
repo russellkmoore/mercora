@@ -40,3 +40,12 @@ describe('checkout gift-card code field placement', () => {
     expect(article).toMatch(/order summary|discount code/i);
   });
 });
+
+describe('checkout gift-card tender line', () => {
+  it('labels the applied tender as the gift card, masked to its last group', () => {
+    expect(summary).toContain('maskGiftCardCode(giftCard.value)');
+    expect(summary).toMatch(/Gift card\{maskedGiftCard \? ` \$\{maskedGiftCard\}` : ''\}/);
+    expect(summary).not.toContain('Other tender');
+    expect(readFileSync('lib/utils/email.ts', 'utf8')).not.toContain('Other tender');
+  });
+});
