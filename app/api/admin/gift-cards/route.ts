@@ -68,3 +68,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ code: 'gift_cards_read_failed', error: 'Gift cards are temporarily unavailable' }, { status: 503 });
   }
 }
+
+/**
+ * RED scaffold (14-06 Task 2): deliberately wrong, non-throwing response so
+ * the new POST test cases fail on real assertions rather than a module-load
+ * crash. Replaced with the full admin-create implementation in the GREEN
+ * commit.
+ */
+export async function POST(_request: NextRequest) {
+  return NextResponse.json({ wrong: true });
+}
