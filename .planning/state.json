@@ -1,7 +1,7 @@
 {
   "contract": "1.0.0",
   "flavor": "core",
-  "milestone": "v2.1 — Gift Card Product",
+  "milestone": "v2.2 — Operations & Polish",
   "phases": [
     {
       "number": "1",
@@ -15,29 +15,49 @@
     },
     {
       "number": "9",
-      "name": "Gift Card Catalogue",
+      "name": "12 (v2.1 Gift Card Product)",
       "status": "complete"
     },
     {
-      "number": "10",
-      "name": "Gift Card Purchase Flow",
-      "status": "complete"
+      "number": "13",
+      "name": "Gift-Card Flags",
+      "status": "pending"
     },
     {
-      "number": "11",
-      "name": "Production Enablement",
-      "status": "complete"
+      "number": "14",
+      "name": "Gift-Card Admin & Audit Trail",
+      "status": "pending"
     },
     {
-      "number": "12",
-      "name": "Content, Assistant & Live Proof",
-      "status": "complete"
+      "number": "15",
+      "name": "Subscription Address In Place",
+      "status": "pending"
+    },
+    {
+      "number": "16",
+      "name": "Blog Surfacing",
+      "status": "pending"
+    },
+    {
+      "number": "17",
+      "name": "Saved Payment Methods",
+      "status": "pending"
+    },
+    {
+      "number": "18",
+      "name": "Tech-Debt Closure",
+      "status": "pending"
+    },
+    {
+      "number": "19",
+      "name": "Operator Checklist (human checkpoints)",
+      "status": "pending"
     }
   ],
   "next": {
-    "command": "/gsd:progress",
-    "label": "Show progress",
-    "reason": "Unsure of state — showing progress"
+    "command": "/gsd:progress --next",
+    "label": "Advance to the next step (plan phase 13)",
+    "reason": "Phase 13 of 7 — needs a plan"
   },
-  "updated_at": "2026-09-10T05:25:42.159Z"
+  "updated_at": "2026-09-10T16:28:00.285Z"
 }

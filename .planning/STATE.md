@@ -4,17 +4,18 @@ milestone: v2.2
 milestone_name: Operations & Polish
 current_phase: 13
 current_phase_name: Gift-Card Flags
-status: planning
-stopped_at: v2.2 roadmap written — Phases 13-19, 34/34 requirements mapped
-last_updated: "2026-09-10T16:18:30.388Z"
+current_plan: 2
+status: executing
+stopped_at: Completed 13-01-PLAN.md
+last_updated: "2026-09-10T16:28:21.873Z"
 last_activity: 2026-09-10
-last_activity_desc: v2.2 ROADMAP.md created (Phases 13-19, 34/34 requirements mapped)
-state_head: a12a6d61f8f9f5f33d7f659ccbedfa902375916b
+last_activity_desc: 13-01 executed — gift-card tender follows honor; shared visibility predicate created
+state_head: f7b606cffcc92f76a482c3b4c0fab647f273a978
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 9
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -29,16 +30,17 @@ See: .planning/PROJECT.md (updated 2026-09-09 after Phase 11)
 
 ## Current Position
 
-Phase: 13 (Gift-Card Flags) — READY TO EXECUTE
-Plan: —
-Status: Roadmapped, awaiting phase discussion
-Last activity: 2026-09-10 — v2.2 ROADMAP.md created (Phases 13-19, 34/34 requirements mapped)
+Phase: 13 (Gift-Card Flags) — EXECUTING
+Current Plan: 2
+Total Plans in Phase: 9
+Status: 13-01 complete (wave 1 tracer); wave 2 unblocked
+Last activity: 2026-09-10 — 13-01 executed: gift-card tender now follows honor, shared visibility predicate created
 
 **Milestone v2.2 phases:**
 
 | Phase | Name | Requirements | Depends on | Status |
 |-------|------|--------------|------------|--------|
-| 13 | Gift-Card Flags | GCF-01..05 | — | Not started |
+| 13 | Gift-Card Flags | GCF-01..05 | — | In progress (1/9 plans) |
 | 14 | Gift-Card Admin & Audit Trail | GCA-01..09 | Phase 13 | Not started |
 | 15 | Subscription Address In Place | SUB-01..03 | — | Not started |
 | 16 | Blog Surfacing | BLOG-01..03 | — | Not started |
@@ -161,6 +163,7 @@ Last activity: 2026-09-10 — v2.2 ROADMAP.md created (Phases 13-19, 34/34 requi
 | Phase 12 P04 | 7min | 3 tasks | 0 files |
 | Phase 12 P05 | 2h | 3 tasks | 4 files |
 | Phase 12 P06 | 12min | 3 tasks | 2 files |
+| Phase 13 P01 | 8min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -306,6 +309,8 @@ Decisions locked for v2:
 - [Phase 12]: [Phase 12, unattended]: EMAIL_PROVIDER alone did not unblock the gift-card email: the cron drain called sendEmail without the worker env, so the sender fell back to a request context that does not exist in a scheduled run and never found the EMAIL binding or DB; attempts failed silently until the row parked as needs_review (attempt 8). Chosen: fix lib/services/gift-card-fulfillment.ts to pass EMAIL/DB/EMAIL_PROVIDER/RESEND_API_KEY into sendEmail at both call sites (integration test asserts it), push to deploy, then re-queue the parked delivery row with one production D1 UPDATE (status pending, attempt_count 0, completed_at NULL) so the next cron cycle sends it. Alternative rejected: leave the row parked for Russell (SHOP-07's delivery half would stay unproven and the first customer card would never arrive).
 - [Phase 12]: [Phase 12, unattended]: With the sender fixed, Cloudflare Email Sending rejected the store's placeholder from-address (support@mercora.example.com, error E_SENDER_DOMAIN_NOT_AVAILABLE: domain not owned by the account). DNS shows russellkmoore.me is onboarded to Email Sending (cf-bounce MX, SPF, DKIM cf2024-1, DMARC). Chosen: set the public var STORE_SENDER_EMAIL = "Voltique <orders@russellkmoore.me>" in wrangler.jsonc and deploy. Not changed: STORE_SUPPORT_EMAIL (still the placeholder; reply-to/support address is Russell's call), and no Email Routing rule exists for orders@ so replies to the sender bounce.
 - [Phase 12]: [Phase 12, 12-06] The phase's scope assertion was run as written and recorded as failing — three files under lib/ and wrangler.jsonc changed, all four attributable to the unattended orchestrator commits 3b821f7, 32b9df1, f813499 and d8b4d11. The stronger true statement is asserted instead: app/, components/ and migrations/ are empty in the range, no migration was added, and the secret scan over added lines is 0.
+- [Phase 13]: Gift-card tender is gated on honor (giftCardReconciliation), not sell (giftCardAcquisition) — the acquisition-gated wrapper is deleted (D-03, GCF-01)
+- [Phase 13]: Public gift-card visibility is decided by one pure predicate in lib/gift-cards/visibility.ts, keyed on product.type and applied at call sites only — never inside lib/models/mach/products.ts (D-08, D-14)
 
 ### Pending Todos
 
@@ -386,8 +391,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-10
-Stopped at: v2.2 roadmap written — Phases 13-19, 34/34 requirements mapped
+Last session: 2026-09-10T16:27:49.378Z
+Stopped at: Completed 13-01-PLAN.md
 Resume file: None
 
 Next: `/gsd-discuss-phase 13`
