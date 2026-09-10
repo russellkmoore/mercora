@@ -121,7 +121,20 @@ Plans:
   4. An admin resends a delivery email, re-queues a `needs_review` delivery, releases a stuck hold, adds a free-text note, and creates a card (amount, recipient, reason) that is issued and delivered like a purchased one — every action lands on the timeline and survives a redeploy, persisted through the expand-only `gift_card_events` migration (next free number `0024`)
   5. No admin screen or API response ever returns a code hash, ciphertext or nonce, and every gift-card admin API refuses a caller without admin auth; a full code reveal is off unless a documented setting enables it, and then it takes a confirm step and writes an audit event
 
-**Plans**: TBD
+**Plans**: 9 plans
+
+Plans:
+
+- [ ] 14-01-PLAN.md — Migration `0024`, the `gift_card_events` Drizzle table and `code_suffix`, proven by a migration-ordering test
+- [ ] 14-02-PLAN.md — Narrow the honor-guard settings refusal, declare the code-reveal setting, add the shared admin route scaffold
+- [ ] 14-03-PLAN.md — Repository: `disableAccount`, `findReservations`, `requeueDelivery`, `writeAdjustment`, once-only `reissue`
+- [ ] 14-04-PLAN.md — Event writer, four-source timeline merge, extended list projection with search, forbidden-column contract
+- [ ] 14-05-PLAN.md — Fulfillment: `issueAdminGiftCard`, `resendGiftCardDelivery`, code suffix on checkout-issued cards
+- [ ] 14-06-PLAN.md — Read and create routes: card detail, timeline, list search and paging, admin-create
+- [ ] 14-07-PLAN.md — Seven mutation routes: disable, notes, requeue, release-hold, resend, reissue, reveal
+- [ ] 14-08-PLAN.md — Admin UI: real list with search and paging, card detail page, action bar, confirm dialogs, timeline
+- [ ] 14-09-PLAN.md — Documentation, full CI gate suite, deploy and read-only production check
+
 **UI hint**: yes
 
 ### Phase 15: Subscription Address In Place
