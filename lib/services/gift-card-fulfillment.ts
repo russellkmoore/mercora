@@ -469,6 +469,28 @@ async function deliverOne(args: {
   }
 }
 
+export type ResendGiftCardDeliveryResult =
+  | { sent: true }
+  | { sent: false; reason: 'not_resendable' | 'code_unavailable' | 'send_failed' };
+
+/**
+ * RED scaffold (Task 2, 14-05) — replaced by the real implementation in
+ * GREEN. Deliberately reports a fixed, unconditional success and never reads
+ * a delivery row or calls the sender, so every RED assertion (both the
+ * "sends" cases and the "refuses" cases) fails for the missing behavior
+ * itself rather than vacuously — a fixed always-refuse stub would make the
+ * refusal assertions pass for the wrong reason.
+ */
+export async function resendGiftCardDelivery(_args: {
+  deliveryId: string;
+  to?: string;
+  idempotencyKey: string;
+  environment: GiftCardFulfillmentEnvironment;
+  now?: number;
+}): Promise<ResendGiftCardDeliveryResult> {
+  return { sent: true };
+}
+
 /** Idempotently issue every paid gift-card line and make delivery retryable. */
 export async function fulfillPaidGiftCards(order: Order, options: {
   environment?: GiftCardFulfillmentEnvironment;
