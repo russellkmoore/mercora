@@ -20,6 +20,7 @@ import {
   validateGiftCardRecipientEmail,
 } from '@/lib/gift-cards/customization';
 import { isGiftCardOrderLine } from '@/lib/gift-cards/checkout';
+import { GIFT_CARD_PRODUCT_TYPE } from '@/lib/gift-cards/visibility';
 import { sendEmail, type EmailSendOptions } from '@/lib/email/sender';
 import { getStoreConfig } from '@/lib/store-config';
 import { recordTelemetry } from '@/lib/observability/telemetry';
@@ -299,12 +300,37 @@ export interface IssueAdminGiftCardResult {
 
 /**
  * D-07: the ceiling on an amount admin-create can mint. There is no
- * STORE_GIFT_CARD_MAX_MINOR constant anywhere in this repository, so this is
- * D-07's stated fallback — the gift-card product's highest configured
- * denomination (the "Voltique Gift Card" product `prod_33`, variant
- * `variant_33`, $200 = 20,000 minor units — see data/d1/seed.sql).
+ * STORE_GIFT_CARD_MAX_MINOR constant anywhere in this repository, so D-07's
+ * stated fallback applies — the gift-card product's highest configured
+ * denomination — and it is read from the catalogue at call time
+ * (`resolveGiftCardAdminIssueMaxMinor`) rather than pinned to seed data, so a
+ * store that sells a different set of denominations gets a matching ceiling
+ * without a code change (WR-04). This literal is the last resort only, for a
+ * catalogue with no active gift-card variant in the requested currency.
  */
-const GIFT_CARD_ADMIN_ISSUE_MAX_MINOR = 20_000;
+const GIFT_CARD_ADMIN_ISSUE_FALLBACK_MAX_MINOR = 20_000;
+
+/**
+ * The highest active gift-card denomination in `currency`, in minor units,
+ * from the same `products`/`product_variants` rows checkout sells from
+ * (`products.type = 'gift_card'`, variant `price` JSON in minor units).
+ */
+export async function resolveGiftCardAdminIssueMaxMinor(
+  database: D1Database,
+  currency: string,
+): Promise<number> {
+  const row = await database.prepare(`SELECT MAX(json_extract(variant.price, '$.amount')) AS max_minor
+    FROM product_variants variant
+    JOIN products product ON product.id = variant.product_id
+    WHERE product.type = ? AND product.status = 'active' AND variant.status = 'active'
+      AND upper(json_extract(variant.price, '$.currency')) = ?`)
+    .bind(GIFT_CARD_PRODUCT_TYPE, currency.toUpperCase())
+    .first<{ max_minor: number | null }>();
+  const max = row?.max_minor;
+  return typeof max === 'number' && Number.isSafeInteger(max) && max > 0
+    ? max
+    : GIFT_CARD_ADMIN_ISSUE_FALLBACK_MAX_MINOR;
+}
 
 /**
  * D-07/D-19: issue a gift card with no order behind it, through the exact
@@ -336,8 +362,9 @@ export async function issueAdminGiftCard(args: {
   if (existing) return { giftCardId, created: false };
 
   assertGiftCardMoney(args.amount, { positive: true });
-  if (args.amount.toMinorUnits() > GIFT_CARD_ADMIN_ISSUE_MAX_MINOR) {
-    throw new RangeError('Gift-card admin issuance amount exceeds the configured maximum');
+  const maxMinor = await resolveGiftCardAdminIssueMaxMinor(database, args.amount.currency);
+  if (args.amount.toMinorUnits() > maxMinor) {
+    throw new RangeError(`Gift-card admin issuance amount exceeds the configured maximum of ${maxMinor} minor units`);
   }
   // Reuses the same whole-object validator checkout uses (parseGiftCardCustomization)
   // rather than a second email regex; it also normalizes (trims, lowercases) the
