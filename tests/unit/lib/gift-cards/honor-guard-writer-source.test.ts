@@ -7,11 +7,17 @@ import { describe, expect, it } from "vitest";
  * request-path write would let a caller declare that no balances exist and
  * switch honoring off while cards still carry money (T-13-33).
  *
- * The contract is "no request path writes this record", which is broader than
- * one directory: a server action, an MCP tool or a service module under `lib/`
- * is reachable from a request too. So this walks `app/`, `lib/` and `workers/`
- * and asserts none of them references the writer or the cron entry point that
- * calls it — except the two files that legitimately do.
+ * **What this file checks is imports, not writes.** It walks `app/`, `lib/` and
+ * `workers/` and asserts that nothing outside two allowlisted files *references*
+ * `writeHonorGuard` or `runGiftCardHonorGuard`. That catches a caller reaching
+ * for the writer; it cannot catch a file that writes the row without importing
+ * anything, which is precisely what CR-02 was — `POST /api/admin/settings`
+ * upserting `admin_settings` through Drizzle with a key from the request body.
+ * The gap between "no request path writes this record" and "no request path
+ * imports the writer" is exactly where that bug lived.
+ *
+ * `admin-settings-writer-source.test.ts` covers the write itself. Keep both:
+ * this one names the specific functions, that one names the table.
  *
  * The forbidden list is its own declared array, not inlined into a string
  * the scan itself could match — this file lives under `tests/`, so it is
