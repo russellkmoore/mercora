@@ -37,6 +37,7 @@ describe('real D1 Workers harness', () => {
       '0022_add_gift_cards.sql',
       '0023_add_order_effects_payload.sql',
       '0023_normalize_tax_category_codes.sql',
+      '0024_add_gift_card_events.sql',
     ]);
   });
 
