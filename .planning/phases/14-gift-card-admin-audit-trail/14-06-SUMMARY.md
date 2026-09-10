@@ -196,10 +196,18 @@ Executed as three `tdd="true"` tasks (Task 1 `type="tracer"`, Tasks 2-3 `type="a
 - **Verification:** `tests/unit/app/api/admin-gift-card-detail-routes.test.ts#400s with invalid_limit for a non-positive-integer limit` passes.
 - **Committed in:** `1b3a3eb` (Task 3 GREEN commit)
 
+**3. [Process — parallel-execution staging race] Sibling plan 14-07 files swept into the final metadata commit**
+- **Found during:** the final `docs(14-06): ...` commit
+- **Issue:** This plan runs in the same checkout (no worktrees) as the parallel 14-07 executor. Immediately before this plan's final commit, `git status --short` showed only `14-06-SUMMARY.md` staged and every 14-07 file (`[id]/notes/route.ts`, `[id]/release-hold/route.ts`, `[id]/requeue/route.ts`, `[id]/resend/route.ts`, and modifications to `lib/gift-cards/events.ts`/`lib/gift-cards/repository.ts`) as untracked (`??`). Between that check and `git commit`, the 14-07 executor's own `git add` ran concurrently and staged those files; `git commit` commits the whole index, not just the path just `add`ed, so they rode along into commit `030178b`.
+- **Fix:** None needed — the content is correct and belongs entirely to plan 14-07's own work; nothing of this plan's was lost or corrupted, and nothing of 14-07's was corrupted either. Documented here rather than reverted, matching the precedent in plan 14-02's SUMMARY for the identical race: a revert risks colliding with the sibling executor's own subsequent commit of the same content.
+- **Files affected:** `app/api/admin/gift-cards/[id]/notes/route.ts`, `app/api/admin/gift-cards/[id]/release-hold/route.ts`, `app/api/admin/gift-cards/[id]/requeue/route.ts`, `app/api/admin/gift-cards/[id]/resend/route.ts`, `lib/gift-cards/events.ts`, `lib/gift-cards/repository.ts` (none in this plan's `files_modified`)
+- **Verification:** `git show --stat 030178b` confirms the extra files are exactly plan 14-07's route files plus the two shared modules it modifies; this plan's own `files_modified` set (route files, `presentations.ts`, test files) is unaffected and still verified above.
+- **Committed in:** `030178b`
+
 ---
 
-**Total deviations:** 2 auto-fixed (1 missing-critical export, 1 blocking scope-preservation).
-**Impact on plan:** No SQL landed in any route (the plan's stated goal); no shared file was edited concurrently with a sibling executor. Both deviations stayed within this plan's actual surface (one small additive export, one route-local construction) and are independently proven by passing tests.
+**Total deviations:** 2 auto-fixed (1 missing-critical export, 1 blocking scope-preservation), 1 process note (no code impact).
+**Impact on plan:** No SQL landed in any route (the plan's stated goal); no shared file was edited concurrently with a sibling executor in this plan's own commits. Both auto-fixed deviations stayed within this plan's actual surface (one small additive export, one route-local construction) and are independently proven by passing tests. The one process note is a checkout-sharing artifact with no effect on either plan's correctness.
 
 ## Issues Encountered
 
