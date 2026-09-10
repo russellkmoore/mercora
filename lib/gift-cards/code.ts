@@ -206,15 +206,33 @@ export function normalizeGiftCardCode(value: unknown): string | null {
   return pattern.test(normalized) ? normalized : null;
 }
 
-// RED-phase stub (#3770): compiles and exports the right names so the test
-// file can import successfully, but every export is deliberately wrong (an
-// unconditional null) so each assertion fails for a real reason.
-export function giftCardCodeSuffix(_value: unknown): string | null {
-  return null;
+/**
+ * D-02: the final code group — display/search material stored in
+ * `gift_card_accounts.code_suffix` at issuance. Derived from the module's own
+ * group-length constant, not a hardcoded slice width. Null for anything
+ * `normalizeGiftCardCode` rejects, so a malformed or partial code never
+ * becomes a stored suffix.
+ */
+export function giftCardCodeSuffix(value: unknown): string | null {
+  const normalized = normalizeGiftCardCode(value);
+  if (!normalized) return null;
+  return normalized.slice(-CODE_GROUP_LENGTH);
 }
 
-export function maskGiftCardCodeSuffix(_suffix: unknown): string | null {
-  return null;
+const CODE_SUFFIX_PATTERN = new RegExp(`^[${CODE_ALPHABET_PATTERN}]{${CODE_GROUP_LENGTH}}$`);
+
+/**
+ * D-02: masks a bare four-character suffix the same way `maskGiftCardCode`
+ * masks a full code ending in it — `GC-****-...-****-{SUFFIX}` — so a card
+ * issued before 0024 (no stored suffix) renders as the "—" callers
+ * already use for `null`. Case-insensitive, matching `normalizeGiftCardCode`.
+ */
+export function maskGiftCardCodeSuffix(suffix: unknown): string | null {
+  if (typeof suffix !== "string") return null;
+  const normalized = suffix.toUpperCase();
+  if (!CODE_SUFFIX_PATTERN.test(normalized)) return null;
+  const hidden = Array.from({ length: CODE_GROUPS - 1 }, () => "*".repeat(CODE_GROUP_LENGTH));
+  return `${CODE_PREFIX}-${[...hidden, normalized].join("-")}`;
 }
 
 function digestMessage(code: string, keyVersion: number): Uint8Array<ArrayBuffer> {
