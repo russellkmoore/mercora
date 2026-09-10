@@ -50,7 +50,8 @@ interface GiftCardActionBarProps {
  * take optional input (resend, and the note form beside this component) —
  * never a native browser confirm. Every outcome is a `sonner` toast, and a success
  * refreshes the card and its timeline via `onChanged` so the audit entry the
- * admin just created is visible immediately.
+ * admin just created is visible immediately — except reveal, which shows the
+ * code inline and refreshes only once its dialog is closed (CR-02).
  */
 export default function GiftCardActionBar({
   giftCardId,
@@ -72,8 +73,21 @@ export default function GiftCardActionBar({
     setDisableReason("");
     setReissueTo("");
     setResendTo("");
-    // T-14-54: the code lives only for the lifetime of this open dialog.
+    // T-14-54: the code lives only for the lifetime of this open dialog — it
+    // is cleared here on close, and unmounting the bar destroys it outright.
     setRevealedCode(null);
+  };
+
+  // D-12/CR-02: the reveal dialog is the one place the code is ever shown, so
+  // the parent's refresh (which re-fetches the card and timeline) must wait
+  // until the admin has closed it. Refreshing earlier would re-render the
+  // detail view and discard the code before anyone saw it, leaving a
+  // `code_revealed` audit row for a reveal nobody witnessed.
+  const closeRevealDialog = () => {
+    if (busy) return;
+    const revealed = revealedCode !== null;
+    closeDialog();
+    if (revealed) onChanged();
   };
 
   const post = async (path: string, body: Record<string, unknown>): Promise<Record<string, unknown>> => {
@@ -163,8 +177,8 @@ export default function GiftCardActionBar({
       const payload = await post("reveal", { confirm: true });
       const code = typeof payload.code === "string" ? payload.code : null;
       if (!code) throw new Error("Gift-card code is unavailable");
+      // Only dialog-local state — never `onChanged()` here (see closeRevealDialog).
       setRevealedCode(code);
-      onChanged();
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : "Failed to reveal gift-card code");
     } finally {
@@ -349,7 +363,7 @@ export default function GiftCardActionBar({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={pending?.type === "reveal"} onOpenChange={(open) => { if (!open) closeDialog(); }}>
+      <AlertDialog open={pending?.type === "reveal"} onOpenChange={(open) => { if (!open) closeRevealDialog(); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Reveal the bearer code</AlertDialogTitle>

@@ -96,6 +96,57 @@ describe("gift-card action bar source contracts (D-17, D-22, D-12)", () => {
   });
 });
 
+describe("reveal keeps the code on screen until the dialog closes (D-12, CR-02)", () => {
+  const actionBarSource = readFileSync(
+    join(process.cwd(), "components", "admin", "gift-cards", "GiftCardActionBar.tsx"),
+    "utf8",
+  );
+  const detailSource = readFileSync(
+    join(process.cwd(), "components", "admin", "gift-cards", "GiftCardDetail.tsx"),
+    "utf8",
+  );
+
+  /** The body of `const {name} = async? (...) => { ... };` at two-space indent. */
+  function functionBody(source: string, name: string): string {
+    const match = source.match(new RegExp(
+      String.raw`\n  const ${name} = (?:async )?\([^)]*\) => \{\n([\s\S]*?)\n  \};`,
+    ));
+    expect(match, `${name} must be defined as an arrow function in the component`).not.toBeNull();
+    // Full-line comments are prose about the rule, not code that could break it.
+    return match![1].split("\n").filter((line) => !/^\s*\/\//.test(line)).join("\n");
+  }
+
+  it("does not call onChanged inside runReveal — the refresh would unmount the dialog before the code renders", () => {
+    const body = functionBody(actionBarSource, "runReveal");
+    expect(body).toContain("setRevealedCode(code)");
+    expect(body).not.toContain("onChanged(");
+  });
+
+  it("refreshes the parent only when the reveal dialog closes, and clears the code on every close", () => {
+    const closeReveal = functionBody(actionBarSource, "closeRevealDialog");
+    expect(closeReveal).toContain("closeDialog()");
+    expect(closeReveal).toContain("onChanged()");
+    expect(functionBody(actionBarSource, "closeDialog")).toContain("setRevealedCode(null)");
+    expect(actionBarSource).toMatch(/pending\?\.type === "reveal"[^\n]*closeRevealDialog\(\)/);
+  });
+
+  it("keeps the code in dialog-local state only — never in a prop, a store, or the URL", () => {
+    expect(actionBarSource).toMatch(/useState<string \| null>\(null\)/);
+    expect(actionBarSource).not.toMatch(/localStorage|sessionStorage|searchParams|revealedCode\s*=\s*props/);
+  });
+
+  it("shows the revealed code with a copy button inside the reveal dialog", () => {
+    expect(actionBarSource).toMatch(/<code[^>]*>\{revealedCode\}<\/code>/);
+    expect(actionBarSource).toContain("navigator.clipboard.writeText(revealedCode)");
+  });
+
+  it("only unmounts the action bar for the first load, not for a refresh", () => {
+    expect(detailSource).toMatch(/if \(mode === "initial"\) setLoading\(true\); else setRefreshing\(true\);/);
+    expect(detailSource).toContain('void load("initial")');
+    expect(detailSource).toContain("onChanged={() => void load()}");
+  });
+});
+
 describe("gift-card note form source contract (D-11, GCA-03)", () => {
   it("bounds the note textarea at 2000 characters", () => {
     const detailSource = readFileSync(
