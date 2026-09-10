@@ -43,7 +43,7 @@ export async function saveAddress(
   addressId?: string,
 ): Promise<{ address: MACHCustomerAddress }> {
   const response = await fetch(
-    addressId ? `/api/account/addresses/${addressId}` : "/api/account/addresses",
+    addressId ? `/api/account/addresses/${encodeURIComponent(addressId)}` : "/api/account/addresses",
     {
       method: addressId ? "PUT" : "POST",
       headers: { "content-type": "application/json" },
