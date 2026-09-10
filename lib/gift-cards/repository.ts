@@ -829,7 +829,7 @@ export function createGiftCardRepository(database: D1Database) {
     const adjustmentEntryId = `gift_ledger_${crypto.randomUUID()}`;
     assertGiftCardId(adjustmentEntryId, "gift-card ledger entry id");
 
-    const result = await database.batch([
+    const statements = [
       // No ON CONFLICT clause on purpose: the pre-check above already proved
       // this key is absent, so a collision here is a race with another
       // reissue of the same card and must abort the whole batch.
@@ -863,7 +863,26 @@ export function createGiftCardRepository(database: D1Database) {
         details: { from_gift_card_id: args.oldGiftCardId },
         createdAt: args.now,
       }),
-    ]);
+    ];
+
+    let result: D1Result[];
+    try {
+      result = await database.batch(statements);
+    } catch (error) {
+      // IN-10: two admins reissuing the same card at once both pass the
+      // pre-check; the loser's batch aborts on the ledger's UNIQUE
+      // business_key (or the D-01 partial index) with a raw D1 error. Nothing
+      // of the loser's landed, so re-probe: if the winner's rows are now
+      // there, this is D-06's "already reissued" 409, not a 503.
+      const [racedAccount, racedAdjustment] = await Promise.all([
+        findAccountById(newGiftCardId),
+        database.prepare(`${LEDGER_SELECT} WHERE business_key = ? LIMIT 1`).bind(adjustmentKey).first<LedgerRow>(),
+      ]);
+      if (racedAccount && racedAdjustment) {
+        throw new GiftCardConflictError("Gift card has already been reissued");
+      }
+      throw error;
+    }
 
     await verifyIssuedAccount(issueInput, issuanceKey);
     const adjustmentRow = await database.prepare(`${LEDGER_SELECT} WHERE business_key = ? LIMIT 1`)
