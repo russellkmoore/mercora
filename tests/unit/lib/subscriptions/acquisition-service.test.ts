@@ -110,6 +110,21 @@ describe("subscription acquisition service", () => {
     expect(provider.createSetupIntent).not.toHaveBeenCalled();
   });
 
+  it("accepts city and region up to the account API's 200-char limit and rejects longer", async () => {
+    const { service, provider } = mocks();
+    await expect(service.begin({
+      ...beginInput,
+      shippingAddress: { line1: "1 Main", city: "C".repeat(150), region: "R".repeat(200), country: "US" },
+    })).resolves.toBeDefined();
+    const over = mocks();
+    await expect(over.service.begin({
+      ...beginInput,
+      shippingAddress: { line1: "1 Main", city: "C".repeat(201), country: "US" },
+    })).rejects.toThrow("shipping address is invalid");
+    expect(over.provider.createSetupIntent).not.toHaveBeenCalled();
+    expect(provider.createSetupIntent).toHaveBeenCalledTimes(1);
+  });
+
   it("derives customer authority and stable consent from the provider SetupIntent", async () => {
     const { service, repository, provider } = mocks();
     const result = await service.begin(beginInput);
