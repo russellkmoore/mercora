@@ -409,6 +409,14 @@ describe("POST /api/admin/gift-cards/[id]/resend", () => {
     expect(mocks.resendGiftCardDelivery).not.toHaveBeenCalled();
   });
 
+  it("returns a typed 503 rather than an unhandled error when the delivery read fails (WR-06)", async () => {
+    repository.findDeliveryByGiftCardId.mockRejectedValue(new Error("D1 unavailable"));
+    const response = await resend(postRequest("resend", {}), context);
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ code: "gift_cards_write_failed" });
+    expect(mocks.resendGiftCardDelivery).not.toHaveBeenCalled();
+  });
+
   it("returns 400 invalid_body for a malformed admin-supplied address", async () => {
     const response = await resend(postRequest("resend", { to: "not-an-email" }), context);
     expect(response.status).toBe(400);
@@ -492,6 +500,26 @@ describe("POST /api/admin/gift-cards/[id]/reissue", () => {
     const response = await reissue(postRequest("reissue", {}), context);
     expect(response.status).toBe(409);
     expect(mocks.appendGiftCardEvent).not.toHaveBeenCalled();
+  });
+
+  it("returns a typed 503 rather than an unhandled error when the delivery read fails (WR-06)", async () => {
+    repository.findDeliveryByGiftCardId.mockRejectedValue(new Error("D1 unavailable"));
+    const response = await reissue(postRequest("reissue", {}), context);
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ code: "gift_cards_write_failed" });
+    expect(repository.reissue).not.toHaveBeenCalled();
+  });
+
+  it("does not read the delivery row at all when the admin supplies an address", async () => {
+    repository.findDeliveryByGiftCardId.mockRejectedValue(new Error("must not be called"));
+    repository.reissue.mockResolvedValue({
+      created: true,
+      newGiftCardId: "gift_card_reissue_x",
+      amount: Money.fromMinor(1_500, "USD"),
+    });
+    const response = await reissue(postRequest("reissue", { to: "fraud-recovery@example.com" }), context);
+    expect(response.status).toBe(200);
+    expect(repository.findDeliveryByGiftCardId).not.toHaveBeenCalled();
   });
 
   it("returns 401 unauthenticated and 400 for an invalid admin-supplied address", async () => {
