@@ -384,6 +384,18 @@ describe('gift-card issuance and durable delivery on real D1', () => {
     errorSpy.mockRestore();
     warnSpy.mockRestore();
   });
+
+  it('records a four-character code suffix on a checkout-issued card (D-02)', async () => {
+    const order = giftOrder();
+    await insertOrder(order);
+    mocks.send.mockResolvedValueOnce({ success: true, id: 'suffix-checkout' });
+
+    await fulfillPaidGiftCards(order, { environment: runtimeEnvironment(), now });
+
+    const row = await env.DB.prepare(`SELECT code_suffix FROM gift_card_accounts WHERE issued_order_id = ?`)
+      .bind(order.id).first<{ code_suffix: string | null }>();
+    expect(row?.code_suffix).toMatch(/^[23456789A-HJ-NP-Z]{4}$/);
+  });
 });
 
 describe('admin-created gift card (D-07, D-19)', () => {
