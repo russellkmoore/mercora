@@ -205,3 +205,29 @@ export async function listAdminGiftCardPresentations(args: {
     total,
   };
 }
+
+/**
+ * D-13/D-16: the single-card counterpart to `listAdminGiftCardPresentations`.
+ * `GET /api/admin/gift-cards/[id]` needs this exact projection (masked code,
+ * code suffix, delivery status, resolved purchaser label) and the plan's own
+ * objective forbids a SQL statement inside the route — so the detail route
+ * calls into this module rather than duplicating `PRESENTATION_SELECT`.
+ * `undefined` for an unknown id; the caller maps that to 404.
+ */
+export async function getAdminGiftCardPresentation(
+  database: D1Database,
+  id: string,
+  now: number,
+): Promise<AdminGiftCardPresentation | undefined> {
+  const row = await database.prepare(`${PRESENTATION_SELECT} WHERE account.id = ? LIMIT 1`)
+    .bind(now, id).first<PresentationRow>();
+  if (!row) return undefined;
+  const purchaserLabels = row.purchaser_customer_id
+    ? await resolvePurchaserLabels(database, [row.purchaser_customer_id])
+    : new Map<string, string>();
+  return mapRow(
+    row,
+    true,
+    row.purchaser_customer_id ? purchaserLabels.get(row.purchaser_customer_id) : undefined,
+  ) as AdminGiftCardPresentation;
+}

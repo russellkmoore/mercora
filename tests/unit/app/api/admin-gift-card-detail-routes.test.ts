@@ -133,7 +133,7 @@ describe('GET /api/admin/gift-cards/[id]', () => {
       giftCardId: 'gift_card_1',
       amount: { toMinorUnits: () => 500 },
       reservedAt: 1_700_000_100,
-      expiresAt: 1_700_100_000,
+      expiresAt: Math.floor(Date.now() / 1_000) + 3_600,
       committedOrderId: undefined,
       committedAt: undefined,
       releasedAt: undefined,
