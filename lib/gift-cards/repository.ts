@@ -84,6 +84,34 @@ export type GiftCardReservationResult =
   | { available: true; created: boolean; reservation: GiftCardReservation }
   | { available: false };
 
+/** A reservation plus whether a `redemption` ledger entry has settled it (D-10). */
+export interface GiftCardReservationWithSettlement extends GiftCardReservation {
+  settled: boolean;
+}
+
+export type GiftCardReservationClass =
+  | "open"
+  | "committed_unsettled"
+  | "released"
+  | "expired"
+  | "settled";
+
+/**
+ * One definition of reservation state, shared by the reissue guard, the
+ * release-hold route and the timeline (D-10). Pure — takes the settlement fact
+ * `findReservations` already joined in, rather than querying again.
+ */
+export function classifyGiftCardReservation(
+  reservation: GiftCardReservationWithSettlement,
+  nowSeconds: number,
+): GiftCardReservationClass {
+  if (reservation.releasedAt !== undefined) return "released";
+  if (reservation.committedAt !== undefined) {
+    return reservation.settled ? "settled" : "committed_unsettled";
+  }
+  return reservation.expiresAt > nowSeconds ? "open" : "expired";
+}
+
 const ACCOUNT_SELECT = `SELECT id, code_hash, code_hash_version, currency_code,
   status, issuance_entry_id, issuance_business_key, issued_amount_minor,
   issued_order_id, issued_line_id, purchaser_customer_id, created_at, disabled_at
@@ -361,22 +389,15 @@ export function createGiftCardRepository(database: D1Database) {
     return row ? mapReservation(row) : undefined;
   };
 
-  return {
-    findAccountById,
-
-    async findAccountByCodeHash(codeHash: GiftCardCodeHash): Promise<GiftCardAccount | undefined> {
-      assertGiftCardCodeHash(codeHash);
-      const row = await database.prepare(
-        `${ACCOUNT_SELECT} WHERE code_hash_version = ? AND code_hash = ? LIMIT 1`,
-      ).bind(codeHash.keyVersion, codeHash.digest).first<AccountRow>();
-      return row ? mapAccount(row) : undefined;
-    },
-
-    async issueAccount(input: IssueGiftCardInput): Promise<{
-      created: boolean;
-      account: GiftCardAccount;
-      issuance: GiftCardLedgerEntry;
-    }> {
+  // Local const (not object-method shorthand) so `reissue` below can call it by
+  // closure reference — matches the `findAccountById`/`findReservationById`
+  // idiom already used in this factory, and avoids relying on `this` binding
+  // if a caller destructures the returned object.
+  const issueAccount = async (input: IssueGiftCardInput): Promise<{
+    created: boolean;
+    account: GiftCardAccount;
+    issuance: GiftCardLedgerEntry;
+  }> => {
       assertIssueGiftCardInput(input);
       const businessKey = giftCardIssuanceBusinessKey(input.id);
       const result = await database.batch([
@@ -481,36 +502,109 @@ export function createGiftCardRepository(database: D1Database) {
         }
       }
       return { created: (result[0]?.meta.changes ?? 0) === 1, account, issuance };
+  };
+
+  const readBalance = async (giftCardId: string, now: number): Promise<GiftCardBalance | undefined> => {
+    assertGiftCardId(giftCardId);
+    assertGiftCardEpoch(now, "gift-card balance time");
+    const row = await database.prepare(`SELECT account.currency_code,
+      COALESCE((SELECT SUM(entry.amount_delta_minor)
+        FROM gift_card_ledger_entries entry
+        WHERE entry.gift_card_id = account.id), 0) AS ledger_balance_minor,
+      COALESCE((SELECT SUM(reservation.amount_minor)
+        FROM gift_card_reservations reservation
+        WHERE reservation.gift_card_id = account.id
+          AND reservation.released_at IS NULL
+          AND (reservation.committed_at IS NOT NULL OR reservation.expires_at > ?)
+          AND NOT EXISTS (
+            SELECT 1 FROM gift_card_ledger_entries settlement
+            WHERE settlement.reservation_id = reservation.id
+              AND settlement.entry_type = 'redemption'
+          )), 0) AS held_amount_minor
+      FROM gift_card_accounts account WHERE account.id = ? LIMIT 1`)
+      .bind(now, giftCardId).first<BalanceRow>();
+    if (!row) return undefined;
+    const ledgerBalance = Money.fromMinor(row.ledger_balance_minor, row.currency_code);
+    const heldAmount = Money.fromMinor(row.held_amount_minor, row.currency_code);
+    return {
+      ledgerBalance,
+      heldAmount,
+      availableBalance: ledgerBalance.subtract(heldAmount),
+    };
+  };
+
+  /**
+   * D-10: every reservation for a card, newest first, each carrying whether a
+   * `redemption` ledger entry has settled it — via LEFT JOIN so the caller (the
+   * reissue guard, the release-hold route, the timeline) never issues a second
+   * query per reservation to learn that fact.
+   */
+  const findReservations = async (giftCardId: string): Promise<GiftCardReservationWithSettlement[]> => {
+    assertGiftCardId(giftCardId);
+    const { results } = await database.prepare(`SELECT
+        reservation.id, reservation.gift_card_id, reservation.currency_code,
+        reservation.request_key, reservation.quote_fingerprint,
+        reservation.requested_amount_minor, reservation.amount_minor,
+        reservation.reserved_at, reservation.expires_at,
+        reservation.committed_order_id, reservation.committed_at,
+        reservation.released_at, reservation.release_reason,
+        CASE WHEN settlement.id IS NOT NULL THEN 1 ELSE 0 END AS settled
+      FROM gift_card_reservations reservation
+      LEFT JOIN gift_card_ledger_entries settlement
+        ON settlement.reservation_id = reservation.id AND settlement.entry_type = 'redemption'
+      WHERE reservation.gift_card_id = ?
+      ORDER BY reservation.reserved_at DESC, reservation.id DESC`)
+      .bind(giftCardId).all<ReservationRow & { settled: number }>();
+    return results.map((row) => ({ ...mapReservation(row), settled: row.settled === 1 }));
+  };
+
+  /** D-05: the one-way active -> disabled transition; retried requests are safe. */
+  const disableAccount = async (args: {
+    giftCardId: string;
+    disabledAt: number;
+  }): Promise<{ changed: boolean; account: GiftCardAccount }> => {
+    assertGiftCardId(args.giftCardId);
+    assertGiftCardEpoch(args.disabledAt, "gift-card disable time");
+    const updated = await database.prepare(`UPDATE gift_card_accounts
+      SET status = 'disabled', disabled_at = ?
+      WHERE id = ? AND status = 'active'
+      RETURNING id`).bind(args.disabledAt, args.giftCardId).first<{ id: string }>();
+    const account = await findAccountById(args.giftCardId);
+    if (!account) throw new GiftCardUnavailableError("Gift card is unavailable");
+    return { changed: updated?.id === args.giftCardId, account };
+  };
+
+  /** D-09: only from `needs_review`; all four CHECK-coupled columns move together. */
+  const requeueDelivery = async (args: {
+    giftCardId: string;
+    now: number;
+  }): Promise<{ requeued: boolean; deliveryId: string | undefined }> => {
+    assertGiftCardId(args.giftCardId);
+    assertGiftCardEpoch(args.now, "gift-card requeue time");
+    const row = await database.prepare(`UPDATE gift_card_deliveries
+      SET status = 'pending', completed_at = NULL, claim_token = NULL, lease_expires_at = NULL,
+          attempt_count = 0, deliver_after = ?, updated_at = ?
+      WHERE gift_card_id = ? AND status = 'needs_review'
+      RETURNING id`).bind(args.now, args.now, args.giftCardId).first<{ id: string }>();
+    return { requeued: Boolean(row), deliveryId: row?.id };
+  };
+
+  return {
+    findAccountById,
+
+    async findAccountByCodeHash(codeHash: GiftCardCodeHash): Promise<GiftCardAccount | undefined> {
+      assertGiftCardCodeHash(codeHash);
+      const row = await database.prepare(
+        `${ACCOUNT_SELECT} WHERE code_hash_version = ? AND code_hash = ? LIMIT 1`,
+      ).bind(codeHash.keyVersion, codeHash.digest).first<AccountRow>();
+      return row ? mapAccount(row) : undefined;
     },
 
-    async readBalance(giftCardId: string, now: number): Promise<GiftCardBalance | undefined> {
-      assertGiftCardId(giftCardId);
-      assertGiftCardEpoch(now, "gift-card balance time");
-      const row = await database.prepare(`SELECT account.currency_code,
-        COALESCE((SELECT SUM(entry.amount_delta_minor)
-          FROM gift_card_ledger_entries entry
-          WHERE entry.gift_card_id = account.id), 0) AS ledger_balance_minor,
-        COALESCE((SELECT SUM(reservation.amount_minor)
-          FROM gift_card_reservations reservation
-          WHERE reservation.gift_card_id = account.id
-            AND reservation.released_at IS NULL
-            AND (reservation.committed_at IS NOT NULL OR reservation.expires_at > ?)
-            AND NOT EXISTS (
-              SELECT 1 FROM gift_card_ledger_entries settlement
-              WHERE settlement.reservation_id = reservation.id
-                AND settlement.entry_type = 'redemption'
-            )), 0) AS held_amount_minor
-        FROM gift_card_accounts account WHERE account.id = ? LIMIT 1`)
-        .bind(now, giftCardId).first<BalanceRow>();
-      if (!row) return undefined;
-      const ledgerBalance = Money.fromMinor(row.ledger_balance_minor, row.currency_code);
-      const heldAmount = Money.fromMinor(row.held_amount_minor, row.currency_code);
-      return {
-        ledgerBalance,
-        heldAmount,
-        availableBalance: ledgerBalance.subtract(heldAmount),
-      };
-    },
+    issueAccount,
+    readBalance,
+    disableAccount,
+    findReservations,
+    requeueDelivery,
 
     async reserve(input: ReserveGiftCardInput): Promise<GiftCardReservationResult> {
       assertReserveGiftCardInput(input);
