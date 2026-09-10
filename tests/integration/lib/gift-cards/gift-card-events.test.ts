@@ -23,7 +23,7 @@ import {
   listGiftCardEvents,
 } from "@/lib/gift-cards/events";
 import { buildGiftCardTimeline } from "@/lib/gift-cards/timeline";
-import { listAdminGiftCardPresentations } from "@/lib/gift-cards/presentations";
+import { getAdminGiftCardPresentation, listAdminGiftCardPresentations } from "@/lib/gift-cards/presentations";
 import type { ReserveGiftCardInput } from "@/lib/gift-cards/domain";
 
 const now = 1_800_500_000;
@@ -317,6 +317,48 @@ describe("listAdminGiftCardPresentations search and projection (D-14, D-15)", ()
       recipientEmail: "recipient@example.com",
       purchaser: "Jane Doe",
     });
+  });
+
+  it("labels an admin-created card 'admin: {display name}' in both the list and the detail projection (D-17, IN-06)", async () => {
+    const repository = createGiftCardRepository(env.DB);
+    const adminUserId = `admin_user_${testSequence}`;
+    await env.DB.prepare(`INSERT INTO admin_users (user_id, email, display_name) VALUES (?, ?, ?)`)
+      .bind(adminUserId, "jane.admin@example.com", "Jane Admin").run();
+    await repository.issueAccount(issuance({ codeSuffix: "7ADM" }));
+    await appendGiftCardEvent({
+      giftCardId,
+      eventType: "admin_created",
+      actor: { type: "admin", id: adminUserId },
+      details: { reason: "goodwill", amount_minor: 1_000, recipient_email: "recipient@example.com" },
+      createdAt: now,
+    });
+
+    const { cards, total } = await listAdminGiftCardPresentations({
+      database: env.DB, now: now + 1, limit: 10, offset: 0, q: "7ADM",
+    });
+    expect(total).toBe(1);
+    expect(cards[0]).toMatchObject({ id: giftCardId, purchaser: "admin: Jane Admin" });
+    // The admin's user id itself never appears in the projection.
+    expect(JSON.stringify(cards[0])).not.toContain(adminUserId);
+
+    await expect(getAdminGiftCardPresentation(env.DB, giftCardId, now + 1))
+      .resolves.toMatchObject({ id: giftCardId, purchaser: "admin: Jane Admin" });
+  });
+
+  it("leaves purchaser undefined for an admin-created card whose creator has no admin_users row", async () => {
+    const repository = createGiftCardRepository(env.DB);
+    await repository.issueAccount(issuance({ codeSuffix: "8ADN" }));
+    await appendGiftCardEvent({
+      giftCardId,
+      eventType: "admin_created",
+      actor: { type: "admin", id: "dev-admin" },
+      details: { reason: "dev", amount_minor: 1_000, recipient_email: "recipient@example.com" },
+      createdAt: now,
+    });
+    const { cards } = await listAdminGiftCardPresentations({
+      database: env.DB, now: now + 1, limit: 10, offset: 0, q: "8ADN",
+    });
+    expect(cards[0]).toMatchObject({ id: giftCardId, purchaser: undefined });
   });
 
   it("renders a null maskedCode for a card with no stored code suffix", async () => {
