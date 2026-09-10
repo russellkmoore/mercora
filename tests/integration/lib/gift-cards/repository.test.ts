@@ -8,6 +8,7 @@ import {
   classifyGiftCardReservation,
   createGiftCardRepository,
 } from "@/lib/gift-cards/repository";
+import { giftCardReissueId } from "@/lib/gift-cards/domain";
 import type { IssueGiftCardInput, ReserveGiftCardInput } from "@/lib/gift-cards/domain";
 
 const now = 1_800_000_000;
@@ -15,6 +16,11 @@ const quote = "b".repeat(64);
 let testSequence = 0;
 let giftCardId = "gift_uninitialized";
 let hash = "0".repeat(64);
+
+/** A second, guaranteed-distinct 64-hex digest for a reissued/second card within the same test. */
+function altDigest(offset: number): string {
+  return (testSequence * 1_000 + offset).toString(16).padStart(64, "0");
+}
 
 function issuance(overrides: Partial<IssueGiftCardInput> = {}): IssueGiftCardInput {
   return {
@@ -607,5 +613,149 @@ describe("gift-card repository on real D1", () => {
     const stillSent = await env.DB.prepare(`SELECT status FROM gift_card_deliveries WHERE gift_card_id = ?`)
       .bind(giftCardId).first<{ status: string }>();
     expect(stillSent?.status).toBe("sent");
+  });
+
+  it("writes exactly one negative adjustment entry per business key and refuses an overdraft", async () => {
+    const repository = createGiftCardRepository(env.DB);
+    await repository.issueAccount(issuance());
+    const businessKey = `adjustment-test/${giftCardId}`;
+
+    const first = await repository.writeAdjustment({
+      giftCardId,
+      amount: Money.fromMinor(-400, "USD"),
+      businessKey,
+      createdAt: now + 1,
+    });
+    expect(first.created).toBe(true);
+    expect(first.entry.entryType).toBe("adjustment");
+    expect(first.entry.amountDelta).toEqual(Money.fromMinor(-400, "USD"));
+
+    const retry = await repository.writeAdjustment({
+      giftCardId,
+      amount: Money.fromMinor(-400, "USD"),
+      businessKey,
+      createdAt: now + 2,
+    });
+    expect(retry.created).toBe(false);
+    expect(retry.entry.id).toBe(first.entry.id);
+
+    const rows = await env.DB.prepare(`SELECT COUNT(*) AS count FROM gift_card_ledger_entries
+      WHERE gift_card_id = ? AND entry_type = 'adjustment'`).bind(giftCardId).first<{ count: number }>();
+    expect(rows?.count).toBe(1);
+
+    await expect(repository.writeAdjustment({
+      giftCardId,
+      amount: Money.fromMinor(-700, "USD"),
+      businessKey: `adjustment-overdraft/${giftCardId}`,
+      createdAt: now + 3,
+    })).rejects.toBeInstanceOf(GiftCardConflictError);
+  });
+
+  it("reissues a disabled card with no blocking reservation, draining it and issuing a new card for the same amount", async () => {
+    const repository = createGiftCardRepository(env.DB);
+    await repository.issueAccount(issuance());
+    await repository.disableAccount({ giftCardId, disabledAt: now + 1 });
+
+    const result = await repository.reissue({
+      oldGiftCardId: giftCardId,
+      now: now + 2,
+      codeHash: { keyVersion: 1, digest: altDigest(1) },
+      codeSuffix: "4A7K",
+    });
+    expect(result.created).toBe(true);
+    expect(result.amount).toEqual(Money.fromMinor(1_000, "USD"));
+
+    const expectedNewId = await giftCardReissueId(giftCardId);
+    expect(result.newGiftCardId).toBe(expectedNewId);
+
+    await expect(repository.readBalance(giftCardId, now + 2)).resolves.toMatchObject({
+      availableBalance: Money.zero("USD"),
+    });
+    const newAccount = await repository.findAccountById(expectedNewId);
+    expect(newAccount).toMatchObject({
+      status: "active",
+      issuedAmount: Money.fromMinor(1_000, "USD"),
+    });
+  });
+
+  it("fails a second reissue attempt on the same card and leaves no partial state", async () => {
+    const repository = createGiftCardRepository(env.DB);
+    await repository.issueAccount(issuance());
+    await repository.disableAccount({ giftCardId, disabledAt: now + 1 });
+    await repository.reissue({
+      oldGiftCardId: giftCardId,
+      now: now + 2,
+      codeHash: { keyVersion: 1, digest: altDigest(1) },
+    });
+
+    await expect(repository.reissue({
+      oldGiftCardId: giftCardId,
+      now: now + 3,
+      codeHash: { keyVersion: 1, digest: altDigest(2) },
+    })).rejects.toBeInstanceOf(GiftCardConflictError);
+
+    const adjustmentCount = await env.DB.prepare(`SELECT COUNT(*) AS count FROM gift_card_ledger_entries
+      WHERE gift_card_id = ? AND entry_type = 'adjustment'`).bind(giftCardId).first<{ count: number }>();
+    expect(adjustmentCount?.count).toBe(1);
+
+    const expectedNewId = await giftCardReissueId(giftCardId);
+    const newAccountCount = await env.DB.prepare(`SELECT COUNT(*) AS count FROM gift_card_accounts WHERE id = ?`)
+      .bind(expectedNewId).first<{ count: number }>();
+    expect(newAccountCount?.count).toBe(1);
+  });
+
+  it("refuses to reissue an active card and writes nothing", async () => {
+    const repository = createGiftCardRepository(env.DB);
+    await repository.issueAccount(issuance());
+    await expect(repository.reissue({
+      oldGiftCardId: giftCardId,
+      now: now + 1,
+      codeHash: { keyVersion: 1, digest: altDigest(1) },
+    })).rejects.toBeInstanceOf(GiftCardConflictError);
+    const ledgerCount = await env.DB.prepare(`SELECT COUNT(*) AS count FROM gift_card_ledger_entries
+      WHERE gift_card_id = ?`).bind(giftCardId).first<{ count: number }>();
+    expect(ledgerCount?.count).toBe(1);
+  });
+
+  it("refuses to reissue a disabled card blocked by an open or committed-unsettled reservation and writes nothing", async () => {
+    const repository = createGiftCardRepository(env.DB);
+
+    await repository.issueAccount(issuance());
+    const openBlockedId = giftCardId;
+    await repository.reserve(reservation(`${openBlockedId}_res_open_block`, 100));
+    await repository.disableAccount({ giftCardId: openBlockedId, disabledAt: now + 1 });
+    await expect(repository.reissue({
+      oldGiftCardId: openBlockedId,
+      now: now + 2,
+      codeHash: { keyVersion: 1, digest: altDigest(1) },
+    })).rejects.toBeInstanceOf(GiftCardConflictError);
+    const openAdjustments = await env.DB.prepare(`SELECT COUNT(*) AS count FROM gift_card_ledger_entries
+      WHERE gift_card_id = ? AND entry_type = 'adjustment'`).bind(openBlockedId).first<{ count: number }>();
+    expect(openAdjustments?.count).toBe(0);
+
+    const committedBlockedId = `${openBlockedId}_committed_block`;
+    await repository.issueAccount(issuance({
+      id: committedBlockedId,
+      codeHash: { keyVersion: 1, digest: altDigest(2) },
+    }));
+    const committedReservationId = `${committedBlockedId}_res_committed_block`;
+    await repository.reserve(reservation(committedReservationId, 100, { giftCardId: committedBlockedId }));
+    const committedOrderId = `${committedBlockedId}_order_block`;
+    await insertPendingOrder(committedOrderId);
+    await repository.commitReservation({
+      reservationId: committedReservationId,
+      orderId: committedOrderId,
+      expectedAmount: Money.fromMinor(100, "USD"),
+      committedAt: now + 1,
+    });
+    await repository.disableAccount({ giftCardId: committedBlockedId, disabledAt: now + 2 });
+    await expect(repository.reissue({
+      oldGiftCardId: committedBlockedId,
+      now: now + 3,
+      codeHash: { keyVersion: 1, digest: altDigest(3) },
+    })).rejects.toBeInstanceOf(GiftCardConflictError);
+    const committedAdjustments = await env.DB.prepare(`SELECT COUNT(*) AS count FROM gift_card_ledger_entries
+      WHERE gift_card_id = ? AND entry_type = 'adjustment'`).bind(committedBlockedId).first<{ count: number }>();
+    expect(committedAdjustments?.count).toBe(0);
   });
 });

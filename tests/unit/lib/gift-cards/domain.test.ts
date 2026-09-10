@@ -8,6 +8,8 @@ import {
   assertReserveGiftCardInput,
   giftCardIssuanceBusinessKey,
   giftCardRedemptionBusinessKey,
+  giftCardReissueAdjustmentBusinessKey,
+  giftCardReissueId,
 } from "@/lib/gift-cards/domain";
 
 const digest = "a".repeat(64);
@@ -118,5 +120,19 @@ describe("gift-card domain", () => {
     expect(() => assertGiftCardReason("a".repeat(501), "disable reason", 500)).toThrow();
     expect(() => assertGiftCardReason(" leading", "disable reason", 500)).toThrow();
     expect(() => assertGiftCardReason("trailing ", "disable reason", 500)).toThrow();
+  });
+
+  it("derives the reissue adjustment business key from the old card id", () => {
+    expect(giftCardReissueAdjustmentBusinessKey("gift_one"))
+      .toBe("gift-card-reissue-out/gift_one");
+  });
+
+  it("derives a deterministic reissue id: same old id converges, different old ids never collide", async () => {
+    const first = await giftCardReissueId("gift_one");
+    const again = await giftCardReissueId("gift_one");
+    const other = await giftCardReissueId("gift_two");
+    expect(first).toBe(again);
+    expect(first).not.toBe(other);
+    expect(first.startsWith("gift_card_reissue_")).toBe(true);
   });
 });
