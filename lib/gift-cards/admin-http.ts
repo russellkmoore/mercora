@@ -82,12 +82,12 @@ export function giftCardAdminFlags(environment: Record<string, unknown>): GiftCa
 export type GiftCardAdminErrorCode =
   | "invalid_body"
   | "invalid_query"
+  | "invalid_limit"
   | "unauthorized"
   | "forbidden"
   | "gift_card_not_found"
   | "gift_cards_unavailable"
   | "gift_card_reissue_blocked"
-  | "gift_card_not_disabled"
   | "gift_card_already_disabled"
   | "delivery_not_found"
   | "delivery_not_requeueable"

@@ -30,14 +30,7 @@ export async function GET(
   if (rawLimit !== null) {
     const parsed = Number(rawLimit);
     if (!Number.isSafeInteger(parsed) || parsed < 1) {
-      // "invalid_limit" is not yet part of the shared GiftCardAdminErrorCode
-      // vocabulary in lib/gift-cards/admin-http.ts, which is being edited
-      // concurrently by a sibling plan's executor in this shared checkout —
-      // constructed directly here rather than widening that file's union.
-      return NextResponse.json(
-        { code: "invalid_limit", error: "limit must be a positive integer" },
-        { status: 400 },
-      );
+      return jsonError("invalid_limit", "limit must be a positive integer", 400);
     }
     limit = Math.min(parsed, MAX_LIMIT);
   }
