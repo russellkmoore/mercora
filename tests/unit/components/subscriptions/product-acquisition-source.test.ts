@@ -35,6 +35,43 @@ describe("product subscription acquisition integration", () => {
     expect(source).toContain("if (!available && !setup) return null;");
     expect(source).not.toContain("confirmSetupAndFinalize({");
     expect(source).not.toMatch(/localStorage|sessionStorage|console\.(?:log|error)/);
+
+    // SUB-01: the add-a-new-address option is always present in the
+    // shipping-address select and the select is never disabled by an empty
+    // list -- only by loading.
+    expect(source).toContain("Add a new address…");
+    expect(source).toContain("ADD_NEW_ADDRESS_VALUE");
+    expect(source).toContain("AddAddressDialog");
+    expect(source).toContain("Add an address to continue");
+    expect(source).toContain("Select an address");
+    expect(source).toContain("disabled={loadingAddresses}");
+    expect(source).not.toContain("disabled={loadingAddresses || visibleAddresses.length === 0}");
+
+    // SUB-01: the navigating "Manage addresses" link to the account page is
+    // gone -- the two remaining Link usages are the subscriptions route and
+    // the terms-of-service link, neither of which is this literal pair.
+    expect(source).not.toContain("Manage addresses");
+    expect(source).not.toContain("/account/addresses");
+
+    // SUB-03: the post-save region refreshes, re-scopes, pre-selects, and
+    // resets exactly the three attempt-scoped values -- and never touches
+    // plan, quantity, or terms-acceptance state.
+    const regionStart = source.indexOf("// address-save-region:start");
+    const regionEnd = source.indexOf("// address-save-region:end");
+    expect(regionStart).toBeGreaterThan(-1);
+    expect(regionEnd).toBeGreaterThan(regionStart);
+    const region = source.slice(regionStart, regionEnd);
+    expect(region).toContain("setAddressesOwner(");
+    expect(region).toContain("nextAddressSelection(");
+    expect(region).toContain("setSetup(null)");
+    expect(region).toContain('setCheckoutError("")');
+    expect(region).toContain("setCompletedOwner(null)");
+    expect(region).not.toContain("setSelectedPlanId");
+    expect(region).not.toContain("setQuantityText");
+    expect(region).not.toContain("setAccepted");
+
+    // D-06: the signed-out branch is untouched -- exactly one sign-in button.
+    expect(source.split('<SignInButton mode="modal">').length - 1).toBe(1);
   });
 
   it("mounts redirect sanitization globally, independent of product and acquisition feature state", () => {
