@@ -6,6 +6,14 @@ import {
   createGiftCardRepository,
   sumOutstandingGiftCardBalances,
 } from "@/lib/gift-cards/repository";
+import {
+  HONOR_GUARD_SETTING_CATEGORY,
+  HONOR_GUARD_SETTING_KEY,
+  HONOR_GUARD_STALE_SECONDS,
+  honorIsEffectivelyOn,
+  readHonorGuard,
+  writeHonorGuard,
+} from "@/lib/gift-cards/honor-guard";
 import type { IssueGiftCardInput, ReserveGiftCardInput } from "@/lib/gift-cards/domain";
 
 const epoch = 1_800_000_000;
@@ -175,5 +183,130 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
       openReservations: 0,
       currency: null,
     });
+  });
+});
+
+describe("honor-guard record on real D1", () => {
+  beforeAll(async () => {
+    await applyTestMigrations();
+  });
+
+  beforeEach(async () => {
+    await env.DB.prepare("DELETE FROM admin_settings WHERE key = ?")
+      .bind(HONOR_GUARD_SETTING_KEY).run();
+  });
+
+  /** A database that fails the moment anything tries to read from it. */
+  const unreadableDatabase = {
+    prepare(): never {
+      throw new Error("the honor guard read D1 when it should not have");
+    },
+  } as unknown as D1Database;
+
+  it("round-trips the four fields the record is fixed at", async () => {
+    const record = {
+      outstanding_minor: 12_345,
+      currency: "USD",
+      open_reservations: 3,
+      measured_at: epoch,
+    };
+    await writeHonorGuard(env.DB, record);
+    await expect(readHonorGuard(env.DB)).resolves.toEqual(record);
+  });
+
+  it("stores the row under the fixed key, category and object data type", async () => {
+    await writeHonorGuard(env.DB, {
+      outstanding_minor: 0,
+      currency: "USD",
+      open_reservations: 0,
+      measured_at: epoch,
+    });
+    await expect(env.DB.prepare(
+      "SELECT key, category, data_type FROM admin_settings WHERE key = ?",
+    ).bind(HONOR_GUARD_SETTING_KEY).first()).resolves.toMatchObject({
+      key: HONOR_GUARD_SETTING_KEY,
+      category: HONOR_GUARD_SETTING_CATEGORY,
+      data_type: "object",
+    });
+  });
+
+  it("replaces the previous measurement instead of colliding on the primary key", async () => {
+    await writeHonorGuard(env.DB, {
+      outstanding_minor: 500,
+      currency: "USD",
+      open_reservations: 1,
+      measured_at: epoch,
+    });
+    await writeHonorGuard(env.DB, {
+      outstanding_minor: 0,
+      currency: "USD",
+      open_reservations: 0,
+      measured_at: epoch + 300,
+    });
+    await expect(readHonorGuard(env.DB)).resolves.toEqual({
+      outstanding_minor: 0,
+      currency: "USD",
+      open_reservations: 0,
+      measured_at: epoch + 300,
+    });
+    await expect(env.DB.prepare(
+      "SELECT COUNT(*) AS rows FROM admin_settings WHERE key = ?",
+    ).bind(HONOR_GUARD_SETTING_KEY).first<{ rows: number }>())
+      .resolves.toMatchObject({ rows: 1 });
+  });
+
+  it("reads a missing row as null", async () => {
+    await expect(readHonorGuard(env.DB)).resolves.toBeNull();
+  });
+
+  it("reads malformed JSON as null rather than throwing", async () => {
+    await env.DB.prepare(`INSERT INTO admin_settings (key, value, category, description, data_type)
+      VALUES (?, ?, ?, ?, 'object')`)
+      .bind(HONOR_GUARD_SETTING_KEY, "{not json", HONOR_GUARD_SETTING_CATEGORY, "corrupt")
+      .run();
+    await expect(readHonorGuard(env.DB)).resolves.toBeNull();
+  });
+
+  it("reads a well-formed row with the wrong shape as null", async () => {
+    await env.DB.prepare(`INSERT INTO admin_settings (key, value, category, description, data_type)
+      VALUES (?, ?, ?, ?, 'object')`)
+      .bind(
+        HONOR_GUARD_SETTING_KEY,
+        JSON.stringify({ outstanding_minor: "12", currency: "USD", open_reservations: 0 }),
+        HONOR_GUARD_SETTING_CATEGORY,
+        "wrong shape",
+      ).run();
+    await expect(readHonorGuard(env.DB)).resolves.toBeNull();
+  });
+
+  it("answers honor-on without touching D1 when honor is configured on", async () => {
+    await expect(honorIsEffectivelyOn(unreadableDatabase, true, epoch)).resolves.toBe(true);
+  });
+
+  it("follows the guard record when honor is configured off", async () => {
+    await writeHonorGuard(env.DB, {
+      outstanding_minor: 0,
+      currency: "USD",
+      open_reservations: 0,
+      measured_at: epoch,
+    });
+    await expect(honorIsEffectivelyOn(env.DB, false, epoch)).resolves.toBe(false);
+    await expect(honorIsEffectivelyOn(env.DB, false, epoch + HONOR_GUARD_STALE_SECONDS + 1))
+      .resolves.toBe(true);
+    await writeHonorGuard(env.DB, {
+      outstanding_minor: 2_500,
+      currency: "USD",
+      open_reservations: 0,
+      measured_at: epoch,
+    });
+    await expect(honorIsEffectivelyOn(env.DB, false, epoch)).resolves.toBe(true);
+  });
+
+  it("keeps honoring when the guard cannot be read at all", async () => {
+    await expect(honorIsEffectivelyOn(unreadableDatabase, false, epoch)).resolves.toBe(true);
+  });
+
+  it("keeps honoring when no measurement has ever been written", async () => {
+    await expect(honorIsEffectivelyOn(env.DB, false, epoch)).resolves.toBe(true);
   });
 });
