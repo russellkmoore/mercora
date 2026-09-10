@@ -108,6 +108,7 @@ beforeEach(() => {
   mocks.parseGiftCardDeliveryKeyRing.mockReturnValue({});
   mocks.encryptGiftCardDeliveryCode.mockResolvedValue({ keyVersion: 1, nonce: "n", ciphertext: "c" });
   repository = {
+    findAccountById: vi.fn().mockResolvedValue({ id: "gift_card_1", status: "active" }),
     disableAccount: vi.fn(),
     requeueDelivery: vi.fn(),
     findReservations: vi.fn(),
@@ -217,6 +218,22 @@ describe("POST /api/admin/gift-cards/[id]/notes", () => {
         details: { text: "Called customer, confirmed identity." },
       }),
     );
+  });
+
+  it("returns 404 gift_card_not_found for an unknown card and writes no event (WR-05, D-13)", async () => {
+    repository.findAccountById.mockResolvedValue(undefined);
+    const response = await notes(postRequest("notes", { text: "hi" }), context);
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ code: "gift_card_not_found" });
+    expect(mocks.appendGiftCardEvent).not.toHaveBeenCalled();
+  });
+
+  it("returns 503 gift_cards_write_failed when the existence lookup itself fails (WR-05)", async () => {
+    repository.findAccountById.mockRejectedValue(new Error("D1 unavailable"));
+    const response = await notes(postRequest("notes", { text: "hi" }), context);
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ code: "gift_cards_write_failed" });
+    expect(mocks.appendGiftCardEvent).not.toHaveBeenCalled();
   });
 
   it("returns 400 for empty or over-long text", async () => {
