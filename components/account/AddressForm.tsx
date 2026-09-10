@@ -11,7 +11,8 @@ export function AddressForm(props: {
   initial?: Partial<AddressFormState>;
   mode: "create" | "edit";
   addressId?: string;
-  onSaved: (address: MACHCustomerAddress) => void;
+  /** Called after the save succeeds; a returned promise is not awaited or observed. */
+  onSaved: (address: MACHCustomerAddress) => void | Promise<void>;
   /**
    * Hand feedback to the parent. When set, the form renders no message of its
    * own: failures arrive here, success is implied by `onSaved`. Leave unset to
@@ -41,21 +42,24 @@ export function AddressForm(props: {
     setBusy(true);
     props.onBusyChange?.(true);
     setMessage(null);
+    let address: MACHCustomerAddress;
     try {
-      const { address } = await saveAddress(form, props.addressId);
-      props.onSaved(address);
-      if (props.mode !== "edit") {
-        setForm({ ...emptyAddressForm, ...(props.lockType ? { type: props.lockType } : {}) });
-      }
-      if (inlineFeedback) setMessage({ kind: "success", text: "Address saved." });
+      ({ address } = await saveAddress(form, props.addressId));
     } catch (error) {
       const text = error instanceof Error ? error.message : "Address could not be saved";
       if (props.onError) props.onError(text);
       else setMessage({ kind: "error", text });
+      return;
     } finally {
       setBusy(false);
       props.onBusyChange?.(false);
     }
+    if (props.mode !== "edit") {
+      setForm({ ...emptyAddressForm, ...(props.lockType ? { type: props.lockType } : {}) });
+    }
+    if (inlineFeedback) setMessage({ kind: "success", text: "Address saved." });
+    // Outside the try: a consumer error must never be reported as a failed save.
+    void props.onSaved(address);
   }
 
   return (

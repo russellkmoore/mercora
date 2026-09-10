@@ -65,6 +65,13 @@ describe("AddressManager edit-mode wiring", () => {
     expect(formSource).toContain("props.onBusyChange?.(true)");
     expect(formSource).toContain("props.onBusyChange?.(false)");
   });
+
+  it("invokes onSaved after the save try/catch so a consumer error is never reported as a failed save", () => {
+    expect(formSource).toContain("onSaved: (address: MACHCustomerAddress) => void | Promise<void>;");
+    const tryEnd = formSource.indexOf("    } finally {");
+    expect(tryEnd).toBeGreaterThan(-1);
+    expect(formSource.indexOf("void props.onSaved(address);")).toBeGreaterThan(tryEnd);
+  });
 });
 
 describe("SUB-02 source contract: one shared address form, one save path", () => {
