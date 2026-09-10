@@ -71,7 +71,14 @@ export async function POST(
   }
 
   const repository = createGiftCardRepository(environment.DB);
-  const delivery = await repository.findDeliveryByGiftCardId(id);
+  // WR-06: a D1 failure on this read must be the typed 503 D-13 promises,
+  // not an unhandled 500 the client renders as a bare "Request failed".
+  let delivery: Awaited<ReturnType<typeof repository.findDeliveryByGiftCardId>>;
+  try {
+    delivery = await repository.findDeliveryByGiftCardId(id);
+  } catch {
+    return jsonError("gift_cards_write_failed", "Gift cards are temporarily unavailable", 503);
+  }
   if (!delivery) {
     return jsonError("delivery_not_found", "Gift card has no delivery to resend", 404);
   }

@@ -205,6 +205,23 @@ describe("POST /api/admin/gift-cards/[id]/reveal", () => {
     expect(await response.json()).toMatchObject({ code: "code_unavailable" });
   });
 
+  it("returns a typed 503 when the settings read fails, and writes no event (WR-06)", async () => {
+    mocks.getSettings.mockRejectedValue(new Error("D1 unavailable"));
+    const response = await reveal(revealRequest({ confirm: true }), context);
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ code: "gift_cards_write_failed" });
+    expect(mocks.appendGiftCardEvent).not.toHaveBeenCalled();
+  });
+
+  it("returns a typed 503 when the stored-code check fails, and writes no event (WR-06)", async () => {
+    mocks.giftCardDeliveryHasStoredCode.mockRejectedValue(new Error("D1 unavailable"));
+    const response = await reveal(revealRequest({ confirm: true }), context);
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ code: "gift_cards_write_failed" });
+    expect(mocks.appendGiftCardEvent).not.toHaveBeenCalled();
+    expect(mocks.revealGiftCardDeliveryCode).not.toHaveBeenCalled();
+  });
+
   it("returns 401 for an unauthenticated caller", async () => {
     mocks.checkAdminPermissions.mockResolvedValue({ success: false, error: "no" });
     const response = await reveal(revealRequest({ confirm: true }), context);

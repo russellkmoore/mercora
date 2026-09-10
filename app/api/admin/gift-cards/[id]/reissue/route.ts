@@ -81,7 +81,16 @@ export async function POST(
   }
 
   const repository = createGiftCardRepository(environment.DB);
-  const recipientEmail = to ?? (await repository.findDeliveryByGiftCardId(id))?.recipientEmail;
+  // WR-06: the delivery read runs before the main try, so it needs its own
+  // typed 503 rather than escaping as an unhandled 500.
+  let recipientEmail = to;
+  if (!recipientEmail) {
+    try {
+      recipientEmail = (await repository.findDeliveryByGiftCardId(id))?.recipientEmail;
+    } catch {
+      return jsonError("gift_cards_write_failed", "Gift cards are temporarily unavailable", 503);
+    }
+  }
   if (!recipientEmail) {
     return jsonError("invalid_body", "A recipient address is required", 400);
   }

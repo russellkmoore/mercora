@@ -56,7 +56,14 @@ export async function POST(
   }
 
   // D-12: the setting must be strictly `true` — a missing key is off.
-  const settings = await getSettings("gift_cards");
+  // WR-06: both D1 reads below answer the typed 503 on failure rather than
+  // escaping the handler as an unhandled 500.
+  let settings: Awaited<ReturnType<typeof getSettings>>;
+  try {
+    settings = await getSettings("gift_cards");
+  } catch {
+    return jsonError("gift_cards_write_failed", "Gift cards are temporarily unavailable", 503);
+  }
   if (settings["gift_cards.code_reveal_enabled"] !== true) {
     return jsonError("code_reveal_disabled", "Code reveal is disabled", 403);
   }
@@ -76,7 +83,12 @@ export async function POST(
     }
   }
 
-  const hasCode = await giftCardDeliveryHasStoredCode({ giftCardId: id, environment });
+  let hasCode: boolean;
+  try {
+    hasCode = await giftCardDeliveryHasStoredCode({ giftCardId: id, environment });
+  } catch {
+    return jsonError("gift_cards_write_failed", "Gift cards are temporarily unavailable", 503);
+  }
   if (!hasCode) {
     return jsonError("code_unavailable", "Gift-card code is unavailable", 409);
   }
