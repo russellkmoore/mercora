@@ -40,6 +40,11 @@ function formatPlanPrice(plan: PublicSubscriptionPlan): string {
   return recurringTotal(plan, 1)?.formatted ?? "Unavailable";
 }
 
+// Keys that move a closed native <select> between options. Windows/Linux
+// Chrome and Firefox fire `change` on each step, so a step onto the
+// "Add a new address…" option must not open the modal by itself.
+const SELECT_TRAVERSAL_KEYS = new Set(["ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
+
 function addressLabel(saved: SavedSubscriptionAddress): string {
   const localized = (value: string | Record<string, string>) =>
     typeof value === "string" ? value : Object.values(value)[0] ?? "";
@@ -122,6 +127,10 @@ export default function SubscriptionAcquisitionPanel({
   const [loadingAddresses, setLoadingAddresses] = useState(false);
   const [addressError, setAddressError] = useState("");
   const [addressDialogOpen, setAddressDialogOpen] = useState(false);
+  // True while keyboard traversal has landed on the sentinel option but the
+  // shopper has not committed it (Enter/Space); `addressId` is untouched.
+  const [addNewPending, setAddNewPending] = useState(false);
+  const keyboardTraversalRef = useRef(false);
   const [accepted, setAccepted] = useState(false);
   const [setup, setSetup] = useState<{
     acquisitionId: string;
@@ -150,6 +159,7 @@ export default function SubscriptionAcquisitionPanel({
     setCheckoutError("");
     setCompletedOwner(null);
     setAddressDialogOpen(false);
+    setAddNewPending(false);
     if (currentOwner !== null && confirmedSetup?.ownerId !== currentOwner) {
       setConfirmedSetup(null);
       setFinalizationWorking(false);
@@ -460,14 +470,40 @@ export default function SubscriptionAcquisitionPanel({
               <label className="block text-sm font-medium text-foreground">
                 Shipping address
                 <select
-                  value={addressId}
+                  value={addNewPending ? ADD_NEW_ADDRESS_VALUE : addressId}
                   disabled={loadingAddresses}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    if (value === ADD_NEW_ADDRESS_VALUE) {
-                      setAddressDialogOpen(true);
+                  onKeyDown={(event) => {
+                    if (SELECT_TRAVERSAL_KEYS.has(event.key)) {
+                      keyboardTraversalRef.current = true;
                       return;
                     }
+                    if (!addNewPending) return;
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setAddNewPending(false);
+                      setAddressDialogOpen(true);
+                    } else if (event.key === "Escape") {
+                      setAddNewPending(false);
+                    }
+                  }}
+                  onMouseDown={() => { keyboardTraversalRef.current = false; }}
+                  onBlur={() => {
+                    keyboardTraversalRef.current = false;
+                    setAddNewPending(false);
+                  }}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    const viaKeyboard = keyboardTraversalRef.current;
+                    keyboardTraversalRef.current = false;
+                    if (value === ADD_NEW_ADDRESS_VALUE) {
+                      // Only a committed choice opens the modal: a mouse pick
+                      // (or the native popup's Enter) opens it now; an arrow
+                      // step just shows the option and waits for Enter/Space.
+                      if (viaKeyboard) setAddNewPending(true);
+                      else setAddressDialogOpen(true);
+                      return;
+                    }
+                    setAddNewPending(false);
                     setAddressId(value);
                     setSetup(null);
                     setCheckoutError("");

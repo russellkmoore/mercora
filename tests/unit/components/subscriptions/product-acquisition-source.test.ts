@@ -85,6 +85,14 @@ describe("product subscription acquisition integration", () => {
     expect(region).toContain("Your address was saved, but the list could not be refreshed.");
     expect(region).not.toContain("Saved addresses could not be loaded");
     expect(region).toContain('setAddressId("");');
+    // Keyboard traversal onto the sentinel does not open the modal by itself;
+    // only a committed choice (mouse pick, popup Enter, or Enter/Space on the
+    // pending option) does, and `addressId` is never written the sentinel.
+    expect(source).toContain("value={addNewPending ? ADD_NEW_ADDRESS_VALUE : addressId}");
+    expect(source).toContain("SELECT_TRAVERSAL_KEYS.has(event.key)");
+    expect(source).toContain("if (viaKeyboard) setAddNewPending(true);");
+    expect(source).toContain('if (event.key === "Enter" || event.key === " ")');
+    expect(source).not.toContain("setAddressId(ADD_NEW_ADDRESS_VALUE)");
     // The modal is attempt-scoped UI state: an owner change closes it.
     expect(source).toMatch(/setStateOwner\(currentOwner\);[\s\S]*?setAddressDialogOpen\(false\);[\s\S]*?setAccepted\(false\);/);
 
