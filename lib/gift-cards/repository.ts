@@ -537,6 +537,23 @@ export function createGiftCardRepository(database: D1Database) {
   };
 
   /**
+   * D-08: the delivery id and recipient address behind a card, for the
+   * resend and reissue routes. Deliberately narrow — only the two columns
+   * neither route needs a second query for — never the ciphertext columns
+   * `resendGiftCardDelivery`/`revealGiftCardDeliveryCode`
+   * (`lib/services/gift-card-fulfillment.ts`) already own reading.
+   */
+  const findDeliveryByGiftCardId = async (
+    giftCardId: string,
+  ): Promise<{ id: string; recipientEmail: string } | undefined> => {
+    assertGiftCardId(giftCardId);
+    const row = await database.prepare(`SELECT id, recipient_email
+      FROM gift_card_deliveries WHERE gift_card_id = ? LIMIT 1`)
+      .bind(giftCardId).first<{ id: string; recipient_email: string }>();
+    return row ? { id: row.id, recipientEmail: row.recipient_email } : undefined;
+  };
+
+  /**
    * D-10: every reservation for a card, newest first, each carrying whether a
    * `redemption` ledger entry has settled it — via LEFT JOIN so the caller (the
    * reissue guard, the release-hold route, the timeline) never issues a second
@@ -736,6 +753,7 @@ export function createGiftCardRepository(database: D1Database) {
     issueAccount,
     readBalance,
     disableAccount,
+    findDeliveryByGiftCardId,
     findReservations,
     requeueDelivery,
     writeAdjustment,

@@ -88,6 +88,14 @@ export interface AppendGiftCardEventInput {
   details?: Record<string, unknown>;
   /** Epoch seconds. Defaults to now — callers pass an explicit value in tests. */
   createdAt?: number;
+  /**
+   * Pre-minted event id (D-08): resend needs the event id *before* the write
+   * so it can fold it into the sender's idempotency key
+   * (`gift-card-resend/{deliveryId}/{eventId}`) and still have the audit row
+   * land under that same id. Defaults to a fresh `crypto.randomUUID()` —
+   * every other caller is unaffected.
+   */
+  id?: string;
 }
 
 /**
@@ -101,7 +109,7 @@ export interface AppendGiftCardEventInput {
 export async function appendGiftCardEvent(input: AppendGiftCardEventInput): Promise<string> {
   assertGiftCardEventDetails(input.details);
   const db = await getDbAsync();
-  const id = crypto.randomUUID();
+  const id = input.id ?? crypto.randomUUID();
   await db.insert(giftCardEvents).values({
     id,
     giftCardId: input.giftCardId,
