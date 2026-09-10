@@ -19,9 +19,9 @@ Requirements for this milestone. Each maps to a roadmap phase.
 
 ### Gift-card admin
 
-- [ ] **GCA-01**: `/admin/gift-cards` lists cards with masked code (last group), issued amount, available balance, status, purchaser (or "admin: who"), recipient email, issuing order, delivery status, created date; searchable by recipient email, order id and last four characters; paginated
-- [ ] **GCA-02**: A card detail page shows a timeline: issuance (order, purchaser, recipient, amount) or admin creation (who, reason), every hold and release, every redemption (order, amount), refunds to the card, disable/reissue events (date, who), and notes
-- [ ] **GCA-03**: An admin can add a free-text note to a card (author and timestamp recorded)
+- [x] **GCA-01**: `/admin/gift-cards` lists cards with masked code (last group), issued amount, available balance, status, purchaser (or "admin: who"), recipient email, issuing order, delivery status, created date; searchable by recipient email, order id and last four characters; paginated
+- [x] **GCA-02**: A card detail page shows a timeline: issuance (order, purchaser, recipient, amount) or admin creation (who, reason), every hold and release, every redemption (order, amount), refunds to the card, disable/reissue events (date, who), and notes
+- [x] **GCA-03**: An admin can add a free-text note to a card (author and timestamp recorded)
 - [ ] **GCA-04**: An admin can disable a card with a reason; a disabled card cannot be redeemed, its ledger is preserved, and the action appears on the timeline
 - [ ] **GCA-05**: An admin can reissue a disabled card: a new card is issued for the remaining balance, emailed to the recipient (or an address the admin enters), and both cards' timelines link to each other
 - [ ] **GCA-06**: An admin can resend the delivery email, re-queue a `needs_review` delivery, and release a stuck hold, each recorded on the timeline
@@ -90,9 +90,9 @@ Deferred to a later milestone.
 | GCF-03 | Phase 13 | Complete |
 | GCF-04 | Phase 13 | Complete |
 | GCF-05 | Phase 13 | Complete |
-| GCA-01 | Phase 14 | Pending |
-| GCA-02 | Phase 14 | Pending |
-| GCA-03 | Phase 14 | Pending |
+| GCA-01 | Phase 14 | Complete |
+| GCA-02 | Phase 14 | Complete |
+| GCA-03 | Phase 14 | Complete |
 | GCA-04 | Phase 14 | Pending |
 | GCA-05 | Phase 14 | Pending |
 | GCA-06 | Phase 14 | Pending |
