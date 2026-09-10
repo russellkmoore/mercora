@@ -349,3 +349,116 @@ catch { return jsonError("gift_cards_write_failed", "Gift cards are temporarily 
 _Reviewed: 2026-09-10T21:43:30Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: deep_
+
+---
+
+## Iteration 2
+
+**Re-reviewed:** 2026-09-10T22:40:00Z
+**Scope:** the 16 fix commits `dcdda08`..`3aaa5fc` against the 17 iteration-1 findings, plus a regression pass over the batch ordering, the honor-guard aggregate, the error-code union and the reveal UI state.
+**Smoke:** `vitest run tests/unit/lib/gift-cards tests/unit/app tests/unit/components` — 1314 passed. `vitest run --config vitest.workers.config.mts tests/integration/lib/gift-cards tests/integration/gift-card-admin-actions.test.ts` — 5 files, 84 passed. `npm run typecheck` — clean.
+
+### Prior findings: verification
+
+| ID | Verdict | What I checked at HEAD |
+| --- | --- | --- |
+| CR-01 | closed | `repository.ts:832-866`: one `database.batch()` with, in order, the drain adjustment (no `ON CONFLICT`), the three `issueAccountStatements` (account, issuance ledger via SELECT, delivery), then `reissued` and `reissued_from`. Order is right for the 0022 triggers: the balance guard sees the adjustment before the issuance guard needs the account row, and the D-01 partial UNIQUE on `reissued` is the last statement so it rejects the whole batch. `business_key` is UNIQUE (0022:222), so a racing reissue aborts at statement 1 and nothing else lands. Pre-batch probe at `:801-810`: both prior rows -> 409 "already reissued"; one -> 409 "inconsistent state". Balance is read only after the probe. Test `repository.test.ts` "rolls back the drain when a later write in the same batch fails": the injected failure is a PK collision on the delivery row (statement 4, after the adjustment; the delivery INSERT's `ON CONFLICT(gift_card_id)` does not cover the `id` PK so it really raises). Asserts old balance still 1_000, zero adjustments, no new account, zero events, then a clean retry succeeds and both balances are right. The pre-existing second-attempt test still asserts `GiftCardConflictError`. |
+| CR-02 | closed | `GiftCardActionBar.tsx`: `runReveal` only calls `setRevealedCode`; `closeRevealDialog` runs `closeDialog()` (which nulls the code) and calls `onChanged()` only if a code was showing; the reveal `AlertDialog`'s `onOpenChange` routes to `closeRevealDialog`; `AlertDialogAction` calls `preventDefault` so the dialog stays open. `GiftCardDetail.tsx`: `loading` is true only for the `"initial"` load; `onChanged`, the note form and the Refresh button call `load()` in `"refresh"` mode, so the bar stays mounted. A failed refresh toasts instead of replacing the page. Code lives in `useState` only; unmount destroys it. |
+| WR-01 | closed | Both event rows are `giftCardEventStatement(...)` entries in the CR-01 batch; `assertGiftCardEventDetails` runs before bind. The route no longer imports or calls `appendGiftCardEvent`. |
+| WR-02 | partially closed — see WR-08 | `code_reveal_failed` is in `GIFT_CARD_EVENT_TYPES` and the timeline labels; the route writes it best-effort and maps `GiftCardDecryptionError` -> 409, anything else -> 503. But the production decrypt path cannot produce "anything else" for a rotated-out key. |
+| WR-03 | closed | `app/api/admin/gift-cards/route.ts:150-152` refuses any body `currency` with 400 `invalid_body`; `:167-168` takes the currency from `resolveStoreConfig(environment).commerce.currency`. Tests in `gift-card-presentation-routes.test.ts`. |
+| WR-04 | closed | `resolveGiftCardAdminIssueMaxMinor` reads `MAX(json_extract(variant.price, '$.amount'))` over active gift-card variants. I checked the units: `data/d1/seed.sql:393` stores `{"amount": 2500, "currency": "USD"}` (minor), and `Money.toJSON()` writes minor units, so the comparison against `amount.toMinorUnits()` is like-for-like. `20_000` is only the fallback. |
+| WR-05 | closed | Notes route looks up the account first: 404 when absent, 503 when the lookup throws, no event written either way. |
+| WR-06 | closed | resend (`:74-79`), reissue (`:83-89`), reveal (`:58-63`, `:78-83`) each wrap the pre-try D1 read and answer 503. |
+| WR-07 | closed | Balance half: `WHERE account.status = 'active' OR ${balance} > 0` with three `nowSeconds` binds (`:325-343`). Reservation half unchanged and already covered committed rows on any account. A drained disabled card sums to zero and drops out of both the SUM and the currency count, so the reissued balance is counted once. `honor-guard.ts` diff is comment-only. The `drainLeftoverBalances()` scaffold runs in `beforeEach` before each case's setup (after `settleStrandedReservations` and the disable), so it is isolation, not masking: the WR-07 case issues + disables inside the case and expects 1_000 with honoring on under both flags off; the "drained to zero" case expects the card to vanish from the aggregate; the cron case expects `honorEffective: true` and the `honor_disabled_with_balances` alarm. A regression to `status = 'active'` fails the first two; a regression to "count everything" fails the third. Phase 13's cases are unchanged. |
+| IN-01 | closed | `.where(sql\`${table.codeSuffix} IS NOT NULL\`)` on the Drizzle index. |
+| IN-02 | closed | `invalid_limit` in the union, events route uses `jsonError`, stale comment gone, `gift_card_not_disabled` has zero references in `app`, `lib`, `components`, `tests`. |
+| IN-03 | closed | `GiftCardTimeline` takes `currency`, formats `amountMinor`/`amount_minor` through `Money.fromMinor(...).format()`, links the two card-id keys. |
+| IN-04 | closed | No empty `finally` left in the reissue route or `issueAdminGiftCard`; the two remaining `finally` blocks in `gift-card-fulfillment.ts` (`:491`, `:590`) are pre-existing and have bodies. |
+| IN-05 | closed | Route normalizes through `parseGiftCardCustomization` once and passes the same value to the service and the event. |
+| IN-06 | closed for admin-created cards — see WR-09 for the case it walks past | `resolveAdminCreatorLabels` joins `gift_card_events.actor_id` to `admin_users.user_id` and returns `admin: {display_name || email}`; the `admin_users` schema has `user_id`, `email`, `display_name`. Batched per page; the admin id is not returned. |
+| IN-07 | closed | Detail route: `codeRevealEnabled = settingOn && await isSuperAdminActor(auth)`; `isSuperAdminActor` refuses service tokens and dev mode. |
+| IN-08 | closed | `parseMajorAmount` uses a precision-bounded digit pattern and `Money.fromMajor(string, currency)` (which accepts strings). `useStoreConfig` throws without a provider, but `app/admin/layout.tsx` is nested under `app/layout.tsx`, which mounts `StoreConfigProvider`, so the dialog has one. |
+
+Regression checks with no finding: `repository.ts` now imports `./events`, which imports `@/lib/db`; `lib/db.ts` only defines `cache()`-wrapped getters and has no top-level `getCloudflareContext` call, so the checkout paths that use the repository are unaffected. `readBalance` is not called after the batch. `created` in the reissue result is derived from the adjustment INSERT's `meta.changes`, which is always 1 on success — harmless. `assertGiftCardActor` accepts `id: null`, so a dev-bypass admin can reissue.
+
+### New findings
+
+#### Warnings
+
+##### WR-08: A rotated-out delivery key is still reported as 409 `code_unavailable` / reason `decrypt`, not the 503 / `configuration` the fix and its test claim
+
+**File:** `app/api/admin/gift-cards/[id]/reveal/route.ts:112-124`, `lib/gift-cards/encryption.ts:337-338, 354-355`, `tests/unit/app/api/admin-gift-cards-reveal.test.ts:185-196`
+
+**Issue:** The route's branch is `error instanceof GiftCardDecryptionError ? "decrypt" : "configuration"`, and the comment says a "missing or rotated-out key" lands in the 503 branch. It does not. `decryptGiftCardDeliveryCode` does `const key = keyRing.byVersion.get(encrypted.keyVersion); if (!key) throw new GiftCardDecryptionError();` and its outer `catch` rewraps every other throw as `GiftCardDecryptionError` too. So the only way to reach the 503 branch in production is `parseGiftCardDeliveryKeyRing` throwing for a wholly missing ring (`GiftCardEncryptionConfigurationError`) or the delivery row lacking ciphertext (already screened by `giftCardDeliveryHasStoredCode`). The operator case WR-02 named — a key version rotated out of `GIFT_CARD_DELIVERY_KEYS_JSON` while old deliveries still reference it — is audited as `decrypt` and shown to the admin as "Gift-card code is unavailable". The unit test at `:186` proves the 503 path only by mocking `revealGiftCardDeliveryCode` to reject with a plain `Error("... is missing version 3")`, which the real function never does, so the test documents behaviour the code does not have.
+
+**Fix:** Distinguish the ring gap before decrypting, in `revealGiftCardDeliveryCode`, where the stored `code_key_version` and the parsed ring are both in hand:
+
+```ts
+// lib/services/gift-card-fulfillment.ts, revealGiftCardDeliveryCode
+const keyRing = parseGiftCardDeliveryKeyRing(args.environment);
+if (!keyRing.keys.some((key) => key.version === row.code_key_version)) {
+  throw new GiftCardEncryptionConfigurationError(); // or a new GiftCardKeyVersionMissingError
+}
+return decryptGiftCardDeliveryCode({ ..., keyRing });
+```
+
+(Adjust the membership check to whatever shape `GiftCardEncryptionKeyRing` exposes at `encryption.ts:23`; `resolveKeyRingUnsafe` already walks it.) Then replace the mocked unit case with one that exercises the real service: an integration test under the workers config that issues a card with key version 1, hands the route an environment whose ring only has version 2, and asserts 503 + `details.reason === "configuration"`.
+
+##### WR-09: A reissued card is labelled "Admin created" in both the list and the detail page
+
+**File:** `lib/gift-cards/presentations.ts:171-174` (`isAdminCreated`), `components/admin/GiftCardQueue.tsx:37-40`, `components/admin/gift-cards/GiftCardDetail.tsx:196`
+
+**Issue:** `isAdminCreated` is `purchaser_customer_id IS NULL AND issued_order_id IS NULL`. A reissued card matches that exactly (`issueAccountStatements` writes both as NULL for reissue). `resolveAdminCreatorLabels` then finds no `admin_created` event, returns no label, and both UIs fall back to "Admin created". The purchaser column exists to answer "who is behind this card" on the fraud-audit surface (Russell's stated need in the context); telling an admin that a fraud-recovery reissue was hand-created is the wrong answer. This existed before the IN-06 fix (the UI fallback was the same), but the fix built the label resolver around exactly this predicate and did not cover the second population it selects. Only the timeline's `reissued_from` entry tells the truth.
+
+**Fix:** Resolve both provenance kinds in the same batched query:
+
+```ts
+// presentations.ts, resolveAdminCreatorLabels -> resolveProvenanceLabels
+`SELECT event.gift_card_id, event.event_type, event.details, admin.display_name, admin.email
+ FROM gift_card_events event
+ LEFT JOIN admin_users admin ON admin.user_id = event.actor_id
+ WHERE event.event_type IN ('admin_created', 'reissued_from')
+   AND event.gift_card_id IN (${placeholders})`
+// admin_created  -> `admin: ${name}`
+// reissued_from  -> `reissued from ${details.from_gift_card_id}` (the UI already links card ids)
+```
+
+And change the two UI fallbacks from "Admin created" to "—" so an unresolved label never asserts provenance. Add an integration case in `gift-card-presentation-routes.test.ts` that reissues a card and asserts the new card's `purchaser` names the old card, not an admin.
+
+#### Info
+
+##### IN-09: Reissue route derives ids from the URL param outside the `try`, so an over-long id is an unhandled 500
+
+**File:** `app/api/admin/gift-cards/[id]/reissue/route.ts:96-97`
+
+**Issue:** `giftCardReissueId(id)` and `giftCardReissueDeliveryId(id)` both call `assertGiftCardId`, which throws a `TypeError` for anything over 128 characters. They run after the WR-06 delivery read but before the `try`. With a `to` in the body the delivery read is skipped, so a 129+ character path segment escapes as a 500; without `to` the same input comes back as 503 "temporarily unavailable" from the delivery read's catch. D-13 says 404 `gift_card_not_found`.
+
+**Fix:** Validate the param once at the top: `try { assertGiftCardId(id); } catch { return jsonError("gift_card_not_found", "Gift card not found", 404); }`, or move the two derivations inside the existing `try` and map `TypeError` to 404. The same one-line guard would tidy the notes and events routes, which currently answer 503 for the same input.
+
+##### IN-10: A reissue that loses the pre-check race answers 503, not D-06's 409
+
+**File:** `lib/gift-cards/repository.ts:832-866`, `app/api/admin/gift-cards/[id]/reissue/route.ts:143-147`
+
+**Issue:** If two admins click Reissue on the same card at once, the second batch fails on the ledger's UNIQUE `business_key` (statement 1) with a raw D1 error. That is the right outcome for the data — nothing lands — but it is not a `GiftCardConflictError`, so the route returns 503 "Failed to reissue gift card" and the admin retries a card that has just been reissued (and then gets the 409). Same shape for the `reissued` partial-index rejection.
+
+**Fix:** Wrap the batch: on failure, re-run the prior-state probe (`findAccountById(newGiftCardId)` + the adjustment lookup) and, if both rows now exist, `throw new GiftCardConflictError("Gift card has already been reissued")`; otherwise rethrow. Add a unit case in the repository suite that pre-inserts the adjustment row under `gift-card-reissue-out/{id}` and asserts the 409 shape.
+
+### Iteration 2 counts
+
+| Severity | Count | IDs |
+| --- | --- | --- |
+| Critical | 0 | — |
+| Warning | 2 | WR-08, WR-09 |
+| Info | 2 | IN-09, IN-10 |
+| Total | 4 | |
+
+Prior findings: 15 of 17 fully closed; WR-02 and IN-06 closed as fixed but each left the adjacent case above (WR-08, WR-09).
+
+---
+
+_Re-reviewed: 2026-09-10T22:40:00Z_
+_Reviewer: Claude (gsd-code-reviewer)_
+_Depth: deep_
+_Iteration: 2_
+
