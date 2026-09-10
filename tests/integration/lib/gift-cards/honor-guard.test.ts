@@ -97,17 +97,45 @@ async function settleStrandedReservations(): Promise<void> {
   }
 }
 
+/**
+ * Drain every leftover balance to zero with a negative adjustment.
+ *
+ * Disabling a leftover card is no longer enough to take it out of the
+ * measurement: a disabled card that still holds a balance is counted (WR-07),
+ * deliberately, because that money is still owed until it is reissued or
+ * written off. The ledger is append-only, so the only way to make a leftover
+ * card contribute nothing is the same thing reissue does — an `adjustment`
+ * entry for exactly the available balance. Runs after
+ * `settleStrandedReservations`, so a committed hold has already become a
+ * redemption and the drain sees the true remainder.
+ */
+async function drainLeftoverBalances(): Promise<void> {
+  const repository = createGiftCardRepository(env.DB);
+  const accounts = await env.DB.prepare("SELECT id FROM gift_card_accounts").all<{ id: string }>();
+  for (const { id } of accounts.results ?? []) {
+    const balance = await repository.readBalance(id, now);
+    if (!balance || !balance.availableBalance.gt(Money.zero(balance.availableBalance.currency))) continue;
+    await repository.writeAdjustment({
+      giftCardId: id,
+      amount: balance.availableBalance.negate(),
+      businessKey: `test-drain/${id}/${testSequence}`,
+      createdAt: now,
+    });
+  }
+}
+
 describe("sumOutstandingGiftCardBalances on real D1", () => {
   beforeAll(async () => {
     await applyTestMigrations();
   });
 
-  // The measurement is an aggregate over every active card, so each case has
-  // to start from a table that contributes nothing. The ledger is append-only
-  // and reservation identity is immutable (migration 0022 triggers), so rows
-  // cannot be deleted or back-dated: instead every case gets its own clock a
-  // day ahead of the last, which expires the previous case's reservations,
-  // and every leftover account is disabled out of the active set first.
+  // The measurement is an aggregate over every card still holding value, so
+  // each case has to start from a table that contributes nothing. The ledger
+  // is append-only and reservation identity is immutable (migration 0022
+  // triggers), so rows cannot be deleted or back-dated: instead every case
+  // gets its own clock a day ahead of the last, which expires the previous
+  // case's reservations, every leftover account is disabled out of the active
+  // set, and whatever balance is left on it is drained to zero (WR-07).
   beforeEach(async () => {
     testSequence += 1;
     now = epoch + testSequence * 86_400;
@@ -117,6 +145,7 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
     await env.DB.prepare(
       "UPDATE gift_card_accounts SET status = 'disabled', disabled_at = ? WHERE status = 'active'",
     ).bind(now).run();
+    await drainLeftoverBalances();
   });
 
   it("reports zeros and a null currency when no gift cards exist", async () => {
@@ -354,13 +383,76 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
     });
   });
 
-  it("excludes a disabled card from the outstanding total", async () => {
+  it("still counts a disabled card's remaining balance, and counts it exactly once after reissue (WR-07)", async () => {
+    // Phase 14 lets an admin disable a card. Disabling stops redemption but
+    // does not forgive the money on it: until the balance is reissued (D-05's
+    // answer to a mistaken disable) it is a liability the store still owes.
+    // If the guard stopped seeing it, both flags off would read "no
+    // balances", honoring would switch off, and the detail page holding the
+    // Reissue button would 404 — the one card that needs it, unreachable.
     const repository = createGiftCardRepository(env.DB);
     await repository.issueAccount(issuance());
-    await env.DB.prepare(
-      "UPDATE gift_card_accounts SET status = 'disabled', disabled_at = ? WHERE id = ?",
-    ).bind(now + 1, giftCardId).run();
-    await expect(sumOutstandingGiftCardBalances(env.DB, now)).resolves.toEqual({
+    await repository.disableAccount({ giftCardId, disabledAt: now + 1 });
+
+    const measured = await sumOutstandingGiftCardBalances(env.DB, now + 1);
+    expect(measured).toEqual({
+      outstandingMinor: 1_000,
+      cardsWithBalance: 1,
+      openReservations: 0,
+      heldMinor: 0,
+      currency: "USD",
+      currencyCount: 1,
+    });
+
+    // With that measurement stored, both flags off keeps honoring on — so
+    // the admin surface stays reachable.
+    await writeHonorGuard(env.DB, {
+      outstanding_minor: measured.outstandingMinor,
+      currency: "USD",
+      open_reservations: 0,
+      measured_at: now + 1,
+    });
+    await expect(resolveHonorEffective(
+      env.DB,
+      { giftCardAcquisition: false, giftCardReconciliation: false },
+      now + 1,
+    )).resolves.toBe(true);
+
+    // Reissue drains the disabled card and issues a new active one: the old
+    // card now reads zero and drops out, the new card is counted — once.
+    const reissued = await repository.reissue({
+      oldGiftCardId: giftCardId,
+      now: now + 2,
+      actor: { type: "admin", id: "user_admin" },
+      codeHash: { keyVersion: 1, digest: (testSequence + 0x4000).toString(16).padStart(64, "0") },
+    });
+    await expect(repository.readBalance(giftCardId, now + 2)).resolves.toMatchObject({
+      availableBalance: Money.zero("USD"),
+    });
+    await expect(repository.readBalance(reissued.newGiftCardId, now + 2)).resolves.toMatchObject({
+      availableBalance: Money.fromMinor(1_000, "USD"),
+    });
+    await expect(sumOutstandingGiftCardBalances(env.DB, now + 2)).resolves.toEqual({
+      outstandingMinor: 1_000,
+      cardsWithBalance: 1,
+      openReservations: 0,
+      heldMinor: 0,
+      currency: "USD",
+      currencyCount: 1,
+    });
+  });
+
+  it("drops a disabled card that has been drained to zero, so it contributes no currency either", async () => {
+    const repository = createGiftCardRepository(env.DB);
+    await repository.issueAccount(issuance());
+    await repository.disableAccount({ giftCardId, disabledAt: now + 1 });
+    await repository.writeAdjustment({
+      giftCardId,
+      amount: Money.fromMinor(-1_000, "USD"),
+      businessKey: `write-off/${giftCardId}`,
+      createdAt: now + 2,
+    });
+    await expect(sumOutstandingGiftCardBalances(env.DB, now + 2)).resolves.toEqual({
       outstandingMinor: 0,
       cardsWithBalance: 0,
       openReservations: 0,

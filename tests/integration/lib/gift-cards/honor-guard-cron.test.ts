@@ -72,6 +72,26 @@ async function settleStrandedReservations(): Promise<void> {
   }
 }
 
+/**
+ * Drain every leftover balance to zero — see the sibling aggregate suite.
+ * A disabled card that still holds a balance is counted (WR-07), so
+ * disabling leftovers is no longer enough to isolate a case.
+ */
+async function drainLeftoverBalances(): Promise<void> {
+  const repository = createGiftCardRepository(env.DB);
+  const accounts = await env.DB.prepare("SELECT id FROM gift_card_accounts").all<{ id: string }>();
+  for (const { id } of accounts.results ?? []) {
+    const balance = await repository.readBalance(id, now);
+    if (!balance || !balance.availableBalance.gt(Money.zero(balance.availableBalance.currency))) continue;
+    await repository.writeAdjustment({
+      giftCardId: id,
+      amount: balance.availableBalance.negate(),
+      businessKey: `test-drain/${id}/${testSequence}`,
+      createdAt: now,
+    });
+  }
+}
+
 describe("runGiftCardHonorGuard on real D1", () => {
   beforeAll(async () => {
     await applyTestMigrations();
@@ -79,7 +99,8 @@ describe("runGiftCardHonorGuard on real D1", () => {
 
   // Same isolation dance as the sibling aggregate suite: the ledger is
   // append-only and reservation identity immutable, so each case advances its
-  // own clock a day and disables whatever the last case left active.
+  // own clock a day, disables whatever the last case left active, and drains
+  // whatever balance is left on it (WR-07).
   beforeEach(async () => {
     testSequence += 1;
     now = epoch + testSequence * 86_400;
@@ -89,6 +110,7 @@ describe("runGiftCardHonorGuard on real D1", () => {
     await env.DB.prepare(
       "UPDATE gift_card_accounts SET status = 'disabled', disabled_at = ? WHERE status = 'active'",
     ).bind(now).run();
+    await drainLeftoverBalances();
   });
 
   it("measures the outstanding balance and stores it under the guard key", async () => {
@@ -143,6 +165,18 @@ describe("runGiftCardHonorGuard on real D1", () => {
       measured_at: now,
     });
     expect(alarms).toEqual([]);
+  });
+
+  it("keeps honoring while a disabled card still holds a balance, so the reissue page stays reachable (WR-07)", async () => {
+    await issueCardWorth(2_500);
+    await createGiftCardRepository(env.DB).disableAccount({ giftCardId, disabledAt: now });
+
+    const { result, alarms } = await tick(false);
+
+    expect(result.honorEffective).toBe(true);
+    expect(result.record).toMatchObject({ outstanding_minor: 2_500, currency: "USD", open_reservations: 0 });
+    expect(alarms).toHaveLength(1);
+    expect(alarms[0]).toMatchObject({ event: "gift_card.honor_disabled_with_balances" });
   });
 
   it("marks the currency mixed rather than formatting a cross-currency sum", async () => {

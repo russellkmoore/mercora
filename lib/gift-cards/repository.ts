@@ -244,9 +244,13 @@ function availableBalanceExpression(accountAlias: string, nowPlaceholder = "?"):
 }
 
 export interface OutstandingGiftCardBalances {
-  /** Summed available balance across every active card, in minor units. */
+  /**
+   * Summed available balance, in minor units, across every card still holding
+   * value: every active card, plus any disabled card whose balance has not yet
+   * been reissued or written off (WR-07 — that balance is still owed).
+   */
   outstandingMinor: number;
-  /** How many active cards still carry a positive available balance. */
+  /** How many cards (active or disabled) still carry a positive available balance. */
   cardsWithBalance: number;
   /**
    * Reservations that still hold value: unreleased, not yet settled, and
@@ -266,10 +270,10 @@ export interface OutstandingGiftCardBalances {
    * "$0.00 outstanding" beside a nonzero reservation count.
    */
   heldMinor: number;
-  /** `null` when there are no active cards; callers pick their own default. */
+  /** `null` when no card is active or holds value; callers pick their own default. */
   currency: string | null;
   /**
-   * How many distinct currencies the active cards span. `outstandingMinor` is
+   * How many distinct currencies the counted cards span. `outstandingMinor` is
    * a bare SUM of minor units, so it is only a real total when this is 1 —
    * above that it is a signal that money exists, not an amount anyone can
    * format. Callers must not print it as `currency`.
@@ -305,8 +309,8 @@ function toCount(value: unknown): number {
  * `readBalance` and the reservation guard trigger use, so there is exactly one
  * definition of "available" in the codebase.
  *
- * `outstandingMinor` sums minor units across every active card without
- * grouping, and `currency` is whichever code sorts first. In a single-currency
+ * `outstandingMinor` sums minor units across every card still holding value
+ * without grouping, and `currency` is whichever code sorts first. In a single-currency
  * store — which is what `storeDefaults.commerce.currency` describes — that is a
  * real total. In a store holding both USD and EUR cards it is not a total of
  * anything, so `currencyCount` is reported alongside it and callers are
@@ -318,17 +322,29 @@ export async function sumOutstandingGiftCardBalances(
 ): Promise<OutstandingGiftCardBalances> {
   const balance = availableBalanceExpression("account");
   const batched = await database.batch([
-    // `balance` is interpolated twice, so this statement carries two `?`
-    // placeholders and `nowSeconds` binds twice, left to right: the one
-    // inside the SUM column first, then the one inside the CASE column.
+    // `balance` is interpolated three times, so this statement carries three
+    // `?` placeholders and `nowSeconds` binds three times, left to right: the
+    // one inside the SUM column, the one inside the CASE column, then the one
+    // in the WHERE clause.
+    //
+    // Which cards count (WR-07): every active card, and every disabled card
+    // that still has an available balance. Disabling a card stops redemption
+    // but does not forgive the money on it — until an admin reissues it (D-05)
+    // or writes it off, that balance is a liability the store still owes, and
+    // the honor guard exists to keep the admin surface reachable while any
+    // such liability exists. Scoping this to active cards alone would let the
+    // guard read "no balances" the moment the last card was disabled, switch
+    // honoring off, and 404 the very detail page the reissue button lives on.
+    // A disabled card that has been drained (by reissue) reads zero here and
+    // drops out, so a reissued balance is counted exactly once, on the new card.
     database.prepare(`SELECT
         COALESCE(SUM(${balance}), 0) AS outstanding_minor,
         COALESCE(SUM(CASE WHEN ${balance} > 0 THEN 1 ELSE 0 END), 0) AS cards_with_balance,
         MIN(account.currency_code) AS currency,
         COUNT(DISTINCT account.currency_code) AS currency_count
       FROM gift_card_accounts account
-      WHERE account.status = 'active'`)
-      .bind(/* SUM(...) */ nowSeconds, /* CASE WHEN ... */ nowSeconds),
+      WHERE account.status = 'active' OR ${balance} > 0`)
+      .bind(/* SUM(...) */ nowSeconds, /* CASE WHEN ... */ nowSeconds, /* WHERE ... */ nowSeconds),
     // The same "still holding value" clause the balance expression uses, so
     // there is one definition of it in the codebase. It has to be the same
     // one: a reservation that is committed but whose redemption ledger entry
@@ -338,28 +354,25 @@ export async function sumOutstandingGiftCardBalances(
     // of the measurement and the guard would report "no balances" while an
     // order is mid-settlement.
     //
-    // Scoped to accounts, for the same reason the balance half is — but with
-    // one deliberate exception, and Phase 14 needs to read this before it ships
-    // gift-card management:
+    // Scoped to accounts the same way the balance half is, with the same
+    // reasoning about disabled cards (WR-07 above):
     //
     //   **A disabled card that still holds a committed, unsettled reservation
     //   is still money, and is still counted here.**
     //
     // Scoping this purely to active accounts would re-open the exact hole the
     // committed-and-unsettled clause was added to close, narrowed to one card
-    // state. Nothing in the tree disables a card today, but nothing stops it
-    // either: `gift_card_accounts_status_transition_guard` permits
-    // active -> disabled with no check for an outstanding reservation, and
-    // neither `settleReservation` nor `restoreRedemption` checks
-    // `account.status`. Only `reserve` requires an active account — so "a
-    // disabled card cannot redeem anyway" is true of *new* reservations and
-    // false of ones already in flight. Disabling a card mid-settlement would
-    // otherwise drop the measurement to zero, switch honoring off, and strand
-    // the redemption on every retry.
+    // state. Phase 14's disable action permits active -> disabled with no check
+    // for an outstanding reservation (`gift_card_accounts_status_transition_guard`
+    // does not require one), and neither `settleReservation` nor
+    // `restoreRedemption` checks `account.status`. Only `reserve` requires an
+    // active account — so "a disabled card cannot redeem anyway" is true of
+    // *new* reservations and false of ones already in flight. Disabling a card
+    // mid-settlement would otherwise drop the measurement to zero, switch
+    // honoring off, and strand the redemption on every retry.
     //
-    // Uncommitted reservations against a disabled card are excluded, matching
-    // the balance half: those hold no money the store has taken yet, and they
-    // expire on their own.
+    // Uncommitted reservations against a disabled card are excluded: those
+    // hold no money the store has taken yet, and they expire on their own.
     database.prepare(`SELECT
         COUNT(*) AS open_reservations,
         COALESCE(SUM(reservation.amount_minor), 0) AS held_minor
