@@ -5,6 +5,7 @@ import { Money } from "@/lib/money";
 import {
   GiftCardConflictError,
   GiftCardUnavailableError,
+  classifyGiftCardReservation,
   createGiftCardRepository,
 } from "@/lib/gift-cards/repository";
 import type { IssueGiftCardInput, ReserveGiftCardInput } from "@/lib/gift-cards/domain";
@@ -483,5 +484,128 @@ describe("gift-card repository on real D1", () => {
        'restoration-over-cap', 'gift-order-restore', ?, ?)`)
       .bind(giftCardId, redemption.entry.id, now + 32).run())
       .rejects.toThrow();
+  });
+
+  it("disables an active card once, safely no-ops a retry, and rejects an unknown id", async () => {
+    const repository = createGiftCardRepository(env.DB);
+    await repository.issueAccount(issuance());
+    const first = await repository.disableAccount({ giftCardId, disabledAt: now + 10 });
+    expect(first.changed).toBe(true);
+    expect(first.account.status).toBe("disabled");
+    expect(first.account.disabledAt).toBe(now + 10);
+
+    const retry = await repository.disableAccount({ giftCardId, disabledAt: now + 20 });
+    expect(retry.changed).toBe(false);
+    expect(retry.account.status).toBe("disabled");
+    expect(retry.account.disabledAt).toBe(now + 10);
+
+    await expect(repository.disableAccount({ giftCardId: "gift_missing_disable", disabledAt: now + 10 }))
+      .rejects.toBeInstanceOf(GiftCardUnavailableError);
+  });
+
+  it("classifies every reservation for a card as open, committed-unsettled, released, expired, or settled", async () => {
+    const repository = createGiftCardRepository(env.DB);
+    await repository.issueAccount(issuance({ amount: Money.fromMinor(10_000, "USD") }));
+    const openId = `${giftCardId}_res_open`;
+    const expiredId = `${giftCardId}_res_expired`;
+    const releasedId = `${giftCardId}_res_released`;
+    const committedId = `${giftCardId}_res_committed`;
+    const settledId = `${giftCardId}_res_settled`;
+    const committedOrderId = `${giftCardId}_order_committed`;
+    const settledOrderId = `${giftCardId}_order_settled`;
+
+    await repository.reserve(reservation(openId, 100));
+    await repository.reserve(reservation(expiredId, 100, {
+      reservedAt: now - 1_000,
+      expiresAt: now - 500,
+    }));
+    await repository.reserve(reservation(releasedId, 100));
+    await repository.releaseReservation({
+      reservationId: releasedId,
+      reason: "test release",
+      releasedAt: now + 1,
+    });
+    await repository.reserve(reservation(committedId, 100));
+    await insertPendingOrder(committedOrderId);
+    await repository.commitReservation({
+      reservationId: committedId,
+      orderId: committedOrderId,
+      expectedAmount: Money.fromMinor(100, "USD"),
+      committedAt: now + 1,
+    });
+    await repository.reserve(reservation(settledId, 100));
+    await insertPendingOrder(settledOrderId);
+    await repository.commitReservation({
+      reservationId: settledId,
+      orderId: settledOrderId,
+      expectedAmount: Money.fromMinor(100, "USD"),
+      committedAt: now + 1,
+    });
+    await repository.settleReservation({
+      reservationId: settledId,
+      orderId: settledOrderId,
+      settledAt: now + 2,
+    });
+
+    const reservations = await repository.findReservations(giftCardId);
+    expect(reservations).toHaveLength(5);
+    expect(reservations[0].id).toBe(settledId);
+
+    const classification = new Map(
+      reservations.map((entry) => [entry.id, classifyGiftCardReservation(entry, now)]),
+    );
+    expect(classification.get(openId)).toBe("open");
+    expect(classification.get(expiredId)).toBe("expired");
+    expect(classification.get(releasedId)).toBe("released");
+    expect(classification.get(committedId)).toBe("committed_unsettled");
+    expect(classification.get(settledId)).toBe("settled");
+  });
+
+  it("re-queues a needs_review delivery back to pending and leaves any other status untouched", async () => {
+    const repository = createGiftCardRepository(env.DB);
+    const deliveryId = `${giftCardId}_delivery`;
+    await repository.issueAccount(issuance({
+      delivery: {
+        id: deliveryId,
+        recipientEmail: "buyer@example.com",
+        emailIdempotencyKey: `idem-${giftCardId}`,
+        codeCiphertext: "cipher-text",
+        codeNonce: "nonce-value",
+        codeKeyVersion: 1,
+      },
+    }));
+    await env.DB.prepare(`UPDATE gift_card_deliveries
+      SET status = 'needs_review', completed_at = ?, claim_token = NULL, lease_expires_at = NULL, attempt_count = ?
+      WHERE gift_card_id = ?`).bind(now + 5, 3, giftCardId).run();
+
+    const requeued = await repository.requeueDelivery({ giftCardId, now: now + 10 });
+    expect(requeued).toEqual({ requeued: true, deliveryId });
+    const row = await env.DB.prepare(`SELECT status, attempt_count, deliver_after,
+      completed_at, claim_token, lease_expires_at
+      FROM gift_card_deliveries WHERE gift_card_id = ?`).bind(giftCardId).first<{
+        status: string;
+        attempt_count: number;
+        deliver_after: number;
+        completed_at: number | null;
+        claim_token: string | null;
+        lease_expires_at: number | null;
+      }>();
+    expect(row).toMatchObject({
+      status: "pending",
+      attempt_count: 0,
+      deliver_after: now + 10,
+      completed_at: null,
+      claim_token: null,
+      lease_expires_at: null,
+    });
+
+    await env.DB.prepare(`UPDATE gift_card_deliveries
+      SET status = 'sent', completed_at = ?, claim_token = NULL, lease_expires_at = NULL
+      WHERE gift_card_id = ?`).bind(now + 20, giftCardId).run();
+    const untouched = await repository.requeueDelivery({ giftCardId, now: now + 30 });
+    expect(untouched).toEqual({ requeued: false, deliveryId: undefined });
+    const stillSent = await env.DB.prepare(`SELECT status FROM gift_card_deliveries WHERE gift_card_id = ?`)
+      .bind(giftCardId).first<{ status: string }>();
+    expect(stillSent?.status).toBe("sent");
   });
 });
