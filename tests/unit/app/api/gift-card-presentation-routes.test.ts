@@ -241,6 +241,27 @@ describe('gift-card presentation routes', () => {
       },
     );
 
+    it('400s a body that carries a currency, whatever its value (WR-03)', async () => {
+      mocks.context.mockResolvedValue({ env: { DB: {}, STORE_FEATURE_GIFT_CARD_RECONCILIATION: 'true' } });
+      for (const currency of ['XXX', 'USD', 'usd', 7, null]) {
+        const response = await adminPost(createRequest({ ...validCreateBody, currency }));
+        expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({ code: 'invalid_body' });
+      }
+      expect(mocks.issueAdminGiftCard).not.toHaveBeenCalled();
+    });
+
+    it('issues in the store currency from the runtime config, the same source checkout uses (WR-03)', async () => {
+      mocks.context.mockResolvedValue({
+        env: { DB: {}, STORE_FEATURE_GIFT_CARD_RECONCILIATION: 'true', STORE_CURRENCY: 'EUR' },
+      });
+      const response = await adminPost(createRequest(validCreateBody));
+      expect(response.status).toBe(201);
+      const call = mocks.issueAdminGiftCard.mock.calls[0][0] as { amount: { currency: string; toMinorUnits(): number } };
+      expect(call.amount.currency).toBe('EUR');
+      expect(call.amount.toMinorUnits()).toBe(2_500);
+    });
+
     it('issues a card, writes one admin_created event, and returns the new card id', async () => {
       mocks.context.mockResolvedValue({ env: { DB: {}, STORE_FEATURE_GIFT_CARD_RECONCILIATION: 'true' } });
       const response = await adminPost(createRequest(validCreateBody));
