@@ -47,6 +47,9 @@ The two gift-card feature flags do what their names say. Sell (`STORE_FEATURE_GI
 ### Planner resolution (accepted by Claude)
 - **D-17:** Under both flags off, the sidebar entry and the public balance endpoint follow the configured flags only (always hidden/404). The admin gift-card page and its API stay reachable by URL while the honor guard is active (money outstanding), so the D-05 banner has somewhere to render; once the guard clears they 404 too. Hiding is presentation, honoring is money (D-10).
 
+### Review reconciliation (iteration 2)
+- **D-18:** D-16's parenthetical ("with honor=off and the guard clear") is subordinate to D-10: with both flags off the checkout gift-card panel never renders, whatever the guard says — hiding follows the configured flags, honoring keeps running server-side. The single source of truth for "is honoring effectively on" is one exported `resolveHonorEffective(database, flags, now)` in `lib/gift-cards/honor-guard.ts`, used by the runtime, the checkout page, the balance route and the admin page; surfaces add their own `giftCardSurfacesHidden` check for presentation.
+
 ### Claude's Discretion
 - Exact copy of the unavailable state on the product page and cart line; whether the product page keeps the image and description above the notice (recommended: yes).
 - Whether the honor-off measurement lives in `admin_settings` (D-06) or a tiny dedicated table — no migration unless needed; prefer `admin_settings`.

@@ -507,3 +507,287 @@ on it rather than opening up; add a case to
 _Reviewed: 2026-09-10_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+
+---
+
+## Iteration 2
+
+**Reviewed:** 2026-09-10 (re-review)
+**Scope:** the thirteen fix commits `fc28f7a`..`cf813ec`
+**Depth:** standard, plus cross-file tracing on the honor-guard override and the chat filter
+**New findings:** 1 Critical, 4 Warning
+
+### What the fixes got right
+
+CR-02 holds. `POST /api/admin/settings` is the only generic writer that takes an arbitrary key,
+`app/api/admin/recommendations/settings/route.ts:75-83` writes four hard-coded keys and nothing
+else, and there is no `PUT` or `DELETE` handler to slip through. `admin_settings.key` is
+`TEXT PRIMARY KEY` with default BINARY collation (`migrations/0001_initial_schema.sql:499-501`), so
+a case-folded or whitespace-padded key becomes a different row that `readHonorGuard` never reads.
+Rejecting on category as well as key closes the rename route. The check runs before `getDbAsync`,
+so a batch mixing the guard with a legitimate setting applies neither half.
+
+CR-04 holds. `topK` is 7 (`app/api/agent-chat/route.ts:624`), so the bounded `inArray` lookup can
+never approach D1's 100-bound-parameter ceiling. The raw metadata id is what is bound *and* what is
+compared, so the two halves cannot drift. `filterListedProducts` keys on `type !== 'gift_card'`, so
+no non-gift result is touched. The model's bold-name picks still resolve against the unfiltered
+matches, but `filterListedProducts` runs on the hydrated rows afterwards and
+`assembleChatResponse` derives `productIds` from the filtered array
+(`app/api/agent-chat/route.ts:412-417`), so nothing leaks through the id list either.
+
+Point 5 holds. `parseRecord` catches `JSON.parse`, rejects arrays and wrong-shaped objects, and now
+requires safe integers and an ISO-shaped code or the `MIXED` sentinel. Every remaining path into
+`Money` is safe: `getPrecision` falls back to 2 for an unknown three-letter code
+(`lib/money/currencies.ts:10-12`), `Intl.NumberFormat` accepts any three alpha characters, and the
+`MIXED` branch returns before `Money` is touched. `new Date(measured_at * 1000).toLocaleString()`
+returns `"Invalid Date"` rather than throwing.
+
+Point 6 holds. `createMcpCheckout` is called inside the try block at `lib/mcp/tools/payment.ts:61`,
+so `GiftCardSalesDisabledError` reaches the new `instanceof` branch. `GIFT_CARD_SALES_DISABLED`
+(uppercase) matches the MCP surface's own convention alongside `CHECKOUT_FAILED`, and
+`gift_card_sales_disabled` (lowercase) matches the HTTP surface's alongside
+`gift_cards_unavailable`. Different case, same identifier, each consistent with its own transport.
+
+Point 7 holds. No test was loosened. Every removed assertion is accounted for: the negative-total
+case at `tests/unit/lib/gift-cards/honor-guard.test.ts:87` was flipped to match the corrected
+behaviour and a sibling case added; the writer-source scan was widened from one root to three; the
+three disturbed fixtures were re-pinned, not deleted. `typecheck` is clean and the 22 files /
+270 tests covering this work pass.
+
+### CR-05: `/checkout` renders the gift-card panel with both flags off
+
+**File:** `app/checkout/page.tsx:50-66`, `components/checkout/CheckoutClient.tsx:520`
+**Severity:** BLOCKER
+
+**Issue:** `resolveHonorEffective` never looks at `STORE_FEATURE_GIFT_CARD_ACQUISITION`. With honor
+configured off it goes straight to the guard, and every "we do not know" answer returns `true`:
+
+```ts
+const configuredHonor = flagOn(environment.STORE_FEATURE_GIFT_CARD_RECONCILIATION);
+if (configuredHonor) return true;
+if (!environment.DB) return true;
+return await honorIsEffectivelyOn(environment.DB, false, Math.floor(Date.now() / 1_000));
+```
+
+`honorIsEffectivelyOn` → `balancesMayExist(null)` → `true` whenever the guard row is missing, stale,
+malformed, or unreadable (`lib/gift-cards/honor-guard.ts:203-206`). So with **both** flags off the
+panel renders in all of these states:
+
+- The first five minutes after any deploy, before the cron's first tick writes the row.
+- Any cron gap longer than `HONOR_GUARD_STALE_SECONDS` (900s).
+- Any D1 read failure.
+- **Permanently on a deploy that has not applied the gift-card migrations** — the state
+  `docs/runtime-configuration.md:62-70`, written by this same fix batch, describes as supported:
+  "the tick logs `[cron] gift-card honor guard unavailable` every five minutes and carries on".
+  The tick throws, no row is ever written, `readHonorGuard` returns `null` forever, and the panel
+  never goes away.
+
+That contradicts three things this phase shipped:
+
+1. **D-10** — "checkout renders no gift-card panel" with both flags off.
+2. **D-17** — hiding follows the configured flags only; honoring is the money decision.
+3. The four-state table in `docs/DEPLOYMENT_SETUP.md:493` — "off | off | Gift cards do not exist.
+   Every surface is absent or 404s."
+
+The same commit resolved the same question the other way one file over.
+`app/api/gift-cards/balance/route.ts:29-33` gates on D-10 *before* consulting the guard and 404s;
+`app/checkout/page.tsx` never applies that gate at all. Two sibling public surfaces now answer
+"does the shopper see gift cards" differently in the identical configuration.
+
+D-16's parenthetical ("with honor=off **and the guard clear**") is what CR-03 implemented, but the
+only configuration in which "honor off + guard active" occurs is both-off — sell=on/honor=off throws
+at `resolveCommerceCapabilities` (`lib/commerce/capabilities.ts:158-162`). So D-16's parenthetical
+and D-10 describe the same state and disagree, and the fix picked one without retiring the other.
+
+The shopper-facing result on a store that has switched gift cards off: a "Pay with a gift card"
+input appears at the payment step. If the store never configured `GIFT_CARD_CODE_HMAC_KEYS_JSON`,
+typing a code reaches `parseGiftCardCodeKeyRing` inside `resolveLookupRuntime`
+(`lib/gift-cards/runtime.ts:45-52`), throws `GiftCardRuntimeConfigurationError`, is not one of the
+two errors `/api/payment-intent` maps, and surfaces as "Failed to create payment intent" at
+`components/checkout/CheckoutClient.tsx:278`.
+
+No test covers this. Nothing under `tests/unit/components/` pins the both-off case, and
+`app/checkout/page.tsx` never references `giftCardSurfacesHidden` or the acquisition flag.
+
+**Fix:** apply the same D-10 gate the balance route already applies, before the guard is consulted:
+
+```ts
+import { giftCardSurfacesHidden } from "@/lib/gift-cards/visibility";
+
+async function resolveHonorEffective(): Promise<boolean> {
+  try {
+    const { env } = await getCloudflareContext({ async: true });
+    const environment = env as unknown as Record<string, unknown> & { DB?: D1Database };
+    const giftCardAcquisition = flagOn(environment.STORE_FEATURE_GIFT_CARD_ACQUISITION);
+    const giftCardReconciliation = flagOn(environment.STORE_FEATURE_GIFT_CARD_RECONCILIATION);
+    // D-10: with both flags off the panel is a surface that does not exist,
+    // whatever the guard says about money. Hiding is presentation; honoring
+    // still runs server-side (D-04).
+    if (giftCardSurfacesHidden({ giftCardAcquisition, giftCardReconciliation })) return false;
+    if (giftCardReconciliation) return true;
+    if (!environment.DB) return true;
+    return await honorIsEffectivelyOn(environment.DB, false, Math.floor(Date.now() / 1_000));
+  } catch {
+    return true;
+  }
+}
+```
+
+Add a case to `tests/unit/components/gift-card-checkout-gating-source.test.ts` (or a behavioural
+test of the page) pinning both-off → `honorEffective === false`, and reconcile D-16's parenthetical
+with D-10 in `13-CONTEXT.md` so the next change does not re-open this.
+
+---
+
+### WR-13: One decision, four call sites, three different preconditions
+
+**File:** `lib/commerce/runtime.ts:37-47`, `app/checkout/page.tsx:50-66`,
+`app/api/gift-cards/balance/route.ts:29-51`, `app/admin/gift-cards/page.tsx:33-38`
+**Severity:** WARNING
+
+**Issue:** "Is honoring effectively on?" is now answered independently in four files, and they do
+not agree on the preconditions:
+
+| Call site | Precondition before reading the guard |
+| --- | --- |
+| `lib/commerce/runtime.ts:37` | honor off **and `!sellsGiftCards`** |
+| `app/api/gift-cards/balance/route.ts:31` | honor off **and not both-off** (D-10 gate) |
+| `app/checkout/page.tsx:55` | honor off (no other condition) |
+| `app/admin/gift-cards/page.tsx:34` | honor off **and `DB` present** |
+
+`runtime.ts` is emphatic that its extra condition is load-bearing: "`!sellsGiftCards` is the whole
+point of the guard, not a detail of it." Neither new consumer carries it, and neither carries the
+other's. CR-05 is the first bug this shape produced; it will not be the last, because a reader
+picking any one of these four as the reference implementation picks wrong three times out of four.
+
+**Fix:** put the decision in one exported function in `lib/gift-cards/honor-guard.ts` that takes
+both configured flags and returns the effective value, and have all four call it:
+
+```ts
+export async function resolveHonorEffective(
+  database: D1Database | undefined,
+  flags: { giftCardAcquisition: boolean; giftCardReconciliation: boolean },
+  nowSeconds: number,
+): Promise<boolean> { ... }
+```
+
+Surfaces that additionally need "is this shown at all" keep their own `giftCardSurfacesHidden`
+check; the money answer stops being re-derived.
+
+---
+
+### WR-14: CR-01's account join re-opens the same hole for a disabled card
+
+**File:** `lib/gift-cards/repository.ts:289-291`
+**Severity:** WARNING
+
+**Issue:** The new count joins `gift_card_accounts` on `status = 'active'`. A reservation that is
+unreleased, committed, and unsettled against a card that has since been **disabled** is counted by
+neither half — the balance half has always excluded disabled cards, and now the reservation half
+does too. `balancesMayExist` reads zero, honoring flips off, and `applyTender` on the pending
+`gift_card` order effect throws `CommerceCapabilityDisabledError` on every retry. That is CR-01's
+exact failure, narrowed to one card state.
+
+It is reachable in principle, not just in theory:
+
+- `settleReservation` (`lib/gift-cards/repository.ts:579`) does not check `account.status`.
+- `restoreRedemption` (`:651`) does not either, so a refund on a disabled card is the same story.
+- `gift_card_accounts_status_transition_guard`
+  (`migrations/0022_add_gift_cards.sql:83-107`) permits `active → disabled` with no check for an
+  outstanding reservation.
+
+Only `reserve` (`:483-491`) requires `status = 'active'`, so "a disabled card cannot redeem anyway"
+is true of *new* reservations and false of ones already in flight.
+
+Nothing in the current codebase disables a card, so this is latent today. It stops being latent the
+moment Phase 14 ships gift-card management — which is the reason given for keeping the admin
+surfaces open in the first place (D-14, and the WR-12 skip note in `13-REVIEW-FIX.md`).
+
+**Fix:** either widen the count to include disabled accounts that still hold a committed, unsettled
+reservation, or refuse the disable when one exists:
+
+```sql
+-- narrower and safer: a disabled card with money still in flight is still money
+JOIN gift_card_accounts account ON account.id = reservation.gift_card_id
+WHERE (account.status = 'active' OR reservation.committed_at IS NOT NULL)
+```
+
+Add an integration case: commit a reservation, disable the card, do not settle, assert
+`runGiftCardHonorGuard(db, false, now).honorEffective === true`. Whichever way it is resolved, write
+the rule down next to the join — Phase 14 will read it.
+
+---
+
+### WR-15: The banner reports a total that excludes the reservations it names
+
+**File:** `components/admin/GiftCardHonorBanner.tsx:62-68`, `lib/gift-cards/repository.ts:280-286`
+**Severity:** WARNING
+
+**Issue:** CR-01 fixed the *decision* but not the *display*. `availableBalanceExpression` subtracts
+a committed-but-unsettled reservation from the card's available balance, so that money contributes
+`0` to `outstanding_minor` — the repository comment says so explicitly. The banner then prints:
+
+```
+$0.00 outstanding across 1 open reservations
+```
+
+An operator reading the page during a settlement burst sees a total that says the store owes
+nothing while the sentence beside it says money is in flight. The two numbers are measured over
+different populations and presented as one statement. This is the page an operator opens when
+gift-card money is already in a state they need to see, and the money figure on it is the one that
+understates.
+
+The decision is unaffected — `open_reservations !== 0` keeps honoring on either way — so this is
+display accuracy, not behaviour. But WR-02 already established that this record's total must not be
+printed as money when it is not one, and this is the same class of problem the `MIXED` sentinel was
+introduced to solve.
+
+**Fix:** report the held amount alongside the available total. `sumOutstandingGiftCardBalances`
+already has the reservation set in hand; add `heldMinor` (the `SUM(reservation.amount_minor)` over
+the same clause) and have the banner say "$X available plus $Y held across N open reservations", or
+at minimum drop the total when `open_reservations > 0` and `outstanding_minor === 0` rather than
+printing `$0.00`.
+
+---
+
+### WR-16: The writer contract still checks imports, not writes
+
+**File:** `tests/unit/lib/gift-cards/honor-guard-writer-source.test.ts:10-20`
+**Severity:** WARNING
+
+**Issue:** The header states the contract as "no request path writes this record" and the scan was
+correctly widened from `app/` to `app/`, `lib/` and `workers/`. But the mechanism is unchanged: it
+greps for the identifiers `writeHonorGuard` and `runGiftCardHonorGuard`. CR-02's hole needed
+neither — `POST /api/admin/settings` writes the row through Drizzle with a key taken from the
+request body, importing nothing from the guard module. The widened scan would not have caught it,
+and it will not catch the next generic `admin_settings` writer either.
+
+The route-level test added in `a69f6c4` covers the one route that exists today. Nothing covers the
+rule.
+
+**Fix:** add a second contract that scans the same three roots for writes to `admin_settings` —
+`db.insert(admin_settings)`, `db.update(admin_settings)`, `INSERT INTO admin_settings`,
+`UPDATE admin_settings` — with an allowlist of the files permitted to do so, and require each
+allowlisted file to reference `HONOR_GUARD_SETTING_KEY`. Then a new settings writer fails the test
+until it says what it does about the guard key. Also soften the header comment so it describes what
+the scan checks (imports) rather than what the contract wants (writes); the gap between those two
+sentences is exactly where CR-02 lived.
+
+---
+
+## REVIEW COMPLETE
+
+| Severity | New this iteration |
+| --- | --- |
+| Critical | 1 (CR-05) |
+| Warning | 4 (WR-13, WR-14, WR-15, WR-16) |
+| **Total** | **5** |
+
+Iteration-1 findings: 16 (4 Critical, 12 Warning) — 14 fixed, 2 skipped by decision. All four
+iteration-1 Critical findings are resolved as described, except that CR-03's fix introduced CR-05
+above.
+
+_Reviewed: 2026-09-10_
+_Reviewer: Claude (gsd-code-reviewer)_
+_Depth: standard_
+_Iteration: 2_
