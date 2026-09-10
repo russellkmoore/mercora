@@ -75,8 +75,8 @@ export interface HonorGuardRecord {
 }
 
 /**
- * Recorded in place of a currency code when the active cards span more than
- * one currency.
+ * Recorded in place of a currency code when the cards still holding value
+ * span more than one currency.
  *
  * `outstandingMinor` is a bare SUM of minor units with no GROUP BY, so a store
  * holding both USD and EUR cards produces a number that is not a total of
@@ -334,8 +334,8 @@ export async function resolveHonorEffective(
 
 /**
  * The store's default currency (`storeDefaults.commerce.currency`), used only
- * when there are no active cards at all and the aggregate has no currency to
- * report. Held locally rather than imported so this module — which capability
+ * when no card is active or still holds value and the aggregate has no
+ * currency to report. Held locally rather than imported so this module — which capability
  * resolution loads on the request path — stays free of the store-config graph.
  */
 const HONOR_GUARD_DEFAULT_CURRENCY = 'USD';
