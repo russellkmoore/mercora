@@ -22,6 +22,8 @@ import {
   appendGiftCardEvent,
   listGiftCardEvents,
 } from "@/lib/gift-cards/events";
+import { buildGiftCardTimeline } from "@/lib/gift-cards/timeline";
+import type { ReserveGiftCardInput } from "@/lib/gift-cards/domain";
 
 const now = 1_800_500_000;
 let testSequence = 0;
@@ -46,6 +48,23 @@ function issuance(overrides: Partial<IssueGiftCardInput> = {}): IssueGiftCardInp
 async function issueTestAccount(id = giftCardId, digest = hash): Promise<void> {
   const repository = createGiftCardRepository(env.DB);
   await repository.issueAccount(issuance({ id, codeHash: { keyVersion: 1, digest } }));
+}
+
+function reservation(
+  id: string,
+  requestedAmount: number,
+  overrides: Partial<ReserveGiftCardInput> = {},
+): ReserveGiftCardInput {
+  return {
+    id,
+    giftCardId,
+    requestKey: `checkout-${id}`,
+    quoteFingerprint: "b".repeat(64),
+    requestedAmount: Money.fromMinor(requestedAmount, "USD"),
+    reservedAt: now,
+    expiresAt: now + 600,
+    ...overrides,
+  };
 }
 
 describe("gift-card events on real D1", () => {
@@ -181,5 +200,57 @@ describe("gift-card events on real D1", () => {
 
     const events = await listGiftCardEvents(giftCardId, 10);
     expect(events).toHaveLength(0);
+  });
+});
+
+describe("buildGiftCardTimeline on real D1", () => {
+  beforeAll(async () => {
+    await applyTestMigrations();
+  });
+
+  beforeEach(() => {
+    testSequence += 1;
+    giftCardId = `gift_timeline_test_${testSequence}`;
+    hash = testSequence.toString(16).padStart(64, "0");
+  });
+
+  it("merges the issuance, a hold, its release, and a note, oldest first", async () => {
+    const repository = createGiftCardRepository(env.DB);
+    await repository.issueAccount(issuance());
+
+    const reserved = await repository.reserve(reservation("reservation_1", 400, {
+      reservedAt: now + 10,
+      expiresAt: now + 600,
+    }));
+    expect(reserved.available).toBe(true);
+
+    await repository.releaseReservation({
+      reservationId: "reservation_1",
+      reason: "admin:admin_1",
+      releasedAt: now + 20,
+    });
+
+    await appendGiftCardEvent({
+      giftCardId,
+      eventType: "note",
+      actor: { type: "admin", id: "admin_1" },
+      details: { text: "test note" },
+      createdAt: now + 30,
+    });
+
+    const { entries } = await buildGiftCardTimeline({
+      database: env.DB,
+      giftCardId,
+      now: now + 100,
+    });
+
+    expect(entries.map((entry) => entry.type)).toEqual(["issuance", "hold", "released", "note"]);
+    expect(entries.map((entry) => entry.createdAt)).toEqual([now, now + 10, now + 20, now + 30]);
+    const released = entries.find((entry) => entry.type === "released");
+    expect(released?.details).toMatchObject({ reason: "admin:admin_1" });
+    const note = entries.find((entry) => entry.type === "note");
+    expect(note).toMatchObject({
+      source: "event", actorType: "admin", actorId: "admin_1", details: { text: "test note" },
+    });
   });
 });
