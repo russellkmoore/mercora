@@ -58,6 +58,19 @@ export interface HonorGuardRecord {
   currency: string;
   open_reservations: number;
   measured_at: number;
+  /**
+   * Face value held by those reservations, in minor units.
+   *
+   * Optional because rows written before this field existed are still perfectly
+   * readable, and a missing value must not turn a usable measurement into
+   * "unknown" — that would flip honoring on across a deploy for no reason. A
+   * consumer that cannot show it simply does not.
+   *
+   * It is not part of the decision: `open_reservations` already answers "is
+   * money in flight". This exists so the banner can stop printing "$0.00
+   * outstanding" beside a nonzero reservation count.
+   */
+  held_minor?: number;
 }
 
 /**
@@ -117,11 +130,17 @@ function parseRecord(raw: string): HonorGuardRecord | null {
     || !isFiniteNumber(candidate.measured_at)
     || !isUsableCurrency(candidate.currency)
   ) return null;
+  // Absent is fine — older rows predate the field. Present but unusable is not:
+  // it reaches `Money.fromMinor` on the admin banner, so it is dropped rather
+  // than passed through, and the banner falls back to naming the count alone.
+  const held = candidate.held_minor;
+  const heldIsUsable = Number.isSafeInteger(held) && (held as number) >= 0;
   return {
     outstanding_minor: candidate.outstanding_minor as number,
     currency: candidate.currency,
     open_reservations: candidate.open_reservations as number,
     measured_at: candidate.measured_at,
+    ...(heldIsUsable ? { held_minor: held as number } : {}),
   };
 }
 
@@ -337,6 +356,7 @@ export async function runGiftCardHonorGuard(
       ? HONOR_GUARD_MIXED_CURRENCY
       : balances.currency ?? HONOR_GUARD_DEFAULT_CURRENCY,
     open_reservations: balances.openReservations,
+    held_minor: balances.heldMinor,
     measured_at: nowSeconds,
   };
   await writeHonorGuard(database, record);

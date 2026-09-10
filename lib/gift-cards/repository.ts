@@ -211,6 +211,17 @@ export interface OutstandingGiftCardBalances {
    * already subtracted it.
    */
   openReservations: number;
+  /**
+   * The face value those reservations are holding, in minor units.
+   *
+   * `outstandingMinor` cannot include it: the available-balance expression has
+   * already subtracted a committed, unsettled reservation, so that money reads
+   * as zero on the card. The two numbers are measured over different
+   * populations and only mean something when reported side by side — "$X
+   * available plus $Y held" — which is what stops an operator being shown
+   * "$0.00 outstanding" beside a nonzero reservation count.
+   */
+  heldMinor: number;
   /** `null` when there are no active cards; callers pick their own default. */
   currency: string | null;
   /**
@@ -231,6 +242,7 @@ interface OutstandingTotalsRow {
 
 interface OpenReservationsRow {
   open_reservations: number | null;
+  held_minor: number | null;
 }
 
 function toCount(value: unknown): number {
@@ -282,13 +294,34 @@ export async function sumOutstandingGiftCardBalances(
     // of the measurement and the guard would report "no balances" while an
     // order is mid-settlement.
     //
-    // Scoped to active accounts for the same reason the balance half is: a
-    // committed reservation never expires, so without the join a reservation
-    // against a card that has since been disabled would be counted forever.
-    database.prepare(`SELECT COUNT(*) AS open_reservations
+    // Scoped to accounts, for the same reason the balance half is — but with
+    // one deliberate exception, and Phase 14 needs to read this before it ships
+    // gift-card management:
+    //
+    //   **A disabled card that still holds a committed, unsettled reservation
+    //   is still money, and is still counted here.**
+    //
+    // Scoping this purely to active accounts would re-open the exact hole the
+    // committed-and-unsettled clause was added to close, narrowed to one card
+    // state. Nothing in the tree disables a card today, but nothing stops it
+    // either: `gift_card_accounts_status_transition_guard` permits
+    // active -> disabled with no check for an outstanding reservation, and
+    // neither `settleReservation` nor `restoreRedemption` checks
+    // `account.status`. Only `reserve` requires an active account — so "a
+    // disabled card cannot redeem anyway" is true of *new* reservations and
+    // false of ones already in flight. Disabling a card mid-settlement would
+    // otherwise drop the measurement to zero, switch honoring off, and strand
+    // the redemption on every retry.
+    //
+    // Uncommitted reservations against a disabled card are excluded, matching
+    // the balance half: those hold no money the store has taken yet, and they
+    // expire on their own.
+    database.prepare(`SELECT
+        COUNT(*) AS open_reservations,
+        COALESCE(SUM(reservation.amount_minor), 0) AS held_minor
       FROM gift_card_reservations reservation
       JOIN gift_card_accounts account ON account.id = reservation.gift_card_id
-      WHERE account.status = 'active'
+      WHERE (account.status = 'active' OR reservation.committed_at IS NOT NULL)
         AND reservation.released_at IS NULL
         AND (
           reservation.committed_at IS NOT NULL
@@ -307,6 +340,7 @@ export async function sumOutstandingGiftCardBalances(
     outstandingMinor: toCount(totals?.outstanding_minor),
     cardsWithBalance: toCount(totals?.cards_with_balance),
     openReservations: toCount(open?.open_reservations),
+    heldMinor: toCount(open?.held_minor),
     currency: typeof totals?.currency === "string" ? totals.currency : null,
     currencyCount: toCount(totals?.currency_count),
   };

@@ -12,8 +12,9 @@
  * line and no warning colour. Alarming on both is how an operator learns to
  * ignore the banner.
  *
- * It names the outstanding total and the open-reservation count, never a card
- * identity, code fragment, recipient or account id (T-13-34).
+ * It names the available total, the amount held by open reservations, and the
+ * reservation count — never a card identity, code fragment, recipient or
+ * account id (T-13-34).
  *
  * The admin dashboard keeps its own fixed palette by design (AGENTS.md);
  * this uses the same amber/warning tones as `AdminGuard.tsx`, not storefront
@@ -54,17 +55,37 @@ function currentSeconds(): number {
 /**
  * How to say what is outstanding.
  *
+ * Two numbers, measured over different populations, and saying only the first
+ * is how an operator gets misled. The available-balance expression subtracts a
+ * committed-but-unsettled reservation from the card, so during a settlement
+ * burst `outstanding_minor` reads zero while money is plainly in flight. The
+ * banner used to print "$0.00 outstanding across 1 open reservations" — a total
+ * that says the store owes nothing, beside a sentence saying it does. So the
+ * held amount is named alongside the available one, and the available total is
+ * never printed alone while reservations are open.
+ *
  * A total spanning several currencies is a bare sum of minor units, not an
  * amount, so it is described rather than formatted — printing it under one
- * currency code would be a smaller number than the truth in one currency and a
- * larger one in another.
+ * currency code would understate it in one currency and overstate it in
+ * another.
  */
 function outstandingSummary(record: HonorGuardRecord): string {
-  const reservations = `${record.open_reservations} open reservation${record.open_reservations === 1 ? "" : "s"}`;
+  const count = record.open_reservations;
+  const reservations = `${count} open reservation${count === 1 ? "" : "s"}`;
   if (record.currency === HONOR_GUARD_MIXED_CURRENCY) {
     return `Balances outstanding across more than one currency, and ${reservations}`;
   }
-  return `${Money.fromMinor(record.outstanding_minor, record.currency).format()} outstanding across ${reservations}`;
+
+  const available = Money.fromMinor(record.outstanding_minor, record.currency).format();
+  if (count === 0) return `${available} outstanding`;
+
+  // Older rows carry no held figure. Naming the count without a misleading
+  // total is the honest fallback.
+  if (record.held_minor === undefined) {
+    return `${available} available, plus an unmeasured amount held across ${reservations}`;
+  }
+  const held = Money.fromMinor(record.held_minor, record.currency).format();
+  return `${available} available plus ${held} held across ${reservations}`;
 }
 
 /**

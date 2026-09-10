@@ -64,6 +64,39 @@ async function insertPendingOrder(id: string): Promise<void> {
     ).run();
 }
 
+/**
+ * Close out any committed-but-unsettled reservation left by a previous case.
+ *
+ * The suites below isolate cases by advancing the clock and disabling leftover
+ * accounts. That is no longer enough: a committed reservation never expires,
+ * and the measurement now counts one against a *disabled* card too (WR-14) —
+ * deliberately, because that is still money. Releasing is not an option either;
+ * `gift_card_reservations_transition_guard` refuses to release anything already
+ * committed. Settling is the only way to close one, which is exactly what
+ * production does, so that is what this does.
+ */
+async function settleStrandedReservations(): Promise<void> {
+  const stranded = await env.DB.prepare(
+    `SELECT id, committed_order_id FROM gift_card_reservations
+     WHERE released_at IS NULL AND committed_at IS NOT NULL
+       AND committed_order_id IS NOT NULL
+       AND NOT EXISTS (
+         SELECT 1 FROM gift_card_ledger_entries entry
+         WHERE entry.reservation_id = gift_card_reservations.id
+           AND entry.entry_type = 'redemption'
+       )`,
+  ).all<{ id: string; committed_order_id: string }>();
+
+  const repository = createGiftCardRepository(env.DB);
+  for (const row of stranded.results ?? []) {
+    await repository.settleReservation({
+      reservationId: row.id,
+      orderId: row.committed_order_id,
+      settledAt: now,
+    });
+  }
+}
+
 describe("sumOutstandingGiftCardBalances on real D1", () => {
   beforeAll(async () => {
     await applyTestMigrations();
@@ -80,6 +113,7 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
     now = epoch + testSequence * 86_400;
     giftCardId = `gift_guard_${testSequence}`;
     hash = (testSequence + 0x1000).toString(16).padStart(64, "0");
+    await settleStrandedReservations();
     await env.DB.prepare(
       "UPDATE gift_card_accounts SET status = 'disabled', disabled_at = ? WHERE status = 'active'",
     ).bind(now).run();
@@ -90,6 +124,7 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
       outstandingMinor: 0,
       cardsWithBalance: 0,
       openReservations: 0,
+      heldMinor: 0,
       currency: null,
       currencyCount: 0,
     });
@@ -102,6 +137,7 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
       outstandingMinor: 1_000,
       cardsWithBalance: 1,
       openReservations: 0,
+      heldMinor: 0,
       currency: "USD",
       currencyCount: 1,
     });
@@ -116,6 +152,7 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
       outstandingMinor: 400,
       cardsWithBalance: 1,
       openReservations: 1,
+      heldMinor: 600,
       currency: "USD",
       currencyCount: 1,
     });
@@ -134,6 +171,7 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
       outstandingMinor: 1_000,
       cardsWithBalance: 1,
       openReservations: 0,
+      heldMinor: 0,
       currency: "USD",
       currencyCount: 1,
     });
@@ -159,6 +197,7 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
       outstandingMinor: 400,
       cardsWithBalance: 1,
       openReservations: 0,
+      heldMinor: 0,
       currency: "USD",
       currencyCount: 1,
     });
@@ -186,6 +225,7 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
       outstandingMinor: 0,
       cardsWithBalance: 0,
       openReservations: 1,
+      heldMinor: 600,
       currency: "USD",
       currencyCount: 1,
     });
@@ -211,8 +251,86 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
       outstandingMinor: 1_000,
       cardsWithBalance: 1,
       openReservations: 0,
+      heldMinor: 0,
       currency: "USD",
       currencyCount: 1,
+    });
+  });
+
+  it("still counts a committed, unsettled reservation after its card is disabled", async () => {
+    // WR-14. Scoping the count to active accounts alone re-opened CR-01's hole,
+    // narrowed to one card state: disabling a card mid-settlement dropped the
+    // measurement to zero and stranded the redemption on every retry. Nothing
+    // in the tree disables a card yet, but nothing stops it either — the status
+    // transition guard permits active -> disabled with an outstanding
+    // reservation, and settleReservation never checks account status.
+    const repository = createGiftCardRepository(env.DB);
+    await repository.issueAccount(issuance({ amount: Money.fromMinor(600, "USD") }));
+    await repository.reserve(reservation("reservation_committed_disabled"));
+    await insertPendingOrder("order_guard_committed_disabled");
+    await repository.commitReservation({
+      reservationId: "reservation_committed_disabled",
+      orderId: "order_guard_committed_disabled",
+      expectedAmount: Money.fromMinor(600, "USD"),
+      committedAt: now + 5,
+    });
+    await env.DB.prepare(
+      "UPDATE gift_card_accounts SET status = 'disabled', disabled_at = ? WHERE id = ?",
+    ).bind(now + 6, giftCardId).run();
+
+    // The card contributes nothing to the balance half — it is not active — so
+    // the reservation count is the only thing left holding honoring on.
+    await expect(sumOutstandingGiftCardBalances(env.DB, now)).resolves.toMatchObject({
+      outstandingMinor: 0,
+      cardsWithBalance: 0,
+      openReservations: 1,
+      heldMinor: 600,
+    });
+
+    await writeHonorGuard(env.DB, {
+      outstanding_minor: 0,
+      currency: "USD",
+      open_reservations: 1,
+      held_minor: 600,
+      measured_at: now,
+    });
+    await expect(resolveHonorEffective(
+      env.DB,
+      { giftCardAcquisition: false, giftCardReconciliation: false },
+      now,
+    )).resolves.toBe(true);
+  });
+
+  it("does not count an uncommitted reservation against a disabled card", async () => {
+    // The exception is committed reservations only. An uncommitted one holds no
+    // money the store has taken, and it expires on its own — counting it would
+    // pin honoring on for any abandoned checkout against a retired card.
+    const repository = createGiftCardRepository(env.DB);
+    await repository.issueAccount(issuance());
+    await repository.reserve(reservation("reservation_open_disabled"));
+    await env.DB.prepare(
+      "UPDATE gift_card_accounts SET status = 'disabled', disabled_at = ? WHERE id = ?",
+    ).bind(now + 1, giftCardId).run();
+
+    await expect(sumOutstandingGiftCardBalances(env.DB, now)).resolves.toMatchObject({
+      openReservations: 0,
+      heldMinor: 0,
+    });
+  });
+
+  it("reports the face value held by open reservations, not just how many there are", async () => {
+    // WR-15. `outstandingMinor` cannot carry this: the available-balance
+    // expression has already subtracted a committed reservation, so the money
+    // reads as zero on the card while it is plainly in flight.
+    const repository = createGiftCardRepository(env.DB);
+    await repository.issueAccount(issuance());
+    await repository.reserve(reservation("reservation_held_a", 250));
+    await repository.reserve(reservation("reservation_held_b", 150));
+
+    await expect(sumOutstandingGiftCardBalances(env.DB, now)).resolves.toMatchObject({
+      outstandingMinor: 600,
+      openReservations: 2,
+      heldMinor: 400,
     });
   });
 
@@ -246,6 +364,7 @@ describe("sumOutstandingGiftCardBalances on real D1", () => {
       outstandingMinor: 0,
       cardsWithBalance: 0,
       openReservations: 0,
+      heldMinor: 0,
       currency: null,
       currencyCount: 0,
     });
