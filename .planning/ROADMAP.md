@@ -82,12 +82,12 @@ Full phase details, success criteria, and plan lists: `milestones/v2.1-ROADMAP.m
   3. Honor cannot be turned off while any active balance or open reservation exists — the runtime refuses to start, or admin shows a loud warning naming the outstanding balance — and sell on with honor off still refuses to start
   4. An operator reading `docs/runtime-configuration.md` and `docs/DEPLOYMENT_SETUP.md` §9 finds the two flags described as sell and honor, with the four-state table and the "stop selling, keep honoring" rollback recipe
 
-**Plans**: 9 plans
+**Plans**: 1/9 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 13-01-PLAN.md — Tracer: tender follows honor, shared gift-card visibility predicate (wave 1)
+- [x] 13-01-PLAN.md — Tracer: tender follows honor, shared gift-card visibility predicate (wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -205,7 +205,7 @@ Plans:
 | 1-4 (v1 Hardening) | 17/17 | Complete | 2026-09-02 |
 | 5-8.2 (v2 Themeable Storefront) | 44/44 | Complete | 2026-09-05 |
 | 9-12 (v2.1 Gift Card Product) | 20/20 | Complete | 2026-09-10 |
-| 13. Gift-Card Flags | 0/9 | Not started | - |
+| 13. Gift-Card Flags | 1/9 | In Progress|  |
 | 14. Gift-Card Admin & Audit Trail | 0/? | Not started | - |
 | 15. Subscription Address In Place | 0/? | Not started | - |
 | 16. Blog Surfacing | 0/? | Not started | - |
