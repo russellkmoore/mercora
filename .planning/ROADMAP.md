@@ -85,14 +85,25 @@ Full phase details, success criteria, and plan lists: `milestones/v2.1-ROADMAP.m
 **Plans**: 9 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 13-01-PLAN.md — Tracer: tender follows honor, shared gift-card visibility predicate (wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 13-02-PLAN.md — Listing visibility at nine public call sites, admin listing untouched (wave 2)
 - [ ] 13-03-PLAN.md — Product page: unavailable notice under sell=off, 404 under both-off (wave 2)
 - [ ] 13-04-PLAN.md — Checkout: server-side sell=off rejection, cart mark, panel gated on honor (wave 2)
 - [ ] 13-05-PLAN.md — Honor guard: balance measurement, admin_settings record, critical event (wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 13-06-PLAN.md — Docs: sell/honor four-state table, rollback recipe, source-contract test (wave 3)
 - [ ] 13-07-PLAN.md — Cron measures and alarms; request-path honor override that still throws (wave 3)
 - [ ] 13-08-PLAN.md — Admin and public surface gating plus the outstanding-balance banner (wave 3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 13-09-PLAN.md — Phase gate: full CI, push to main, read-only production confirmation (wave 4)
 
 **UI hint**: yes
