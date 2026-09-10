@@ -45,6 +45,8 @@ import { toPublicProduct } from "@/lib/models/mach/product-serializer";
 import { notFound } from "next/navigation";
 import type { Product } from "@/lib/types";
 import { getLayoutSettings } from "@/lib/layout/settings";
+import { getStoreConfig } from "@/lib/store-config";
+import { filterListedProducts } from "@/lib/gift-cards/visibility";
 
 /**
  * Category page component that displays products for a specific category
@@ -70,9 +72,13 @@ export default async function CategoryPage({
   let error: string | null = null;
 
   try {
-    products = (await getProductsByCategory(category.id as string))
-      .filter((product) => product.status === "active")
-      .map(toPublicProduct);
+    const { giftCardAcquisition } = getStoreConfig().commerce.features;
+    products = filterListedProducts(
+      (await getProductsByCategory(category.id as string)).filter(
+        (product) => product.status === "active",
+      ),
+      { giftCardAcquisition },
+    ).map(toPublicProduct);
   } catch (e) {
     error = e instanceof Error ? e.message : 'Unknown error';
   }

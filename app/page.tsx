@@ -40,6 +40,8 @@ import { getProductsByCategory } from "@/lib/models/mach/products";
 import { toPublicProduct } from "@/lib/models/mach/product-serializer";
 import { getLayoutSettings } from "@/lib/layout/settings";
 import { HOME_HERO_MAP } from "@/components/layout/home/home-hero-map";
+import { getStoreConfig } from "@/lib/store-config";
+import { filterListedProducts } from "@/lib/gift-cards/visibility";
 
 /**
  * Home page component - main landing page for the application
@@ -48,8 +50,11 @@ import { HOME_HERO_MAP } from "@/components/layout/home/home-hero-map";
  */
 export default async function HomePage() {
   // Fetch only 3 featured products with optimized query
-  const featuredProducts = (await getProductsByCategory("cat_1"))
-    .filter((product) => product.status === "active")
+  const { giftCardAcquisition } = getStoreConfig().commerce.features;
+  const featuredProducts = filterListedProducts(
+    (await getProductsByCategory("cat_1")).filter((product) => product.status === "active"),
+    { giftCardAcquisition },
+  )
     .map(toPublicProduct)
     .slice(0, 3);
 

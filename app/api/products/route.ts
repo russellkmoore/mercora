@@ -16,6 +16,8 @@ import {
 } from "@/lib/models/mach/product-serializer";
 import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
 import { errorDetails } from "@/lib/utils/error-response";
+import { getStoreConfig } from "@/lib/store-config";
+import { filterListedProducts } from "@/lib/gift-cards/visibility";
 
 const PRODUCT_STATUSES = ['active', 'inactive', 'draft', 'archived'] as const;
 type ProductStatus = (typeof PRODUCT_STATUSES)[number];
@@ -76,13 +78,21 @@ export async function GET(request: NextRequest) {
         ? products.filter((product) => statusFilter.includes(product.status as ProductStatus))
         : products;
 
+    // Admin manages the gift card regardless of the sell flag (D-14); only
+    // the public branch loses it while selling is off.
+    const { giftCardAcquisition } = getStoreConfig().commerce.features;
+    const filterByVisibility = (products: Product[]): Product[] =>
+      isAdmin
+        ? products
+        : filterListedProducts(products, { giftCardAcquisition });
+
     let total: number;
     let products: Product[];
 
     if (category?.trim()) {
       // The category model is not status/pagination aware. Filter before
       // slicing so totals and links describe the same public result set.
-      const visibleProducts = filterByStatus(await getProductsByCategory(category.trim()));
+      const visibleProducts = filterByVisibility(filterByStatus(await getProductsByCategory(category.trim())));
       total = visibleProducts.length;
       products = visibleProducts.slice(offset, offset + limit);
     } else {
@@ -90,8 +100,8 @@ export async function GET(request: NextRequest) {
         listProducts({ status: statusFilter }),
         listProducts({ status: statusFilter, limit, offset }),
       ]);
-      total = filterByStatus(allProducts).length;
-      products = filterByStatus(page);
+      total = filterByVisibility(filterByStatus(allProducts)).length;
+      products = filterByVisibility(filterByStatus(page));
     }
 
     const responseProducts = (isAdmin
