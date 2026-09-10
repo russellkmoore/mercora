@@ -1,5 +1,28 @@
 # Milestones
 
+## v2.1 Gift Card Product (Shipped: 2026-09-10)
+
+**Delivered:** A shopper can buy a Voltique gift card on the storefront and the recipient receives it by email. The catalogue carries `prod_33` with four denominations and a Workers-AI image; the product page collects recipient email, name, note and an optional delivery date; an all-digital cart checks out with a billing step and no shipping; both gift-card key rings and both feature flags are live in production; Volt, the support article and the Terms of Service describe what ships; and one real $25 test-mode purchase on production issued a card and delivered the email. After the live proof, Russell's own checkout drove three more changes the same night: the gift-card code is applied on the Payment Information step with its own Apply/Remove (re-quoting in place and releasing the previous hold), the applied tender is labelled with the masked code, and the Account → Gift cards section was removed as a wrong idea.
+
+**Phases completed:** 4 phases (9, 10, 11, 12), 20 plans, 30 tasks
+**Timeline:** 2026-09-07 (Phase 9 discussion) → 2026-09-10 (close), 3 days
+**Git range:** `7026921` → `cf55fcd`, 177 commits
+**Code changes (excluding `.planning/`):** 69 files, +3,498 / −327 lines (66 code files outside `docs/`, +3,358 / −321)
+**Closeout:** verified_closeout — all 4 phases verified (10 and 12 by Russell via `/gsd-verify-work`), 18/18 requirements complete (SHOP-07's account-listing clause withdrawn by Russell). Known verification overrides: 5 newly acknowledged, 8 carried forward from a prior close (see STATE.md Deferred Items): three next-milestone todos and two UAT files already passed with 0 pending scenarios.
+**Tech debt accepted:** see `milestones/v2.1-MILESTONE-AUDIT.md` (Stripe Tax unavailable on the live account; `STORE_SUPPORT_EMAIL` placeholder and no routing rule for `orders@`; orphaned `/api/tax`; acquisition flag gates redemption not sales — redesigned as sell/honor in the next milestone seed; `order-effects` `{ DB }` fallback; pre-deploy carts with a URL in the note; production secret list missing `ORDER_STATUS_SECRET` and the unsubscribe secrets).
+**Unattended production changes (all accepted by Russell 2026-09-10):** fallback tax zero-rates nontaxable lines; `EMAIL_PROVIDER=cloudflare` and `STORE_SENDER_EMAIL` set (no transactional email had ever sent from production before); the cron now hands the worker env to the email sender; the buyer's note is delivered in the email.
+
+**Key accomplishments:**
+
+- Gift card catalogue product `prod_33` seeded idempotently, imaged with Workers AI, applied to production, never out of stock, nontaxable (`txcd_00000000`).
+- Product-page recipient form with server-parity validators, cart lines keyed by recipient and denomination, recipient details on four surfaces, and a three-step digital-only checkout.
+- Both gift-card key rings put into production as Worker secrets through non-echoing pipelines; flags rolled out reconciliation-first behind a blocking-human gate.
+- Support article, product copy and Terms §6 corrected to what the code does (scheduled delivery, note in the email, no expiry, no cash), re-indexed for Volt.
+- One real production purchase proved issuance and delivery end to end and surfaced four latent production defects (tax fallback, email provider, cron sender env, sender domain), all fixed and deployed.
+- Gift-card tender redesigned from Russell's live checkout: applied on the payment step with Apply/Remove, previous hold released on re-quote, masked code on the summary and receipt.
+
+---
+
 ## v2 Themeable Storefront (Shipped: 2026-09-05)
 
 **Delivered:** The Voltique storefront is skinnable without touching component code. A theme is one CSS file of 23 tokens in `themes/`, validated at build time, chosen from admin with swatch previews, and applied per request to the storefront, transactional emails, and the crash page. Three page templates expose enumerated layout switches set from admin. Seven presets ship. The docs were pruned from 28 files to 20 and rewritten product-neutral, with a root `AGENTS.md` a coding assistant can follow from clone to deploy.

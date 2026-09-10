@@ -1,0 +1,9 @@
+{
+  "workflow": {
+    "_auto_chain_active": false,
+    "use_worktrees": false
+  },
+  "git": {
+    "allow_default_branch_commits": true
+  }
+}

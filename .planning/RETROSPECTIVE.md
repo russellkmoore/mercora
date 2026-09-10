@@ -110,6 +110,59 @@
 
 ---
 
+## Milestone: v2.1 — Gift Card Product
+
+**Shipped:** 2026-09-10
+**Phases:** 4 (9, 10, 11, 12) | **Plans:** 20 | **Tasks:** 30 | **Commits:** 177 over 3 days (2026-09-07 to 2026-09-10)
+
+### What Was Built
+
+- Catalogue product `prod_33` with four denominations, a Workers-AI image, nontaxable classification, seeded as a sentinel block and applied to production by hand.
+- Recipient form with server-parity validators, cart identity by recipient + denomination, recipient details on four surfaces, digital-only checkout with a billing step.
+- Production enablement: two key rings as Worker secrets via non-echoing pipelines, flags rolled out reconciliation-first behind a blocking-human gate.
+- Content aligned to code (article, product copy, Terms §6), knowledge and product vectors upserted, Volt answering gift/present/voucher questions by name.
+- One real production purchase proving issuance and delivery; then, from Russell's own checkout, gift-card tender on the payment step with Apply/Remove and hold release.
+
+### What Worked
+
+- **The live proof was the real test.** Every unit and integration suite was green, and the first production purchase still found four defects (fallback tax on a nontaxable line, no email provider chosen, the cron sender without the worker env, a placeholder sender domain). Nothing but a real order through the real cron would have surfaced them.
+- **Unattended run with a decision log.** Russell left with "move forward with best assumption decisions"; every unattended change was recorded in STATE.md with alternatives, and he accepted the lot the next day after redeeming the card himself.
+- **Read-only tracer before production writes.** Phase 12 opened by proving the remote-binding harness could read D1, R2, Vectorize and AI before any script wrote anything; every later write reused the same harness with count-before/count-after proofs.
+- **Three review iterations on the fix commits.** Review found the article promising things the code did not do (scheduled delivery, the note) and the product copy still contradicting the article; the fix loop caught a dead regex and a paging alert on a successful delivery.
+- **The owner testing in a browser within the hour.** Two rounds of "nowhere to enter it" and "should not say other tender" reshaped the tender UX the same night.
+
+### What Was Inefficient
+
+- **A field nobody had ever looked at.** The gift-card code entry shipped with the v1 backend, in a box under the order summary that vanished after step 1. Phase 10 assumed it, the article described it from the code, and the deferred browser walkthrough was the only thing that would have caught it — the owner did.
+- **Silent failures in the cron.** Every cron tick logged "recovery queues drained" and no `cron.recovery_failed` while every delivery attempt was failing inside a bare `catch {}`. Eight attempts burned before anyone knew. Telemetry now carries a per-delivery failure event.
+- **Reservation semantics fought the retry.** A reload minted a new request key, so the first hold blocked the same card for 15 minutes and the server collapsed it into a generic error. Fixed with previous-order release, but the plan's `--resume` rule never matched what a browser does.
+- **Scope gate that could only fail.** 12-06's "no code under lib/" assertion was written for a phase that then had to fix production; it failed by design and was overridden with a stronger true statement. Write scope gates as "only these files", not "no files".
+- **Shell hazards again.** `noclobber` swallowed one commit message file; `rtk`'s grep rewrite made a live-page check return 0 regardless. Both known from v2.
+
+### Patterns Established
+
+- Production writes from a laptop go through the remote-binding harness or `wrangler d1 execute --file` with read-back before, read-back after, and a restore statement recorded in the SUMMARY.
+- Scripted purchases use only the publishable key plus `pm_card_visa`; the client secret is memory-only; proofs read named non-secret columns and never `code_*`.
+- Anything reached from the scheduled handler receives the worker `env` explicitly; `getCloudflareContext()` is a request-path convenience only.
+- Gift-card tender is applied on the payment step; every re-quote names the previous order so its hold and intent are released; the masked code (`GC-****-…-LMS7`) is the display form.
+- Human-facing copy (article, product description, Terms, helper text) is pinned by source-contract tests that assert the claim and reject its inverse.
+
+### Key Lessons
+
+1. Ship one real transaction through production before calling a flow done; test suites cannot see a missing env var, an unpicked provider, or a placeholder domain.
+2. A swallowed exception in a cron is worse than a crash: it looks healthy. Log or emit on every per-item failure.
+3. Verify UI claims by walking them in a browser, not by reading the component that renders them.
+4. Write scope assertions as allowlists so an unavoidable fix does not turn the gate into theatre.
+5. Requirements can be wrong: SHOP-07's account clause and the acquisition flag's meaning were both product mistakes, caught only by the owner using the thing.
+
+### Cost Observations
+
+- Model mix: opus for planner, checker, executors touching production, reviewers and fixers; sonnet for the article executor and security audit; orchestrator on the session model. Not measured precisely.
+- Sessions: roughly 4 across three days (one long unattended run with compactions, then an interactive night with the owner testing live).
+- Notable: the 12-05 purchase plan took about two hours of wall clock because of the tax halt, the email fix chain and three deploys; the four content/tracer plans ran 7–10 minutes each.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -118,6 +171,7 @@
 |-----------|----------|--------|------------|
 | v1 | ~8 | 4 | First GSD milestone; map + ingest drove requirements; tracer-then-parallel plan shape |
 | v2 | ~6 | 7 | Autonomous run with batched decisions; two inserted phases (6.1 scope, 8.1 debt) plus 8.2 docs; fail-first gates and screenshot diffs |
+| v2.1 | ~4 | 4 | Fully unattended run with a decision log; live production proof as the closing phase; owner-in-the-loop UX fixes the same night |
 
 ### Cumulative Quality
 
@@ -125,6 +179,7 @@
 |-----------|-------|----------|-------------------|
 | v1 | 233 unit files + Workers + observability suites; +65 tests in the audit's E2E sample | not measured | 1 (`lib/auth/deployment-guard.ts`, no new packages) |
 | v2 | 265 unit files (2,187 tests) + Workers (154) + observability suites | not measured | 2 zero-dep scripts (`build-themes.mjs`, `scan-hardcoded-colors.mjs`, `docs-lint.mjs`); Playwright added as a dev dependency for the screenshot harness |
+| v2.1 | 288 unit files (2,375 tests) + Workers (157) + observability (3) | not measured | 0 new packages; scratch scripts only |
 
 ### Top Lessons (Verified Across Milestones)
 
@@ -132,3 +187,5 @@
 2. Docs cite code; code is the source of truth. (v1, v2)
 3. Build the gate first and watch it fail before the sweep it guards. (v2)
 4. Verify visual claims by render, not by grep. (v2)
+5. One real transaction through production beats every green suite. (v2.1)
+6. A cron that swallows per-item errors looks healthy while failing. (v2.1)
