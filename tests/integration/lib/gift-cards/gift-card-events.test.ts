@@ -1,9 +1,21 @@
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { env } from "cloudflare:workers";
+import { drizzle } from "drizzle-orm/d1";
+import * as schema from "@/lib/db/schema";
 import { applyTestMigrations } from "../../helpers/d1";
 import { Money } from "@/lib/money";
 import { createGiftCardRepository } from "@/lib/gift-cards/repository";
 import type { IssueGiftCardInput } from "@/lib/gift-cards/domain";
+
+// `appendGiftCardEvent`/`listGiftCardEvents` go through `getDbAsync`, which
+// resolves the Cloudflare context via `getCloudflareContext` — unavailable
+// under the vitest-pool-workers integration harness. Same substitution as
+// `tests/integration/content-publication-models.test.ts`: bind Drizzle
+// straight to the real `env.DB` D1 database this suite already migrates.
+vi.mock("@/lib/db", () => ({
+  getDbAsync: async () => drizzle(env.DB, { schema }),
+}));
+
 import {
   GIFT_CARD_EVENT_TYPES,
   assertGiftCardEventDetails,
