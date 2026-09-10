@@ -22,10 +22,10 @@ Requirements for this milestone. Each maps to a roadmap phase.
 - [x] **GCA-01**: `/admin/gift-cards` lists cards with masked code (last group), issued amount, available balance, status, purchaser (or "admin: who"), recipient email, issuing order, delivery status, created date; searchable by recipient email, order id and last four characters; paginated
 - [x] **GCA-02**: A card detail page shows a timeline: issuance (order, purchaser, recipient, amount) or admin creation (who, reason), every hold and release, every redemption (order, amount), refunds to the card, disable/reissue events (date, who), and notes
 - [x] **GCA-03**: An admin can add a free-text note to a card (author and timestamp recorded)
-- [ ] **GCA-04**: An admin can disable a card with a reason; a disabled card cannot be redeemed, its ledger is preserved, and the action appears on the timeline
-- [ ] **GCA-05**: An admin can reissue a disabled card: a new card is issued for the remaining balance, emailed to the recipient (or an address the admin enters), and both cards' timelines link to each other
-- [ ] **GCA-06**: An admin can resend the delivery email, re-queue a `needs_review` delivery, and release a stuck hold, each recorded on the timeline
-- [ ] **GCA-07**: An admin can create a card (amount, recipient email, reason) that is issued and delivered like a purchased one, marked as admin-created with the admin's identity
+- [x] **GCA-04**: An admin can disable a card with a reason; a disabled card cannot be redeemed, its ledger is preserved, and the action appears on the timeline
+- [x] **GCA-05**: An admin can reissue a disabled card: a new card is issued for the remaining balance, emailed to the recipient (or an address the admin enters), and both cards' timelines link to each other
+- [x] **GCA-06**: An admin can resend the delivery email, re-queue a `needs_review` delivery, and release a stuck hold, each recorded on the timeline
+- [x] **GCA-07**: An admin can create a card (amount, recipient email, reason) that is issued and delivered like a purchased one, marked as admin-created with the admin's identity
 - [x] **GCA-08**: Card codes are never shown in admin by default; a reveal, if enabled by a documented setting, requires a confirm step and writes an audit event (decision recorded in the phase context)
 - [x] **GCA-09**: Human actions and notes persist in an expand-only `gift_card_events` migration; all admin gift-card APIs require admin auth and never return hash, ciphertext or nonce columns
 
@@ -93,10 +93,10 @@ Deferred to a later milestone.
 | GCA-01 | Phase 14 | Complete |
 | GCA-02 | Phase 14 | Complete |
 | GCA-03 | Phase 14 | Complete |
-| GCA-04 | Phase 14 | Pending |
-| GCA-05 | Phase 14 | Pending |
-| GCA-06 | Phase 14 | Pending |
-| GCA-07 | Phase 14 | Pending |
+| GCA-04 | Phase 14 | Complete |
+| GCA-05 | Phase 14 | Complete |
+| GCA-06 | Phase 14 | Complete |
+| GCA-07 | Phase 14 | Complete |
 | GCA-08 | Phase 14 | Complete |
 | GCA-09 | Phase 14 | Complete |
 | SUB-01 | Phase 15 | Pending |
