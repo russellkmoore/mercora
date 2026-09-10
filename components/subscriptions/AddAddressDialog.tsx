@@ -13,7 +13,7 @@ import type { MACHCustomerAddress } from "@/lib/types/mach/Customer";
 interface AddAddressDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSaved: (address: MACHCustomerAddress) => void;
+  onSaved: (address: MACHCustomerAddress) => void | Promise<void>;
 }
 
 export default function AddAddressDialog({ open, onOpenChange, onSaved }: AddAddressDialogProps) {
