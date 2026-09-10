@@ -11,9 +11,12 @@ import {
 } from '@/lib/commerce/capabilities';
 import {
   checkoutGiftCardCustomization,
+  GiftCardSalesDisabledError,
   hasPhysicalCheckoutLines,
   isGiftCardOrderLine,
 } from '@/lib/gift-cards/checkout';
+import { GIFT_CARD_PRODUCT_TYPE } from '@/lib/gift-cards/visibility';
+import { getStoreConfig } from '@/lib/store-config';
 import type { Address, CheckoutLineAllocation, OrderItem, Promotion } from '@/lib/types';
 import {
   allowedShippingCountries,
@@ -71,6 +74,15 @@ interface PricingDependencies {
   getPromotionById: typeof getPromotionById;
   getSettings: typeof getSettings;
   calculateTax: typeof calculateTax;
+  /**
+   * Sell — `STORE_FEATURE_GIFT_CARD_ACQUISITION` (D-01). Read here rather than
+   * taken from `options.capabilities`, which carries capability objects and no
+   * raw flags, and rather than from a `resolveRuntimeCommerceCapabilities()`
+   * round trip, which would touch the gift-card key ring to answer one boolean.
+   * Injectable so tests state the flag instead of mutating the environment; the
+   * request body never reaches it, so a hand-crafted cart cannot turn selling on.
+   */
+  giftCardSalesEnabled: () => boolean;
 }
 
 type TaxCalculation = Awaited<ReturnType<typeof calculateTax>>;
@@ -93,6 +105,7 @@ const defaultDependencies: PricingDependencies = {
   getPromotionById,
   getSettings,
   calculateTax,
+  giftCardSalesEnabled: () => getStoreConfig().commerce.features.giftCardAcquisition,
 };
 
 function localized(value: unknown): string {
@@ -533,6 +546,9 @@ export async function priceCheckout(
   }
 
   const seenLineIds = new Set<string>();
+  // Read once for the whole cart, not once per line: the answer cannot change
+  // mid-request and the read is a config lookup, not a lookup per line item.
+  const giftCardSalesEnabled = deps.giftCardSalesEnabled();
   const catalog = await Promise.all(input.items.map(async (line, index) => {
     if (
       !line ||
@@ -564,6 +580,9 @@ export async function priceCheckout(
     const unitPrice = Money.fromStored(variant.price);
     if (unitPrice.isNegative()) throw new Error(`Variant ${variantId} has an invalid catalog price`);
     const giftCardCustomization = checkoutGiftCardCustomization(line.giftCardCustomization);
+    if (product.type === GIFT_CARD_PRODUCT_TYPE && !giftCardSalesEnabled) {
+      throw new GiftCardSalesDisabledError();
+    }
     if (product.type === 'gift_card' && !giftCardCustomization) {
       throw new Error('Gift-card lines require recipient delivery details');
     }

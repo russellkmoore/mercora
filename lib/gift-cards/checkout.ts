@@ -3,6 +3,25 @@ import { parseGiftCardCustomization } from '@/lib/gift-cards/customization';
 import type { GiftCardCustomization } from '@/lib/types/cartitem';
 import type { OrderItem } from '@/lib/types/order';
 
+/**
+ * Selling is off, so a gift-card line cannot be priced or paid for (D-09).
+ *
+ * Distinct from `GiftCardTenderUnavailableError`, which means "that code did
+ * not work". A shopper holding a stale gift-card line and a shopper typing a
+ * bad code need different guidance, so `/api/payment-intent` maps this to its
+ * own response code (D-16).
+ *
+ * It lives here rather than in `lib/gift-cards/capability.ts` because that
+ * module pulls in the gift-card repository and key ring; the pricing service
+ * and the payment-intent route both need this class without paying for either.
+ */
+export class GiftCardSalesDisabledError extends Error {
+  constructor() {
+    super("Gift-card sales are disabled");
+    this.name = "GiftCardSalesDisabledError";
+  }
+}
+
 export interface GiftCardOrderLineSnapshot {
   lineId: string;
   recipientEmail: string;

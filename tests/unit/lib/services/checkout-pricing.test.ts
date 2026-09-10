@@ -916,34 +916,30 @@ describe('gift-card sales flag (sell) at pricing time', () => {
   });
 
   /**
-   * Sell is off. The dependency is injected rather than read from the
-   * environment so the assertion is about `priceCheckout`'s decision, not
-   * about how a test process happens to be configured.
+   * A catalogue with one gift-card product beside the ordinary one. Every case
+   * below injects the sell flag explicitly rather than reading it from the
+   * environment, so each assertion states the flag it is about.
    */
-  function sellOffDependencies(overrides: Record<string, unknown> = {}) {
-    return dependencies({
-      giftCardSalesEnabled: vi.fn(() => false),
-      getProduct: vi.fn(async (id: string) => id === 'gift_product'
-        ? {
-            id, name: 'Gift card', type: 'gift_card', fulfillment_type: 'digital',
-            status: 'active', tax_category: 'txcd_99999999', default_variant_id: 'gift_variant',
-          }
-        : {
-            id, name: 'Catalog name', status: 'active', categories: ['category-1'],
-            tax_category: 'txcd_99999999', default_variant_id: 'var_1',
-          }),
-      getProductVariant: vi.fn(async (id: string) => id === 'gift_variant'
-        ? {
-            id, product_id: 'gift_product', sku: 'GIFT', status: 'active',
-            option_values: [], shipping_required: false, price: Money.fromMinor(2_500).toJSON(),
-          }
-        : {
-            id, product_id: 'prod_1', sku: 'SKU-1', status: 'active',
-            option_values: [], price: Money.fromMinor(2_000).toJSON(),
-          }),
-      ...overrides,
-    });
-  }
+  const catalogue = () => ({
+    getProduct: vi.fn(async (id: string) => id === 'gift_product'
+      ? {
+          id, name: 'Gift card', type: 'gift_card', fulfillment_type: 'digital',
+          status: 'active', tax_category: 'txcd_99999999', default_variant_id: 'gift_variant',
+        }
+      : {
+          id, name: 'Catalog name', status: 'active', categories: ['category-1'],
+          tax_category: 'txcd_99999999', default_variant_id: 'var_1',
+        }),
+    getProductVariant: vi.fn(async (id: string) => id === 'gift_variant'
+      ? {
+          id, product_id: 'gift_product', sku: 'GIFT', status: 'active',
+          option_values: [], shipping_required: false, price: Money.fromMinor(2_500).toJSON(),
+        }
+      : {
+          id, product_id: 'prod_1', sku: 'SKU-1', status: 'active',
+          option_values: [], price: Money.fromMinor(2_000).toJSON(),
+        }),
+  });
 
   const giftLine = {
     lineId: 'line_0123456789abcdef', productId: 'gift_product', variantId: 'gift_variant', quantity: 1,
@@ -959,7 +955,7 @@ describe('gift-card sales flag (sell) at pricing time', () => {
       items: [giftLine],
       shippingAddress: address,
       shippingMethodId: '',
-    }, { dependencies: sellOffDependencies() as any }));
+    }, { dependencies: dependencies({ giftCardSalesEnabled: vi.fn(() => false), ...catalogue() }) as any }));
 
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).name).toBe('GiftCardSalesDisabledError');
@@ -971,7 +967,7 @@ describe('gift-card sales flag (sell) at pricing time', () => {
       items: [{ productId: 'prod_1', variantId: 'var_1', quantity: 1 }],
       shippingAddress: address,
       shippingMethodId: 'standard',
-    }, { dependencies: sellOffDependencies() as any });
+    }, { dependencies: dependencies({ giftCardSalesEnabled: vi.fn(() => false), ...catalogue() }) as any });
 
     expect(quote.total).toEqual({ amount: 2_700, currency: 'USD' });
   });
@@ -989,7 +985,7 @@ describe('gift-card sales flag (sell) at pricing time', () => {
       giftCardToken: 'GC-2345-2345-2345-2345-2345-2345-2345',
       giftCardRequestKey: 'checkout-gift-1',
     }, {
-      dependencies: sellOffDependencies() as any,
+      dependencies: dependencies({ giftCardSalesEnabled: vi.fn(() => false), ...catalogue() }) as any,
       capabilities: {
         giftCards: { resolveTender, verifyReservedTender: vi.fn(), applyTender: vi.fn() },
         subscriptions: { orderPaid: vi.fn() },
@@ -1014,7 +1010,7 @@ describe('gift-card sales flag (sell) at pricing time', () => {
       giftCardToken: 'GC-2345-2345-2345-2345-2345-2345-2345',
       giftCardRequestKey: 'checkout-gift-2',
     }, {
-      dependencies: sellOffDependencies() as any,
+      dependencies: dependencies({ giftCardSalesEnabled: vi.fn(() => false), ...catalogue() }) as any,
       capabilities: {
         giftCards: { resolveTender, verifyReservedTender: vi.fn(), applyTender: vi.fn() },
         subscriptions: { orderPaid: vi.fn() },
