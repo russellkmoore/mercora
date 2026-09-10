@@ -98,3 +98,34 @@ describe("SUB-02 source contract: one shared address form, one save path", () =>
     }
   });
 });
+
+describe("SUB-01/SUB-03 source contract: the subscription-PDP modal is the second AddressForm consumer", () => {
+  const dialogSource = readFileSync("components/subscriptions/AddAddressDialog.tsx", "utf8");
+
+  it("AddAddressDialog renders the shared account AddressForm locked to shipping, in create mode", () => {
+    expect(dialogSource).toContain("@/components/account/AddressForm");
+    expect(dialogSource).toContain('lockType="shipping"');
+    expect(dialogSource).toContain('mode="create"');
+  });
+
+  it("AddAddressDialog carries no field markup of its own", () => {
+    for (const key of ADDRESS_FORM_STATE_KEYS) {
+      expect(occurrences(dialogSource, `name="${key}"`)).toBe(0);
+    }
+  });
+
+  it("the directory walk still finds exactly one file with the field list now that components/subscriptions/ has gained a file", () => {
+    const candidates = [
+      ...listTsxFiles("components/account"),
+      ...listTsxFiles("components/subscriptions"),
+    ];
+    const filesWithLine1 = candidates.filter((file) =>
+      readFileSync(file, "utf8").includes('name="line1"'),
+    );
+    expect(filesWithLine1).toEqual(["components/account/AddressForm.tsx"]);
+  });
+
+  it("never persists or logs address field values", () => {
+    expect(dialogSource).not.toMatch(/localStorage|sessionStorage|console\.(?:log|error)/);
+  });
+});
