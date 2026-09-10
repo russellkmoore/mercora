@@ -1,7 +1,10 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
-import { GIFT_CARD_EVENT_FORBIDDEN_DETAIL_KEYS } from "@/lib/gift-cards/events";
+import {
+  GIFT_CARD_EVENT_FORBIDDEN_DETAIL_KEYS,
+  assertGiftCardEventDetails,
+} from "@/lib/gift-cards/events";
 
 /**
  * === D-14/GCA-09: the forbidden-column source contract ===
@@ -69,9 +72,14 @@ function collectRouteFiles(dir: string): string[] {
   return files;
 }
 
-/** D-14's six named columns, plus the general ledger business-key column. */
+/**
+ * D-14's six named columns, plus the general ledger business-key column.
+ * Only the column-shaped (snake_case) keys are source-scanned: the bare
+ * `code` key (UF-14-3) is a runtime details rule, and as a substring it would
+ * match `code_suffix`, `maskedCode` and every comment about codes.
+ */
 const FORBIDDEN_COLUMNS: readonly string[] = [
-  ...GIFT_CARD_EVENT_FORBIDDEN_DETAIL_KEYS,
+  ...GIFT_CARD_EVENT_FORBIDDEN_DETAIL_KEYS.filter((key) => key.includes("_")),
   "business_key",
 ];
 
@@ -134,6 +142,16 @@ const routeEntries: ScannedFile[] = collectRouteFiles(join(root, ROUTE_DIR)).map
 const allEntries = [...coreEntries, ...routeEntries];
 
 describe("gift-card admin read paths never carry code material (D-14, GCA-09)", () => {
+  it("lists the six D-14 columns plus the bare bearer-code key, and refuses `code` in event details at runtime (UF-14-3)", () => {
+    expect(GIFT_CARD_EVENT_FORBIDDEN_DETAIL_KEYS).toContain("code");
+    expect(FORBIDDEN_COLUMNS).toHaveLength(7);
+    expect(() => assertGiftCardEventDetails({ code: "GC-2345-6789-2345-6789-2345-6789-2345" })).toThrow(TypeError);
+    expect(() => assertGiftCardEventDetails({ Code: "x" })).toThrow(TypeError);
+    expect(() => assertGiftCardEventDetails({ nested: { code: "x" } })).toThrow(TypeError);
+    // Display material stays allowed: only the exact bearer-code key is refused.
+    expect(() => assertGiftCardEventDetails({ codeSuffix: "AB12", code_suffix: "AB12", maskedCode: "GC-****-AB12" })).not.toThrow();
+  });
+
   it("scanned a non-empty, real file set", () => {
     // The three core modules are hardcoded paths, not a glob — an empty or
     // misconfigured glob pattern can never fake this assertion.
