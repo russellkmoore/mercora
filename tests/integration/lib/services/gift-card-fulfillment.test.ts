@@ -17,6 +17,7 @@ import {
   drainGiftCardDeliveries,
   fulfillPaidGiftCards,
   issueAdminGiftCard,
+  resendGiftCardDelivery,
 } from '@/lib/services/gift-card-fulfillment';
 import { TELEMETRY_MARKER } from '@/lib/observability/telemetry';
 import { TAIL_CRITICAL_EVENTS } from '@/workers/observability-tail/src/core';
@@ -81,6 +82,19 @@ async function insertOrder(order: Order): Promise<void> {
       new Date(now * 1_000).toISOString(),
       new Date(now * 1_000).toISOString(),
     ).run();
+}
+
+/** Issue and immediately deliver one gift-card order, for resend tests that need a `sent` row. */
+async function issueAndDeliver(): Promise<{ order: Order; deliveryId: string; giftCardId: string }> {
+  const order = giftOrder();
+  await insertOrder(order);
+  mocks.send.mockResolvedValueOnce({ success: true, id: 'setup-send' });
+  await fulfillPaidGiftCards(order, { environment: runtimeEnvironment(), now });
+  const row = await env.DB.prepare(`SELECT id AS delivery_id, gift_card_id
+    FROM gift_card_deliveries WHERE order_id = ?`).bind(order.id)
+    .first<{ delivery_id: string; gift_card_id: string }>();
+  if (!row) throw new Error('setup: delivery row missing after fulfillPaidGiftCards');
+  return { order, deliveryId: row.delivery_id, giftCardId: row.gift_card_id };
 }
 
 beforeAll(async () => {
@@ -474,5 +488,118 @@ describe('admin-created gift card (D-07, D-19)', () => {
     const delivery = await env.DB.prepare(`SELECT status FROM gift_card_deliveries WHERE gift_card_id = ?`)
       .bind(created.giftCardId).first<{ status: string }>();
     expect(delivery?.status).toBe('sent');
+  });
+});
+
+interface DeliverySnapshot {
+  status: string;
+  attempt_count: number;
+  completed_at: number | null;
+  claim_token: string | null;
+  lease_expires_at: number | null;
+}
+
+async function deliverySnapshot(deliveryId: string): Promise<DeliverySnapshot | null> {
+  return env.DB.prepare(`SELECT status, attempt_count, completed_at, claim_token, lease_expires_at
+    FROM gift_card_deliveries WHERE id = ?`).bind(deliveryId).first<DeliverySnapshot>();
+}
+
+describe('gift-card delivery resend (D-08, D-21)', () => {
+  it('resends a sent delivery to the original recipient with the caller-supplied idempotency key, leaving the delivery row unchanged', async () => {
+    const { order, deliveryId } = await issueAndDeliver();
+    const before = await deliverySnapshot(deliveryId);
+    const rowBefore = await env.DB.prepare(`SELECT email_idempotency_key FROM gift_card_deliveries WHERE id = ?`)
+      .bind(deliveryId).first<{ email_idempotency_key: string }>();
+
+    mocks.send.mockResolvedValueOnce({ success: true, id: 'resend-1' });
+    const key = `gift-card-resend/${deliveryId}/evt-1`;
+    const result = await resendGiftCardDelivery({
+      deliveryId, idempotencyKey: key, environment: runtimeEnvironment(), now: now + 100,
+    });
+    expect(result).toEqual({ sent: true });
+
+    const [message, options] = mocks.send.mock.calls.at(-1) as [
+      { to: string; text: string }, { idempotencyKey: string },
+    ];
+    expect(message.to).toBe(order.items[0].gift_card!.recipientEmail);
+    expect(message.text).toContain('Code: ');
+    expect(options.idempotencyKey).toBe(key);
+    expect(options.idempotencyKey).not.toBe(rowBefore?.email_idempotency_key);
+
+    const after = await deliverySnapshot(deliveryId);
+    expect(after).toEqual(before);
+  });
+
+  it('resends a needs_review delivery', async () => {
+    const { deliveryId } = await issueAndDeliver();
+    await env.DB.prepare(`UPDATE gift_card_deliveries SET status = 'needs_review' WHERE id = ?`)
+      .bind(deliveryId).run();
+
+    mocks.send.mockResolvedValueOnce({ success: true, id: 'resend-2' });
+    const result = await resendGiftCardDelivery({
+      deliveryId, idempotencyKey: `gift-card-resend/${deliveryId}/evt-2`,
+      environment: runtimeEnvironment(), now: now + 100,
+    });
+    expect(result).toEqual({ sent: true });
+    expect(mocks.send).toHaveBeenCalledTimes(2); // setup send + this resend
+  });
+
+  it('refuses a pending delivery without sending', async () => {
+    const order = giftOrder();
+    order.items[0].gift_card!.deliveryDate = '2031-01-01';
+    await insertOrder(order);
+    await fulfillPaidGiftCards(order, { environment: runtimeEnvironment(), now });
+    const row = await env.DB.prepare(`SELECT id FROM gift_card_deliveries WHERE order_id = ?`)
+      .bind(order.id).first<{ id: string }>();
+
+    const before = mocks.send.mock.calls.length;
+    const result = await resendGiftCardDelivery({
+      deliveryId: row!.id, idempotencyKey: `gift-card-resend/${row!.id}/evt-3`,
+      environment: runtimeEnvironment(), now: now + 1,
+    });
+    expect(result).toEqual({ sent: false, reason: 'not_resendable' });
+    expect(mocks.send.mock.calls.length).toBe(before);
+  });
+
+  it('sends to an admin-supplied address instead of the original recipient when `to` is provided', async () => {
+    const { deliveryId } = await issueAndDeliver();
+    mocks.send.mockResolvedValueOnce({ success: true, id: 'resend-4' });
+    const result = await resendGiftCardDelivery({
+      deliveryId, to: 'fraud-recovery@example.test',
+      idempotencyKey: `gift-card-resend/${deliveryId}/evt-4`,
+      environment: runtimeEnvironment(), now: now + 100,
+    });
+    expect(result).toEqual({ sent: true });
+    const [message] = mocks.send.mock.calls.at(-1) as [{ to: string }];
+    expect(message.to).toBe('fraud-recovery@example.test');
+  });
+
+  it('refuses a delivery whose ciphertext is absent', async () => {
+    const { deliveryId } = await issueAndDeliver();
+    await env.DB.prepare(`UPDATE gift_card_deliveries SET code_ciphertext = NULL,
+      code_nonce = NULL, code_key_version = NULL WHERE id = ?`).bind(deliveryId).run();
+
+    const before = mocks.send.mock.calls.length;
+    const result = await resendGiftCardDelivery({
+      deliveryId, idempotencyKey: `gift-card-resend/${deliveryId}/evt-5`,
+      environment: runtimeEnvironment(), now: now + 100,
+    });
+    expect(result).toEqual({ sent: false, reason: 'code_unavailable' });
+    expect(mocks.send.mock.calls.length).toBe(before);
+  });
+
+  it('reports a sender failure to the caller and leaves the delivery row untouched', async () => {
+    const { deliveryId } = await issueAndDeliver();
+    const before = await deliverySnapshot(deliveryId);
+
+    mocks.send.mockResolvedValueOnce({ success: false, error: 'temporary provider failure' });
+    const result = await resendGiftCardDelivery({
+      deliveryId, idempotencyKey: `gift-card-resend/${deliveryId}/evt-6`,
+      environment: runtimeEnvironment(), now: now + 100,
+    });
+    expect(result).toEqual({ sent: false, reason: 'send_failed' });
+
+    const after = await deliverySnapshot(deliveryId);
+    expect(after).toEqual(before);
   });
 });
