@@ -126,8 +126,7 @@ describe("the generic settings writer refuses the gift-card honor guard (CR-02, 
     ]));
 
     expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.code).not.toBe("honor_guard_read_only");
+    expect(await response.json()).not.toMatchObject({ code: "honor_guard_read_only" });
     expect(mocks.getDbAsync).toHaveBeenCalled();
   });
 
