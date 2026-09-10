@@ -1,10 +1,10 @@
 ---
 phase: 14-gift-card-admin-audit-trail
-fixed_at: 2026-09-10T22:23:00Z
+fixed_at: 2026-09-10T22:44:00Z
 review_path: .planning/phases/14-gift-card-admin-audit-trail/14-REVIEW.md
-iteration: 2
-findings_in_scope: 21
-fixed: 21
+iteration: 3
+findings_in_scope: 26
+fixed: 26
 skipped: 0
 status: all_fixed
 ---
@@ -118,8 +118,37 @@ Per-fix verification was typecheck plus the directly affected suites: reveal / d
 
 None.
 
+## Iteration 3 (security advisories)
+
+**Fixed at:** 2026-09-10T22:44:00Z
+**Source:** Phase 14 security audit batch from the coordinator (A-1, A-2, A-3, UF-14-2, UF-14-3). The admin-page server gate (`middleware.ts`, `lib/auth/admin-session.ts`, `app/admin/gift-cards/page.tsx`, `app/admin/gift-cards/[id]/page.tsx`) is the coordinator's own change and was not touched here.
+**Summary:** 5 in scope, 5 fixed, 0 skipped. Five commits on `main`, explicit-path adds, no push.
+
+| ID | Status | Commit | What changed |
+| --- | --- | --- | --- |
+| A-1 | fixed | `a805daf` | 401 unit cases for `release-hold` and `resend` in `admin-gift-cards-actions.test.ts`, each also pinning that the Cloudflare context, the repository, the sender and the event writer are never touched. |
+| A-2 | fixed | `062d2f9` | Resend now audits BEFORE sending, mirroring reveal: `delivery_resent { to }` is written first (its pre-minted id is what the D-08 idempotency key is built from); if that write fails nothing is sent (503). On any non-sent outcome or thrown error a best-effort `delivery_resend_failed { to, reason }` is appended (`not_resendable` / `code_unavailable` / `send_failed` / `exception`). New event type in `GIFT_CARD_EVENT_TYPES` (11 members) and the timeline labels. Unit cases: event-before-send ordering, no send when the audit write fails, reason recorded per outcome, and a failed failure-write not changing the answer. Chose "write `delivery_resent` first" over a separate `delivery_resend_requested` type to keep D-08's event name and the reveal pattern. |
+| A-3 | fixed | `9329634` | `repository.issueAccountWithEvents(input, events)` batches the issuance statements with `giftCardEventStatement` rows; a new `onceOnly` form (`INSERT … SELECT … WHERE NOT EXISTS`) means an idempotent retry cannot double the event. `issueAdminGiftCard` now takes `actor` and `reason` (validated with `assertGiftCardReason`) and writes `admin_created { reason, amount_minor, recipient_email }` inside that batch; the create route passes them through and no longer appends an event. Integration tests: exactly one event with the right actor/details and none added on retry; a delivery-id collision injected inside the batch leaves neither card nor event; a suite-wide invariant that every admin-created account has exactly one `admin_created` event. Unit tests for the route assert the actor/reason are passed and `appendGiftCardEvent` is never called. |
+| UF-14-2 | fixed | `994e3d8` | The forbidden-columns source contract also scans the six camelCase forms (`codeHash`, `codeCiphertext`, `codeNonce`, `codeKeyVersion`, `claimToken`, `emailIdempotencyKey`) over the same file set, with an exact-block allow-list for the reissue route's write-side block (hash + encrypt the new card's code, hand it to `repository.reissue`). A second test pins that the allow-listed block still exists and never builds a response, so a moved block cannot quietly escape the scan. |
+| UF-14-3 | fixed | `5f77256` | `"code"` added to `GIFT_CARD_EVENT_FORBIDDEN_DETAIL_KEYS`; matching is exact after normalisation, so `code_suffix` / `codeSuffix` / `maskedCode` stay allowed. The two consumers that substring-matched the list were adjusted (the source scan keeps only snake_case names; the detail-route response check now walks JSON keys). Runtime cases in the forbidden-columns unit suite and the events integration suite. |
+
+### Verification (main checkout, after `5f77256`)
+
+| Gate | Result |
+| --- | --- |
+| `npm run lint` | 0 errors, 54 warnings (unchanged; none in touched files beyond the two pre-existing mount-effect notes) |
+| `npm run typecheck` | clean |
+| `mise exec -- npm test` | 307 files, 2757 passed (+20 over iteration 2) |
+| `mise exec -- npm run test:workers` | 31 files, 249 passed (+3 over iteration 2) |
+
+No gift-card code or secret was printed (test fixtures use the existing mock `GC-2345-…` literal only); no `.env*.local` / `.dev.vars` read; no deploy; nothing pushed.
+
+### Iteration 3 skipped issues
+
+None.
+
 ---
 
-_Fixed: 2026-09-10T22:23:00Z_
+_Fixed: 2026-09-10T22:44:00Z_
 _Fixer: Claude (gsd-code-fixer)_
-_Iteration: 2_
+_Iteration: 3_
