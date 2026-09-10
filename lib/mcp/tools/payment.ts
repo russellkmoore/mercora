@@ -6,6 +6,10 @@ import {
   type McpCheckoutRequest,
 } from '../checkout';
 import { requireOwnedSession } from '../session';
+import {
+  GIFT_CARD_SALES_DISABLED_MESSAGE,
+  GiftCardSalesDisabledError,
+} from '../../gift-cards/checkout';
 import type { MCPToolResponse } from '../types';
 
 export interface AgentPaymentIntentResponse {
@@ -87,6 +91,24 @@ export async function createAgentPaymentIntent(
     };
   } catch (error) {
     console.error('[mcp] PaymentIntent creation failed:', error);
+    // A stopped gift-card sale is a specific, actionable state, not a checkout
+    // failure. The browser client gets `gift_card_sales_disabled` from
+    // `/api/payment-intent`; an agent given only 'CHECKOUT_FAILED' has nothing
+    // to branch on and will retry a checkout that can never succeed while the
+    // card is in the cart (D-16, WR-10).
+    if (error instanceof GiftCardSalesDisabledError) {
+      return {
+        success: false,
+        data: EMPTY_PAYMENT_INTENT,
+        context: { session_id: sessionId, agent_id: agentId, processing_time_ms: Date.now() - startTime },
+        error: { code: 'GIFT_CARD_SALES_DISABLED', message: GIFT_CARD_SALES_DISABLED_MESSAGE },
+        metadata: {
+          can_fulfill_percentage: 0,
+          estimated_satisfaction: 0,
+          next_actions: ['Remove the gift-card line from the cart', 'Retry checkout'],
+        },
+      };
+    }
     return {
       success: false,
       data: EMPTY_PAYMENT_INTENT,
