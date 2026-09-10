@@ -105,8 +105,11 @@ describe("SUB-02 source contract: one shared address form, one save path", () =>
   });
 
   it("uses the correct ARIA role for error vs success messages", () => {
-    expect(formSource).toContain('role="alert"');
-    expect(formSource).toContain('role="status"');
+    // Pairing, not presence: swapping the roles must fail.
+    expect(formSource).toMatch(/message\.kind === "error" && \(\s*<p role="alert"/);
+    expect(formSource).toMatch(/message\.kind === "success" && \(\s*<p role="status"/);
+    expect(occurrences(formSource, '<p role="alert"')).toBe(1);
+    expect(occurrences(formSource, '<p role="status"')).toBe(1);
   });
 
   it("never persists or logs address field values", () => {
