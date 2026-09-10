@@ -15,7 +15,7 @@ import {
 } from '@/lib/services/inventory-adjustments';
 import { recordTelemetry } from '@/lib/observability/telemetry';
 import { resolveRuntimeCommerceCapabilities } from '@/lib/commerce/runtime';
-import { hasPhysicalCheckoutLines } from '@/lib/gift-cards/checkout';
+import { GiftCardSalesDisabledError, hasPhysicalCheckoutLines } from '@/lib/gift-cards/checkout';
 import { finalizeZeroCashGiftOrder } from '@/lib/services/order-finalization';
 import { getOrderById } from '@/lib/models/mach/orders';
 import { GiftCardTenderUnavailableError } from '@/lib/gift-cards/capability';
@@ -44,6 +44,15 @@ interface PaymentIntentRequest {
 
 const GIFT_CARD_UNAVAILABLE_MESSAGE =
   "That gift card couldn't be applied. Check the code, or if you just tried it, its hold clears within 15 minutes.";
+
+/**
+ * Deliberately not `GIFT_CARD_UNAVAILABLE_MESSAGE`: that one asks the shopper
+ * to check a code, which is useless advice to someone whose cart holds a gift
+ * card the store has stopped selling. Different problem, different next step
+ * (D-16).
+ */
+const GIFT_CARD_SALES_DISABLED_MESSAGE =
+  "Gift cards aren't on sale right now. Remove the gift card from your cart to continue checking out.";
 
 async function releasePreviousCheckout(
   previousOrderId: string,
@@ -159,6 +168,12 @@ export async function POST(request: NextRequest) {
     recordTelemetry('payment.pricing_rejected', {
       operation: 'validate', outcome: 'rejected', path: '/api/payment-intent',
     }, error);
+    if (error instanceof GiftCardSalesDisabledError) {
+      return NextResponse.json(
+        { error: GIFT_CARD_SALES_DISABLED_MESSAGE, code: 'gift_card_sales_disabled' },
+        { status: 400 }
+      );
+    }
     if (error instanceof GiftCardTenderUnavailableError || error instanceof GiftCardConflictError) {
       return NextResponse.json(
         { error: GIFT_CARD_UNAVAILABLE_MESSAGE, code: 'gift_card_unavailable' },
