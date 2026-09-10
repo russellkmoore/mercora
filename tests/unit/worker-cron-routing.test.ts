@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   regenerateAnalytics: vi.fn(),
   runRecommendationCron: vi.fn(),
   recordTelemetry: vi.fn(),
+  runGiftCardHonorGuard: vi.fn(),
 }));
 
 vi.mock('@/lib/services/order-effects', () => ({
@@ -27,7 +28,14 @@ vi.mock('@/lib/recommendations/cron', () => ({
 vi.mock('@/lib/observability/telemetry', () => ({
   recordTelemetry: mocks.recordTelemetry,
 }));
+// Only the cron's entry point is mocked. Stubbing this one module keeps the
+// gift-card repository, its aggregate SQL and the runtime capability factory
+// out of a test that is about scheduled routing, not about measurement.
+vi.mock('@/lib/gift-cards/honor-guard', () => ({
+  runGiftCardHonorGuard: mocks.runGiftCardHonorGuard,
+}));
 
+import { noOpCommerceCapabilities } from '@/lib/commerce/capabilities';
 import { handleScheduled } from '@/lib/observability/scheduled';
 
 function controller(cron: string): ScheduledController {
@@ -48,7 +56,17 @@ beforeEach(() => {
   mocks.drainGiftCardDeliveries.mockResolvedValue({ attempted: 0 });
   mocks.regenerateAnalytics.mockResolvedValue(undefined);
   mocks.runRecommendationCron.mockResolvedValue(undefined);
+  mocks.runGiftCardHonorGuard.mockResolvedValue({
+    honorEffective: true,
+    record: { outstanding_minor: 0, currency: 'USD', open_reservations: 0, measured_at: 0 },
+  });
 });
+
+/** The capabilities object the order-effects drain was handed on this tick. */
+function drainedCapabilities() {
+  const [call] = mocks.drainOrderEffects.mock.calls;
+  return (call?.[0] as { capabilities: typeof noOpCommerceCapabilities }).capabilities;
+}
 
 describe('Worker scheduled routing behavior', () => {
   it('reports recovery failure through the bounded critical event and settles waitUntil', async () => {
@@ -93,6 +111,78 @@ describe('Worker scheduled routing behavior', () => {
     handleScheduled(controller('*/5 * * * *'), { DB: {} } as CloudflareEnv, ctx);
     await Promise.all(waits);
     expect(mocks.drainGiftCardDeliveries).not.toHaveBeenCalled();
+  });
+
+  it('measures outstanding gift-card value on every five-minute tick', async () => {
+    const { ctx, waits } = context();
+    const database = {} as D1Database;
+    const runtime = {
+      DB: database,
+      STORE_FEATURE_GIFT_CARD_RECONCILIATION: 'false',
+    } as unknown as CloudflareEnv;
+
+    handleScheduled(controller('*/5 * * * *'), runtime, ctx);
+    await Promise.all(waits);
+
+    expect(mocks.runGiftCardHonorGuard).toHaveBeenCalledTimes(1);
+    const [passedDatabase, configuredHonor, nowSeconds] = mocks.runGiftCardHonorGuard.mock.calls[0];
+    // The scheduled handler already holds the binding; it must not reach for
+    // getCloudflareContext to rediscover it.
+    expect(passedDatabase).toBe(database);
+    expect(configuredHonor).toBe(false);
+    expect(nowSeconds).toBeTypeOf('number');
+  });
+
+  it('keeps honoring on the drained capabilities while the guard finds outstanding value', async () => {
+    const { ctx, waits } = context();
+    mocks.runGiftCardHonorGuard.mockResolvedValue({
+      honorEffective: true,
+      record: { outstanding_minor: 4_500, currency: 'USD', open_reservations: 1, measured_at: 10 },
+    });
+
+    handleScheduled(controller('*/5 * * * *'), {
+      DB: {} as D1Database,
+      STORE_FEATURE_GIFT_CARD_RECONCILIATION: 'false',
+    } as unknown as CloudflareEnv, ctx);
+    await Promise.all(waits);
+
+    expect(drainedCapabilities().giftCards).not.toBe(noOpCommerceCapabilities.giftCards);
+  });
+
+  it('leaves honoring disabled once the guard reports nothing outstanding', async () => {
+    const { ctx, waits } = context();
+    mocks.runGiftCardHonorGuard.mockResolvedValue({
+      honorEffective: false,
+      record: { outstanding_minor: 0, currency: 'USD', open_reservations: 0, measured_at: 10 },
+    });
+
+    handleScheduled(controller('*/5 * * * *'), {
+      DB: {} as D1Database,
+      STORE_FEATURE_GIFT_CARD_RECONCILIATION: 'false',
+    } as unknown as CloudflareEnv, ctx);
+    await Promise.all(waits);
+
+    expect(drainedCapabilities().giftCards).toBe(noOpCommerceCapabilities.giftCards);
+  });
+
+  it('drains the recovery queues even when the honor measurement fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const { ctx, waits } = context();
+    mocks.runGiftCardHonorGuard.mockRejectedValue(new Error('guard measurement unavailable'));
+
+    handleScheduled(controller('*/5 * * * *'), {
+      DB: {} as D1Database,
+      STORE_FEATURE_GIFT_CARD_RECONCILIATION: 'false',
+    } as unknown as CloudflareEnv, ctx);
+    await Promise.all(waits);
+
+    expect(waits).toHaveLength(1);
+    expect(mocks.drainInventoryAdjustments).toHaveBeenCalledWith({ database: {}, limit: 25 });
+    // Degrades to the configured flags rather than widening honoring on a
+    // measurement we could not take.
+    expect(drainedCapabilities().giftCards).toBe(noOpCommerceCapabilities.giftCards);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it('reports analytics failure while preserving background completion', async () => {
