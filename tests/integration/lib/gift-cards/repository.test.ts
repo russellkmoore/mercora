@@ -65,6 +65,32 @@ describe("gift-card repository on real D1", () => {
     hash = testSequence.toString(16).padStart(64, "0");
   });
 
+  it("stores a code suffix at issuance, leaves it NULL without one, and converges a suffixed retry", async () => {
+    const repository = createGiftCardRepository(env.DB);
+    await repository.issueAccount(issuance({ codeSuffix: "4A7K" }));
+    const withSuffix = await env.DB.prepare(
+      `SELECT code_suffix FROM gift_card_accounts WHERE id = ?`,
+    ).bind(giftCardId).first<{ code_suffix: string | null }>();
+    expect(withSuffix?.code_suffix).toBe("4A7K");
+
+    const retry = await repository.issueAccount(issuance({ codeSuffix: "4A7K" }));
+    expect(retry.created).toBe(false);
+    const stillOneRow = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM gift_card_accounts WHERE id = ?`,
+    ).bind(giftCardId).first<{ count: number }>();
+    expect(stillOneRow?.count).toBe(1);
+
+    const otherId = `${giftCardId}_no_suffix`;
+    await repository.issueAccount(issuance({
+      id: otherId,
+      codeHash: { keyVersion: 1, digest: "c".repeat(64) },
+    }));
+    const withoutSuffix = await env.DB.prepare(
+      `SELECT code_suffix FROM gift_card_accounts WHERE id = ?`,
+    ).bind(otherId).first<{ code_suffix: string | null }>();
+    expect(withoutSuffix?.code_suffix).toBeNull();
+  });
+
   it("issues exactly one account and ledger entry and converges an exact retry", async () => {
     const repository = createGiftCardRepository(env.DB);
     const first = await repository.issueAccount(issuance());
