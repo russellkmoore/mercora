@@ -473,22 +473,99 @@ export type ResendGiftCardDeliveryResult =
   | { sent: true }
   | { sent: false; reason: 'not_resendable' | 'code_unavailable' | 'send_failed' };
 
+interface ResendDeliveryRow {
+  id: string;
+  gift_card_id: string;
+  order_id: string | null;
+  order_line_id: string | null;
+  recipient_email: string;
+  recipient_name: string | null;
+  status: string;
+  code_ciphertext: string | null;
+  code_nonce: string | null;
+  code_key_version: number | null;
+}
+
 /**
- * RED scaffold (Task 2, 14-05) — replaced by the real implementation in
- * GREEN. Deliberately reports a fixed, unconditional success and never reads
- * a delivery row or calls the sender, so every RED assertion (both the
- * "sends" cases and the "refuses" cases) fails for the missing behavior
- * itself rather than vacuously — a fixed always-refuse stub would make the
- * refusal assertions pass for the wrong reason.
+ * D-08/D-21: send the same delivery email again, to the original recipient
+ * or an admin-supplied address, without modifying the delivery row and
+ * without the sender's D1-row-backed dedupe swallowing the resend (a fresh,
+ * caller-supplied idempotency key is required — reusing the row's own
+ * `email_idempotency_key` would short-circuit to a false success with no
+ * provider call, RESEARCH anti-pattern).
+ *
+ * `environment` must be the full worker env (`getCloudflareContext().env`)
+ * the caller obtained — never a `{ DB }`-only object. `emailEnvironmentFrom`
+ * branches on whether ANY env was supplied at all, so a partial one switches
+ * off its own `getCloudflareContext` fallback and loses the EMAIL binding —
+ * the same constraint `deliverOne`'s callers already honor.
  */
-export async function resendGiftCardDelivery(_args: {
+export async function resendGiftCardDelivery(args: {
   deliveryId: string;
   to?: string;
   idempotencyKey: string;
   environment: GiftCardFulfillmentEnvironment;
   now?: number;
 }): Promise<ResendGiftCardDeliveryResult> {
-  return { sent: true };
+  assertGiftCardId(args.deliveryId, 'gift-card delivery id');
+  if (
+    typeof args.idempotencyKey !== 'string'
+    || args.idempotencyKey.trim().length === 0
+    || args.idempotencyKey.length > 256
+  ) {
+    throw new TypeError('Gift-card resend idempotency key is invalid');
+  }
+  if (args.to !== undefined && validateGiftCardRecipientEmail(args.to) !== null) {
+    throw new TypeError('Gift-card resend recipient address is invalid');
+  }
+  if (!args.environment.DB) throw new Error('Gift-card database is unavailable');
+  const database = args.environment.DB;
+
+  const row = await database.prepare(`SELECT id, gift_card_id, order_id, order_line_id,
+    recipient_email, recipient_name, status, code_ciphertext, code_nonce, code_key_version
+    FROM gift_card_deliveries WHERE id = ? LIMIT 1`).bind(args.deliveryId).first<ResendDeliveryRow>();
+  if (!row || (row.status !== 'sent' && row.status !== 'needs_review')) {
+    return { sent: false, reason: 'not_resendable' };
+  }
+  if (!row.code_ciphertext || !row.code_nonce || !row.code_key_version) {
+    return { sent: false, reason: 'code_unavailable' };
+  }
+
+  let code: string | undefined;
+  try {
+    let decrypted: string;
+    try {
+      decrypted = await decryptGiftCardDeliveryCode({
+        giftCardId: row.gift_card_id,
+        deliveryId: row.id,
+        encrypted: { keyVersion: row.code_key_version, nonce: row.code_nonce, ciphertext: row.code_ciphertext },
+        keyRing: parseGiftCardDeliveryKeyRing(args.environment),
+      });
+    } catch {
+      return { sent: false, reason: 'code_unavailable' };
+    }
+    code = decrypted;
+    const account = await database.prepare(`SELECT issued_amount_minor, currency_code
+      FROM gift_card_accounts WHERE id = ?`).bind(row.gift_card_id)
+      .first<{ issued_amount_minor: number; currency_code: string }>();
+    if (!account) return { sent: false, reason: 'code_unavailable' };
+    const giftMessage = await giftMessageFor({
+      database, orderId: row.order_id, orderLineId: row.order_line_id,
+    });
+    const message = deliveryMessage({
+      code,
+      amount: Money.fromMinor(account.issued_amount_minor, account.currency_code),
+      ...(row.recipient_name ? { recipientName: row.recipient_name } : {}),
+      ...(giftMessage ? { giftMessage } : {}),
+    });
+    const result = await sendEmail({ ...message, to: args.to ?? row.recipient_email }, {
+      idempotencyKey: args.idempotencyKey,
+      env: emailEnvironmentFrom(args.environment),
+    });
+    return result.success ? { sent: true } : { sent: false, reason: 'send_failed' };
+  } finally {
+    code = undefined;
+  }
 }
 
 /** Idempotently issue every paid gift-card line and make delivery retryable. */
