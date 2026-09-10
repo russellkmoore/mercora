@@ -479,7 +479,19 @@ npm run deploy
 ## 9. Gift Card Enablement
 
 Gift cards ship disabled. Enabling them is four secrets and two feature flags applied in a
-fixed order. `docs/runtime-configuration.md` owns the variable contract for both key rings.
+fixed order. `docs/runtime-configuration.md` owns the variable contract for both key rings and
+for the flags below — this section only walks the deploy steps.
+
+Two independent flags gate gift cards: **sell** (`STORE_FEATURE_GIFT_CARD_ACQUISITION`) controls
+whether a shopper can buy a new card, and **honor** (`STORE_FEATURE_GIFT_CARD_RECONCILIATION`)
+controls whether existing cards redeem, settle, and refund. The four states:
+
+| Sell | Honor | What a shopper sees | What an operator should know |
+| --- | --- | --- | --- |
+| on | on | Normal. Gift cards are for sale; existing cards redeem, settle, and refund. | — |
+| off | on | Stopped selling, still honoring. The product is hidden from every listing; a direct link to its page still renders, with an unavailable notice in place of the purchase form. Checkout refuses any gift-card line. | This is the rollback state — see Step 5. |
+| off | off | Gift cards do not exist. Every surface is absent or 404s. | If a balance or open reservation still exists, the runtime keeps honoring it anyway — hiding is presentation, honoring is money. |
+| on | off | Invalid. Capability resolution throws on the first request or cron tick after a deploy in this state. | Never deploy this combination. |
 
 ### **Step 1: Generate and Store the Four Secrets**
 
@@ -513,7 +525,7 @@ The proof is the four names — never a value.
 If the command reports that the latest version of the Worker is not currently deployed,
 deploy the current `main` first, then retry the four commands above.
 
-### **Step 2: Enable Reconciliation**
+### **Step 2: Enable Honor (Reconciliation)**
 
 Add one entry to `wrangler.jsonc` `vars`, next to the subscription flags:
 
@@ -535,9 +547,9 @@ back afterward — otherwise the generated file picks up local-only names that C
 Commit `wrangler.jsonc` and the regenerated types together and push to `main`. Cloudflare
 Workers Builds deploys the push.
 
-### **Step 3: Verify Reconciliation**
+### **Step 3: Verify Honor**
 
-Do not proceed to Step 4 until all three checks pass.
+Do not proceed to Step 4 until all four checks pass.
 
 1. The new version appears in `npx wrangler deployments list`.
 2. One five-minute recovery cron cycle completes cleanly: watch the Worker's tail and expect
@@ -549,8 +561,11 @@ Do not proceed to Step 4 until all three checks pass.
    `{"valid": false}` and HTTP 200. It answers identically for a bad code, an unknown card, and a
    broken ring, by design — it proves availability and nothing about ring health; check #2
    above is what catches a malformed ring.
+4. The honor-guard row (`admin_settings` key `gift_cards.honor_guard`) appears after that same
+   cron cycle. Until it does, the runtime behaves as if balances exist — which is harmless with
+   honor on, but is the reason Step 5's rollback can take up to five minutes to quiet down.
 
-### **Step 4: Enable Acquisition**
+### **Step 4: Enable Sell (Acquisition)**
 
 Only after Step 3 passes. Same entry shape, same regenerate-commit-push cycle:
 
@@ -563,9 +578,23 @@ resolution, on the first request or cron tick after such a deploy.
 
 ### **Step 5: Rolling Back**
 
-Set acquisition back to `"false"` and push, to stop new gift-card sales. Leave reconciliation
-enabled for as long as any balance or reservation exists, so existing cards can still be
-verified, settled, and released.
+Set sell to `"false"` and push, to stop new gift-card sales:
+
+```jsonc
+"STORE_FEATURE_GIFT_CARD_ACQUISITION": "false",
+```
+
+Leave honor on until every card balance is zero and every reservation is released or refunded —
+see `docs/runtime-configuration.md`'s four-state table for what a shopper sees in this state
+(the product hides from listings; a direct link still renders with an unavailable notice;
+checkout refuses a gift-card line).
+
+Turning honor off while balances remain does not make the liability disappear. The runtime
+keeps honoring existing cards anyway, the five-minute cron emits the critical telemetry event
+`gift_card.honor_disabled_with_balances` every tick the condition holds, and the admin
+gift-card page shows a banner naming the outstanding total. The flag is not a way to make money
+already on cards go away — it only stops new sales once sell is off, and honor cannot be turned
+off for real until the balance is actually zero.
 
 To rotate a ring, add a second version to the JSON object and move the current-version
 pointer. Never remove a key version that has issued cards under it.
