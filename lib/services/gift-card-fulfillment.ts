@@ -571,6 +571,61 @@ export async function resendGiftCardDelivery(args: {
   }
 }
 
+/**
+ * D-12: whether a delivery's retained code material exists for this card, with
+ * no ciphertext ever crossing into the caller. Deliberately split from
+ * `revealGiftCardDeliveryCode` below so a caller (the reveal route) can
+ * refuse a card with nothing to reveal, write its audit event, and only then
+ * decrypt — the D-12 ordering requires the availability check and the
+ * decrypt to be two separate round trips, not one.
+ *
+ * This module (not `app/api/admin/gift-cards/`) is deliberately where every
+ * `code_ciphertext`/`code_nonce`/`code_key_version` column reference lives —
+ * the same placement `resendGiftCardDelivery` already uses — so the admin
+ * route directory the D-14 forbidden-column source contract scans never
+ * contains those column names itself.
+ */
+export async function giftCardDeliveryHasStoredCode(args: {
+  giftCardId: string;
+  environment: GiftCardFulfillmentEnvironment;
+}): Promise<boolean> {
+  assertGiftCardId(args.giftCardId, 'gift-card id');
+  if (!args.environment.DB) throw new Error('Gift-card database is unavailable');
+  const row = await args.environment.DB.prepare(`SELECT id, code_ciphertext, code_nonce, code_key_version
+    FROM gift_card_deliveries WHERE gift_card_id = ? LIMIT 1`).bind(args.giftCardId).first<{
+      id: string; code_ciphertext: string | null; code_nonce: string | null; code_key_version: number | null;
+    }>();
+  return Boolean(row?.code_ciphertext && row?.code_nonce && row?.code_key_version);
+}
+
+/**
+ * D-12: decrypt and return the retained bearer code for a super-admin reveal.
+ * Callers must have already confirmed `giftCardDeliveryHasStoredCode` and
+ * written the `code_revealed` audit event — this function does the one thing
+ * left, and does it last. Never logs, stores, or attaches the returned code
+ * to an error; `decryptGiftCardDeliveryCode` zeroizes its own key material.
+ */
+export async function revealGiftCardDeliveryCode(args: {
+  giftCardId: string;
+  environment: GiftCardFulfillmentEnvironment;
+}): Promise<string> {
+  assertGiftCardId(args.giftCardId, 'gift-card id');
+  if (!args.environment.DB) throw new Error('Gift-card database is unavailable');
+  const row = await args.environment.DB.prepare(`SELECT id, code_ciphertext, code_nonce, code_key_version
+    FROM gift_card_deliveries WHERE gift_card_id = ? LIMIT 1`).bind(args.giftCardId).first<{
+      id: string; code_ciphertext: string | null; code_nonce: string | null; code_key_version: number | null;
+    }>();
+  if (!row || !row.code_ciphertext || !row.code_nonce || !row.code_key_version) {
+    throw new Error('Gift-card delivery has no retained code to reveal');
+  }
+  return decryptGiftCardDeliveryCode({
+    giftCardId: args.giftCardId,
+    deliveryId: row.id,
+    encrypted: { keyVersion: row.code_key_version, nonce: row.code_nonce, ciphertext: row.code_ciphertext },
+    keyRing: parseGiftCardDeliveryKeyRing(args.environment),
+  });
+}
+
 /** Idempotently issue every paid gift-card line and make delivery retryable. */
 export async function fulfillPaidGiftCards(order: Order, options: {
   environment?: GiftCardFulfillmentEnvironment;
