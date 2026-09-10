@@ -72,7 +72,7 @@ export function AddressForm(props: {
             name="type"
             className={input}
             value={form.type}
-            onChange={(e) => setForm({ ...form, type: e.target.value as AddressFormState["type"] })}
+            onChange={(e) => setForm({ ...form, type: e.target.value === "billing" ? "billing" : "shipping" })}
           >
             <option value="shipping">Shipping</option>
             <option value="billing">Billing</option>
