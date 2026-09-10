@@ -200,7 +200,12 @@ describe("agent-chat prompt and response projection", () => {
     };
     const productWhere = vi.fn().mockResolvedValue([productRecord]);
     const variantWhere = vi.fn().mockResolvedValue([variantRecord]);
+    // Three selects, in order: the gift-card visibility check on the ids the
+    // vector search returned (empty here — nothing in this fixture is a gift
+    // card), then the products, then their variants.
+    const giftCardWhere = vi.fn().mockResolvedValue([]);
     const db = { select: vi.fn()
+      .mockReturnValueOnce({ from: () => ({ where: giftCardWhere }) })
       .mockReturnValueOnce({ from: () => ({ where: productWhere }) })
       .mockReturnValueOnce({ from: () => ({ where: variantWhere }) }) };
     getDbAsync.mockResolvedValue(db);
