@@ -40,8 +40,9 @@ describe('gift-card checkout gating source contract (GCF-01, GCF-03, D-09, D-16)
     const source = withoutComments(checkout);
     expect(source).toMatch(/import \{[^}]*useStoreConfig[^}]*\} from ["']@\/lib\/store["']/);
     expect(source).toMatch(/giftCardReconciliation[\s\S]{0,120}?<GiftCardApplyPanel/);
-    // Import plus one guarded render — no second, ungated call site.
-    expect((source.match(/GiftCardApplyPanel/g) ?? []).length).toBe(2);
+    // Exactly one render site, so there is no second, ungated call site.
+    expect((source.match(/<GiftCardApplyPanel/g) ?? []).length).toBe(1);
+    expect(source).toMatch(/import GiftCardApplyPanel from/);
     // Sell must not reach this decision: a shopper holding a balance can still
     // redeem after the store stops selling (GCF-01, D-03).
     expect(source).not.toContain('giftCardAcquisition');

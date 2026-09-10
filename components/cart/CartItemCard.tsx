@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useCartStore } from "@/lib/stores/cart-store";
+import { useStoreConfig } from "@/lib/store";
 import type { StableCartItem } from "@/lib/types/cartitem";
 import { Button } from "@/components/ui/button";
 import { usePathname } from "next/navigation";
@@ -17,6 +18,12 @@ export default function CartItemCard({ item }: CartItemCardProps) {
   const updateQuantity = useCartStore((state) => state.updateQuantity);
   const pathname = usePathname();
   const isCheckoutPage = pathname.startsWith("/checkout");
+  const { commerce } = useStoreConfig();
+  // A StableCartItem carries no product type, so the recipient details are what
+  // identify a gift-card line (D-09). Advisory only: the server refuses the
+  // line whatever this renders.
+  const giftCardLineUnavailable =
+    item.giftCardCustomization !== undefined && !commerce.features.giftCardAcquisition;
 
   return (
     <div className="flex gap-3 sm:gap-4 border p-3 rounded shadow-sm">
@@ -58,6 +65,11 @@ export default function CartItemCard({ item }: CartItemCardProps) {
         <p className="text-xs sm:text-sm text-muted-on-inverse mt-1">
           {Money.fromStored(item.price).format()} × {item.quantity} : {cartItemTotal(item).format()}
         </p>
+        {giftCardLineUnavailable && (
+          <p className="text-xs sm:text-sm text-warning mt-1">
+            No longer available — remove this line to check out.
+          </p>
+        )}
         {item.giftCardCustomization && (
           <GiftCardRecipientBlock customization={item.giftCardCustomization} tone="inverse" />
         )}
