@@ -7,7 +7,11 @@ import { appendGiftCardEvent } from '@/lib/gift-cards/events';
 import { resolveHonorEffective } from '@/lib/gift-cards/honor-guard';
 import { listAdminGiftCardPresentations } from '@/lib/gift-cards/presentations';
 import { giftCardSurfacesHidden } from '@/lib/gift-cards/visibility';
-import { validateGiftCardRecipientEmail, GiftCardCustomizationValidationError } from '@/lib/gift-cards/customization';
+import {
+  GiftCardCustomizationValidationError,
+  parseGiftCardCustomization,
+  validateGiftCardRecipientEmail,
+} from '@/lib/gift-cards/customization';
 import { issueAdminGiftCard } from '@/lib/services/gift-card-fulfillment';
 import { Money } from '@/lib/money';
 import { resolveStoreConfig, type Environment } from '@/lib/store-config';
@@ -111,8 +115,17 @@ export async function POST(request: NextRequest) {
     return jsonError('invalid_body', 'amountMinor must be a positive integer', 400);
   }
 
-  const recipientEmail = record.recipientEmail;
-  if (typeof recipientEmail !== 'string' || validateGiftCardRecipientEmail(recipientEmail) !== null) {
+  const rawRecipientEmail = record.recipientEmail;
+  if (typeof rawRecipientEmail !== 'string' || validateGiftCardRecipientEmail(rawRecipientEmail) !== null) {
+    return jsonError('invalid_body', 'A valid recipientEmail is required', 400);
+  }
+  // IN-05: normalize once, through the same parser checkout and
+  // issueAdminGiftCard use (trim + lowercase), so the admin_created event and
+  // the delivery row name the same address.
+  let recipientEmail: string;
+  try {
+    recipientEmail = parseGiftCardCustomization({ recipientEmail: rawRecipientEmail }).recipientEmail;
+  } catch {
     return jsonError('invalid_body', 'A valid recipientEmail is required', 400);
   }
 
