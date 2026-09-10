@@ -17,6 +17,8 @@ export function AddressForm(props: {
    * keep the inline `role="alert"` / `role="status"` message.
    */
   onError?: (message: string) => void;
+  /** Mirrors the form's busy flag so a parent can lock its own controls during a save. */
+  onBusyChange?: (busy: boolean) => void;
   onCancel?: () => void;
   lockType?: "shipping" | "billing";
   submitLabel?: string;
@@ -35,6 +37,7 @@ export function AddressForm(props: {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
+    props.onBusyChange?.(true);
     setMessage(null);
     try {
       const { address } = await saveAddress(form, props.addressId);
@@ -49,6 +52,7 @@ export function AddressForm(props: {
       else setMessage({ kind: "error", text });
     } finally {
       setBusy(false);
+      props.onBusyChange?.(false);
     }
   }
 

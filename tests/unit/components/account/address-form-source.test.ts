@@ -56,6 +56,14 @@ describe("AddressManager edit-mode wiring", () => {
     expect(managerSource).toContain("onError={setMessage}");
     expect(formSource).toContain("const inlineFeedback = props.onError === undefined");
   });
+
+  it("locks Edit/Remove while a save is in flight, as the pre-extraction manager did", () => {
+    expect(managerSource).toContain("onBusyChange={handleBusyChange}");
+    expect(managerSource).toContain("const locked = busy || saving;");
+    expect(occurrences(managerSource, "disabled={locked}")).toBe(2);
+    expect(formSource).toContain("props.onBusyChange?.(true)");
+    expect(formSource).toContain("props.onBusyChange?.(false)");
+  });
 });
 
 describe("SUB-02 source contract: one shared address form, one save path", () => {
