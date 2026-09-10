@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { emptyAddressForm, saveAddress } from "@/lib/account/address-client";
 
 function occurrences(source: string, needle: string): number {
   return source.split(needle).length - 1;
@@ -112,6 +113,29 @@ describe("SUB-02 source contract: one shared address form, one save path", () =>
     for (const source of [formSource, clientSource]) {
       expect(source).not.toMatch(/localStorage|sessionStorage|console\.(?:log|error)/);
     }
+  });
+});
+
+describe("saveAddress response handling", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("maps a non-JSON failure body to the generic message instead of a parser error", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("<html>Bad gateway</html>", { status: 502 })));
+    await expect(saveAddress(emptyAddressForm)).rejects.toThrow("Address could not be saved");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 401 })));
+    await expect(saveAddress(emptyAddressForm)).rejects.toThrow("Address could not be saved");
+  });
+
+  it("surfaces the API's own error text and returns the created address on success", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: "city is invalid" }, { status: 400 })));
+    await expect(saveAddress(emptyAddressForm)).rejects.toThrow("city is invalid");
+    const address = { id: "addr_1", type: "shipping", address: { line1: "1 Main", city: "Denver", country: "US" } };
+    const fetcher = vi.fn(async () => Response.json({ address }, { status: 201 }));
+    vi.stubGlobal("fetch", fetcher);
+    await expect(saveAddress(emptyAddressForm)).resolves.toEqual({ address });
+    expect(fetcher).toHaveBeenCalledWith("/api/account/addresses", expect.objectContaining({
+      method: "POST", credentials: "same-origin",
+    }));
   });
 });
 
