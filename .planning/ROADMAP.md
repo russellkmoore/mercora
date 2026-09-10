@@ -58,7 +58,7 @@ Full phase details, success criteria, and plan lists: `milestones/v2.1-ROADMAP.m
 
 **Milestone Goal:** Make gift cards operable — flags that mean what they say, and an admin that can manage individual cards with an audit trail. Close the shopper-facing gaps the v2.1 live test exposed: subscription address entry in place, the blog reachable, saved payment methods. Clear the tech debt carried out of v2.1 and the operator checklist that needs Russell in the Stripe and Cloudflare dashboards.
 
-- [ ] **Phase 13: Gift-Card Flags** - Sell and honor each control what their name says, and both off makes gift cards vanish
+- [x] **Phase 13: Gift-Card Flags** - Sell and honor each control what their name says, and both off makes gift cards vanish (completed 2026-09-10)
 - [ ] **Phase 14: Gift-Card Admin & Audit Trail** - An admin can find, read the history of, and act on any individual gift card
 - [ ] **Phase 15: Subscription Address In Place** - A shopper adds a shipping address on the subscription product page without leaving it
 - [ ] **Phase 16: Blog Surfacing** - The blog is reachable from the header and the latest articles appear on the home page
@@ -205,7 +205,7 @@ Plans:
 | 1-4 (v1 Hardening) | 17/17 | Complete | 2026-09-02 |
 | 5-8.2 (v2 Themeable Storefront) | 44/44 | Complete | 2026-09-05 |
 | 9-12 (v2.1 Gift Card Product) | 20/20 | Complete | 2026-09-10 |
-| 13. Gift-Card Flags | 9/9 | In Progress|  |
+| 13. Gift-Card Flags | 9/9 | Complete    | 2026-09-10 |
 | 14. Gift-Card Admin & Audit Trail | 0/? | Not started | - |
 | 15. Subscription Address In Place | 0/? | Not started | - |
 | 16. Blog Surfacing | 0/? | Not started | - |
