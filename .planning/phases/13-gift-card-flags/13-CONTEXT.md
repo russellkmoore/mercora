@@ -44,6 +44,9 @@ The two gift-card feature flags do what their names say. Sell (`STORE_FEATURE_GI
 - **D-15:** The honor-guard measurement is stored in `admin_settings` under category `gift_cards`, key `gift_cards.honor_guard`, value `{ outstanding_minor, currency, open_reservations, measured_at }`; written only by the cron tick, read by capability resolution (when honor=off) and the admin page. A missing or stale (> 15 min) record while honor=off counts as "balances may exist" — honor stays effectively on.
 - **D-16:** With honor=off (and the guard clear), `GiftCardApplyPanel` simply does not render; no explanatory copy. `priceCheckout` under sell=off rejects gift-card lines with a distinct `GiftCardSalesDisabledError` surfaced by `/api/payment-intent` as `{ code: 'gift_card_sales_disabled' }`, read from `getStoreConfig().commerce.features.giftCardAcquisition` (synchronous), not a capability round trip.
 
+### Planner resolution (accepted by Claude)
+- **D-17:** Under both flags off, the sidebar entry and the public balance endpoint follow the configured flags only (always hidden/404). The admin gift-card page and its API stay reachable by URL while the honor guard is active (money outstanding), so the D-05 banner has somewhere to render; once the guard clears they 404 too. Hiding is presentation, honoring is money (D-10).
+
 ### Claude's Discretion
 - Exact copy of the unavailable state on the product page and cart line; whether the product page keeps the image and description above the notice (recommended: yes).
 - Whether the honor-off measurement lives in `admin_settings` (D-06) or a tiny dedicated table — no migration unless needed; prefer `admin_settings`.
