@@ -19,12 +19,21 @@ export interface AdminGiftCardPresentation extends GiftCardPresentation {
   maskedCode: string | null;
   recipientEmail: string | undefined;
   /**
-   * A resolved display label — the customer's name, else their email, for an
-   * order-issued card; `undefined` for a card with no purchaser (admin-created
-   * cards render "admin: {display name}" from the `admin_created` event
-   * instead). Never the raw customer id (D-22).
+   * A resolved display label for who is behind this card — the customer's
+   * name, else their email, for an order-issued card; otherwise the card's
+   * recorded provenance: "admin: {display name}" from its `admin_created`
+   * event, or "reissued from {old card id}" from its `reissued_from` event
+   * (WR-09). `undefined` when nothing on the record says, so the UI renders
+   * "—" rather than asserting a provenance it cannot back. Never the raw
+   * customer id (D-22).
    */
   purchaser: string | undefined;
+  /**
+   * WR-09: for a card issued by reissue, the id of the card it replaced —
+   * from the `reissued_from` event's `from_gift_card_id` — so the UI can link
+   * "Reissued from …" to that card's detail page. `undefined` otherwise.
+   */
+  reissuedFromGiftCardId: string | undefined;
 }
 
 interface PresentationRow {
@@ -48,10 +57,18 @@ interface CustomerPersonRow {
   person: string | null;
 }
 
-interface AdminCreatorRow {
+interface ProvenanceRow {
   gift_card_id: string;
+  event_type: 'admin_created' | 'reissued_from';
+  from_gift_card_id: string | null;
   display_name: string | null;
   email: string | null;
+}
+
+/** What the record says about where a card with no purchasing customer came from. */
+interface Provenance {
+  label: string;
+  reissuedFromGiftCardId?: string;
 }
 
 const PRESENTATION_SELECT = `SELECT account.id, account.currency_code, account.issued_amount_minor,
@@ -73,6 +90,7 @@ function mapRow(
   row: PresentationRow,
   admin: boolean,
   purchaser: string | undefined,
+  reissuedFromGiftCardId?: string,
 ): GiftCardPresentation | AdminGiftCardPresentation {
   const issuedAmount = Money.fromMinor(row.issued_amount_minor, row.currency_code).toMach();
   const availableBalance = Money.fromMinor(row.available_balance_minor, row.currency_code).toMach();
@@ -95,6 +113,7 @@ function mapRow(
     maskedCode: maskGiftCardCodeSuffix(row.code_suffix),
     recipientEmail: row.recipient_email ?? undefined,
     purchaser,
+    reissuedFromGiftCardId,
   } : base;
 }
 
@@ -147,37 +166,52 @@ async function resolvePurchaserLabels(
 }
 
 /**
- * D-17/D-22: "admin: {display name}" for a card with no purchaser and no
- * issuing order, from its `admin_created` event's actor joined to
- * `admin_users` — batched per page exactly like `resolvePurchaserLabels`. A
- * creator with no `admin_users` row (the development bypass) yields no label,
- * and the UI falls back to a generic "Admin created". The admin's user id is
- * never returned, only the resolved name or email.
+ * D-17/D-22/WR-09: provenance for cards with no purchasing customer, read from
+ * the record rather than inferred from "no purchaser and no order" (which is
+ * equally true of a reissued card). One batched query per page, like
+ * `resolvePurchaserLabels`:
+ *
+ * - `reissued_from` -> "reissued from {old card id}", plus the old id so the
+ *   UI can link it;
+ * - `admin_created` -> "admin: {display name || email}" from `admin_users`.
+ *   A creator with no `admin_users` row (the development bypass) yields no
+ *   label, and the UI renders "—" rather than a provenance it cannot back.
+ *
+ * The admin's user id is never returned, only the resolved name or email.
  */
-async function resolveAdminCreatorLabels(
+async function resolveProvenance(
   database: D1Database,
   giftCardIds: readonly string[],
-): Promise<Map<string, string>> {
-  const labels = new Map<string, string>();
-  if (giftCardIds.length === 0) return labels;
+): Promise<Map<string, Provenance>> {
+  const provenance = new Map<string, Provenance>();
+  if (giftCardIds.length === 0) return provenance;
   const placeholders = giftCardIds.map(() => '?').join(', ');
   const { results } = await database.prepare(
-    `SELECT event.gift_card_id, admin.display_name, admin.email
+    `SELECT event.gift_card_id, event.event_type,
+       json_extract(event.details, '$.from_gift_card_id') AS from_gift_card_id,
+       admin.display_name, admin.email
      FROM gift_card_events event
-     LEFT JOIN admin_users admin ON admin.user_id = event.actor_id
-     WHERE event.event_type = 'admin_created' AND event.actor_type = 'admin'
+     LEFT JOIN admin_users admin ON admin.user_id = event.actor_id AND event.actor_type = 'admin'
+     WHERE event.event_type IN ('admin_created', 'reissued_from')
        AND event.gift_card_id IN (${placeholders})`,
-  ).bind(...giftCardIds).all<AdminCreatorRow>();
+  ).bind(...giftCardIds).all<ProvenanceRow>();
   for (const row of results ?? []) {
+    if (row.event_type === 'reissued_from') {
+      if (typeof row.from_gift_card_id === 'string' && row.from_gift_card_id.length > 0) {
+        // A reissue is the stronger fact: it names the card this one replaced.
+        provenance.set(row.gift_card_id, {
+          label: `reissued from ${row.from_gift_card_id}`,
+          reissuedFromGiftCardId: row.from_gift_card_id,
+        });
+      }
+      continue;
+    }
     const name = row.display_name?.trim() || row.email?.trim() || '';
-    if (name && !labels.has(row.gift_card_id)) labels.set(row.gift_card_id, `admin: ${name}`);
+    if (name && !provenance.has(row.gift_card_id)) {
+      provenance.set(row.gift_card_id, { label: `admin: ${name}` });
+    }
   }
-  return labels;
-}
-
-/** A card with neither a purchasing customer nor an issuing order was created by hand. */
-function isAdminCreated(row: PresentationRow): boolean {
-  return row.purchaser_customer_id === null && row.issued_order_id === null;
+  return provenance;
 }
 
 /** D-15: one bound-parameter WHERE fragment for the status filter and the ordered `q` match. */
@@ -234,19 +268,17 @@ export async function listAdminGiftCardPresentations(args: {
   const purchaserIds = [...new Set(
     rows.map((row) => row.purchaser_customer_id).filter((id): id is string => Boolean(id)),
   )];
-  const [purchaserLabels, creatorLabels] = await Promise.all([
+  const [purchaserLabels, provenance] = await Promise.all([
     resolvePurchaserLabels(args.database, purchaserIds),
-    resolveAdminCreatorLabels(args.database, rows.filter(isAdminCreated).map((row) => row.id)),
+    resolveProvenance(args.database, rows.filter((row) => !row.purchaser_customer_id).map((row) => row.id)),
   ]);
 
   return {
-    cards: rows.map((row) => mapRow(
-      row,
-      true,
-      row.purchaser_customer_id
-        ? purchaserLabels.get(row.purchaser_customer_id)
-        : creatorLabels.get(row.id),
-    ) as AdminGiftCardPresentation),
+    cards: rows.map((row) => {
+      const customer = row.purchaser_customer_id ? purchaserLabels.get(row.purchaser_customer_id) : undefined;
+      const recorded = customer === undefined ? provenance.get(row.id) : undefined;
+      return mapRow(row, true, customer ?? recorded?.label, recorded?.reissuedFromGiftCardId) as AdminGiftCardPresentation;
+    }),
     total,
   };
 }
@@ -267,11 +299,9 @@ export async function getAdminGiftCardPresentation(
   const row = await database.prepare(`${PRESENTATION_SELECT} WHERE account.id = ? LIMIT 1`)
     .bind(now, id).first<PresentationRow>();
   if (!row) return undefined;
-  let purchaser: string | undefined;
-  if (row.purchaser_customer_id) {
-    purchaser = (await resolvePurchaserLabels(database, [row.purchaser_customer_id])).get(row.purchaser_customer_id);
-  } else if (isAdminCreated(row)) {
-    purchaser = (await resolveAdminCreatorLabels(database, [row.id])).get(row.id);
-  }
-  return mapRow(row, true, purchaser) as AdminGiftCardPresentation;
+  const customer = row.purchaser_customer_id
+    ? (await resolvePurchaserLabels(database, [row.purchaser_customer_id])).get(row.purchaser_customer_id)
+    : undefined;
+  const recorded = customer === undefined ? (await resolveProvenance(database, [row.id])).get(row.id) : undefined;
+  return mapRow(row, true, customer ?? recorded?.label, recorded?.reissuedFromGiftCardId) as AdminGiftCardPresentation;
 }

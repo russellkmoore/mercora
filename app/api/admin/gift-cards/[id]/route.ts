@@ -81,6 +81,7 @@ export async function GET(
         issuedOrderId: presentation.issuedOrderId ?? null,
         recipientEmail: presentation.recipientEmail ?? null,
         purchaser: presentation.purchaser ?? null,
+        reissuedFromGiftCardId: presentation.reissuedFromGiftCardId ?? null,
         delivery: presentation.delivery ?? null,
       },
       reservations: reservations.map((reservation) => ({

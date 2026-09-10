@@ -345,6 +345,38 @@ describe("listAdminGiftCardPresentations search and projection (D-14, D-15)", ()
       .resolves.toMatchObject({ id: giftCardId, purchaser: "admin: Jane Admin" });
   });
 
+  it("labels a reissued card 'reissued from {old id}' with the old id for linking, in list and detail (WR-09)", async () => {
+    // A reissued card has no purchaser and no order — exactly like an
+    // admin-created one — so provenance has to come from the record, not
+    // from that absence. Its reissued_from event is the record.
+    const repository = createGiftCardRepository(env.DB);
+    await repository.issueAccount(issuance());
+    await repository.disableAccount({ giftCardId, disabledAt: now + 1 });
+    const reissued = await repository.reissue({
+      oldGiftCardId: giftCardId,
+      now: now + 2,
+      actor: { type: "admin", id: "user_admin" },
+      codeHash: { keyVersion: 1, digest: altDigest(7) },
+      codeSuffix: "9RSD",
+    });
+
+    const { cards, total } = await listAdminGiftCardPresentations({
+      database: env.DB, now: now + 3, limit: 10, offset: 0, q: "9RSD",
+    });
+    expect(total).toBe(1);
+    expect(cards[0]).toMatchObject({
+      id: reissued.newGiftCardId,
+      purchaser: `reissued from ${giftCardId}`,
+      reissuedFromGiftCardId: giftCardId,
+    });
+    await expect(getAdminGiftCardPresentation(env.DB, reissued.newGiftCardId, now + 3))
+      .resolves.toMatchObject({ purchaser: `reissued from ${giftCardId}`, reissuedFromGiftCardId: giftCardId });
+
+    // The old card carries no provenance of its own and no reissuedFrom link.
+    await expect(getAdminGiftCardPresentation(env.DB, giftCardId, now + 3))
+      .resolves.toMatchObject({ purchaser: undefined, reissuedFromGiftCardId: undefined });
+  });
+
   it("leaves purchaser undefined for an admin-created card whose creator has no admin_users row", async () => {
     const repository = createGiftCardRepository(env.DB);
     await repository.issueAccount(issuance({ codeSuffix: "8ADN" }));

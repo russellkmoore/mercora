@@ -21,6 +21,8 @@ interface AdminGiftCard {
   issuedLineId?: string;
   recipientEmail?: string;
   purchaser?: string;
+  /** WR-09: set for a card issued by reissue — the card it replaced. */
+  reissuedFromGiftCardId?: string;
   delivery?: { status: 'pending' | 'processing' | 'sent' | 'needs_review'; attempts: number };
 }
 
@@ -34,9 +36,23 @@ const PAGE_SIZE = 25;
 
 function money(value: MachMoney) { return Money.fromMajor(value.amount, value.currency).format(); }
 
-function purchaserLabel(card: AdminGiftCard): string {
-  if (card.purchaser) return card.purchaser;
-  return card.issuedOrderId ? '—' : 'Admin created';
+/**
+ * Who is behind this card. Provenance comes from the record (the customer,
+ * an `admin_created` event, a `reissued_from` event) — never inferred, so an
+ * unresolved label renders "—" rather than asserting something (WR-09).
+ */
+function PurchaserCell({ card }: { card: AdminGiftCard }) {
+  if (card.reissuedFromGiftCardId) {
+    return (
+      <>
+        Reissued from{' '}
+        <Link href={`/admin/gift-cards/${encodeURIComponent(card.reissuedFromGiftCardId)}`} className="text-orange-400 hover:underline">
+          {card.reissuedFromGiftCardId}
+        </Link>
+      </>
+    );
+  }
+  return <>{card.purchaser ?? '—'}</>;
 }
 
 function deliveryLabel(card: AdminGiftCard): string {
@@ -167,7 +183,7 @@ export default function GiftCardQueue() {
                   <td className="p-4">{money(card.issuedAmount)}</td>
                   <td className="p-4">{money(card.availableBalance)}</td>
                   <td className="p-4">{card.status}</td>
-                  <td className="p-4">{purchaserLabel(card)}</td>
+                  <td className="p-4"><PurchaserCell card={card} /></td>
                   <td className="p-4 text-gray-400">{card.recipientEmail ?? '—'}</td>
                   <td className="p-4 text-gray-400">{card.issuedOrderId ?? '—'}</td>
                   <td className="p-4">{deliveryLabel(card)}</td>

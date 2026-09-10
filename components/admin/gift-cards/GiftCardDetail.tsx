@@ -24,6 +24,8 @@ export interface GiftCardDetailCard {
   issuedOrderId: string | null;
   recipientEmail: string | null;
   purchaser: string | null;
+  /** WR-09: set for a card issued by reissue — the card it replaced. */
+  reissuedFromGiftCardId: string | null;
   delivery: { status: "pending" | "processing" | "sent" | "needs_review"; attempts: number } | null;
 }
 
@@ -202,7 +204,16 @@ export default function GiftCardDetail({ giftCardId }: { giftCardId: string }) {
           </div>
           <div>
             <p className="text-gray-500">Purchaser</p>
-            <p className="text-white">{card.purchaser ?? (card.issuedOrderId ? "—" : "Admin created")}</p>
+            <p className="text-white">
+              {card.reissuedFromGiftCardId ? (
+                <>
+                  Reissued from{" "}
+                  <Link className="text-orange-400 hover:underline" href={`/admin/gift-cards/${encodeURIComponent(card.reissuedFromGiftCardId)}`}>
+                    {card.reissuedFromGiftCardId}
+                  </Link>
+                </>
+              ) : (card.purchaser ?? "—")}
+            </p>
           </div>
           <div>
             <p className="text-gray-500">Issuing order</p>
