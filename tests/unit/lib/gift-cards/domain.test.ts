@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { Money } from "@/lib/money";
 import {
   assertGiftCardCodeHash,
+  assertGiftCardCodeSuffix,
+  assertGiftCardReason,
   assertIssueGiftCardInput,
   assertReserveGiftCardInput,
   giftCardIssuanceBusinessKey,
@@ -74,5 +76,47 @@ describe("gift-card domain", () => {
       .toBe("gift-card/issuance/gift_one/v1");
     expect(giftCardRedemptionBusinessKey("reservation_one"))
       .toBe("gift-card/redemption/reservation_one/v1");
+  });
+
+  it("restricts the code suffix to four alphabet characters and rejects everything else", () => {
+    expect(() => assertGiftCardCodeSuffix("4A7K")).not.toThrow();
+    for (const invalid of ["4a7k", "4A7", "4A7KX", "4A7O", "4A7I", "4A7 ", "", "4A_K"]) {
+      expect(() => assertGiftCardCodeSuffix(invalid)).toThrow();
+    }
+  });
+
+  it("still accepts issuance input with no code suffix at all", () => {
+    expect(() => assertIssueGiftCardInput({
+      id: "gift_no_suffix",
+      codeHash: { keyVersion: 1, digest },
+      amount: Money.fromMinor(500, "USD"),
+      createdAt: 1_800_000_000,
+    })).not.toThrow();
+  });
+
+  it("validates a supplied code suffix as part of issuance input", () => {
+    expect(() => assertIssueGiftCardInput({
+      id: "gift_with_suffix",
+      codeHash: { keyVersion: 1, digest },
+      amount: Money.fromMinor(500, "USD"),
+      createdAt: 1_800_000_000,
+      codeSuffix: "4A7K",
+    })).not.toThrow();
+    expect(() => assertIssueGiftCardInput({
+      id: "gift_with_bad_suffix",
+      codeHash: { keyVersion: 1, digest },
+      amount: Money.fromMinor(500, "USD"),
+      createdAt: 1_800_000_000,
+      codeSuffix: "bad",
+    })).toThrow();
+  });
+
+  it("bounds a reason to [1, maximum] and trims no whitespace for it", () => {
+    expect(() => assertGiftCardReason("x", "disable reason", 500)).not.toThrow();
+    expect(() => assertGiftCardReason("a".repeat(500), "disable reason", 500)).not.toThrow();
+    expect(() => assertGiftCardReason("", "disable reason", 500)).toThrow();
+    expect(() => assertGiftCardReason("a".repeat(501), "disable reason", 500)).toThrow();
+    expect(() => assertGiftCardReason(" leading", "disable reason", 500)).toThrow();
+    expect(() => assertGiftCardReason("trailing ", "disable reason", 500)).toThrow();
   });
 });
