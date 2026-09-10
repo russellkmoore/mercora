@@ -40,6 +40,7 @@ const ENTRY_LABELS: Record<string, string> = {
   admin_created: "Created by an admin",
   code_revealed: "Code revealed",
   code_reveal_failed: "Code reveal failed — no code was returned",
+  delivery_resend_failed: "Delivery re-send failed — no email went out",
 };
 
 function labelFor(type: string): string {

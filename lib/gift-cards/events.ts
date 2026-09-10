@@ -23,6 +23,9 @@ export const GIFT_CARD_EVENT_TYPES = [
   // WR-02: a reveal whose decrypt failed *after* `code_revealed` was written.
   // The audit log must not claim a reveal happened when no code came back.
   "code_reveal_failed",
+  // A-2: a resend whose send failed *after* `delivery_resent` recorded the
+  // attempt and its address — same shape as the reveal pair above.
+  "delivery_resend_failed",
 ] as const;
 
 export type GiftCardEventType = (typeof GIFT_CARD_EVENT_TYPES)[number];
