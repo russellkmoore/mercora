@@ -110,3 +110,25 @@ describe("middleware admin deployment guard", () => {
     expect(guardIndex).toBeLessThan(shortCircuitIndex);
   });
 });
+
+describe("middleware admin page session gate (Phase 14 audit UF-14-1)", () => {
+  it("redirects an anonymous /admin page request to sign-in before any segment renders", async () => {
+    const auth = async () => ({ userId: null });
+    const response = await middleware(auth, new NextRequest("http://localhost/admin/gift-cards?x=1"));
+    expect(response.status).toBe(307);
+    const location = new URL(response.headers.get("location") ?? "", "http://localhost");
+    expect(location.pathname).toBe("/sign-in");
+    expect(location.searchParams.get("redirect_url")).toBe("/admin/gift-cards?x=1");
+  });
+
+  it("lets a signed-in session through to the admin short-circuit", async () => {
+    const auth = async () => ({ userId: "user_1" });
+    const response = await middleware(auth, new NextRequest("http://localhost/admin/gift-cards"));
+    expect(response.status).toBe(200);
+  });
+
+  it("does not apply the page gate to /api/admin (service tokens live there)", async () => {
+    const response = await middleware({}, new NextRequest("http://localhost/api/admin/gift-cards"));
+    expect(response.status).toBe(200);
+  });
+});

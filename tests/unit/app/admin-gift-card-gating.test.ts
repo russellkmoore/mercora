@@ -15,6 +15,9 @@ const mocks = vi.hoisted(() => ({
   resolveHonorEffective: vi.fn(),
 }));
 
+vi.mock("@/lib/auth/admin-session", () => ({
+  requireAdminSession: vi.fn(async () => ({ success: true, userId: "admin_test" })),
+}));
 vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext: mocks.context }));
 // Three collaborators, and the split matters: `resolveHonorEffective` answers
 // "does this page exist" (D-18), while `balancesMayExist` reads the record the

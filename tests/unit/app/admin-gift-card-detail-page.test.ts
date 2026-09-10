@@ -13,6 +13,9 @@ const mocks = vi.hoisted(() => ({
   resolveHonorEffective: vi.fn(),
 }));
 
+vi.mock("@/lib/auth/admin-session", () => ({
+  requireAdminSession: vi.fn(async () => ({ success: true, userId: "admin_test" })),
+}));
 vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext: mocks.context }));
 // D-16: the detail page must ask the same owner the list page and the
 // detail/events routes already ask — never re-derive the decision.
