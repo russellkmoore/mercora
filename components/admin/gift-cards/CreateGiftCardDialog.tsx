@@ -16,6 +16,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertTriangle, PlusCircle, RefreshCw } from "lucide-react";
 import { validateGiftCardRecipientEmail } from "@/lib/gift-cards/customization";
+import { Money } from "@/lib/money";
+import { getPrecision } from "@/lib/money/currencies";
+import { useStoreConfig } from "@/lib/store";
 
 interface CreateGiftCardDialogProps {
   /** D-07/T-14-56: minted once when the dialog opens, reused on every retry of this submission. */
@@ -25,12 +28,35 @@ interface CreateGiftCardDialogProps {
 }
 
 /**
+ * IN-08: parse a typed major-unit amount in the store currency. Only plain
+ * decimal digits with at most the currency's own number of fraction digits
+ * are accepted — no exponent notation, no signs, no separators — and the
+ * conversion goes through `Money.fromMajor` so a zero- or three-decimal
+ * currency is handled the same way the rest of the storefront handles it.
+ */
+function parseMajorAmount(input: string, currency: string): number | null {
+  const trimmed = input.trim();
+  const precision = getPrecision(currency);
+  const pattern = precision > 0 ? new RegExp(`^\\d{1,9}(\\.\\d{1,${precision}})?$`) : /^\d{1,9}$/;
+  if (!pattern.test(trimmed)) return null;
+  try {
+    const minor = Money.fromMajor(trimmed, currency).toMinorUnits();
+    return minor > 0 ? minor : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * D-07/D-22: an admin-created card, confirmed by a required reason. The
  * `requestId` prop is minted once per dialog-open by the parent and posted
  * unchanged on every retry, so a double-click cannot mint two cards — the
  * server-side idempotent id derivation is the real backstop.
  */
 export default function CreateGiftCardDialog({ requestId, onCancel, onCreated }: CreateGiftCardDialogProps) {
+  const { commerce } = useStoreConfig();
+  const currency = commerce.currency;
+  const precision = getPrecision(currency);
   const [amount, setAmount] = useState("");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [recipientName, setRecipientName] = useState("");
@@ -38,8 +64,8 @@ export default function CreateGiftCardDialog({ requestId, onCancel, onCreated }:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const parsedMinor = Math.round(Number(amount) * 100);
-  const amountValid = amount.trim().length > 0 && Number.isFinite(parsedMinor) && parsedMinor > 0;
+  const parsedMinor = parseMajorAmount(amount, currency);
+  const amountValid = parsedMinor !== null;
   const emailValid = recipientEmail.trim().length > 0 && validateGiftCardRecipientEmail(recipientEmail.trim()) === null;
   const reasonValid = reason.trim().length > 0 && reason.trim().length <= 500;
   const canSubmit = amountValid && emailValid && reasonValid && !busy;
@@ -85,16 +111,21 @@ export default function CreateGiftCardDialog({ requestId, onCancel, onCreated }:
 
         <div className="space-y-4 py-2">
           <div>
-            <Label htmlFor="gift-card-amount" className="mb-2 block">Amount</Label>
-            <Input
-              id="gift-card-amount"
-              className="admin-input"
-              inputMode="decimal"
-              placeholder="25.00"
-              value={amount}
-              disabled={busy}
-              onChange={(event) => setAmount(event.target.value)}
-            />
+            <Label htmlFor="gift-card-amount" className="mb-2 block">Amount ({currency})</Label>
+            <div className="relative">
+              <Input
+                id="gift-card-amount"
+                className="admin-input pr-14"
+                inputMode="decimal"
+                placeholder={`25${precision > 0 ? `.${"0".repeat(precision)}` : ""}`}
+                value={amount}
+                disabled={busy}
+                onChange={(event) => setAmount(event.target.value)}
+              />
+              <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-gray-500">
+                {currency}
+              </span>
+            </div>
           </div>
           <div>
             <Label htmlFor="gift-card-recipient-email" className="mb-2 block">Recipient email</Label>
