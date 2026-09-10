@@ -22,6 +22,7 @@ created: "2026-09-10"
 | **Config file** | `vitest.config.mts` (unit, `tests/unit/**/*.test.ts`) · `vitest.workers.config.mts` (integration, `tests/integration/**/*.test.ts`) |
 | **Quick run command** | `mise exec -- npx vitest run <file>` |
 | **Full suite command** | `mise exec -- npm test && mise exec -- npm run test:workers && mise exec -- npm run test:observability-worker` |
+| **Phase gate command** | the full AGENTS.md list, in plan 13-09 task 1 — includes `npm audit`, `npm run cf-typecheck` (with `.dev.vars` moved aside under an `EXIT` trap) and `npm run check:migrations -- --base origin/main` |
 | **Estimated runtime** | ~45s unit, ~90s integration, ~15s observability worker |
 
 Notes that matter for this phase:
@@ -37,6 +38,13 @@ Notes that matter for this phase:
 - `tests/unit/app/api/payment-intent-authority.test.ts` replaces the whole
   `@/lib/services/checkout-pricing` module. That is why plan 13-04 puts the new error class in
   `lib/gift-cards/checkout.ts`, which that suite leaves real.
+- **`grep` on this machine resolves to ripgrep.** Any acceptance pattern containing `(` must use
+  `grep -F`, or ripgrep rejects it as an unclosed group (`it(`, `SUM(`) or silently reads it as a
+  capture group and matches the wrong text (`SUM(entry.amount_delta_minor)`). Every affected
+  criterion in this phase's plans uses `-F`.
+- **`grep -c` counts matching lines, not occurrences.** An imported-and-called symbol scores `2`,
+  not `1`. Criteria in plans 13-07 and 13-08 check the import line and the call site separately
+  rather than asserting a bare count of `1`.
 
 ---
 
@@ -73,7 +81,7 @@ Notes that matter for this phase:
 | 13-08-01 | 08 | 3 | GCF-02, GCF-03 | T-13-34, T-13-35 | Banner names an aggregate and a count, never card material; reachable exactly when the guard is active | unit | `mise exec -- npx vitest run tests/unit/app/admin-gift-card-gating.test.ts` | ❌ created by task | ⬜ pending |
 | 13-08-02 | 08 | 3 | GCF-03 | T-13-31, T-13-32 | Authentication precedes existence; the public balance route keeps one generic invalid response | unit | `mise exec -- npx vitest run tests/unit/app/api/gift-card-presentation-routes.test.ts` | ✅ | ⬜ pending |
 | 13-08-03 | 08 | 3 | GCF-02 | T-13-33, T-13-36 | No file under `app/` can write the honor-guard record | source-contract | `mise exec -- npx vitest run tests/unit/lib/gift-cards/honor-guard-writer-source.test.ts` | ❌ created by task | ⬜ pending |
-| 13-09-01 | 09 | 4 | GCF-01..05 | T-13-38, T-13-40 | Whole CI list green; generated Cloudflare types do not drift; no unplanned migration | suite | `npm run build:themes:check && npm run scan:tokens && npm run lint && npm run typecheck && mise exec -- npm test && mise exec -- npm run test:workers && mise exec -- npm run test:observability-worker && npm run docs:lint && npm run build` | ✅ | ⬜ pending |
+| 13-09-01 | 09 | 4 | GCF-01..05 | T-13-38, T-13-40 | Whole CI list green including audit, cf-typecheck and the migration check; generated Cloudflare types do not drift; no unplanned migration | suite | `npm audit --omit=dev --audit-level=high && npm run build:themes:check && npm run scan:tokens && npm run lint && npm run typecheck && ( trap 'mv -f /tmp/dev.vars.hold .dev.vars 2>/dev/null' EXIT; mv -f .dev.vars /tmp/dev.vars.hold; npm run cf-typecheck ) && mise exec -- npm test && mise exec -- npm run test:workers && mise exec -- npm run test:observability-worker && npm run docs:lint && npm run build && npm run check:migrations -- --base origin/main` | ✅ | ⬜ pending |
 | 13-09-02 | 09 | 4 | GCF-01..05 | T-13-37, T-13-40 | Deploy by push only; no flag value changed | cli | `mise exec -- npx wrangler deployments list` | ✅ | ⬜ pending |
 | 13-09-03 | 09 | 4 | GCF-01..05 | T-13-39, T-13-41 | Production unchanged; guard row present and zero; alarm quiet | cli | `curl -s -o /dev/null -w '%{http_code}\n' https://voltique.russellkmoore.me/product/gift-card && mise exec -- npx wrangler d1 execute mercora-db --remote --json --command "SELECT key, data_type FROM admin_settings WHERE key = 'gift_cards.honor_guard'"` | ✅ | ⬜ pending |
 
