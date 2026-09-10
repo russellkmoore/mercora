@@ -39,6 +39,11 @@ The two gift-card feature flags do what their names say. Sell (`STORE_FEATURE_GI
 ### UI design contract
 - **D-13:** The plan-gate's frontend detector matched the word "page" in the success criteria. The UI in this phase is an unavailable notice on the product page, an unavailable mark on a cart line, and an admin banner, all in existing token classes; planning runs with `--skip-ui`, the same call as Phases 9 and 12.
 
+### Research resolutions (Claude, after 13-RESEARCH.md)
+- **D-14:** The listing filter lives at the public call sites through one shared predicate (e.g. `lib/gift-cards/visibility.ts` `hidesGiftCardsFromListings(features)` + a `filterListedProducts` helper), never inside `listProducts`/`searchProducts`/`getProductsByCategory`, which `/admin/products` also uses and Phase 14 depends on. CMS page-builder product blocks (`lib/cms/page-products.ts`) count as listing surfaces and use the same predicate.
+- **D-15:** The honor-guard measurement is stored in `admin_settings` under category `gift_cards`, key `gift_cards.honor_guard`, value `{ outstanding_minor, currency, open_reservations, measured_at }`; written only by the cron tick, read by capability resolution (when honor=off) and the admin page. A missing or stale (> 15 min) record while honor=off counts as "balances may exist" — honor stays effectively on.
+- **D-16:** With honor=off (and the guard clear), `GiftCardApplyPanel` simply does not render; no explanatory copy. `priceCheckout` under sell=off rejects gift-card lines with a distinct `GiftCardSalesDisabledError` surfaced by `/api/payment-intent` as `{ code: 'gift_card_sales_disabled' }`, read from `getStoreConfig().commerce.features.giftCardAcquisition` (synchronous), not a capability round trip.
+
 ### Claude's Discretion
 - Exact copy of the unavailable state on the product page and cart line; whether the product page keeps the image and description above the notice (recommended: yes).
 - Whether the honor-off measurement lives in `admin_settings` (D-06) or a tiny dedicated table — no migration unless needed; prefer `admin_settings`.
