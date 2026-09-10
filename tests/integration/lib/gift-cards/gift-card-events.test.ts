@@ -302,8 +302,11 @@ describe("listAdminGiftCardPresentations search and projection (D-14, D-15)", ()
       },
     }));
 
+    // Filtered by this test's own unique suffix — this D1 instance is shared
+    // across every test in the file (migrations run once in `beforeAll`), so
+    // an unfiltered list would also count every card earlier tests created.
     const { cards, total } = await listAdminGiftCardPresentations({
-      database: env.DB, now: now + 1, limit: 10, offset: 0,
+      database: env.DB, now: now + 1, limit: 10, offset: 0, q: "4A7K",
     });
     expect(total).toBe(1);
     expect(cards[0]).toMatchObject({
@@ -317,11 +320,15 @@ describe("listAdminGiftCardPresentations search and projection (D-14, D-15)", ()
 
   it("renders a null maskedCode for a card with no stored code suffix", async () => {
     const repository = createGiftCardRepository(env.DB);
-    await repository.issueAccount(issuance());
-    const { cards } = await listAdminGiftCardPresentations({
-      database: env.DB, now: now + 1, limit: 10, offset: 0,
+    const orderId = `order_no_suffix_${testSequence}`;
+    await insertPendingOrder(orderId);
+    await repository.issueAccount(issuance({ issuedOrderId: orderId, issuedLineId: "line_1" }));
+    // Filtered by this test's own order id — see the comment above.
+    const { cards, total } = await listAdminGiftCardPresentations({
+      database: env.DB, now: now + 1, limit: 10, offset: 0, q: orderId,
     });
-    expect(cards[0]).toMatchObject({ codeSuffix: undefined, maskedCode: null });
+    expect(total).toBe(1);
+    expect(cards[0]).toMatchObject({ id: giftCardId, codeSuffix: undefined, maskedCode: null });
   });
 
   it("matches an exact order id, an exact recipient email, and an exact suffix, case-insensitively for the latter two", async () => {
