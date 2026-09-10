@@ -20,6 +20,9 @@ export const GIFT_CARD_EVENT_TYPES = [
   "hold_released",
   "admin_created",
   "code_revealed",
+  // WR-02: a reveal whose decrypt failed *after* `code_revealed` was written.
+  // The audit log must not claim a reveal happened when no code came back.
+  "code_reveal_failed",
 ] as const;
 
 export type GiftCardEventType = (typeof GIFT_CARD_EVENT_TYPES)[number];

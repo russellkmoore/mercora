@@ -30,6 +30,7 @@ vi.mock("@/lib/services/gift-card-fulfillment", () => ({
 }));
 
 import { POST as reveal } from "@/app/api/admin/gift-cards/[id]/reveal/route";
+import { GiftCardDecryptionError } from "@/lib/gift-cards/encryption";
 
 const context = { params: Promise.resolve({ id: "gift_card_1" }) };
 
@@ -164,6 +165,44 @@ describe("POST /api/admin/gift-cards/[id]/reveal", () => {
     // No code material anywhere in the event details.
     const eventArgs = mocks.appendGiftCardEvent.mock.calls[0][0];
     expect(JSON.stringify(eventArgs.details ?? {})).not.toContain("GC-");
+  });
+
+  it("audits a failed decrypt as code_reveal_failed and still answers 409 code_unavailable (WR-02)", async () => {
+    mocks.revealGiftCardDeliveryCode.mockRejectedValue(new GiftCardDecryptionError());
+    const response = await reveal(revealRequest({ confirm: true }), context);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: "code_unavailable" });
+    expect(mocks.appendGiftCardEvent).toHaveBeenCalledTimes(2);
+    expect(mocks.appendGiftCardEvent).toHaveBeenNthCalledWith(1, expect.objectContaining({ eventType: "code_revealed" }));
+    expect(mocks.appendGiftCardEvent).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      giftCardId: "gift_card_1",
+      eventType: "code_reveal_failed",
+      actor: { type: "admin", id: "user_super_admin" },
+      details: { reason: "decrypt" },
+    }));
+  });
+
+  it("reports a key-ring misconfiguration as 503, audited with reason configuration, never as code_unavailable (WR-02)", async () => {
+    mocks.revealGiftCardDeliveryCode.mockRejectedValue(new Error("GIFT_CARD_DELIVERY_KEYS_JSON is missing version 3"));
+    const response = await reveal(revealRequest({ confirm: true }), context);
+    expect(response.status).toBe(503);
+    const body = await response.json();
+    expect(body).toMatchObject({ code: "gift_cards_write_failed" });
+    expect(JSON.stringify(body)).not.toContain("GC-");
+    expect(mocks.appendGiftCardEvent).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      eventType: "code_reveal_failed",
+      details: { reason: "configuration" },
+    }));
+  });
+
+  it("does not let a failed code_reveal_failed write change the answer (WR-02)", async () => {
+    mocks.revealGiftCardDeliveryCode.mockRejectedValue(new GiftCardDecryptionError());
+    mocks.appendGiftCardEvent
+      .mockResolvedValueOnce("event_1")
+      .mockRejectedValueOnce(new Error("D1 unavailable"));
+    const response = await reveal(revealRequest({ confirm: true }), context);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: "code_unavailable" });
   });
 
   it("returns 401 for an unauthenticated caller", async () => {

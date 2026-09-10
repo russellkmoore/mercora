@@ -37,6 +37,7 @@ const ENTRY_LABELS: Record<string, string> = {
   hold_released: "Hold released",
   admin_created: "Created by an admin",
   code_revealed: "Code revealed",
+  code_reveal_failed: "Code reveal failed — no code was returned",
 };
 
 function labelFor(type: string): string {
