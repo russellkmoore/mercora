@@ -10,6 +10,7 @@ import {
 import { assertGiftCardReason } from "@/lib/gift-cards/domain";
 import { appendGiftCardEvent } from "@/lib/gift-cards/events";
 import { resolveHonorEffective } from "@/lib/gift-cards/honor-guard";
+import { createGiftCardRepository } from "@/lib/gift-cards/repository";
 import { giftCardSurfacesHidden } from "@/lib/gift-cards/visibility";
 
 /** D-11/D-13: a CSR note, 1-2000 characters, attributed to the calling admin. */
@@ -56,6 +57,20 @@ export async function POST(
     assertGiftCardReason(text, "gift-card note", 2_000);
   } catch {
     return jsonError("invalid_body", "A note between 1 and 2000 characters is required", 400);
+  }
+
+  // WR-05: D-13's 404 for an unknown card. Without this the FK on
+  // gift_card_events.gift_card_id fails the insert and the catch below
+  // reports a 503 "temporarily unavailable" for a card that simply does not
+  // exist.
+  let exists: boolean;
+  try {
+    exists = Boolean(await createGiftCardRepository(environment.DB).findAccountById(id));
+  } catch {
+    return jsonError("gift_cards_write_failed", "Gift cards are temporarily unavailable", 503);
+  }
+  if (!exists) {
+    return jsonError("gift_card_not_found", "Gift card not found", 404);
   }
 
   try {
