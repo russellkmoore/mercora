@@ -59,7 +59,7 @@ Full phase details, success criteria, and plan lists: `milestones/v2.1-ROADMAP.m
 **Milestone Goal:** Make gift cards operable — flags that mean what they say, and an admin that can manage individual cards with an audit trail. Close the shopper-facing gaps the v2.1 live test exposed: subscription address entry in place, the blog reachable, saved payment methods. Clear the tech debt carried out of v2.1 and the operator checklist that needs Russell in the Stripe and Cloudflare dashboards.
 
 - [x] **Phase 13: Gift-Card Flags** - Sell and honor each control what their name says, and both off makes gift cards vanish (completed 2026-09-10)
-- [ ] **Phase 14: Gift-Card Admin & Audit Trail** - An admin can find, read the history of, and act on any individual gift card
+- [x] **Phase 14: Gift-Card Admin & Audit Trail** - An admin can find, read the history of, and act on any individual gift card (completed 2026-09-10)
 - [ ] **Phase 15: Subscription Address In Place** - A shopper adds a shipping address on the subscription product page without leaving it
 - [ ] **Phase 16: Blog Surfacing** - The blog is reachable from the header and the latest articles appear on the home page
 - [ ] **Phase 17: Saved Payment Methods** - A signed-in shopper saves a card at checkout and manages it from their account
@@ -126,33 +126,33 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 14-01-PLAN.md — Migration `0024`, the `gift_card_events` Drizzle table and `code_suffix`, proven by a migration-ordering test
-- [ ] 14-02-PLAN.md — Narrow the honor-guard settings refusal, declare the code-reveal setting, add the shared admin route scaffold
+- [x] 14-01-PLAN.md — Migration `0024`, the `gift_card_events` Drizzle table and `code_suffix`, proven by a migration-ordering test
+- [x] 14-02-PLAN.md — Narrow the honor-guard settings refusal, declare the code-reveal setting, add the shared admin route scaffold
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 14-03-PLAN.md — Repository: `disableAccount`, `findReservations`, `requeueDelivery`, `writeAdjustment`, once-only `reissue`
+- [x] 14-03-PLAN.md — Repository: `disableAccount`, `findReservations`, `requeueDelivery`, `writeAdjustment`, once-only `reissue`
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 14-04-PLAN.md — Event writer, four-source timeline merge, extended list projection with search, forbidden-column contract
+- [x] 14-04-PLAN.md — Event writer, four-source timeline merge, extended list projection with search, forbidden-column contract
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 14-05-PLAN.md — Fulfillment: `issueAdminGiftCard`, `resendGiftCardDelivery`, code suffix on checkout-issued cards
+- [x] 14-05-PLAN.md — Fulfillment: `issueAdminGiftCard`, `resendGiftCardDelivery`, code suffix on checkout-issued cards
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 14-06-PLAN.md — Read and create routes: card detail, timeline, list search and paging, admin-create
-- [ ] 14-07-PLAN.md — Seven mutation routes: disable, notes, requeue, release-hold, resend, reissue, reveal
+- [x] 14-06-PLAN.md — Read and create routes: card detail, timeline, list search and paging, admin-create
+- [x] 14-07-PLAN.md — Seven mutation routes: disable, notes, requeue, release-hold, resend, reissue, reveal
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 14-08-PLAN.md — Admin UI: real list with search and paging, card detail page, action bar, confirm dialogs, timeline
+- [x] 14-08-PLAN.md — Admin UI: real list with search and paging, card detail page, action bar, confirm dialogs, timeline
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 14-09-PLAN.md — Documentation, full CI gate suite, deploy and read-only production check
+- [x] 14-09-PLAN.md — Documentation, full CI gate suite, deploy and read-only production check
 
 **UI hint**: yes
 
@@ -238,7 +238,7 @@ Plans:
 | 5-8.2 (v2 Themeable Storefront) | 44/44 | Complete | 2026-09-05 |
 | 9-12 (v2.1 Gift Card Product) | 20/20 | Complete | 2026-09-10 |
 | 13. Gift-Card Flags | 9/9 | Complete    | 2026-09-10 |
-| 14. Gift-Card Admin & Audit Trail | 0/? | Not started | - |
+| 14. Gift-Card Admin & Audit Trail | 9/9 | Complete    | 2026-09-10 |
 | 15. Subscription Address In Place | 0/? | Not started | - |
 | 16. Blog Surfacing | 0/? | Not started | - |
 | 17. Saved Payment Methods | 0/? | Not started | - |
