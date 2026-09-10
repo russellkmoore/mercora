@@ -5,6 +5,7 @@ import { GIFT_CARD_EVENT_FORBIDDEN_DETAIL_KEYS } from '@/lib/gift-cards/events';
 const mocks = vi.hoisted(() => ({
   context: vi.fn(),
   adminAuth: vi.fn(),
+  isSuperAdminActor: vi.fn(),
   resolveHonorEffective: vi.fn(),
   findAccountById: vi.fn(),
   findReservations: vi.fn(),
@@ -14,7 +15,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@opennextjs/cloudflare', () => ({ getCloudflareContext: mocks.context }));
-vi.mock('@/lib/auth/admin-middleware', () => ({ checkAdminPermissions: mocks.adminAuth }));
+vi.mock('@/lib/auth/admin-middleware', () => ({
+  checkAdminPermissions: mocks.adminAuth,
+  isSuperAdminActor: mocks.isSuperAdminActor,
+}));
 // The detail and events routes ask the single owner of the money decision
 // (D-16), the same function `/api/admin/gift-cards` asks.
 vi.mock('@/lib/gift-cards/honor-guard', () => ({
@@ -76,6 +80,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.context.mockResolvedValue({ env: { DB: {}, STORE_FEATURE_GIFT_CARD_RECONCILIATION: 'true' } });
   mocks.adminAuth.mockResolvedValue({ success: true, userId: 'admin_one' });
+  mocks.isSuperAdminActor.mockResolvedValue(true);
   mocks.resolveHonorEffective.mockResolvedValue(true);
   mocks.findAccountById.mockResolvedValue(sampleAccount);
   mocks.getAdminGiftCardPresentation.mockResolvedValue(samplePresentation);
@@ -160,6 +165,23 @@ describe('GET /api/admin/gift-cards/[id]', () => {
     expect(body.reservations).toHaveLength(1);
     expect(body.reservations[0]).toMatchObject({ id: 'res_1', amountMinor: 500, classification: 'open' });
     expect(body.capabilities).toEqual({ codeRevealEnabled: true });
+  });
+
+  it('reports codeRevealEnabled false for a non-super-admin even with the setting on (IN-07)', async () => {
+    mocks.getSettings.mockResolvedValue({ 'gift_cards.code_reveal_enabled': true });
+    mocks.isSuperAdminActor.mockResolvedValue(false);
+    const { request, params } = detailRequest('gift_card_1');
+    const response = await detailGet(request, { params });
+    expect(response.status).toBe(200);
+    expect(((await response.json()) as { capabilities: unknown }).capabilities).toEqual({ codeRevealEnabled: false });
+  });
+
+  it('does not consult the super-admin check at all while the setting is off (IN-07)', async () => {
+    mocks.getSettings.mockResolvedValue({ 'gift_cards.code_reveal_enabled': false });
+    const { request, params } = detailRequest('gift_card_1');
+    const response = await detailGet(request, { params });
+    expect(((await response.json()) as { capabilities: unknown }).capabilities).toEqual({ codeRevealEnabled: false });
+    expect(mocks.isSuperAdminActor).not.toHaveBeenCalled();
   });
 
   it('carries no forbidden column names in a successful response body', async () => {
