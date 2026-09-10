@@ -211,3 +211,55 @@ describe('public product endpoints', () => {
     expect(body.meta.total).toBe(2);
   });
 });
+
+describe('public product pagination stays consistent with the visibility filter (WR-07)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(checkAdminPermissions).mockResolvedValue({
+      success: false,
+      error: 'Authentication required. Please sign in.',
+    });
+  });
+
+  /** Ten active products with the gift card sitting inside the first page. */
+  const catalogue = [
+    { ...activeProduct, id: 'p0' },
+    { ...giftCardProduct, id: 'p1' },
+    ...Array.from({ length: 8 }, (_, index) => ({ ...activeProduct, id: `p${index + 2}` })),
+  ];
+
+  it('returns a full page and a matching total when a hidden product falls inside it', async () => {
+    // The page used to be sliced in SQL and filtered in memory afterwards, so
+    // the page holding the gift card came back with limit - 1 items while
+    // `total` described the fully filtered set. A client paginating on `total`
+    // walked into a hole.
+    setGiftCardFeatures({ giftCardAcquisition: false });
+    vi.mocked(listProducts).mockResolvedValue(catalogue as never);
+
+    const response = await getProducts(
+      new NextRequest('http://localhost/api/products?limit=3&offset=0'),
+    );
+    const body = await response.json() as { data: Array<{ id: string }>; meta: { total: number } };
+
+    expect(body.data).toHaveLength(3);
+    expect(body.data.map((product) => product.id)).toEqual(['p0', 'p2', 'p3']);
+    expect(body.meta.total).toBe(9);
+  });
+
+  it('walks every page without a gap or a repeat', async () => {
+    setGiftCardFeatures({ giftCardAcquisition: false });
+    vi.mocked(listProducts).mockResolvedValue(catalogue as never);
+
+    const seen: string[] = [];
+    for (let offset = 0; offset < 9; offset += 3) {
+      const response = await getProducts(
+        new NextRequest(`http://localhost/api/products?limit=3&offset=${offset}`),
+      );
+      const body = await response.json() as { data: Array<{ id: string }> };
+      seen.push(...body.data.map((product) => product.id));
+    }
+
+    expect(seen).toEqual(['p0', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9']);
+    expect(new Set(seen).size).toBe(seen.length);
+  });
+});
