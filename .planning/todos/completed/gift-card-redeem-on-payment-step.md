@@ -30,3 +30,7 @@ Roughly half a day. Real regression risk in the payment step, so plan it as its 
 
 - Recipient-based Account → Gift cards listing (SHOP-07 gap, v2.1 audit).
 - `STORE_FEATURE_GIFT_CARD_ACQUISITION` only gates tender today (v2.1 audit INT-01).
+
+## Resolved 2026-09-10
+
+Shipped in `b121c93`: "Pay with a gift card" panel on the Payment Information step with Apply/Remove, in-place re-quote, Elements remount, `previousOrderId` release of the earlier hold, and a specific gift-card error. Browser walkthrough by Russell pending.
