@@ -110,4 +110,37 @@ describe("the generic settings writer refuses the gift-card honor guard (CR-02, 
     expect(response.status).toBe(200);
     expect(mocks.getDbAsync).toHaveBeenCalled();
   });
+
+  it("accepts a write for the gift-card code-reveal setting, in category gift_cards (D-20)", async () => {
+    const where = vi.fn().mockResolvedValue(undefined);
+    mocks.getDbAsync.mockResolvedValue({
+      select: vi.fn()
+        .mockImplementationOnce(() => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }))
+        .mockImplementation(() => ({ from: () => ({ where: async () => [] }) })),
+      insert: () => ({ values: async () => undefined }),
+      update: () => ({ set: () => ({ where }) }),
+    });
+
+    const response = await POST(settingsRequest([
+      { key: "gift_cards.code_reveal_enabled", category: "gift_cards", value: true, data_type: "boolean" },
+    ]));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.code).not.toBe("honor_guard_read_only");
+    expect(mocks.getDbAsync).toHaveBeenCalled();
+  });
+
+  it("rejects a padded/whitespace variant of the guard key", async () => {
+    const response = await POST(settingsRequest([{
+      key: `  ${HONOR_GUARD_SETTING_KEY}  `,
+      category: "system",
+      data_type: "object",
+      value: forgedMeasurement,
+    }]));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: "honor_guard_read_only" });
+    expect(mocks.getDbAsync).not.toHaveBeenCalled();
+  });
 });

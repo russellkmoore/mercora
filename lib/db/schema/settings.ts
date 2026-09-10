@@ -195,5 +195,14 @@ export const defaultSettings = [
     category: 'recommendations',
     description: 'Hide products the customer already purchased',
     data_type: 'boolean'
+  },
+
+  // Gift Cards
+  {
+    key: 'gift_cards.code_reveal_enabled',
+    value: JSON.stringify(false),
+    category: 'gift_cards',
+    description: 'Allow a super admin to reveal a gift-card code; each reveal writes a permanent audit event naming the admin who asked',
+    data_type: 'boolean'
   }
 ];
