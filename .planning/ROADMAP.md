@@ -82,7 +82,7 @@ Full phase details, success criteria, and plan lists: `milestones/v2.1-ROADMAP.m
   3. Honor cannot be turned off while any active balance or open reservation exists — the runtime refuses to start, or admin shows a loud warning naming the outstanding balance — and sell on with honor off still refuses to start
   4. An operator reading `docs/runtime-configuration.md` and `docs/DEPLOYMENT_SETUP.md` §9 finds the two flags described as sell and honor, with the four-state table and the "stop selling, keep honoring" rollback recipe
 
-**Plans**: 1/9 plans executed
+**Plans**: 9/9 plans executed
 
 Plans:
 **Wave 1**
@@ -91,20 +91,20 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 13-02-PLAN.md — Listing visibility at nine public call sites, admin listing untouched (wave 2)
-- [ ] 13-03-PLAN.md — Product page: unavailable notice under sell=off, 404 under both-off (wave 2)
-- [ ] 13-04-PLAN.md — Checkout: server-side sell=off rejection, cart mark, panel gated on honor (wave 2)
-- [ ] 13-05-PLAN.md — Honor guard: balance measurement, admin_settings record, critical event (wave 2)
+- [x] 13-02-PLAN.md — Listing visibility at nine public call sites, admin listing untouched (wave 2)
+- [x] 13-03-PLAN.md — Product page: unavailable notice under sell=off, 404 under both-off (wave 2)
+- [x] 13-04-PLAN.md — Checkout: server-side sell=off rejection, cart mark, panel gated on honor (wave 2)
+- [x] 13-05-PLAN.md — Honor guard: balance measurement, admin_settings record, critical event (wave 2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 13-06-PLAN.md — Docs: sell/honor four-state table, rollback recipe, source-contract test (wave 3)
-- [ ] 13-07-PLAN.md — Cron measures and alarms; request-path honor override that still throws (wave 3)
-- [ ] 13-08-PLAN.md — Admin and public surface gating plus the outstanding-balance banner (wave 3)
+- [x] 13-06-PLAN.md — Docs: sell/honor four-state table, rollback recipe, source-contract test (wave 3)
+- [x] 13-07-PLAN.md — Cron measures and alarms; request-path honor override that still throws (wave 3)
+- [x] 13-08-PLAN.md — Admin and public surface gating plus the outstanding-balance banner (wave 3)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 13-09-PLAN.md — Phase gate: full CI, push to main, read-only production confirmation (wave 4)
+- [x] 13-09-PLAN.md — Phase gate: full CI, push to main, read-only production confirmation (wave 4)
 
 **UI hint**: yes
 
@@ -205,7 +205,7 @@ Plans:
 | 1-4 (v1 Hardening) | 17/17 | Complete | 2026-09-02 |
 | 5-8.2 (v2 Themeable Storefront) | 44/44 | Complete | 2026-09-05 |
 | 9-12 (v2.1 Gift Card Product) | 20/20 | Complete | 2026-09-10 |
-| 13. Gift-Card Flags | 1/9 | In Progress|  |
+| 13. Gift-Card Flags | 9/9 | In Progress|  |
 | 14. Gift-Card Admin & Audit Trail | 0/? | Not started | - |
 | 15. Subscription Address In Place | 0/? | Not started | - |
 | 16. Blog Surfacing | 0/? | Not started | - |

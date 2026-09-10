@@ -12,10 +12,10 @@ Requirements for this milestone. Each maps to a roadmap phase.
 ### Gift-card flags
 
 - [x] **GCF-01**: With `STORE_FEATURE_GIFT_CARD_ACQUISITION` (sell) off and reconciliation (honor) on, the gift card cannot be bought: the product page shows no recipient form and "not available" copy, `priceCheckout` rejects gift-card lines, and existing cards still redeem at checkout
-- [ ] **GCF-02**: Honor (`STORE_FEATURE_GIFT_CARD_RECONCILIATION`) cannot be turned off while any active balance or open reservation exists: the runtime refuses to start (or, if a refusal is judged too blunt, admin shows a loud warning naming the outstanding balance) and the deploy docs say so
-- [ ] **GCF-03**: With both flags off, no gift-card surface renders: product hidden from listings and 404 on its page, no checkout gift-card panel, no admin nav entry, no `/admin/gift-cards`
+- [x] **GCF-02**: Honor (`STORE_FEATURE_GIFT_CARD_RECONCILIATION`) cannot be turned off while any active balance or open reservation exists: the runtime refuses to start (or, if a refusal is judged too blunt, admin shows a loud warning naming the outstanding balance) and the deploy docs say so
+- [x] **GCF-03**: With both flags off, no gift-card surface renders: product hidden from listings and 404 on its page, no checkout gift-card panel, no admin nav entry, no `/admin/gift-cards`
 - [x] **GCF-04**: Sell on with honor off still refuses to start (existing rule kept and tested)
-- [ ] **GCF-05**: `docs/runtime-configuration.md` and `docs/DEPLOYMENT_SETUP.md` §9 describe the two flags as sell and honor with the four-state table and the rollback recipe (stop selling, keep honoring)
+- [x] **GCF-05**: `docs/runtime-configuration.md` and `docs/DEPLOYMENT_SETUP.md` §9 describe the two flags as sell and honor with the four-state table and the rollback recipe (stop selling, keep honoring)
 
 ### Gift-card admin
 
@@ -86,10 +86,10 @@ Deferred to a later milestone.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | GCF-01 | Phase 13 | Complete |
-| GCF-02 | Phase 13 | Pending |
-| GCF-03 | Phase 13 | Pending |
+| GCF-02 | Phase 13 | Complete |
+| GCF-03 | Phase 13 | Complete |
 | GCF-04 | Phase 13 | Complete |
-| GCF-05 | Phase 13 | Pending |
+| GCF-05 | Phase 13 | Complete |
 | GCA-01 | Phase 14 | Pending |
 | GCA-02 | Phase 14 | Pending |
 | GCA-03 | Phase 14 | Pending |
