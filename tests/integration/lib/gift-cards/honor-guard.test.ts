@@ -7,6 +7,7 @@ import {
   sumOutstandingGiftCardBalances,
 } from "@/lib/gift-cards/repository";
 import {
+  HONOR_GUARD_MIXED_CURRENCY,
   HONOR_GUARD_SETTING_CATEGORY,
   HONOR_GUARD_SETTING_KEY,
   HONOR_GUARD_STALE_SECONDS,
@@ -341,6 +342,49 @@ describe("honor-guard record on real D1", () => {
         "wrong shape",
       ).run();
     await expect(readHonorGuard(env.DB)).resolves.toBeNull();
+  });
+
+  it.each([
+    ["an empty currency, which throws in the Money constructor", { currency: "" }],
+    ["a non-ISO currency, which throws out of Intl.NumberFormat", { currency: "US$" }],
+    ["a two-letter currency", { currency: "US" }],
+    ["a fractional total, which trips assertSafeMinorUnits", { outstanding_minor: 12.5 }],
+    ["a total beyond safe integer range", { outstanding_minor: Number.MAX_SAFE_INTEGER + 2 }],
+    ["a negative reservation count, which cannot describe anything real", { open_reservations: -1 }],
+  ])("reads a row carrying %s as null rather than letting the banner format it", async (_name, overrides) => {
+    // The banner runs Money.fromMinor(...).format() on whatever comes back, in
+    // an admin server component. Every value here throws somewhere in that
+    // chain, so the parse has to refuse it — null is a shape the banner and
+    // balancesMayExist both already handle, and it fails toward honoring.
+    await env.DB.prepare(`INSERT INTO admin_settings (key, value, category, description, data_type)
+      VALUES (?, ?, ?, ?, 'object')`)
+      .bind(
+        HONOR_GUARD_SETTING_KEY,
+        JSON.stringify({
+          outstanding_minor: 100,
+          currency: "USD",
+          open_reservations: 0,
+          measured_at: epoch,
+          ...overrides,
+        }),
+        HONOR_GUARD_SETTING_CATEGORY,
+        "unusable",
+      ).run();
+
+    await expect(readHonorGuard(env.DB)).resolves.toBeNull();
+    await expect(honorIsEffectivelyOn(env.DB, false, epoch)).resolves.toBe(true);
+  });
+
+  it("still reads the mixed-currency sentinel, which is deliberate and not corruption", async () => {
+    await writeHonorGuard(env.DB, {
+      outstanding_minor: 3_000,
+      currency: HONOR_GUARD_MIXED_CURRENCY,
+      open_reservations: 0,
+      measured_at: epoch,
+    });
+    await expect(readHonorGuard(env.DB)).resolves.toMatchObject({
+      currency: HONOR_GUARD_MIXED_CURRENCY,
+    });
   });
 
   it("answers honor-on without touching D1 when honor is configured on", async () => {
