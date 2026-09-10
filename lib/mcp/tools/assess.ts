@@ -4,6 +4,8 @@ import { enhanceUserContext } from '../context';
 import { Money } from '../../money';
 import { toPublicProduct, toWireProduct } from '../../models/mach/product-serializer';
 import { isBoundedString, isPlainRecord } from '../../public-request-validation';
+import { getStoreConfig } from '../../store-config';
+import { filterListedProducts } from '../../gift-cards/visibility';
 
 export async function assessFulfillmentCapability(
   request: AssessRequest,
@@ -43,9 +45,10 @@ export async function assessFulfillmentCapability(
     const userContext = enhanceUserContext(request.agent_context || null);
     
     // Assess each requested item
+    const { giftCardAcquisition } = getStoreConfig().commerce.features;
     const assessmentResults: Array<{item: string, confidence: number, products: any[]}> =
       await Promise.all(requirements.items.map(async (item) => {
-        const products = await searchProducts(item);
+        const products = filterListedProducts(await searchProducts(item), { giftCardAcquisition });
         return { item, confidence: calculateConfidence(products), products };
       }));
     const canFulfill = assessmentResults

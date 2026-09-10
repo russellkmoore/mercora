@@ -2,6 +2,8 @@ import { getProductsBySlugs } from "@/lib/models/mach/products";
 import { Money } from "@/lib/money";
 import type { Product } from "@/lib/types";
 import type { PageSection } from "./page-sections";
+import { getStoreConfig } from "@/lib/store-config";
+import { isPubliclyVisibleProduct } from "@/lib/gift-cards/visibility";
 
 const PLACEHOLDER_IMAGE = "/placeholder.svg";
 
@@ -56,6 +58,15 @@ export async function resolveSectionProducts(
     products = await getProductsBySlugs(references.map((section) => section.productSlug));
   } catch {
     return new Map();
+  }
+
+  // CMS page-builder product blocks are a listing surface too (D-14): drop
+  // any resolved product the shared predicate says should not be browsable.
+  const { giftCardAcquisition } = getStoreConfig().commerce.features;
+  for (const [slug, product] of products) {
+    if (!isPubliclyVisibleProduct(product, { giftCardAcquisition })) {
+      products.delete(slug);
+    }
   }
 
   const resolved = new Map<string, ProductCardData>();

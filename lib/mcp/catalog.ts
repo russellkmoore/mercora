@@ -5,6 +5,8 @@ import { allowedShippingCountries } from '../shipping/allowed-countries';
 import type { Product } from '../types';
 import { getSettings } from '../utils/settings';
 import type { CapabilitiesResponse } from './types';
+import { getStoreConfig } from '../store-config';
+import { filterListedProducts } from '../gift-cards/visibility';
 
 export function isPublicMcpProduct(product: Product): boolean {
   return product.status === 'active';
@@ -37,7 +39,11 @@ export async function getCatalogCapabilities(): Promise<CapabilitiesResponse> {
     listProducts({ status: ['active'] }),
     getSettings('shipping'),
   ]);
-  const publicProducts = products.filter(isPublicMcpProduct);
+  const { giftCardAcquisition } = getStoreConfig().commerce.features;
+  const publicProducts = filterListedProducts(
+    products.filter(isPublicMcpProduct),
+    { giftCardAcquisition },
+  );
   const categoryNames = categories.flatMap((category) => {
     const name = getCategoryDisplayName(category);
     return name ? [name] : [];
