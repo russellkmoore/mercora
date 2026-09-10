@@ -1,6 +1,6 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { NextRequest, NextResponse } from "next/server";
-import { checkAdminPermissions } from "@/lib/auth/admin-middleware";
+import { checkAdminPermissions, isSuperAdminActor } from "@/lib/auth/admin-middleware";
 import { giftCardAdminFlags, jsonError } from "@/lib/gift-cards/admin-http";
 import { resolveHonorEffective } from "@/lib/gift-cards/honor-guard";
 import { getAdminGiftCardPresentation } from "@/lib/gift-cards/presentations";
@@ -61,6 +61,12 @@ export async function GET(
 
     const reservations = await repository.findReservations(id);
     const settings = await getSettings("gift_cards");
+    // IN-07: the reveal control only appears for a caller the reveal route
+    // would actually accept — setting on AND a super-admin browser session
+    // (service tokens and the dev bypass are refused there). Anyone else
+    // would only get a 403 toast for their click.
+    const codeRevealEnabled = settings["gift_cards.code_reveal_enabled"] === true
+      && await isSuperAdminActor(auth);
 
     return NextResponse.json({
       card: {
@@ -89,10 +95,9 @@ export async function GET(
         classification: classifyGiftCardReservation(reservation, nowSeconds),
       })),
       // D-12: read-only here — the UI's reveal control and the reveal
-      // route's own gate (plan 14-07) both read this same stored setting.
-      capabilities: {
-        codeRevealEnabled: settings["gift_cards.code_reveal_enabled"] === true,
-      },
+      // route's own gate both read this same stored setting and the same
+      // super-admin check.
+      capabilities: { codeRevealEnabled },
     });
   } catch {
     return jsonError("gift_cards_read_failed", "Gift cards are temporarily unavailable", 503);
