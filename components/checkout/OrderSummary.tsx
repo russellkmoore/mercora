@@ -2,6 +2,7 @@ import type { ShippingOption } from "@/lib/types/shipping";
 import type { CartItem } from "@/lib/types/cartitem";
 import OrderItemCard from "./OrderItemCard";
 import DiscountCodeInput from "./DiscountCodeInput";
+import { Gift } from "lucide-react";
 import { useCartStore } from "@/lib/stores/cart-store";
 import { Money, cartSubtotal, type MachMoney } from "@/lib/money";
 
@@ -30,6 +31,13 @@ interface Props {
   shippingOption?: ShippingOption;
   taxAmount?: { amount: number; currency: string };
   showDiscountInput?: boolean;
+  /**
+   * Gift-card code entry. Rendered beside the discount-code input, because that
+   * is where shoppers look for "a code" — the old placement (a separate box
+   * under this summary, gone once the quote existed) was reported as
+   * "nowhere to enter it". The code is applied when the quote is created.
+   */
+  giftCard?: { value: string; onChange: (value: string) => void };
   authoritativeQuote?: AuthoritativeCheckoutQuote;
 }
 
@@ -38,6 +46,7 @@ export default function OrderSummary({
   shippingOption,
   taxAmount,
   showDiscountInput = false,
+  giftCard,
   authoritativeQuote,
 }: Props) {
   const { appliedDiscounts } = useCartStore();
@@ -97,6 +106,31 @@ export default function OrderSummary({
           <hr className="my-4" />
           <DiscountCodeInput />
         </>
+      )}
+
+      {showDiscountInput && giftCard && (
+        <div className="mt-4 space-y-2">
+          <label
+            htmlFor="gift-card-code"
+            className="flex items-center gap-2 text-sm text-muted-foreground"
+          >
+            <Gift className="h-4 w-4" />
+            <span>Have a gift card?</span>
+          </label>
+          <input
+            id="gift-card-code"
+            type="text"
+            value={giftCard.value}
+            onChange={(event) => giftCard.onChange(event.target.value)}
+            autoComplete="off"
+            maxLength={512}
+            className="w-full rounded border border-border bg-surface px-3 py-2 text-sm text-foreground"
+            placeholder="Enter gift card code"
+          />
+          <p className="text-xs text-muted-foreground">
+            Applied when you continue to payment.
+          </p>
+        </div>
       )}
 
       <hr className="my-2" />
