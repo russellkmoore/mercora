@@ -100,3 +100,13 @@ describe("honor-guard writer contract (D-15, T-13-33)", () => {
     }
   });
 });
+
+describe("honor-guard request path reads one keyed row (T-13-19)", () => {
+  it("keeps aggregate SQL out of lib/gift-cards/honor-guard.ts", () => {
+    const source = stripCommentLines(readFileSync(join(process.cwd(), "lib/gift-cards/honor-guard.ts"), "utf8"));
+    // The SUM/COUNT over accounts and reservations lives in the repository and
+    // runs from the cron tick; capability resolution must never scan balances.
+    expect(source).not.toMatch(/\b(SUM|COUNT)\s*\(/);
+    expect(source).not.toMatch(/gift_card_(accounts|reservations|ledger)/);
+  });
+});
