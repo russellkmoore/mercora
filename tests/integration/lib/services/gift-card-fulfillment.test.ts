@@ -13,7 +13,11 @@ vi.mock('@/lib/store-config', () => ({
   }),
 }));
 
-import { drainGiftCardDeliveries, fulfillPaidGiftCards } from '@/lib/services/gift-card-fulfillment';
+import {
+  drainGiftCardDeliveries,
+  fulfillPaidGiftCards,
+  issueAdminGiftCard,
+} from '@/lib/services/gift-card-fulfillment';
 import { TELEMETRY_MARKER } from '@/lib/observability/telemetry';
 import { TAIL_CRITICAL_EVENTS } from '@/workers/observability-tail/src/core';
 import type { Order } from '@/lib/types/order';
@@ -365,5 +369,110 @@ describe('gift-card issuance and durable delivery on real D1', () => {
     });
     errorSpy.mockRestore();
     warnSpy.mockRestore();
+  });
+});
+
+describe('admin-created gift card (D-07, D-19)', () => {
+  const adminMaxMinor = 20_000;
+
+  it('creates an account with no order, line, or purchaser attribution, and a four-character code suffix', async () => {
+    const result = await issueAdminGiftCard({
+      requestId: 'admin-request-attribution-1',
+      amount: Money.fromMinor(5_000, 'USD'),
+      recipientEmail: 'admin-recipient-1@example.test',
+      recipientName: 'Admin Recipient',
+      environment: runtimeEnvironment(),
+      now,
+    });
+    expect(result.created).toBe(true);
+    const row = await env.DB.prepare(`SELECT issued_order_id, issued_line_id,
+      purchaser_customer_id, code_suffix, issued_amount_minor
+      FROM gift_card_accounts WHERE id = ?`).bind(result.giftCardId).first<{
+        issued_order_id: string | null;
+        issued_line_id: string | null;
+        purchaser_customer_id: string | null;
+        code_suffix: string | null;
+        issued_amount_minor: number;
+      }>();
+    expect(row).toMatchObject({
+      issued_order_id: null,
+      issued_line_id: null,
+      purchaser_customer_id: null,
+      issued_amount_minor: 5_000,
+    });
+    expect(row?.code_suffix).toMatch(/^[23456789A-HJ-NP-Z]{4}$/);
+  });
+
+  it('converges two calls with the same requestId into one account', async () => {
+    const args = {
+      requestId: 'admin-request-idempotent-1',
+      amount: Money.fromMinor(2_500, 'USD'),
+      recipientEmail: 'admin-recipient-2@example.test',
+      environment: runtimeEnvironment(),
+      now,
+    };
+    const first = await issueAdminGiftCard(args);
+    const second = await issueAdminGiftCard(args);
+    expect(first.created).toBe(true);
+    expect(second.created).toBe(false);
+    expect(second.giftCardId).toBe(first.giftCardId);
+    const count = await env.DB.prepare(`SELECT COUNT(*) AS count FROM gift_card_accounts WHERE id = ?`)
+      .bind(first.giftCardId).first<{ count: number }>();
+    expect(count?.count).toBe(1);
+  });
+
+  it('creates two separate accounts for two different requestIds', async () => {
+    const base = {
+      amount: Money.fromMinor(2_500, 'USD'),
+      recipientEmail: 'admin-recipient-3@example.test',
+      environment: runtimeEnvironment(),
+      now,
+    };
+    const first = await issueAdminGiftCard({ ...base, requestId: 'admin-request-distinct-a' });
+    const second = await issueAdminGiftCard({ ...base, requestId: 'admin-request-distinct-b' });
+    expect(first.created).toBe(true);
+    expect(second.created).toBe(true);
+    expect(first.giftCardId).not.toBe(second.giftCardId);
+  });
+
+  it('refuses an amount at or below zero, or above the configured maximum, and writes nothing', async () => {
+    const before = await env.DB.prepare(`SELECT COUNT(*) AS count FROM gift_card_accounts`)
+      .first<{ count: number }>();
+    const invalidAmounts = [
+      Money.fromMinor(0, 'USD'),
+      Money.fromMinor(-100, 'USD'),
+      Money.fromMinor(adminMaxMinor + 1, 'USD'),
+    ];
+    for (const [index, amount] of invalidAmounts.entries()) {
+      await expect(issueAdminGiftCard({
+        requestId: `admin-request-invalid-${index}`,
+        amount,
+        recipientEmail: 'admin-recipient-invalid@example.test',
+        environment: runtimeEnvironment(),
+        now,
+      })).rejects.toThrow();
+    }
+    const after = await env.DB.prepare(`SELECT COUNT(*) AS count FROM gift_card_accounts`)
+      .first<{ count: number }>();
+    expect(after?.count).toBe(before?.count);
+  });
+
+  it('delivers an admin-created card through the existing cron drain', async () => {
+    const created = await issueAdminGiftCard({
+      requestId: 'admin-request-drain-1',
+      amount: Money.fromMinor(10_000, 'USD'),
+      recipientEmail: 'admin-recipient-drain@example.test',
+      environment: runtimeEnvironment(),
+      now,
+    });
+    mocks.send.mockResolvedValue({ success: true, id: 'admin-drain-1' });
+    const before = mocks.send.mock.calls.length;
+    await drainGiftCardDeliveries({ environment: runtimeEnvironment(), now: now + 1 });
+    const calls = mocks.send.mock.calls.slice(before) as Array<[{ to: string }, unknown]>;
+    const matched = calls.find(([message]) => message.to === 'admin-recipient-drain@example.test');
+    expect(matched).toBeTruthy();
+    const delivery = await env.DB.prepare(`SELECT status FROM gift_card_deliveries WHERE gift_card_id = ?`)
+      .bind(created.giftCardId).first<{ status: string }>();
+    expect(delivery?.status).toBe('sent');
   });
 });
