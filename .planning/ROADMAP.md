@@ -44,9 +44,9 @@ Full phase details, success criteria, and plan lists: `milestones/v2-ROADMAP.md`
 **Milestone Goal:** A shopper can buy a Voltique gift card on the storefront and the recipient receives it by email, using the gift card backend that shipped in v1 (PR #79, locked behind ADR-CTB-10). This milestone adds only the storefront front half — catalogue entry, recipient form, cart/checkout display — and production enablement of the flags and secrets that make issuance and delivery actually run.
 
 - [x] **Phase 9: Gift Card Catalogue** - A gift card product with four denomination variants exists in production and renders like any other product (completed 2026-09-08)
-- [ ] **Phase 10: Gift Card Purchase Flow** - A shopper enters recipient details on the product page and carries them through cart, checkout, and order history
+- [x] **Phase 10: Gift Card Purchase Flow** - A shopper enters recipient details on the product page and carries them through cart, checkout, and order history (completed 2026-09-09)
 - [x] **Phase 11: Production Enablement** - Gift card secrets and feature flags are live in production, rolled out in the required order, and documented (completed 2026-09-09)
-- [ ] **Phase 12: Content, Assistant & Live Proof** - Volt and the Terms page describe the gift card accurately, and a real production purchase proves the whole flow end to end
+- [x] **Phase 12: Content, Assistant & Live Proof** - Volt and the Terms page describe the gift card accurately, and a real production purchase proves the whole flow end to end (completed 2026-09-09)
 
 **Phase Numbering:** continues from v2 (which ended at Phase 8.2); this milestone runs Phases 9-12. Decimal phases (9.1, 9.2, ...) are urgent insertions.
 
@@ -189,6 +189,6 @@ Plans:
 | 1-4 (v1 Hardening) | 17/17 | Complete | 2026-09-02 |
 | 5-8.2 (v2 Themeable Storefront) | 44/44 | Complete | 2026-09-05 |
 | 9. Gift Card Catalogue | 4/4 | Complete    | 2026-09-08 |
-| 10. Gift Card Purchase Flow | 5/5 | In Progress|  |
+| 10. Gift Card Purchase Flow | 5/5 | Complete    | 2026-09-09 |
 | 11. Production Enablement | 5/5 | Complete    | 2026-09-09 |
-| 12. Content, Assistant & Live Proof | 6/6 | In Progress|  |
+| 12. Content, Assistant & Live Proof | 6/6 | Complete    | 2026-09-09 |
