@@ -1,10 +1,10 @@
 ---
 phase: 14-gift-card-admin-audit-trail
-fixed_at: 2026-09-10T22:09:00Z
+fixed_at: 2026-09-10T22:23:00Z
 review_path: .planning/phases/14-gift-card-admin-audit-trail/14-REVIEW.md
-iteration: 1
-findings_in_scope: 17
-fixed: 17
+iteration: 2
+findings_in_scope: 21
+fixed: 21
 skipped: 0
 status: all_fixed
 ---
@@ -90,8 +90,36 @@ SQL. No gift-card codes or secrets were printed; no `.env*.local` / `.dev.vars` 
 
 None.
 
+## Iteration 2
+
+**Fixed at:** 2026-09-10T22:23:00Z
+**Source:** `14-REVIEW.md` § Iteration 2 (0 Critical, WR-08, WR-09, IN-09, IN-10)
+**Summary:** 4 in scope, 4 fixed, 0 skipped. Four commits on `main`, explicit-path adds, no push.
+
+| ID | Status | Commit | What changed |
+| --- | --- | --- | --- |
+| WR-08 | fixed | `1654f90` | `revealGiftCardDeliveryCode` parses the ring first and checks `Object.hasOwn(keyRing.keys, row.code_key_version)` before decrypting; a gap throws `GiftCardEncryptionConfigurationError` (route → 503, audited `configuration`), so only a genuine decrypt failure reaches the route as `GiftCardDecryptionError` (409, `decrypt`). `decryptGiftCardDeliveryCode` is untouched — its collapse-everything behaviour is right for the delivery drain. The mocked plain-`Error` unit case now uses the real error class. New workers integration case exercises the real function for all three outcomes: intact ring → a code (shape-asserted only, never printed); version 1 rotated out with only version 2 in the ring → configuration error; ciphertext tampered in the row → decrypt error. |
+| WR-09 | fixed | `a132069` | `isAdminCreated` (no purchaser, no order) is gone. `resolveProvenance` reads `gift_card_events` in one batched query per page for every row without a purchasing customer: `reissued_from` → `purchaser: "reissued from {old id}"` plus a new `reissuedFromGiftCardId` on `AdminGiftCardPresentation`; `admin_created` → `"admin: {display name || email}"` via `admin_users`; otherwise `undefined`. Reissue wins over admin-created. The detail route passes `reissuedFromGiftCardId` through; `GiftCardQueue` and `GiftCardDetail` render "Reissued from <link to old card>" when set, and both fallbacks are now "—" (never "Admin created"). Integration cases cover both provenance kinds in list and detail (the IN-06 admin-created case from iteration 1 plus a new reissued-card case that also checks the old card carries no provenance of its own). |
+| IN-09 | fixed | `172ec15` | New `invalidGiftCardIdResponse(id)` in `admin-http.ts` runs `assertGiftCardId` and answers D-13's 404 `gift_card_not_found`. All nine `[id]` routes (detail, events, disable, notes, reissue, release-hold, requeue, resend, reveal) call it right after reading the param, so `giftCardReissueId` / `giftCardReissueDeliveryId` and the first repository read only ever see a well-formed id. Unit cases: the helper (well-formed, over-long, empty, whitespace, non-string) and the reissue-with-`to`, notes, detail and events routes with a 129-character id, each asserting no D1 read or derivation happened. |
+| IN-10 | fixed | `2dc5f68` | The reissue batch is wrapped: on failure the repository re-probes `findAccountById(newGiftCardId)` and the adjustment by business key, and throws `GiftCardConflictError("Gift card has already been reissued")` when both exist (route → 409 `gift_card_reissue_blocked`), otherwise rethrows the D1 error (→ 503). Integration test wraps `env.DB` in a `Proxy` whose `batch()` first lets a competing reissue complete (so both callers passed the pre-check), asserts the loser gets the conflict, and that exactly the winner's adjustment, account and two events exist. Detection is by re-probe, not by parsing the D1 error message. |
+
+### Verification (main checkout, after `172ec15`)
+
+| Gate | Result |
+| --- | --- |
+| `npm run lint` | 0 errors, 54 warnings (unchanged from iteration 1; the touched files carry only the two pre-existing `react-hooks/set-state-in-effect` notes on the `GiftCardQueue` / `GiftCardDetail` mount effects) |
+| `npm run typecheck` | clean |
+| `mise exec -- npm test` | 306 files, 2737 passed (+9 over iteration 1) |
+| `mise exec -- npm run test:workers` | 31 files, 246 passed (+3 over iteration 1) |
+
+Per-fix verification was typecheck plus the directly affected suites: reveal / detail-routes / presentation-routes / admin-http unit suites, and the fulfillment, gift-card-events and repository workers suites. No gift-card code or secret was printed; no `.env*.local` / `.dev.vars` read; no deploy; nothing pushed.
+
+### Iteration 2 skipped issues
+
+None.
+
 ---
 
-_Fixed: 2026-09-10T22:09:00Z_
+_Fixed: 2026-09-10T22:23:00Z_
 _Fixer: Claude (gsd-code-fixer)_
-_Iteration: 1_
+_Iteration: 2_
