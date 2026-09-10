@@ -214,6 +214,24 @@ export async function giftCardReissueId(oldGiftCardId: string): Promise<string> 
   return id;
 }
 
+/**
+ * The reissued card's own delivery row id — same derivation style as
+ * `giftCardReissueId`, one discriminator level deeper (its own purpose-scoped
+ * message) so the two ids never collide with each other or with a purchased
+ * card's `gift_delivery_{orderId}_{lineId}` id. Deterministic in the same old
+ * card id, so a retried reissue converges on the same delivery row instead of
+ * racing a second one into existence.
+ */
+export async function giftCardReissueDeliveryId(oldGiftCardId: string): Promise<string> {
+  assertGiftCardId(oldGiftCardId, "gift-card id");
+  const bytes = new TextEncoder().encode(`gift-card-reissue-delivery/v1/${oldGiftCardId}`);
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  const hex = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const id = `gift_delivery_reissue_${hex}`;
+  assertGiftCardId(id, "gift-card reissue delivery id");
+  return id;
+}
+
 // Uppercase symbols with the most common lookalike pairs removed: 0/O and 1/I.
 // Mirrors CODE_ALPHABET_PATTERN in ./code.ts (not exported there); the suffix
 // is display/search material sliced from a code generated with that alphabet.
