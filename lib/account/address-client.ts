@@ -51,7 +51,12 @@ export async function saveAddress(
       body: JSON.stringify(form),
     },
   );
-  const body = (await response.json()) as { address?: MACHCustomerAddress; error?: string };
+  let body: { address?: MACHCustomerAddress; error?: string } = {};
+  try {
+    body = (await response.json()) as typeof body;
+  } catch {
+    // Non-JSON body (empty 401, HTML 5xx page): fall through to the generic message.
+  }
   if (!response.ok || !body.address) {
     throw new Error(body.error || "Address could not be saved");
   }
