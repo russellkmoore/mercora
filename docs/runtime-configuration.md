@@ -142,6 +142,29 @@ acquisition. Products that also have subscription plans remain available for a
 one-time purchase while acquisition is off. Only the dedicated subscription
 route consults the acquisition flag and selected recurring plan.
 
+## Gift-card code reveal
+
+Unlike the sell/honor pair above, this is not a Worker variable. `gift_cards.code_reveal_enabled`
+is a boolean `admin_settings` row in category `gift_cards`, flipped through the admin settings
+screen like any other setting — changing it is not a deploy. It ships off.
+
+The neighbouring `gift_cards.honor_guard` key lives in the same `gift_cards` settings category but
+is still refused when submitted there: the five-minute recovery cron owns that key, and the admin
+settings writer rejects it regardless of who asks.
+
+Turning code reveal on lets a database super admin, in a browser session, reveal one gift card's
+full bearer code after a confirm step. A service token cannot reveal a code, and neither can the
+`x-dev-admin` development bypass — reveal checks `isSuperAdminActor`, not `checkAdminPermissions`
+alone, so both of those normally-privileged paths are refused.
+
+A reveal is not free: it writes a permanent `gift_card_events` row naming the admin who asked and
+when, and that row is written *before* the code is returned — if the write fails, no code comes
+back. Reveal does not change anything else. Codes stay absent from every list, every card detail
+view, every other API response, and every log line, whether or not the setting is on.
+
+Recommendation: leave code reveal off. Turn it on only for the duration of a specific
+investigation, and turn it back off when the investigation is done.
+
 ## Search indexing and images
 
 Robots defaults to `noindex`. Production must opt in with
