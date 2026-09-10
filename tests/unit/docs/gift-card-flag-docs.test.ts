@@ -79,16 +79,12 @@ describe('gift-card flag docs: sell-on/honor-off is a real throw, not just prose
   });
 
   it('resolveCommerceCapabilities actually throws with sell on and honor off', () => {
-    // RED evidence (13-06 task 2): intentionally inverted assertion. Real
-    // production behavior (`lib/commerce/capabilities.ts`) throws in this
-    // state; asserting `.not.toThrow()` here must fail for real, proving the
-    // check can tell true doc claims from false ones before GREEN restores it.
     expect(() => resolveCommerceCapabilities({
       giftCardAcquisition: true,
       giftCardReconciliation: false,
       subscriptionAcquisition: false,
       subscriptionReconciliation: false,
-    })).not.toThrow(CommerceCapabilityConfigurationError);
+    })).toThrow(CommerceCapabilityConfigurationError);
   });
 });
 
@@ -119,10 +115,7 @@ describe('gift-card flag docs: sell-off/honor-on still honors, not just prose', 
       currency: 'USD',
       amountDue: Money.fromMinor(500, 'USD'),
     });
-    // RED evidence (13-06 task 2): intentionally inverted assertion. Real
-    // production behavior delegates the nonempty token; asserting
-    // `.not.toHaveBeenCalledWith(...)` here must fail for real.
-    expect(capability.resolveTender).not.toHaveBeenCalledWith(
+    expect(capability.resolveTender).toHaveBeenCalledWith(
       expect.objectContaining({ token: 'GC-DOC-CONTRACT' }),
     );
   });
