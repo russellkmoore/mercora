@@ -26,8 +26,8 @@ Requirements for this milestone. Each maps to a roadmap phase.
 - [ ] **GCA-05**: An admin can reissue a disabled card: a new card is issued for the remaining balance, emailed to the recipient (or an address the admin enters), and both cards' timelines link to each other
 - [ ] **GCA-06**: An admin can resend the delivery email, re-queue a `needs_review` delivery, and release a stuck hold, each recorded on the timeline
 - [ ] **GCA-07**: An admin can create a card (amount, recipient email, reason) that is issued and delivered like a purchased one, marked as admin-created with the admin's identity
-- [ ] **GCA-08**: Card codes are never shown in admin by default; a reveal, if enabled by a documented setting, requires a confirm step and writes an audit event (decision recorded in the phase context)
-- [ ] **GCA-09**: Human actions and notes persist in an expand-only `gift_card_events` migration; all admin gift-card APIs require admin auth and never return hash, ciphertext or nonce columns
+- [x] **GCA-08**: Card codes are never shown in admin by default; a reveal, if enabled by a documented setting, requires a confirm step and writes an audit event (decision recorded in the phase context)
+- [x] **GCA-09**: Human actions and notes persist in an expand-only `gift_card_events` migration; all admin gift-card APIs require admin auth and never return hash, ciphertext or nonce columns
 
 ### Subscription address
 
@@ -97,8 +97,8 @@ Deferred to a later milestone.
 | GCA-05 | Phase 14 | Pending |
 | GCA-06 | Phase 14 | Pending |
 | GCA-07 | Phase 14 | Pending |
-| GCA-08 | Phase 14 | Pending |
-| GCA-09 | Phase 14 | Pending |
+| GCA-08 | Phase 14 | Complete |
+| GCA-09 | Phase 14 | Complete |
 | SUB-01 | Phase 15 | Pending |
 | SUB-02 | Phase 15 | Pending |
 | SUB-03 | Phase 15 | Pending |
