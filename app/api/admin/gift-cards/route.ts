@@ -133,6 +133,14 @@ export async function POST(request: NextRequest) {
     return jsonError('invalid_body', 'requestId is required', 400);
   }
 
+  // WR-03: the currency is the store's, never the caller's. A card minted in
+  // a currency the store does not trade in can never be redeemed (`reserve`
+  // requires the checkout currency) and turns the honor guard MIXED, so a
+  // body that tries to choose one is refused outright rather than ignored.
+  if (record.currency !== undefined) {
+    return jsonError('invalid_body', 'currency is not accepted; cards are issued in the store currency', 400);
+  }
+
   try {
     const { env } = await getCloudflareContext({ async: true });
     const environment = env as unknown as Record<string, unknown> & { DB?: D1Database };
@@ -147,11 +155,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const currencyInput = typeof record.currency === 'string' ? record.currency.trim().toUpperCase() : undefined;
-    const currency = currencyInput && /^[A-Z]{3}$/.test(currencyInput)
-      ? currencyInput
-      : resolveStoreConfig(environment as unknown as Environment).commerce.currency;
-
+    // Same source checkout prices in: the store config's commerce currency.
+    const currency = resolveStoreConfig(environment as unknown as Environment).commerce.currency;
     const amount = Money.fromMinor(amountMinor, currency);
 
     let result;
