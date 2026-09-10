@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { MACHCustomerAddress } from "@/lib/types/mach/Customer";
 import { AddressForm } from "@/components/account/AddressForm";
+import { addressFormFrom } from "@/lib/account/address-client";
 
 export function AddressManager({ initial }: { initial: MACHCustomerAddress[] }) {
   const [addresses, setAddresses] = useState(initial);
@@ -28,9 +29,14 @@ export function AddressManager({ initial }: { initial: MACHCustomerAddress[] }) 
       const reset = address.is_default
         ? current.map((entry) => ({ ...entry, is_default: false }))
         : current;
-      return [...reset, address];
+      return editing
+        ? reset.map((entry) => (entry.id === editing ? address : entry))
+        : [...reset, address];
     });
+    setEditing(null);
   }
+
+  const entryBeingEdited = editing ? addresses.find((entry) => entry.id === editing) : undefined;
 
   return (
     <div className="space-y-8">
@@ -48,7 +54,15 @@ export function AddressManager({ initial }: { initial: MACHCustomerAddress[] }) 
       </div>
       <div className="space-y-4 rounded-lg border border-border bg-surface-elevated p-5">
         <h2 className="text-lg font-semibold text-foreground">{editing ? "Edit address" : "Add an address"}</h2>
-        <AddressForm mode="create" onSaved={handleSaved} />
+        <AddressForm
+          key={editing ?? "create"}
+          mode={editing ? "edit" : "create"}
+          addressId={editing ?? undefined}
+          initial={editing && entryBeingEdited ? addressFormFrom(entryBeingEdited) : undefined}
+          submitLabel={editing ? "Save changes" : "Save"}
+          onSaved={handleSaved}
+          onCancel={editing ? () => setEditing(null) : undefined}
+        />
       </div>
       {message && <p role="status" className="text-sm text-muted-foreground">{message}</p>}
     </div>
