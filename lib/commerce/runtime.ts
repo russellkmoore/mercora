@@ -6,7 +6,7 @@ import {
   type CommerceFeatureFlags,
 } from '@/lib/commerce/capabilities';
 import { createRuntimeGiftCardCapabilityFactory } from '@/lib/gift-cards/runtime';
-import { honorIsEffectivelyOn } from '@/lib/gift-cards/honor-guard';
+import { resolveHonorEffective } from '@/lib/gift-cards/honor-guard';
 
 type RuntimeEnvironment = Record<string, unknown>;
 
@@ -29,22 +29,23 @@ export async function resolveRuntimeCommerceCapabilities(): Promise<CommerceCapa
   // after the honor flag is turned off (D-04). One `admin_settings` row
   // answers that — never a balance query on the request path (D-06).
   //
-  // `!sellsGiftCards` is the whole point of the guard, not a detail of it. If
-  // the override ran while selling is on, a deploy configured to sell cards it
+  // The decision itself lives in `resolveHonorEffective` (D-18), which carries
+  // the `!sellsGiftCards` short-circuit this file used to own. That
+  // short-circuit is the whole point of the guard, not a detail of it: if the
+  // override ran while selling is on, a deploy configured to sell cards it
   // cannot redeem would resolve cleanly instead of throwing, and GCF-04 would
-  // be silently gone. Short-circuiting also means the row is never read while
-  // honoring is already configured on.
-  const honorsGiftCardsEffectively = honorsGiftCards || (
-    !sellsGiftCards
-    && await honorIsEffectivelyOn(
-      environment.DB as D1Database,
-      false,
-      Math.floor(Date.now() / 1000),
-    // `honorIsEffectivelyOn` already answers "keep honoring" on a failed read.
-    // Repeating that here keeps the fail-safe direction true at the call site
-    // even if that internal guarantee is ever refactored away.
-    ).catch(() => true)
-  );
+  // be silently gone. It also means the row is never read while honoring is
+  // already configured on.
+  //
+  // `.catch(() => true)` is belt-and-braces: `resolveHonorEffective` already
+  // answers "keep honoring" on a failed read, and repeating it here keeps the
+  // fail-safe direction true at the call site even if that internal guarantee
+  // is ever refactored away.
+  const honorsGiftCardsEffectively = await resolveHonorEffective(
+    environment.DB as D1Database | undefined,
+    { giftCardAcquisition: sellsGiftCards, giftCardReconciliation: honorsGiftCards },
+    Math.floor(Date.now() / 1000),
+  ).catch(() => true);
 
   const flags: CommerceFeatureFlags = {
     giftCardAcquisition: sellsGiftCards,

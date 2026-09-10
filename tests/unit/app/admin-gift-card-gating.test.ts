@@ -11,13 +11,15 @@ vi.mock("next/navigation", () => ({
 const mocks = vi.hoisted(() => ({
   context: vi.fn(),
   readHonorGuard: vi.fn(),
-  balancesMayExist: vi.fn(),
+  resolveHonorEffective: vi.fn(),
 }));
 
 vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext: mocks.context }));
+// The page reads the record for *display* and asks `resolveHonorEffective` for
+// the decision (D-18). Both are stubbed here; both are collaborators.
 vi.mock("@/lib/gift-cards/honor-guard", () => ({
   readHonorGuard: mocks.readHonorGuard,
-  balancesMayExist: mocks.balancesMayExist,
+  resolveHonorEffective: mocks.resolveHonorEffective,
   HONOR_GUARD_STALE_SECONDS: 900,
   HONOR_GUARD_MIXED_CURRENCY: "MIXED",
 }));
@@ -61,7 +63,7 @@ function findBannerProps(node: unknown): Record<string, unknown> | undefined {
 beforeEach(() => {
   mocks.context.mockResolvedValue({ env: { DB: {} } });
   mocks.readHonorGuard.mockResolvedValue(RECORD);
-  mocks.balancesMayExist.mockReturnValue(false);
+  mocks.resolveHonorEffective.mockResolvedValue(false);
 });
 
 afterEach(() => {
@@ -71,13 +73,13 @@ afterEach(() => {
 describe("admin gift-card page gating (D-17)", () => {
   it("throws NEXT_NOT_FOUND when both flags are off and the honor guard is clear", async () => {
     mocks.context.mockResolvedValue({ env: { DB: {} } });
-    mocks.balancesMayExist.mockReturnValue(false);
+    mocks.resolveHonorEffective.mockResolvedValue(false);
     await expect(render()).rejects.toThrow("NEXT_NOT_FOUND");
   });
 
   it("renders with the banner wired to the guard record when honoring is off and the guard is active", async () => {
     mocks.context.mockResolvedValue({ env: { DB: {} } });
-    mocks.balancesMayExist.mockReturnValue(true);
+    mocks.resolveHonorEffective.mockResolvedValue(true);
     const tree = await render();
     const bannerProps = findBannerProps(tree);
     expect(bannerProps).toEqual({ record: RECORD, honorConfigured: false, guardActive: true });
@@ -89,7 +91,7 @@ describe("admin gift-card page gating (D-17)", () => {
     // that page. `/api/admin/gift-cards` already swallows the same error.
     mocks.context.mockResolvedValue({ env: { DB: {} } });
     mocks.readHonorGuard.mockRejectedValue(new Error("D1_ERROR: no such table"));
-    mocks.balancesMayExist.mockReturnValue(true);
+    mocks.resolveHonorEffective.mockResolvedValue(true);
 
     const tree = await render();
 
@@ -98,9 +100,11 @@ describe("admin gift-card page gating (D-17)", () => {
       honorConfigured: false,
       guardActive: true,
     });
-    // Null is what balancesMayExist reads as "measurement unavailable", which
-    // keeps honoring on rather than guessing it is safe to stop.
-    expect(mocks.balancesMayExist).toHaveBeenCalledWith(null, expect.any(Number));
+    // The read was attempted and its failure absorbed — `null` is the shape the
+    // banner reads as "measurement unavailable". The decision beside it comes
+    // from `resolveHonorEffective`, which fails toward honoring on its own.
+    expect(mocks.readHonorGuard).toHaveBeenCalled();
+    expect(mocks.resolveHonorEffective).toHaveBeenCalled();
   });
 
   it("resolves without throwing and passes honorConfigured=true (no banner content) when honoring is on", async () => {

@@ -4,7 +4,8 @@ import { toWireMoney } from '@/lib/money';
 import { parseGiftCardCodeKeyRing } from '@/lib/gift-cards/config';
 import { giftCardLookupCandidates } from '@/lib/gift-cards/code';
 import { createGiftCardRepository } from '@/lib/gift-cards/repository';
-import { honorIsEffectivelyOn } from '@/lib/gift-cards/honor-guard';
+import { resolveHonorEffective } from '@/lib/gift-cards/honor-guard';
+import { giftCardSurfacesHidden } from '@/lib/gift-cards/visibility';
 import { enforceRateLimit, getClientIp } from '@/lib/rate-limit';
 import { isBoundedString, isPlainRecord } from '@/lib/public-request-validation';
 
@@ -27,8 +28,11 @@ export async function POST(request: NextRequest) {
     const giftCardAcquisition = String(raw.STORE_FEATURE_GIFT_CARD_ACQUISITION ?? '').trim().toLowerCase() === 'true';
     const giftCardReconciliation = String(raw.STORE_FEATURE_GIFT_CARD_RECONCILIATION ?? '').trim().toLowerCase() === 'true';
     // Both flags off: gift cards do not exist for a visitor at all (D-10).
-    // Configured flags only — the honor guard never widens a public surface.
-    if (!giftCardAcquisition && !giftCardReconciliation) {
+    // Configured flags only, and applied before the guard is consulted — the
+    // honor guard is a money decision and never widens a public surface
+    // (D-18). The checkout page applies the identical gate in the same order.
+    const flags = { giftCardAcquisition, giftCardReconciliation };
+    if (giftCardSurfacesHidden(flags)) {
       return NextResponse.json({ code: 'gift_cards_unavailable', error: 'Gift cards are not available' }, { status: 404 });
     }
     // Existing-card redemption and balance checks remain available during a
@@ -41,9 +45,9 @@ export async function POST(request: NextRequest) {
     // short-circuits inside `honorIsEffectivelyOn` without reading D1, and any
     // failure reading the guard row answers "keep honoring".
     if (!raw.DB) return NextResponse.json({ valid: false });
-    const honorEffective = await honorIsEffectivelyOn(
+    const honorEffective = await resolveHonorEffective(
       raw.DB,
-      giftCardReconciliation,
+      flags,
       Math.floor(Date.now() / 1_000),
     );
     if (!honorEffective) {

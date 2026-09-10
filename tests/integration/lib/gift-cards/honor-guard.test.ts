@@ -13,6 +13,7 @@ import {
   HONOR_GUARD_STALE_SECONDS,
   honorIsEffectivelyOn,
   readHonorGuard,
+  resolveHonorEffective,
   writeHonorGuard,
 } from "@/lib/gift-cards/honor-guard";
 import type { IssueGiftCardInput, ReserveGiftCardInput } from "@/lib/gift-cards/domain";
@@ -412,6 +413,74 @@ describe("honor-guard record on real D1", () => {
 
   it("keeps honoring when the guard cannot be read at all", async () => {
     await expect(honorIsEffectivelyOn(unreadableDatabase, false, epoch)).resolves.toBe(true);
+  });
+
+  describe("resolveHonorEffective is the one owner of the money decision (D-18)", () => {
+    const SELL_ON_HONOR_OFF = { giftCardAcquisition: true, giftCardReconciliation: false };
+    const BOTH_OFF = { giftCardAcquisition: false, giftCardReconciliation: false };
+    const SELL_OFF_HONOR_ON = { giftCardAcquisition: false, giftCardReconciliation: true };
+
+    it("answers yes without touching D1 when honor is configured on", async () => {
+      await expect(resolveHonorEffective(unreadableDatabase, SELL_OFF_HONOR_ON, epoch))
+        .resolves.toBe(true);
+    });
+
+    it("answers no without touching D1 when selling is on and honor is off", async () => {
+      // The short-circuit that used to live in lib/commerce/runtime.ts, and the
+      // reason it is load-bearing: this combination throws at capability
+      // resolution (GCF-04). If the guard were read here, a store selling cards
+      // it cannot redeem would resolve cleanly instead of throwing, and the
+      // protection would be gone with nothing to notice it. `unreadableDatabase`
+      // throws on any read, so reaching D1 fails this test rather than passing
+      // it quietly.
+      await expect(resolveHonorEffective(unreadableDatabase, SELL_ON_HONOR_OFF, epoch))
+        .resolves.toBe(false);
+    });
+
+    it("answers no even with a guard record that would say balances exist", async () => {
+      // Same state, but with a real database holding a record that screams
+      // "money outstanding". The flags decide; the guard is not consulted.
+      await writeHonorGuard(env.DB, {
+        outstanding_minor: 250_000,
+        currency: "USD",
+        open_reservations: 9,
+        measured_at: epoch,
+      });
+      await expect(resolveHonorEffective(env.DB, SELL_ON_HONOR_OFF, epoch))
+        .resolves.toBe(false);
+    });
+
+    it("follows the guard with both flags off", async () => {
+      await writeHonorGuard(env.DB, {
+        outstanding_minor: 0,
+        currency: "USD",
+        open_reservations: 0,
+        measured_at: epoch,
+      });
+      await expect(resolveHonorEffective(env.DB, BOTH_OFF, epoch)).resolves.toBe(false);
+
+      await writeHonorGuard(env.DB, {
+        outstanding_minor: 4_000,
+        currency: "USD",
+        open_reservations: 0,
+        measured_at: epoch,
+      });
+      await expect(resolveHonorEffective(env.DB, BOTH_OFF, epoch)).resolves.toBe(true);
+    });
+
+    it("keeps honoring with both flags off and no database binding at all", async () => {
+      // Not knowing is not a reason to stop honoring (D-04).
+      await expect(resolveHonorEffective(undefined, BOTH_OFF, epoch)).resolves.toBe(true);
+    });
+
+    it("keeps honoring with both flags off when the guard cannot be read", async () => {
+      await expect(resolveHonorEffective(unreadableDatabase, BOTH_OFF, epoch))
+        .resolves.toBe(true);
+    });
+
+    it("keeps honoring with both flags off when no measurement exists yet", async () => {
+      await expect(resolveHonorEffective(env.DB, BOTH_OFF, epoch)).resolves.toBe(true);
+    });
   });
 
   it("keeps honoring when no measurement has ever been written", async () => {
