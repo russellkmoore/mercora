@@ -162,3 +162,43 @@ describe('gift-card flag docs: no dangling npm run reference', () => {
     }
   });
 });
+
+describe('gift-card flag docs: the cron measurement is described as unconditional (WR-08)', () => {
+  it.each([
+    ['docs/runtime-configuration.md', runtimeConfigDoc],
+    ['docs/DEPLOYMENT_SETUP.md', deploymentSetupDoc],
+  ])('%s says the measurement runs regardless of the flags', (_name, doc) => {
+    // The docs used to promise the opposite — "leave both off, that path opens
+    // no D1 connection" — while lib/observability/scheduled.ts calls
+    // runGiftCardHonorGuard unconditionally. The code is right (D-05: a
+    // measurement gated on the flag it exists to overrule could never produce
+    // the reading that turns honoring off), so the prose was corrected.
+    expect(stripFencesAndComments(doc))
+      .toMatch(/every five-minute tick\s+regardless\s+of\s+either\s+flag/i);
+  });
+
+  it('runGiftCardHonorGuard is called with no flag guard in front of it', () => {
+    const scheduled = readFileSync(join(root, 'lib/observability/scheduled.ts'), 'utf8');
+    // The call sits directly inside ctx.waitUntil, with the configured flag
+    // passed in as an argument rather than used as a gate.
+    expect(scheduled).toMatch(/ctx\.waitUntil\(\s*(?:\/\/[^\n]*\n\s*)*runGiftCardHonorGuard\(/);
+  });
+
+  it('runtime-configuration.md still claims the request path is inert with both flags off', () => {
+    // The inert claim was true of the request path all along; only the cron
+    // sentence was wrong. Losing the true half would be its own regression.
+    expect(stripFencesAndComments(runtimeConfigDoc))
+      .toMatch(/request path[\s\S]{0,200}?no bearer-code keys/i);
+  });
+});
+
+describe('gift-card flag docs: the ISR window is explained rather than left implicit (WR-11)', () => {
+  it('runtime-configuration.md ties the flags to a deploy, which is what invalidates the cache', () => {
+    // app/page.tsx caches for an hour. The flags are deploy-time Worker
+    // variables, so there is no path by which one flips without a deploy, and
+    // therefore none by which a cached page outlives its visibility decision.
+    const prose = stripFencesAndComments(runtimeConfigDoc);
+    expect(prose).toMatch(/deploy-time Worker variables/i);
+    expect(prose).toMatch(/invalidates the incremental cache/i);
+  });
+});
