@@ -20,10 +20,17 @@ vi.mock("@/lib/recommendations", () => ({
 vi.mock("@/lib/recommendations/user-context.server", () => ({
   buildServerUserContext: vi.fn(async () => ({})),
 }));
+const commerceFeatures = vi.hoisted(() => ({
+  subscriptionAcquisition: false,
+  subscriptionReconciliation: false,
+  giftCardAcquisition: true,
+  giftCardReconciliation: true,
+}));
+
 vi.mock("@/lib/store-config", () => ({
   getStoreConfig: vi.fn(() => ({
     commerce: {
-      features: { subscriptionAcquisition: false, subscriptionReconciliation: false },
+      features: commerceFeatures,
       subscriptionTermsVersion: undefined,
     },
     urls: { terms: "https://example.test/terms" },
@@ -31,16 +38,36 @@ vi.mock("@/lib/store-config", () => ({
 }));
 
 import ProductPage from "@/app/product/[slug]/page";
+import ProductDisplay from "@/app/product/[slug]/ProductDisplay";
 import { getProductBySlug } from "@/lib/models";
 
 const ACTIVE_PRODUCT = { id: "prod-1", status: "active" };
+const GIFT_CARD_PRODUCT = { id: "prod-gift", status: "active", type: "gift_card" };
 
 function render(slug: string) {
   return ProductPage({ params: Promise.resolve({ slug }) });
 }
 
+/** Walks the returned element tree to find ProductDisplay's own props (identity match on type). */
+function findProductDisplayProps(node: unknown): Record<string, unknown> | undefined {
+  if (node == null || typeof node !== "object") return undefined;
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findProductDisplayProps(child);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  const element = node as { type?: unknown; props?: Record<string, unknown> };
+  if (element.type === ProductDisplay) return element.props;
+  if (element.props?.children) return findProductDisplayProps(element.props.children);
+  return undefined;
+}
+
 beforeEach(() => {
   vi.mocked(getProductBySlug).mockReset();
+  commerceFeatures.giftCardAcquisition = true;
+  commerceFeatures.giftCardReconciliation = true;
 });
 
 afterEach(() => {
@@ -91,5 +118,39 @@ describe("product page", () => {
     resolveParams({ slug: "arctic-pulse-tool" });
     await expect(pending).resolves.toBeTruthy();
     expect(getProductBySlug).toHaveBeenCalledWith("arctic-pulse-tool");
+  });
+});
+
+describe("gift-card flag states (GCF-01, GCF-03, D-07, D-10)", () => {
+  it("passes giftCardSalesDisabled=false to ProductDisplay with sell on and honor on", async () => {
+    commerceFeatures.giftCardAcquisition = true;
+    commerceFeatures.giftCardReconciliation = true;
+    vi.mocked(getProductBySlug).mockResolvedValue(GIFT_CARD_PRODUCT as never);
+    const element = await render("gift-card");
+    const props = findProductDisplayProps(element);
+    expect(props?.giftCardSalesDisabled).toBe(false);
+  });
+
+  it("passes giftCardSalesDisabled=true to ProductDisplay with sell off and honor on", async () => {
+    commerceFeatures.giftCardAcquisition = false;
+    commerceFeatures.giftCardReconciliation = true;
+    vi.mocked(getProductBySlug).mockResolvedValue(GIFT_CARD_PRODUCT as never);
+    const element = await render("gift-card");
+    const props = findProductDisplayProps(element);
+    expect(props?.giftCardSalesDisabled).toBe(true);
+  });
+
+  it("throws NEXT_NOT_FOUND for the gift-card product with both flags off", async () => {
+    commerceFeatures.giftCardAcquisition = false;
+    commerceFeatures.giftCardReconciliation = false;
+    vi.mocked(getProductBySlug).mockResolvedValue(GIFT_CARD_PRODUCT as never);
+    await expect(render("gift-card")).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+
+  it("leaves a non-gift product unaffected with both flags off", async () => {
+    commerceFeatures.giftCardAcquisition = false;
+    commerceFeatures.giftCardReconciliation = false;
+    vi.mocked(getProductBySlug).mockResolvedValue(ACTIVE_PRODUCT as never);
+    await expect(render("arctic-pulse-tool")).resolves.toBeTruthy();
   });
 });
