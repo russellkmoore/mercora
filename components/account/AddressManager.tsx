@@ -10,6 +10,13 @@ export function AddressManager({ initial }: { initial: MACHCustomerAddress[] }) 
   const [editing, setEditing] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const locked = busy || saving;
+
+  function handleBusyChange(next: boolean) {
+    setSaving(next);
+    if (next) setMessage("");
+  }
 
   async function remove(id: string) {
     setBusy(true); setMessage("");
@@ -47,8 +54,8 @@ export function AddressManager({ initial }: { initial: MACHCustomerAddress[] }) 
             <h2 className="font-semibold text-foreground">{entry.label || (entry.type === "billing" ? "Billing address" : "Shipping address")}{entry.is_default ? " · Default" : ""}</h2>
             <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">{[entry.address.line1, entry.address.line2, `${entry.address.city}, ${entry.address.region ?? ""} ${entry.address.postal_code ?? ""}`, entry.address.country].filter(Boolean).join("\n")}</p>
             <div className="mt-4 flex gap-3 text-sm">
-              <button type="button" disabled={busy} className="text-primary" onClick={() => setEditing(entry.id ?? null)}>Edit</button>
-              {entry.id && <button type="button" disabled={busy} className="text-danger" onClick={() => void remove(entry.id!)}>Remove</button>}
+              <button type="button" disabled={locked} className="text-primary" onClick={() => setEditing(entry.id ?? null)}>Edit</button>
+              {entry.id && <button type="button" disabled={locked} className="text-danger" onClick={() => void remove(entry.id!)}>Remove</button>}
             </div>
           </article>
         ))}
@@ -63,6 +70,7 @@ export function AddressManager({ initial }: { initial: MACHCustomerAddress[] }) 
           submitLabel={editing ? "Save changes" : "Save"}
           onSaved={handleSaved}
           onError={setMessage}
+          onBusyChange={handleBusyChange}
           onCancel={editing ? () => setEditing(null) : undefined}
         />
       </div>
