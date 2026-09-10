@@ -29,7 +29,8 @@
  */
 
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { honorIsEffectivelyOn } from "@/lib/gift-cards/honor-guard";
+import { resolveHonorEffective } from "@/lib/gift-cards/honor-guard";
+import { giftCardSurfacesHidden } from "@/lib/gift-cards/visibility";
 import CheckoutPageClient from "./CheckoutPageClient";
 
 /**
@@ -43,22 +44,35 @@ function flagOn(value: unknown): boolean {
 }
 
 /**
- * Whether redemption is live right now. Configured honor short-circuits
- * without touching D1; configured-off reads the single `admin_settings` row the
- * cron maintains — never a balance query on the request path (D-06).
+ * Whether the redemption panel renders. Two decisions, in this order.
+ *
+ * **Presentation first (D-10, D-18).** With both flags off gift cards do not
+ * exist for a visitor: no listing entry, no product page, no balance endpoint,
+ * and no checkout panel — whatever the guard says about money. Consulting the
+ * guard first got this wrong, because every "we do not know" answer inside it
+ * is "keep honoring": the panel appeared for the first five minutes after any
+ * deploy, through any cron gap over 900s, on any D1 read failure, and
+ * permanently on a deploy that had not applied the gift-card migrations. The
+ * sibling balance route already gated on D-10 before reading the guard; these
+ * two surfaces now answer the question the same way.
+ *
+ * Hiding the panel does not stop honoring. Redemption, settlement and refunds
+ * keep running server-side in that state (D-04) — there is simply no input
+ * offered for a card the store says does not exist.
+ *
+ * **Then money.** `resolveHonorEffective` is the single owner of that decision
+ * (D-18); this page does not re-derive it.
  */
-async function resolveHonorEffective(): Promise<boolean> {
+async function resolveCheckoutHonor(): Promise<boolean> {
   try {
     const { env } = await getCloudflareContext({ async: true });
     const environment = env as unknown as Record<string, unknown> & { DB?: D1Database };
-    const configuredHonor = flagOn(environment.STORE_FEATURE_GIFT_CARD_RECONCILIATION);
-    if (configuredHonor) return true;
-    if (!environment.DB) return true;
-    return await honorIsEffectivelyOn(
-      environment.DB,
-      false,
-      Math.floor(Date.now() / 1_000),
-    );
+    const flags = {
+      giftCardAcquisition: flagOn(environment.STORE_FEATURE_GIFT_CARD_ACQUISITION),
+      giftCardReconciliation: flagOn(environment.STORE_FEATURE_GIFT_CARD_RECONCILIATION),
+    };
+    if (giftCardSurfacesHidden(flags)) return false;
+    return await resolveHonorEffective(environment.DB, flags, Math.floor(Date.now() / 1_000));
   } catch {
     // Fail open: the server would still honor a code typed into the panel.
     return true;
@@ -66,7 +80,7 @@ async function resolveHonorEffective(): Promise<boolean> {
 }
 
 export default async function CheckoutPage() {
-  const honorEffective = await resolveHonorEffective();
+  const honorEffective = await resolveCheckoutHonor();
 
   return (
     <div className="bg-surface-elevated text-foreground min-h-screen px-4 sm:px-6 lg:px-12 py-12 sm:py-16">

@@ -256,6 +256,56 @@ export async function honorIsEffectivelyOn(
   }
 }
 
+/** The two configured `commerce.features` flags the money decision reads. */
+export interface HonorGuardFlags {
+  /** Sell — `STORE_FEATURE_GIFT_CARD_ACQUISITION`. */
+  giftCardAcquisition: boolean;
+  /** Honor — `STORE_FEATURE_GIFT_CARD_RECONCILIATION`. */
+  giftCardReconciliation: boolean;
+}
+
+/**
+ * The one answer to "is honoring effectively on right now?" (D-18).
+ *
+ * This used to be re-derived at four call sites with three different
+ * preconditions, and the disagreement produced a real bug: the checkout page
+ * consulted the guard without the sell flag and rendered a redemption panel in
+ * a configuration where gift cards do not exist. A reader picking any one of
+ * those four as the reference implementation picked wrong three times out of
+ * four. There is now one implementation and four callers.
+ *
+ * The four states, in the order they are decided:
+ *
+ * 1. **Honor configured on** — yes, and D1 is never touched. The guard is a
+ *    reason to keep honoring, never a reason to stop.
+ * 2. **Sell on, honor off** — no, and the guard is deliberately *not* consulted.
+ *    This combination is invalid and throws at capability resolution (GCF-04).
+ *    Reading the guard here would let a deploy configured to sell cards it
+ *    cannot redeem resolve cleanly instead of throwing, and silently delete
+ *    that protection. This is the `!sellsGiftCards` short-circuit that
+ *    `lib/commerce/runtime.ts` has always carried, now shared.
+ * 3. **Both off, no database** — yes. We cannot know, and not knowing means
+ *    keep honoring.
+ * 4. **Both off, database present** — the guard row decides, and every "we do
+ *    not know" answer inside it is also yes (D-04).
+ *
+ * This is the *money* decision only. Whether a shopper sees a gift-card surface
+ * at all is a separate, presentation decision made by `giftCardSurfacesHidden`,
+ * and a public surface applies that gate **first** — with both flags off the
+ * panel is absent whatever the guard says about money, because hiding is
+ * presentation and honoring still runs server-side (D-10, D-18).
+ */
+export async function resolveHonorEffective(
+  database: D1Database | undefined,
+  flags: HonorGuardFlags,
+  nowSeconds: number,
+): Promise<boolean> {
+  if (flags.giftCardReconciliation) return true;
+  if (flags.giftCardAcquisition) return false;
+  if (!database) return true;
+  return honorIsEffectivelyOn(database, false, nowSeconds);
+}
+
 /**
  * The store's default currency (`storeDefaults.commerce.currency`), used only
  * when there are no active cards at all and the aggregate has no currency to

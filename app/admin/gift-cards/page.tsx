@@ -3,7 +3,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import GiftCardQueue from "@/components/admin/GiftCardQueue";
 import GiftCardHonorBanner from "@/components/admin/GiftCardHonorBanner";
 import { giftCardSurfacesHidden } from "@/lib/gift-cards/visibility";
-import { readHonorGuard, balancesMayExist } from "@/lib/gift-cards/honor-guard";
+import { readHonorGuard, resolveHonorEffective } from "@/lib/gift-cards/honor-guard";
 
 function flagOn(value: unknown): boolean {
   return String(value ?? "").trim().toLowerCase() === "true";
@@ -27,19 +27,25 @@ export default async function AdminGiftCardsPage() {
   const giftCardAcquisition = flagOn(environment.STORE_FEATURE_GIFT_CARD_ACQUISITION);
   const giftCardReconciliation = flagOn(environment.STORE_FEATURE_GIFT_CARD_RECONCILIATION);
 
-  // Fail open on a read error, exactly as `honorIsEffectivelyOn` does for
-  // `/api/admin/gift-cards`. Without the catch a D1 error propagates out of
-  // this server component and 500s the page — and this is the page an operator
-  // opens when gift-card money is already in a state they need to see. `null`
-  // is the shape both `balancesMayExist` and the banner already read as
-  // "measurement unavailable", which keeps honoring on.
+  // Two reads, deliberately. The record is for *display* — the banner names
+  // the total and the reservation count — and the decision comes from
+  // `resolveHonorEffective`, the single owner of it (D-18). Deriving the
+  // decision from the record here instead would put a fifth implementation of
+  // it in the tree, which is what CR-05 came out of.
+  //
+  // Fail open on a read error, exactly as `/api/admin/gift-cards` does.
+  // Without the catch a D1 error propagates out of this server component and
+  // 500s the page — and this is the page an operator opens when gift-card
+  // money is already in a state they need to see. `null` is the shape the
+  // banner reads as "measurement unavailable".
+  const flags = { giftCardAcquisition, giftCardReconciliation };
   const guardRecord = !giftCardReconciliation && environment.DB
     ? await readHonorGuard(environment.DB).catch(() => null)
     : null;
   const guardActive = !giftCardReconciliation
-    && balancesMayExist(guardRecord, currentSeconds());
+    && await resolveHonorEffective(environment.DB, flags, currentSeconds());
 
-  if (giftCardSurfacesHidden({ giftCardAcquisition, giftCardReconciliation }) && !guardActive) {
+  if (giftCardSurfacesHidden(flags) && !guardActive) {
     notFound();
   }
 

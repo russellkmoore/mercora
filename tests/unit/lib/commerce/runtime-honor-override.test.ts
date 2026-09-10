@@ -2,14 +2,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   getCloudflareContext: vi.fn(),
-  honorIsEffectivelyOn: vi.fn(),
+  resolveHonorEffective: vi.fn(),
 }));
 
 vi.mock('@opennextjs/cloudflare', () => ({
   getCloudflareContext: mocks.getCloudflareContext,
 }));
+// The unit under test is `runtime.ts`; the money decision is its collaborator.
+// `resolveHonorEffective` owns that decision now (D-18), so it is what gets
+// stubbed here — and the short-circuit these tests used to assert through a
+// mock is asserted against the real function in
+// `tests/unit/lib/gift-cards/honor-guard.test.ts`, which is stronger.
 vi.mock('@/lib/gift-cards/honor-guard', () => ({
-  honorIsEffectivelyOn: mocks.honorIsEffectivelyOn,
+  resolveHonorEffective: mocks.resolveHonorEffective,
 }));
 
 import {
@@ -43,7 +48,7 @@ async function offerBearerCode(capability: { resolveTender: (args: {
 }
 
 beforeEach(() => {
-  mocks.honorIsEffectivelyOn.mockResolvedValue(true);
+  mocks.resolveHonorEffective.mockResolvedValue(true);
 });
 
 describe('runtime honor override', () => {
@@ -52,20 +57,29 @@ describe('runtime honor override', () => {
 
     const resolved = await resolveRuntimeCommerceCapabilities();
 
-    expect(mocks.honorIsEffectivelyOn).not.toHaveBeenCalled();
+    // The decision function is still called — it is the only owner of the
+    // answer — but it is handed honor=true, which is the input that makes it
+    // return without touching D1.
+    expect(mocks.resolveHonorEffective).toHaveBeenCalledWith(
+      database,
+      { giftCardAcquisition: false, giftCardReconciliation: true },
+      expect.any(Number),
+    );
     expect(resolved.giftCards).not.toBe(noOpCommerceCapabilities.giftCards);
   });
 
   it('keeps honoring while the guard says balances may still exist', async () => {
     environment({ sell: false, honor: false });
-    mocks.honorIsEffectivelyOn.mockResolvedValue(true);
+    mocks.resolveHonorEffective.mockResolvedValue(true);
 
     const resolved = await resolveRuntimeCommerceCapabilities();
 
-    expect(mocks.honorIsEffectivelyOn).toHaveBeenCalledTimes(1);
-    const [passedDatabase, configuredHonor, nowSeconds] = mocks.honorIsEffectivelyOn.mock.calls[0];
+    expect(mocks.resolveHonorEffective).toHaveBeenCalledTimes(1);
+    const [passedDatabase, passedFlags, nowSeconds] = mocks.resolveHonorEffective.mock.calls[0];
     expect(passedDatabase).toBe(database);
-    expect(configuredHonor).toBe(false);
+    // Both configured flags reach the decision unmodified. That is what makes
+    // its sell-on short-circuit reachable from here at all.
+    expect(passedFlags).toEqual({ giftCardAcquisition: false, giftCardReconciliation: false });
     expect(nowSeconds).toBeTypeOf('number');
 
     expect(resolved.giftCards).not.toBe(noOpCommerceCapabilities.giftCards);
@@ -77,7 +91,7 @@ describe('runtime honor override', () => {
 
   it('stops honoring once the guard reports a fresh, empty measurement', async () => {
     environment({ sell: false, honor: false });
-    mocks.honorIsEffectivelyOn.mockResolvedValue(false);
+    mocks.resolveHonorEffective.mockResolvedValue(false);
 
     const resolved = await resolveRuntimeCommerceCapabilities();
 
@@ -88,18 +102,28 @@ describe('runtime honor override', () => {
 
   it('still refuses to sell cards it cannot honor, whatever the guard would say', async () => {
     environment({ sell: true, honor: false });
-    mocks.honorIsEffectivelyOn.mockResolvedValue(true);
+    // What the real decision returns in this state, and why it must: answering
+    // "keep honoring" here would resolve a deploy that sells cards it cannot
+    // redeem into a clean capability set, erasing GCF-04 silently. The
+    // short-circuit that guarantees it — sell on means the guard is never even
+    // read — is asserted against the real function in
+    // tests/unit/lib/gift-cards/honor-guard.test.ts.
+    mocks.resolveHonorEffective.mockResolvedValue(false);
 
     await expect(resolveRuntimeCommerceCapabilities())
       .rejects.toBeInstanceOf(CommerceCapabilityConfigurationError);
-    // Not merely "the throw survived": the guard must never be consulted in
-    // this state, or a widened honor value would erase the configuration error.
-    expect(mocks.honorIsEffectivelyOn).not.toHaveBeenCalled();
+    // Both flags reach the decision unmodified, which is what makes its
+    // sell-on branch reachable from this call site at all.
+    expect(mocks.resolveHonorEffective).toHaveBeenCalledWith(
+      database,
+      { giftCardAcquisition: true, giftCardReconciliation: false },
+      expect.any(Number),
+    );
   });
 
   it('keeps honoring when the guard read fails outright', async () => {
     environment({ sell: false, honor: false });
-    mocks.honorIsEffectivelyOn.mockRejectedValue(new Error('admin_settings unreadable'));
+    mocks.resolveHonorEffective.mockRejectedValue(new Error('admin_settings unreadable'));
 
     const resolved = await resolveRuntimeCommerceCapabilities();
 

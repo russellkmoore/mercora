@@ -60,14 +60,26 @@ describe('gift-card checkout gating source contract (GCF-01, GCF-03, D-09, D-16)
     expect(source).not.toContain('useStoreConfig');
   });
 
+  it('applies the D-10 visibility gate before it asks the money question', () => {
+    // CR-05: consulting the guard first rendered the panel with both flags off,
+    // because every "we do not know" answer inside the guard is "keep
+    // honoring". Order is the fix, so order is what is pinned.
+    const source = withoutComments(checkoutPage);
+    expect(source).toMatch(/giftCardSurfacesHidden\(flags\)\) return false;[\s\S]{0,200}?resolveHonorEffective\(/);
+  });
+
   it('resolves the effective honor value on the server, once per request', () => {
     const source = withoutComments(checkoutPage);
     // A client component cannot read the guard row, so the page must be a
     // server component that awaits it.
     expect(source).not.toContain("'use client'");
     expect(source).not.toContain('"use client"');
-    expect(source).toMatch(/import \{[^}]*honorIsEffectivelyOn[^}]*\} from ["']@\/lib\/gift-cards\/honor-guard["']/);
-    expect(source).toMatch(/await honorIsEffectivelyOn\(/);
+    // One owner of the money decision (D-18): the page calls it, never
+    // re-derives it from the guard record.
+    expect(source).toMatch(/import \{[^}]*resolveHonorEffective[^}]*\} from ["']@\/lib\/gift-cards\/honor-guard["']/);
+    expect(source).toMatch(/await resolveHonorEffective\(/);
+    expect(source).not.toContain('balancesMayExist');
+    expect(source).not.toContain('readHonorGuard');
     // Per request, not per build: a cached decision could show a stale answer
     // about money in flight.
     expect(source).toMatch(/export const dynamic = ["']force-dynamic["']/);
