@@ -62,7 +62,12 @@ describe("product subscription acquisition integration", () => {
     expect(regionEnd).toBeGreaterThan(regionStart);
     const region = source.slice(regionStart, regionEnd);
     expect(region).toContain("setAddressesOwner(");
-    expect(region).toContain("nextAddressSelection(");
+    // Pre-selection must receive the id from the save response, and the
+    // sentinel branch of the select must return before any setAddressId.
+    expect(region).toContain("nextAddressSelection(next, saved.id)");
+    expect(source).toMatch(
+      /if \(value === ADD_NEW_ADDRESS_VALUE\) \{(?:\s*\/\/[^\n]*)*\s*if \(viaKeyboard\) setAddNewPending\(true\);\s*else setAddressDialogOpen\(true\);\s*return;\s*\}/,
+    );
     expect(region).toContain("setSetup(null)");
     expect(region).toContain('setCheckoutError("")');
     expect(region).toContain("setCompletedOwner(null)");
