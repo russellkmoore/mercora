@@ -2,20 +2,19 @@
 gsd_state_version: "1.0"
 milestone: v2.1
 milestone_name: Gift Card Product
-current_phase: 12
-current_plan: Not started
-status: completed
-stopped_at: Phases 10 and 12 verified by Russell (2026-09-10); milestone v2.1 ready for /gsd-complete-milestone
-last_updated: "2026-09-10T05:03:24.420Z"
+status: Awaiting next milestone
+stopped_at: Milestone v2.1 archived and tagged; ready for /gsd-new-milestone
+last_updated: "2026-09-10T05:25:42.120Z"
 last_activity: 2026-09-09
-last_activity_desc: Phase 12 complete
-state_head: cb5e98339239247bc75149a2546507f265dfefbf
+last_activity_desc: Milestone v2.1 completed and archived
+state_head: bdbe599be91dc25f48e39c00092d7904a788c949
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 4
   total_plans: 20
   completed_plans: 20
-  percent: 50
+  percent: 100
+current_phase: 12
 ---
 
 # Project State
@@ -25,17 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-09 after Phase 11)
 
 **Core value:** A customer or an external AI agent can find the right product through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** Milestone v2.1 close-out — all four phases complete; run /gsd-complete-milestone v2.1, then /gsd-cleanup
+**Current focus:** No active milestone — v2.1 shipped 2026-09-10. Next: /gsd-new-milestone (seeds in .planning/todos/pending/: gift-card admin + sell/honor flags, blog navigation/home block, saved payment methods)
 
 ## Current Position
 
-Phase: 12
-Current Plan: Not started
-Total Plans in Phase: 6
-Status: All phases complete
-Last activity: 2026-09-09 — Phase 12 complete
-
-Progress: [█████░░░░░] 50%
+Phase: Milestone v2.1 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-09-09 — Milestone v2.1 completed and archived
 
 ## Performance Metrics
 
@@ -347,6 +343,11 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 | Category | Item | Status | Deferred At | Milestone |
 |----------|------|--------|-------------|-----------|
+| todos | blog-public-navigation-and-home-block.md | (presence-only) | 2026-09-10 | v2.1 |
+| todos | gift-card-admin-and-flags.md | (presence-only) | 2026-09-10 | v2.1 |
+| todos | saved-payment-methods.md | (presence-only) | 2026-09-10 | v2.1 |
+| uat_gaps | 09/09-UAT.md | passed, 0 pending scenarios | 2026-09-10 | v2.1 |
+| uat_gaps | 11/11-UAT.md | passed, 0 pending scenarios | 2026-09-10 | v2.1 |
 | uat_gaps | 05/05-UAT.md | passed, 0 pending scenarios | 2026-09-05 | v2 |
 | uat_gaps | 06/06-UAT.md | passed, 0 pending scenarios | 2026-09-05 | v2 |
 | uat_gaps | 06.1/06.1-UAT.md | passed, 0 pending scenarios | 2026-09-05 | v2 |
@@ -372,4 +373,4 @@ Next: `/gsd-plan-phase 12` (then `/gsd-verify-work 10`)
 
 ## Operator Next Steps
 
-- Review the v2.1 roadmap (Phases 9-12), then start planning with `/gsd-plan-phase 9`
+- Start the next milestone with /gsd-new-milestone

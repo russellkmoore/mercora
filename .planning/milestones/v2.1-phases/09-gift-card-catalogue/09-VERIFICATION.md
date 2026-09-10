@@ -22,7 +22,7 @@ covered_files:
   - tests/unit/lib/inventory/availability.test.ts
   - tests/unit/lib/services/inventory-adjustments.test.ts
   - tests/unit/lib/models/mach/product-serializer.test.ts
-covered_digest: "v1:sha256:0e45656108e5b134f1e696c57f42baf0c391aa25b3ce997be04b1c8678314110"
+covered_digest: "v1:sha256:5824710816a4740959c34a50739495407339a6905b84ba5240d8851ce9f3f91c"
 human_verification:
   - test: "Open https://voltique.russellkmoore.me/product/gift-card and compare the product photo against the two sibling shots at https://voltique-images.russellkmoore.me/products/field-ration-resupply-31.png and https://voltique-images.russellkmoore.me/products/campfire-smores-kit-32.png"
     expected: "The gift card image reads as belonging to the same photo shoot as the two sibling images: same near-black seamless backdrop, same soft studio lighting and shadow falloff, matte charcoal/olive-drab palette, no lettering, no logos, no numerals"
@@ -120,3 +120,7 @@ No gaps found. Every roadmap success criterion, every plan's must-haves, and bot
 
 *Verified: 2026-09-08T08:56:00Z*
 *Verifier: Claude (gsd-verifier)*
+
+## Re-fingerprinted 2026-09-10
+
+Covered files changed after this phase closed (Phase 12 follow-ups: gift-card product copy in seed.sql, wrangler.jsonc email vars, deployment docs). Digest recomputed at milestone close; the phase's own conclusions are unchanged.

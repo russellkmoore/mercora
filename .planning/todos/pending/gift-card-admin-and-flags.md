@@ -3,6 +3,9 @@ title: Gift cards v2 — admin management, audit trail, and flags that mean what
 created: 2026-09-10
 resolves_phase: null
 source: Russell, 2026-09-10, after the first live gift-card purchase ("this admin panel is next to useless")
+audit_acknowledged:
+  milestone: v2.1
+  at: 2026-09-10
 ---
 
 # Seed for the next gift-card milestone
@@ -19,6 +22,7 @@ Two flags, kept (env names stay for compatibility), renamed in docs to what they
 | on | off | **invalid** — refuse to start (already enforced in `lib/commerce/capabilities.ts`) |
 
 Fixes needed:
+
 - **Sell=off must stop sales.** Today it only blocks redemption (backwards). It must hide the recipient form on the product page (or the product), reject gift-card lines in `priceCheckout`, and leave redemption alone.
 - **Honor=off must refuse, or warn loudly in admin, while any active balance or open reservation exists.** Prepaid money must not be stranded by flipping a var.
 - Off/off hides the admin nav entry and the account/checkout surfaces.

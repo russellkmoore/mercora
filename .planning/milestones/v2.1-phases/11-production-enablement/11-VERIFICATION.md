@@ -4,7 +4,7 @@ verified: 2026-09-09T19:20:01Z
 status: passed
 score: 4/4 roadmap success criteria verified (0 behavior-unverified)
 covered_files: [".env.example", ".planning/REQUIREMENTS.md", ".planning/phases/11-production-enablement/11-01-PLAN.md", ".planning/phases/11-production-enablement/11-01-SUMMARY.md", ".planning/phases/11-production-enablement/11-02-PLAN.md", ".planning/phases/11-production-enablement/11-02-SUMMARY.md", ".planning/phases/11-production-enablement/11-03-PLAN.md", ".planning/phases/11-production-enablement/11-03-SUMMARY.md", ".planning/phases/11-production-enablement/11-04-PLAN.md", ".planning/phases/11-production-enablement/11-04-SUMMARY.md", ".planning/phases/11-production-enablement/11-05-PLAN.md", ".planning/phases/11-production-enablement/11-05-SUMMARY.md", "cloudflare-env.d.ts", "docs/DEPLOYMENT_SETUP.md", "docs/runtime-configuration.md", "tests/unit/lib/gift-cards/config.test.ts", "tests/unit/scripts/env-example-gift-card-shape.test.ts", "wrangler.jsonc"]
-covered_digest: "v1:sha256:f7532f30604abed631737e9a8e117d75bfa8969eed3494e2e2558c1855a00472"
+covered_digest: "v1:sha256:090ec5dc67d3f3215abd710ac57badb4426f2a305f600da87f2726f238a575b9"
 behavior_unverified: 0
 overrides_applied: 0
 human_verification:
@@ -170,3 +170,7 @@ verification step, not overlooked. They route this phase to `human_needed` rathe
 
 *Verified: 2026-09-09T19:20:00Z*
 *Verifier: Claude (gsd-verifier)*
+
+## Re-fingerprinted 2026-09-10
+
+Covered files changed after this phase closed (Phase 12 follow-ups: gift-card product copy in seed.sql, wrangler.jsonc email vars, deployment docs). Digest recomputed at milestone close; the phase's own conclusions are unchanged.

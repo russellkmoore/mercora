@@ -1,0 +1,43 @@
+{
+  "contract": "1.0.0",
+  "flavor": "core",
+  "milestone": "v2.1 — Gift Card Product",
+  "phases": [
+    {
+      "number": "1",
+      "name": "4 (v1 Hardening)",
+      "status": "complete"
+    },
+    {
+      "number": "5",
+      "name": "8.2 (v2 Themeable Storefront)",
+      "status": "complete"
+    },
+    {
+      "number": "9",
+      "name": "Gift Card Catalogue",
+      "status": "complete"
+    },
+    {
+      "number": "10",
+      "name": "Gift Card Purchase Flow",
+      "status": "complete"
+    },
+    {
+      "number": "11",
+      "name": "Production Enablement",
+      "status": "complete"
+    },
+    {
+      "number": "12",
+      "name": "Content, Assistant & Live Proof",
+      "status": "complete"
+    }
+  ],
+  "next": {
+    "command": "/gsd:progress",
+    "label": "Show progress",
+    "reason": "Unsure of state — showing progress"
+  },
+  "updated_at": "2026-09-10T05:25:42.159Z"
+}

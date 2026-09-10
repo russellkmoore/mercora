@@ -3,6 +3,9 @@ title: Saved payment methods for signed-in shoppers (Stripe Customer + Account â
 created: 2026-09-10
 resolves_phase: null
 source: Russell, 2026-09-10 â€” "Save my information" at checkout saved nothing to the store
+audit_acknowledged:
+  milestone: v2.1
+  at: 2026-09-10
 ---
 
 # Saved payment methods

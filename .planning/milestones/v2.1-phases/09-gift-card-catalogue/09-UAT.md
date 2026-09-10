@@ -4,6 +4,10 @@ phase: 09-gift-card-catalogue
 source: [09-VERIFICATION.md]
 started: 2026-09-08T09:00:12Z
 updated: 2026-09-08T16:17:21Z
+audit_acknowledged:
+  milestone: v2.1
+  at: 2026-09-10
+  gap_snapshot: "passed::scenarios=0"
 ---
 
 ## Current Test
@@ -22,6 +26,7 @@ awaiting: none (all tests complete)
 ## Tests
 
 ### 1. Photo-shoot style continuity of the gift card image
+
 expected: The gift card image belongs to the same photo shoot as the two sibling gear shots (same backdrop, lighting, palette; no text of any kind).
 result: passed — Russell confirmed 2026-09-08: same photo shoot as the sibling gear shots
 
