@@ -49,6 +49,7 @@ import { getRecommendationsForProduct } from "@/lib/recommendations";
 import { buildServerUserContext } from "@/lib/recommendations/user-context.server";
 import { getStoreConfig } from "@/lib/store-config";
 import { getLayoutSettings } from "@/lib/layout/settings";
+import { GIFT_CARD_PRODUCT_TYPE, giftCardSurfacesHidden } from "@/lib/gift-cards/visibility";
 
 export const revalidate = 0;
 
@@ -63,9 +64,12 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   const storedProduct = await getProductBySlug(slug);
   if (!storedProduct || storedProduct.status !== "active") return notFound();
-  const product = toPublicProduct(storedProduct);
   const store = getStoreConfig();
   const commerce = store.commerce;
+  const isGiftCardProduct = storedProduct.type === GIFT_CARD_PRODUCT_TYPE;
+  if (isGiftCardProduct && giftCardSurfacesHidden(commerce.features)) return notFound();
+  const giftCardSalesDisabled = isGiftCardProduct && !commerce.features.giftCardAcquisition;
+  const product = toPublicProduct(storedProduct);
   const userContextPromise = buildServerUserContext(userId);
   const { productGallery } = await getLayoutSettings();
 
@@ -95,6 +99,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           reviews={reviews}
           reviewEligibility={reviewEligibility}
           productGallery={productGallery}
+          giftCardSalesDisabled={giftCardSalesDisabled}
           subscription={{
             enabled: commerce.features.subscriptionAcquisition
               && commerce.features.subscriptionReconciliation

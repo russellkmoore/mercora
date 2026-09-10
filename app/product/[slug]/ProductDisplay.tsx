@@ -115,6 +115,13 @@ interface ProductDisplayProps {
    * union, never a bare string (LAYOUT-04).
    */
   productGallery: ProductGallery;
+  /**
+   * True when this is a gift-card product and selling is off (sell=off,
+   * honor=on — D-07). Computed server-side from the flags, not re-derived
+   * here. Distinct from `available`, which is inventory availability for a
+   * physical/variant product and does not apply to this state.
+   */
+  giftCardSalesDisabled?: boolean;
 }
 
 function stringifyDescription(description: Product["description"]): string {
@@ -138,6 +145,7 @@ export default function ProductDisplay({
   reviewEligibility,
   subscription,
   productGallery,
+  giftCardSalesDisabled = false,
 }: ProductDisplayProps) {
   const allImages = useMemo(() => {
     try {
@@ -361,7 +369,12 @@ export default function ProductDisplay({
             )}
 
             {product.type === "gift_card" ? (
-              available ? (
+              giftCardSalesDisabled ? (
+                <div>
+                  <p className="text-lg font-semibold text-warning sm:text-xl">Gift cards are not available right now</p>
+                  <p className="text-sm text-muted-foreground">Any gift card you already own still works at checkout.</p>
+                </div>
+              ) : available ? (
                 <GiftCardRecipientForm
                   available={available}
                   onAdd={(customization) => handleGiftCardAdd(customization)}
