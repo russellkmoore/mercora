@@ -23,6 +23,8 @@
  *    the store meant to stop honoring.
  */
 
+import { recordTelemetry, type TelemetryOptions } from '@/lib/observability/telemetry';
+
 /** The `admin_settings` primary key this measurement lives under (D-15). */
 export const HONOR_GUARD_SETTING_KEY = 'gift_cards.honor_guard';
 
@@ -125,6 +127,29 @@ export async function writeHonorGuard(
     'Outstanding gift-card balance measured by the scheduled honor guard',
     'object',
   ).run();
+}
+
+/**
+ * Page on-call: the honor flag is off and there is still money on cards.
+ *
+ * The five-minute cron calls this every tick the condition holds (D-05), so
+ * the alarm keeps sounding rather than firing once and going quiet. The event
+ * is registered critical at sample rate 1, so it is never sampled away.
+ *
+ * Only fields already in the closed taxonomy are used. The stranded total
+ * itself is not one of them — it lives in the guard record and on the admin
+ * banner, which is where an operator acts on it.
+ */
+export function reportHonorDisabledWithBalances(
+  record: HonorGuardRecord,
+  options: TelemetryOptions = {},
+): void {
+  recordTelemetry('gift_card.honor_disabled_with_balances', {
+    effect_type: 'gift_card',
+    trigger: 'scheduled',
+    outcome: 'needs_review',
+    count: record.open_reservations,
+  }, undefined, options);
 }
 
 /**
