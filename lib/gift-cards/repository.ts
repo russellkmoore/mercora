@@ -2,6 +2,7 @@ import { Money } from "@/lib/money";
 import {
   assertGiftCardBusinessKey,
   assertGiftCardCodeHash,
+  assertGiftCardCodeSuffix,
   assertGiftCardCurrency,
   assertGiftCardEpoch,
   assertGiftCardId,
@@ -12,6 +13,8 @@ import {
   giftCardIssuanceBusinessKey,
   giftCardRestorationBusinessKey,
   giftCardRedemptionBusinessKey,
+  giftCardReissueAdjustmentBusinessKey,
+  giftCardReissueId,
   type GiftCardAccount,
   type GiftCardCodeHash,
   type GiftCardLedgerEntry,
@@ -589,6 +592,136 @@ export function createGiftCardRepository(database: D1Database) {
     return { requeued: Boolean(row), deliveryId: row?.id };
   };
 
+  /**
+   * A signed ledger adjustment, modelled line for line on `restoreRedemption`'s
+   * idempotent single-INSERT idiom. `reservation_id` and `related_entry_id` are
+   * always NULL — the 0022 entry-type CHECK requires that for `adjustment`.
+   * Never pre-checks overdraft: `gift_card_ledger_balance_guard` is the safety
+   * net and its rejection is the correct failure (D-06).
+   */
+  const writeAdjustment = async (args: {
+    giftCardId: string;
+    amount: Money;
+    businessKey: string;
+    entryId?: string;
+    createdAt: number;
+  }): Promise<{ created: boolean; entry: GiftCardLedgerEntry }> => {
+    assertGiftCardId(args.giftCardId);
+    if (!(args.amount instanceof Money)) throw new TypeError("gift-card adjustment amount must be Money");
+    assertGiftCardCurrency(args.amount.currency);
+    assertGiftCardBusinessKey(args.businessKey);
+    assertGiftCardEpoch(args.createdAt, "gift-card adjustment time");
+    const entryId = args.entryId ?? `gift_ledger_${crypto.randomUUID()}`;
+    assertGiftCardId(entryId, "gift-card ledger entry id");
+
+    const existing = async (): Promise<GiftCardLedgerEntry | undefined> => {
+      const row = await database.prepare(`${LEDGER_SELECT} WHERE business_key = ? LIMIT 1`)
+        .bind(args.businessKey).first<LedgerRow>();
+      return row ? mapLedger(row) : undefined;
+    };
+    const validate = (entry: GiftCardLedgerEntry): GiftCardLedgerEntry => {
+      if (
+        entry.entryType !== "adjustment"
+        || entry.giftCardId !== args.giftCardId
+        || !entry.amountDelta.equals(args.amount)
+      ) throw new GiftCardConflictError("Gift-card adjustment conflicts with durable state");
+      return entry;
+    };
+
+    const prior = await existing();
+    if (prior) return { created: false, entry: validate(prior) };
+
+    let inserted: { id: string } | null;
+    try {
+      inserted = await database.prepare(`INSERT INTO gift_card_ledger_entries (
+        id, gift_card_id, currency_code, entry_type, amount_delta_minor,
+        business_key, order_id, reservation_id, related_entry_id, created_at
+      ) VALUES (?, ?, ?, 'adjustment', ?, ?, NULL, NULL, NULL, ?)
+      ON CONFLICT DO NOTHING RETURNING id`).bind(
+        entryId,
+        args.giftCardId,
+        args.amount.currency,
+        args.amount.toMinorUnits(),
+        args.businessKey,
+        args.createdAt,
+      ).first<{ id: string }>();
+    } catch {
+      const raced = await existing();
+      if (raced) return { created: false, entry: validate(raced) };
+      throw new GiftCardConflictError("Gift-card adjustment could not be written");
+    }
+    const entry = await existing();
+    if (!entry) throw new GiftCardConflictError("Gift-card adjustment could not be written");
+    return { created: inserted?.id === entryId, entry: validate(entry) };
+  };
+
+  /**
+   * Drain a disabled card's available balance into a negative adjustment and
+   * issue a new card for the same amount (D-06). Idempotency comes from
+   * `giftCardReissueId` — a deterministic new-card id — rather than a custom
+   * business key on `issueAccount`, which derives its own from the id it is
+   * given (D-19, RESEARCH Pitfall 2). `writeAdjustment` and `issueAccount` run
+   * as two sequential, individually idempotent calls, not one `database.batch()`.
+   */
+  const reissue = async (args: {
+    oldGiftCardId: string;
+    now: number;
+    codeHash: GiftCardCodeHash;
+    codeSuffix?: string;
+    delivery?: IssueGiftCardInput["delivery"];
+  }): Promise<{ created: boolean; newGiftCardId: string; amount: Money }> => {
+    assertGiftCardId(args.oldGiftCardId, "gift-card id");
+    assertGiftCardEpoch(args.now, "gift-card reissue time");
+    assertGiftCardCodeHash(args.codeHash);
+    if (args.codeSuffix !== undefined) assertGiftCardCodeSuffix(args.codeSuffix);
+
+    const oldAccount = await findAccountById(args.oldGiftCardId);
+    if (!oldAccount) throw new GiftCardUnavailableError("Gift card is unavailable");
+    if (oldAccount.status !== "disabled") {
+      throw new GiftCardConflictError("Gift card must be disabled before it can be reissued");
+    }
+
+    const reservations = await findReservations(args.oldGiftCardId);
+    for (const candidate of reservations) {
+      const classification = classifyGiftCardReservation(candidate, args.now);
+      if (classification === "open" || classification === "committed_unsettled") {
+        throw new GiftCardConflictError(
+          `Gift card cannot be reissued while a reservation is ${classification}`,
+        );
+      }
+    }
+
+    const balance = await readBalance(args.oldGiftCardId, args.now);
+    if (!balance) throw new GiftCardUnavailableError("Gift card is unavailable");
+    const zero = Money.zero(balance.availableBalance.currency);
+    if (!balance.availableBalance.gt(zero)) {
+      throw new GiftCardConflictError("Gift card has no available balance to reissue");
+    }
+
+    const adjustment = await writeAdjustment({
+      giftCardId: args.oldGiftCardId,
+      amount: balance.availableBalance.negate(),
+      businessKey: giftCardReissueAdjustmentBusinessKey(args.oldGiftCardId),
+      createdAt: args.now,
+    });
+
+    const newGiftCardId = await giftCardReissueId(args.oldGiftCardId);
+    const issued = await issueAccount({
+      id: newGiftCardId,
+      codeHash: args.codeHash,
+      amount: balance.availableBalance,
+      createdAt: args.now,
+      codeSuffix: args.codeSuffix,
+      delivery: args.delivery,
+    });
+
+    return {
+      created: adjustment.created && issued.created,
+      newGiftCardId,
+      amount: balance.availableBalance,
+    };
+  };
+
   return {
     findAccountById,
 
@@ -605,6 +738,8 @@ export function createGiftCardRepository(database: D1Database) {
     disableAccount,
     findReservations,
     requeueDelivery,
+    writeAdjustment,
+    reissue,
 
     async reserve(input: ReserveGiftCardInput): Promise<GiftCardReservationResult> {
       assertReserveGiftCardInput(input);
