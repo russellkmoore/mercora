@@ -295,9 +295,15 @@ export default function SubscriptionAcquisitionPanel({
     try {
       const next = await fetchSavedAddressesForPlan(fetch, selectedPlan, controller.signal);
       if (!live()) return;
+      const nextId = nextAddressSelection(next, saved.id);
       setAddresses(next);
       setAddressesOwner(owner);
-      setAddressId(nextAddressSelection(next, saved.id));
+      setAddressId(nextId);
+      if (saved.id && nextId !== saved.id) {
+        // The account API accepted it but the subscription filter did not:
+        // say so instead of silently selecting a different address.
+        setAddressError("The new address was saved but cannot be used for this subscription. Edit it under Account > Addresses.");
+      }
     } catch (error) {
       if (live()) {
         setAddressError(error instanceof Error ? error.message : "Saved addresses could not be loaded");

@@ -259,7 +259,7 @@ export function shippingAddressFromSaved(value: SavedSubscriptionAddress): Addre
     return localized(entry, label, max, false);
   };
   const line2 = localized(address.line2, "line2", 256, false);
-  const region = optional(address.region, "region", 128);
+  const region = optional(address.region, "region", 200);
   const postalCode = optional(address.postal_code, "postal code", 32);
   const company = optional(address.company, "company", 200);
   const recipient = optional(address.recipient, "recipient", 200);
@@ -273,7 +273,7 @@ export function shippingAddressFromSaved(value: SavedSubscriptionAddress): Addre
   return {
     line1: localized(address.line1, "line1", 256)!,
     ...(line2 === undefined ? {} : { line2 }),
-    city: localized(address.city, "city", 128)!,
+    city: localized(address.city, "city", 200)!,
     ...(region === undefined ? {} : { region }),
     ...(postalCode === undefined ? {} : { postal_code: postalCode }),
     country,

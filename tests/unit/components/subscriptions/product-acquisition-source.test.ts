@@ -78,6 +78,8 @@ describe("product subscription acquisition integration", () => {
     expect(region).toContain("fetchSavedAddressesForPlan(fetch, selectedPlan, controller.signal)");
     expect(region).toContain("refreshControllerRef.current = controller");
     expect(source).toContain("useEffect(() => () => refreshControllerRef.current?.abort(), []);");
+    // A saved address the subscription filter drops is reported, never silent.
+    expect(region).toContain("if (saved.id && nextId !== saved.id)");
 
     // D-06: the signed-out branch is untouched -- exactly one sign-in button.
     expect(source.split('<SignInButton mode="modal">').length - 1).toBe(1);

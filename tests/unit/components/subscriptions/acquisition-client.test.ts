@@ -69,6 +69,21 @@ describe("subscription acquisition client", () => {
     }));
   });
 
+  it("keeps a saved address the account API accepts (city/region up to 200 chars) so it cannot vanish after a save", async () => {
+    const longCity = "C".repeat(150);
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({
+      addresses: [
+        { id: "addr_short", address: { line1: "1 Main", city: "Denver", country: "US" } },
+        { id: "addr_long", address: { line1: "2 Main", city: longCity, region: "R".repeat(200), country: "US" } },
+        { id: "addr_over", address: { line1: "3 Main", city: "C".repeat(201), country: "US" } },
+      ],
+    }), { status: 200 })) as unknown as FetchLike;
+    const next = await fetchSavedAddressesForPlan(fetcher, { shippingRequired: true });
+    expect(next.map((entry) => entry.id)).toEqual(["addr_short", "addr_long"]);
+    expect(nextAddressSelection(next, "addr_long")).toBe("addr_long");
+    expect(shippingAddressFromSaved(next[1]!).city).toBe(longCity);
+  });
+
   it("sends the exact physical SetupIntent body, consent, and stable key", async () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify({
       acquisitionId: "acq_one", setupIntentId: "seti_one", clientSecret: "seti_one_secret_value",
