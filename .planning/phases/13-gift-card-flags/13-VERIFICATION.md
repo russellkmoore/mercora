@@ -6,6 +6,7 @@ score: 8/8 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0
 covered_files:
+
   - ".planning/REQUIREMENTS.md"
   - ".planning/phases/13-gift-card-flags/13-01-PLAN.md"
   - ".planning/phases/13-gift-card-flags/13-01-SUMMARY.md"
@@ -76,13 +77,15 @@ covered_files:
   - "tests/unit/lib/services/checkout-pricing.test.ts"
   - "tests/unit/worker-cron-routing.test.ts"
   - "workers/observability-tail/src/core.ts"
-covered_digest: "v1:sha256:ea0d73e152d5ec3a7387a88a82a35c95624336d81e0184eb425a26a9346c8799"
+
+covered_digest: "v1:sha256:9765a022d66ae56e942acc51ea20b9edaf3e4f12b091c3f04fea9d39bb018750"
 decision_coverage:
   honored: 17
   total: 17
   not_honored: []
 human_verification: []
 optional_confirmations:
+
   - test: "Set both gift-card flags to false in local .dev.vars, run npm run dev, and eyeball the admin sidebar, /admin/gift-cards and the home page."
     expected: "No Gift cards sidebar entry, an ordinary 404 on /admin/gift-cards, no gift card on the home grid."
     why_optional: "The same three truths are each pinned by an automated test (AdminSidebar source contract, the admin page's notFound() behavioural test, and the anonymous /api/products listing test against the shared predicate). This is a visual confirmation, not the evidence the truth rests on."
