@@ -124,15 +124,34 @@ Plans:
 **Plans**: 9 plans
 
 Plans:
+**Wave 1**
 
 - [ ] 14-01-PLAN.md — Migration `0024`, the `gift_card_events` Drizzle table and `code_suffix`, proven by a migration-ordering test
 - [ ] 14-02-PLAN.md — Narrow the honor-guard settings refusal, declare the code-reveal setting, add the shared admin route scaffold
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 14-03-PLAN.md — Repository: `disableAccount`, `findReservations`, `requeueDelivery`, `writeAdjustment`, once-only `reissue`
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 14-04-PLAN.md — Event writer, four-source timeline merge, extended list projection with search, forbidden-column contract
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 14-05-PLAN.md — Fulfillment: `issueAdminGiftCard`, `resendGiftCardDelivery`, code suffix on checkout-issued cards
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 14-06-PLAN.md — Read and create routes: card detail, timeline, list search and paging, admin-create
 - [ ] 14-07-PLAN.md — Seven mutation routes: disable, notes, requeue, release-hold, resend, reissue, reveal
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 14-08-PLAN.md — Admin UI: real list with search and paging, card detail page, action bar, confirm dialogs, timeline
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
 - [ ] 14-09-PLAN.md — Documentation, full CI gate suite, deploy and read-only production check
 
 **UI hint**: yes
