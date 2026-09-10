@@ -30,14 +30,31 @@ import { eq, inArray } from "drizzle-orm";
  * redemption and refund until the next tick — or permanently, by dating the
  * forged record into the future.
  *
- * Both the key and its category are refused: the category is what an operator
- * UI would page through, and nothing else legitimately writes under it.
+ * The `gift_cards` category now holds more than one key (D-20):
+ * `gift_cards.honor_guard` (cron-owned, never writable here) and
+ * `gift_cards.code_reveal_enabled` (an ordinary admin setting, D-12). The
+ * guard key itself is always refused, trimmed before comparison so a padded
+ * variant cannot slip through. Any *other* key in the category is refused too
+ * unless it is explicitly allowlisted below — that allowlist is the only way
+ * a new `gift_cards.*` setting becomes writable through this route, so a
+ * future key does not silently inherit write access to the category.
  */
+const WRITABLE_GIFT_CARDS_CATEGORY_KEYS = new Set<string>([
+  "gift_cards.code_reveal_enabled",
+]);
+
 function writesTheHonorGuard(update: unknown): boolean {
   if (!update || typeof update !== "object") return false;
   const candidate = update as Record<string, unknown>;
-  return candidate.key === HONOR_GUARD_SETTING_KEY
-    || candidate.category === HONOR_GUARD_SETTING_CATEGORY;
+  const key = typeof candidate.key === "string" ? candidate.key.trim() : candidate.key;
+  if (key === HONOR_GUARD_SETTING_KEY) return true;
+  if (
+    candidate.category === HONOR_GUARD_SETTING_CATEGORY
+    && !WRITABLE_GIFT_CARDS_CATEGORY_KEYS.has(key as string)
+  ) {
+    return true;
+  }
+  return false;
 }
 
 /**
