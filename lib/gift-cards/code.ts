@@ -206,6 +206,17 @@ export function normalizeGiftCardCode(value: unknown): string | null {
   return pattern.test(normalized) ? normalized : null;
 }
 
+// RED-phase stub (#3770): compiles and exports the right names so the test
+// file can import successfully, but every export is deliberately wrong (an
+// unconditional null) so each assertion fails for a real reason.
+export function giftCardCodeSuffix(_value: unknown): string | null {
+  return null;
+}
+
+export function maskGiftCardCodeSuffix(_suffix: unknown): string | null {
+  return null;
+}
+
 function digestMessage(code: string, keyVersion: number): Uint8Array<ArrayBuffer> {
   return encoder.encode([
     HMAC_PURPOSE,
