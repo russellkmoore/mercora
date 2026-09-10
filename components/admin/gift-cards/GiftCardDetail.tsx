@@ -71,13 +71,19 @@ export default function GiftCardDetail({ giftCardId }: { giftCardId: string }) {
   const [reservations, setReservations] = useState<GiftCardReservationView[]>([]);
   const [capabilities, setCapabilities] = useState<{ codeRevealEnabled: boolean }>({ codeRevealEnabled: false });
   const [events, setEvents] = useState<GiftCardTimelineEntry[]>([]);
+  // `loading` gates the full-page placeholder and is true only until the
+  // first card arrives. Later refreshes (after an action, a note, or the
+  // Refresh button) set `refreshing` instead, so the action bar and any open
+  // dialog stay mounted while the data updates — the reveal dialog in
+  // particular must survive its own refresh (CR-02).
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [noteText, setNoteText] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (mode: "initial" | "refresh" = "refresh") => {
+    if (mode === "initial") setLoading(true); else setRefreshing(true);
     setError("");
     try {
       const [cardResponse, eventsResponse] = await Promise.all([
@@ -97,13 +103,17 @@ export default function GiftCardDetail({ giftCardId }: { giftCardId: string }) {
       setCapabilities(cardPayload.capabilities ?? { codeRevealEnabled: false });
       setEvents(eventsPayload.events ?? []);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Gift card could not be loaded");
+      const message = cause instanceof Error ? cause.message : "Gift card could not be loaded";
+      // A failed refresh keeps the card already on screen and says so in a
+      // toast; only a failed first load replaces the page with the error state.
+      if (mode === "initial") setError(message); else toast.error(message);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [giftCardId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load("initial"); }, [load]);
 
   // D-11/GCA-03: a 1-2000 character CSR note, prepended to the timeline on
   // success by refetching it via `load()`.
@@ -137,7 +147,7 @@ export default function GiftCardDetail({ giftCardId }: { giftCardId: string }) {
     return (
       <div role="alert" className="rounded-lg border border-red-900 bg-red-950/30 p-5 text-sm text-red-100">
         <p>{error || "Gift card could not be loaded"}</p>
-        <button type="button" onClick={() => void load()} className="mt-4 rounded-md border border-red-700 px-3 py-2 hover:border-red-500">Try again</button>
+        <button type="button" onClick={() => void load("initial")} className="mt-4 rounded-md border border-red-700 px-3 py-2 hover:border-red-500">Try again</button>
       </div>
     );
   }
@@ -150,8 +160,8 @@ export default function GiftCardDetail({ giftCardId }: { giftCardId: string }) {
         <Link href="/admin/gift-cards" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white">
           <ArrowLeft className="h-4 w-4" /> Back to gift cards
         </Link>
-        <Button variant="ghost" size="sm" onClick={() => void load()} disabled={loading}>
-          <RefreshCw className="mr-2 h-4 w-4" /> Refresh
+        <Button variant="ghost" size="sm" onClick={() => void load()} disabled={refreshing}>
+          <RefreshCw className={`mr-2 h-4 w-4${refreshing ? " animate-spin" : ""}`} /> Refresh
         </Button>
       </div>
 
