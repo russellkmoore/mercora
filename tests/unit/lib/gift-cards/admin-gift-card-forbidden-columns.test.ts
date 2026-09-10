@@ -75,6 +75,41 @@ const FORBIDDEN_COLUMNS: readonly string[] = [
   "business_key",
 ];
 
+/**
+ * UF-14-2: the same columns as the camelCase property names the repository
+ * and the encryption helpers use for them. A route that builds a response
+ * from a repository object could leak code material under these names
+ * without ever typing the snake_case column, so they are scanned too.
+ */
+const FORBIDDEN_CAMEL_FORMS = [
+  "codeHash",
+  "codeCiphertext",
+  "codeNonce",
+  "codeKeyVersion",
+  "claimToken",
+  "emailIdempotencyKey",
+] as const;
+
+/**
+ * The one place a route legitimately names code material in camelCase: the
+ * reissue route's write-side block, which hashes and encrypts the NEW card's
+ * bearer code and hands it to `repository.reissue` as an input. Allowed by
+ * exact block, not by file, so a second occurrence anywhere else in the
+ * route — or a response that echoes one of these — still fails the scan.
+ */
+const WRITE_SIDE_ALLOW_LIST: ReadonlyArray<{ path: string; block: RegExp }> = [{
+  path: join("app", "api", "admin", "gift-cards", "[id]", "reissue", "route.ts"),
+  block: /const codeHash = await digestGiftCardCode\([\s\S]*?const result = await repository\.reissue\(\{[\s\S]*?\n {4}\}\);\n/,
+}];
+
+function withoutAllowedWriteBlocks(entry: ScannedFile): string {
+  let text = entry.scanned;
+  for (const allowed of WRITE_SIDE_ALLOW_LIST) {
+    if (allowed.path === entry.path) text = text.replace(allowed.block, "");
+  }
+  return text;
+}
+
 interface ScannedFile {
   path: string;
   raw: string;
@@ -111,6 +146,25 @@ describe("gift-card admin read paths never carry code material (D-14, GCA-09)", 
   it.each(FORBIDDEN_COLUMNS)("never references the forbidden column \"%s\"", (column) => {
     for (const entry of allEntries) {
       expect(entry.scanned, `${entry.path} must not reference "${column}"`).not.toContain(column);
+    }
+  });
+
+  it.each(FORBIDDEN_CAMEL_FORMS)("never references the camelCase form \"%s\" outside the allowed write-side block (UF-14-2)", (form) => {
+    for (const entry of allEntries) {
+      expect(withoutAllowedWriteBlocks(entry), `${entry.path} must not reference "${form}"`).not.toContain(form);
+    }
+  });
+
+  it("keeps every allow-listed write-side block present and away from any response (UF-14-2)", () => {
+    // A dead allow-list would hide a moved block from the scan above; a block
+    // that builds a response would be the exact leak the scan exists for.
+    for (const allowed of WRITE_SIDE_ALLOW_LIST) {
+      const entry = allEntries.find((candidate) => candidate.path === allowed.path);
+      expect(entry, `${allowed.path} must exist`).toBeDefined();
+      const match = entry!.scanned.match(allowed.block);
+      expect(match, `${allowed.path} must still contain the allow-listed write-side block`).not.toBeNull();
+      expect(match![0]).not.toContain("NextResponse.json");
+      expect(match![0]).toContain("repository.reissue(");
     }
   });
 
