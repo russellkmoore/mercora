@@ -401,7 +401,7 @@ describe("POST /api/admin/gift-cards/[id]/resend", () => {
 });
 
 describe("POST /api/admin/gift-cards/[id]/reissue", () => {
-  it("drains a disabled card to a new card for the same amount, delivered to the original recipient, and writes the paired events", async () => {
+  it("drains a disabled card to a new card for the same amount, delivered to the original recipient, with the actor handed to the repository's single batch (CR-01, WR-01)", async () => {
     repository.reissue.mockResolvedValue({
       created: true,
       newGiftCardId: "gift_card_reissue_x",
@@ -415,27 +415,17 @@ describe("POST /api/admin/gift-cards/[id]/reissue", () => {
     expect(repository.reissue).toHaveBeenCalledWith(
       expect.objectContaining({
         oldGiftCardId: "gift_card_1",
+        actor: { type: "admin", id: "user_admin" },
         delivery: expect.objectContaining({ recipientEmail: "buyer@example.com" }),
       }),
     );
-    expect(mocks.appendGiftCardEvent).toHaveBeenCalledTimes(2);
-    expect(mocks.appendGiftCardEvent).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      giftCardId: "gift_card_1",
-      eventType: "reissued",
-      details: {
-        to_gift_card_id: "gift_card_reissue_x",
-        amount_minor: 1_500,
-        recipient_email: "buyer@example.com",
-      },
-    }));
-    expect(mocks.appendGiftCardEvent).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      giftCardId: "gift_card_reissue_x",
-      eventType: "reissued_from",
-      details: { from_gift_card_id: "gift_card_1" },
-    }));
+    // The `reissued`/`reissued_from` rows land inside the repository's batch,
+    // in the same transaction as the drain and the issuance — the route must
+    // not append them afterwards on a separate connection.
+    expect(mocks.appendGiftCardEvent).not.toHaveBeenCalled();
   });
 
-  it("delivers to an admin-supplied address instead, and records it on the event", async () => {
+  it("delivers to an admin-supplied address instead", async () => {
     repository.reissue.mockResolvedValue({
       created: true,
       newGiftCardId: "gift_card_reissue_x",
@@ -447,9 +437,6 @@ describe("POST /api/admin/gift-cards/[id]/reissue", () => {
         delivery: expect.objectContaining({ recipientEmail: "fraud-recovery@example.com" }),
       }),
     );
-    expect(mocks.appendGiftCardEvent).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      details: expect.objectContaining({ recipient_email: "fraud-recovery@example.com" }),
-    }));
   });
 
   it("returns 409 gift_card_reissue_blocked naming the reason for an active card, and writes nothing", async () => {

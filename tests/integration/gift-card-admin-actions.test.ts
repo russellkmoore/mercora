@@ -105,12 +105,13 @@ function reservation(
 
 /**
  * Mirrors exactly what `POST .../reissue` does — generate the new card's
- * bearer material, call `repository.reissue`, then write the paired
- * `reissued`/`reissued_from` events — as two direct calls against real D1
- * rather than through the HTTP route layer, matching this codebase's
- * established integration-test pattern (repository/service functions
- * exercised directly; see `tests/integration/lib/gift-cards/repository.test.ts`
- * and `gift-card-events.test.ts`, neither of which invokes a Next.js route
+ * bearer material and call `repository.reissue`, which writes the drain, the
+ * new card and the paired `reissued`/`reissued_from` events in one batch
+ * (CR-01, WR-01) — as a direct call against real D1 rather than through the
+ * HTTP route layer, matching this codebase's established integration-test
+ * pattern (repository/service functions exercised directly; see
+ * `tests/integration/lib/gift-cards/repository.test.ts` and
+ * `gift-card-events.test.ts`, neither of which invokes a Next.js route
  * handler under vitest-pool-workers).
  */
 async function performReissue(oldGiftCardId: string, to = "buyer@example.test") {
@@ -127,9 +128,10 @@ async function performReissue(oldGiftCardId: string, to = "buyer@example.test") 
     code,
     keyRing: parseGiftCardDeliveryKeyRing(environment),
   });
-  const result = await repository.reissue({
+  return repository.reissue({
     oldGiftCardId,
     now,
+    actor: { type: "admin", id: "user_admin" },
     codeHash,
     codeSuffix: giftCardCodeSuffix(code) ?? undefined,
     delivery: {
@@ -141,21 +143,6 @@ async function performReissue(oldGiftCardId: string, to = "buyer@example.test") 
       codeKeyVersion: encrypted.keyVersion,
     },
   });
-  await appendGiftCardEvent({
-    giftCardId: oldGiftCardId,
-    eventType: "reissued",
-    actor: { type: "admin", id: "user_admin" },
-    details: { to_gift_card_id: result.newGiftCardId, amount_minor: result.amount.toMinorUnits(), recipient_email: to },
-    createdAt: now,
-  });
-  await appendGiftCardEvent({
-    giftCardId: result.newGiftCardId,
-    eventType: "reissued_from",
-    actor: { type: "admin", id: "user_admin" },
-    details: { from_gift_card_id: oldGiftCardId },
-    createdAt: now,
-  });
-  return result;
 }
 
 describe("gift-card admin mutation routes against real D1 (D-05, D-06, D-09, D-10)", () => {

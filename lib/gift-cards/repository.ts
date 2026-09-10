@@ -22,6 +22,8 @@ import {
   type IssueGiftCardInput,
   type ReserveGiftCardInput,
 } from "./domain";
+import { assertGiftCardEventDetails, type GiftCardEventType } from "./events";
+import type { Actor } from "@/lib/fulfillment/types";
 
 interface AccountRow {
   id: string;
@@ -200,6 +202,17 @@ function sameReservation(reservation: GiftCardReservation, input: ReserveGiftCar
     && reservation.requestKey === input.requestKey
     && reservation.quoteFingerprint === input.quoteFingerprint
     && reservation.requestedAmount.equals(input.requestedAmount);
+}
+
+function assertGiftCardActor(value: unknown): asserts value is Actor {
+  if (
+    typeof value !== "object" || value === null
+    || !["admin", "service", "system"].includes((value as { type?: unknown }).type as string)
+    || !("id" in value)
+    || ((value as { id: unknown }).id !== null && typeof (value as { id: unknown }).id !== "string")
+  ) {
+    throw new TypeError("gift-card actor must be { type: admin|service|system, id: string | null }");
+  }
 }
 
 function assertOrderId(value: unknown): asserts value is string {
@@ -396,14 +409,14 @@ export function createGiftCardRepository(database: D1Database) {
   // closure reference — matches the `findAccountById`/`findReservationById`
   // idiom already used in this factory, and avoids relying on `this` binding
   // if a caller destructures the returned object.
-  const issueAccount = async (input: IssueGiftCardInput): Promise<{
-    created: boolean;
-    account: GiftCardAccount;
-    issuance: GiftCardLedgerEntry;
-  }> => {
-      assertIssueGiftCardInput(input);
-      const businessKey = giftCardIssuanceBusinessKey(input.id);
-      const result = await database.batch([
+  /**
+   * The three idempotent INSERTs that make up an issuance — account, issuance
+   * ledger entry, and (optionally) the pending delivery row. Split out of
+   * `issueAccount` so `reissue` can put the same statements into one larger
+   * `database.batch()` beside its drain adjustment and audit events (D-06,
+   * D-19): the batch is what makes the whole reissue all-or-nothing.
+   */
+  const issueAccountStatements = (input: IssueGiftCardInput, businessKey: string): D1PreparedStatement[] => [
         database.prepare(`INSERT INTO gift_card_accounts (
           id, code_hash, code_hash_version, currency_code, status,
           issuance_entry_id, issuance_business_key, issued_amount_minor,
@@ -468,7 +481,17 @@ export function createGiftCardRepository(database: D1Database) {
           input.createdAt,
           input.createdAt,
         )] : []),
-      ]);
+  ];
+
+  /**
+   * Post-write validation shared by `issueAccount` and `reissue`: the durable
+   * rows must match the input exactly, or a retry with changed facts (or a
+   * colliding id) is surfaced as a conflict rather than silently accepted.
+   */
+  const verifyIssuedAccount = async (input: IssueGiftCardInput, businessKey: string): Promise<{
+    account: GiftCardAccount;
+    issuance: GiftCardLedgerEntry;
+  }> => {
       const account = await findAccountById(input.id);
       const issuanceRow = await database.prepare(
         `${LEDGER_SELECT} WHERE business_key = ? LIMIT 1`,
@@ -504,6 +527,18 @@ export function createGiftCardRepository(database: D1Database) {
           throw new GiftCardConflictError('Gift-card delivery conflicts with durable state');
         }
       }
+      return { account, issuance };
+  };
+
+  const issueAccount = async (input: IssueGiftCardInput): Promise<{
+    created: boolean;
+    account: GiftCardAccount;
+    issuance: GiftCardLedgerEntry;
+  }> => {
+      assertIssueGiftCardInput(input);
+      const businessKey = giftCardIssuanceBusinessKey(input.id);
+      const result = await database.batch(issueAccountStatements(input, businessKey));
+      const { account, issuance } = await verifyIssuedAccount(input, businessKey);
       return { created: (result[0]?.meta.changes ?? 0) === 1, account, issuance };
   };
 
@@ -673,16 +708,55 @@ export function createGiftCardRepository(database: D1Database) {
   };
 
   /**
-   * Drain a disabled card's available balance into a negative adjustment and
-   * issue a new card for the same amount (D-06). Idempotency comes from
-   * `giftCardReissueId` — a deterministic new-card id — rather than a custom
-   * business key on `issueAccount`, which derives its own from the id it is
-   * given (D-19, RESEARCH Pitfall 2). `writeAdjustment` and `issueAccount` run
-   * as two sequential, individually idempotent calls, not one `database.batch()`.
+   * One raw `INSERT INTO gift_card_events` statement for a batch. Mirrors the
+   * row `appendGiftCardEvent` (`./events`) writes, but as a prepared statement
+   * so it can share a transaction with the money it describes. Details are
+   * run through the same forbidden-key check before binding (D-03/D-14).
+   */
+  const giftCardEventStatement = (args: {
+    giftCardId: string;
+    eventType: GiftCardEventType;
+    actor: Actor;
+    details: Record<string, unknown>;
+    createdAt: number;
+  }): D1PreparedStatement => {
+    assertGiftCardEventDetails(args.details);
+    return database.prepare(`INSERT INTO gift_card_events (
+      id, gift_card_id, event_type, actor_type, actor_id, details, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)`).bind(
+      crypto.randomUUID(),
+      args.giftCardId,
+      args.eventType,
+      args.actor.type,
+      args.actor.id,
+      JSON.stringify(args.details),
+      args.createdAt,
+    );
+  };
+
+  /**
+   * Drain a disabled card's available balance into a negative adjustment,
+   * issue a new card for the same amount, and write the paired
+   * `reissued`/`reissued_from` audit events — all in ONE `database.batch()`,
+   * which D1 runs as a single transaction (D-06, D-19). Either every row lands
+   * or none does: a CHECK failure on the delivery row, a UNIQUE collision, or
+   * a dropped connection can no longer leave the old card drained with no new
+   * card to show for it.
+   *
+   * Idempotency comes from `giftCardReissueId` — a deterministic new-card id —
+   * rather than a custom business key on `issueAccount`, which derives its own
+   * from the id it is given (RESEARCH Pitfall 2). A retry converges on what
+   * already happened *before* re-reading the balance: once the new card and
+   * the drain adjustment both exist the answer is "already reissued", and a
+   * half-applied state left by a pre-batch deploy is surfaced for repair
+   * rather than guessed at. The D-01 partial UNIQUE index on `reissued` is the
+   * database-level once-only guarantee: a second batch for the same card is
+   * rejected as a whole, adjustment and issuance included.
    */
   const reissue = async (args: {
     oldGiftCardId: string;
     now: number;
+    actor: Actor;
     codeHash: GiftCardCodeHash;
     codeSuffix?: string;
     delivery?: IssueGiftCardInput["delivery"];
@@ -691,6 +765,7 @@ export function createGiftCardRepository(database: D1Database) {
     assertGiftCardEpoch(args.now, "gift-card reissue time");
     assertGiftCardCodeHash(args.codeHash);
     if (args.codeSuffix !== undefined) assertGiftCardCodeSuffix(args.codeSuffix);
+    assertGiftCardActor(args.actor);
 
     const oldAccount = await findAccountById(args.oldGiftCardId);
     if (!oldAccount) throw new GiftCardUnavailableError("Gift card is unavailable");
@@ -708,34 +783,92 @@ export function createGiftCardRepository(database: D1Database) {
       }
     }
 
+    // Converge on prior state first, never on a balance that has already moved.
+    const newGiftCardId = await giftCardReissueId(args.oldGiftCardId);
+    const adjustmentKey = giftCardReissueAdjustmentBusinessKey(args.oldGiftCardId);
+    const priorNewAccount = await findAccountById(newGiftCardId);
+    const priorAdjustment = await database.prepare(`${LEDGER_SELECT} WHERE business_key = ? LIMIT 1`)
+      .bind(adjustmentKey).first<LedgerRow>();
+    if (priorNewAccount && priorAdjustment) {
+      throw new GiftCardConflictError("Gift card has already been reissued");
+    }
+    if (priorNewAccount || priorAdjustment) {
+      throw new GiftCardConflictError("Gift card reissue is in an inconsistent state and needs manual repair");
+    }
+
     const balance = await readBalance(args.oldGiftCardId, args.now);
     if (!balance) throw new GiftCardUnavailableError("Gift card is unavailable");
-    const zero = Money.zero(balance.availableBalance.currency);
-    if (!balance.availableBalance.gt(zero)) {
+    const amount = balance.availableBalance;
+    if (!amount.gt(Money.zero(amount.currency))) {
       throw new GiftCardConflictError("Gift card has no available balance to reissue");
     }
 
-    const adjustment = await writeAdjustment({
-      giftCardId: args.oldGiftCardId,
-      amount: balance.availableBalance.negate(),
-      businessKey: giftCardReissueAdjustmentBusinessKey(args.oldGiftCardId),
-      createdAt: args.now,
-    });
-
-    const newGiftCardId = await giftCardReissueId(args.oldGiftCardId);
-    const issued = await issueAccount({
+    const issueInput: IssueGiftCardInput = {
       id: newGiftCardId,
       codeHash: args.codeHash,
-      amount: balance.availableBalance,
+      amount,
       createdAt: args.now,
-      codeSuffix: args.codeSuffix,
-      delivery: args.delivery,
-    });
+      ...(args.codeSuffix !== undefined ? { codeSuffix: args.codeSuffix } : {}),
+      ...(args.delivery ? { delivery: args.delivery } : {}),
+    };
+    assertIssueGiftCardInput(issueInput);
+    const issuanceKey = giftCardIssuanceBusinessKey(newGiftCardId);
+    const adjustmentEntryId = `gift_ledger_${crypto.randomUUID()}`;
+    assertGiftCardId(adjustmentEntryId, "gift-card ledger entry id");
+
+    const result = await database.batch([
+      // No ON CONFLICT clause on purpose: the pre-check above already proved
+      // this key is absent, so a collision here is a race with another
+      // reissue of the same card and must abort the whole batch.
+      database.prepare(`INSERT INTO gift_card_ledger_entries (
+        id, gift_card_id, currency_code, entry_type, amount_delta_minor,
+        business_key, order_id, reservation_id, related_entry_id, created_at
+      ) VALUES (?, ?, ?, 'adjustment', ?, ?, NULL, NULL, NULL, ?)`).bind(
+        adjustmentEntryId,
+        args.oldGiftCardId,
+        amount.currency,
+        amount.negate().toMinorUnits(),
+        adjustmentKey,
+        args.now,
+      ),
+      ...issueAccountStatements(issueInput, issuanceKey),
+      giftCardEventStatement({
+        giftCardId: args.oldGiftCardId,
+        eventType: "reissued",
+        actor: args.actor,
+        details: {
+          to_gift_card_id: newGiftCardId,
+          amount_minor: amount.toMinorUnits(),
+          ...(args.delivery ? { recipient_email: args.delivery.recipientEmail } : {}),
+        },
+        createdAt: args.now,
+      }),
+      giftCardEventStatement({
+        giftCardId: newGiftCardId,
+        eventType: "reissued_from",
+        actor: args.actor,
+        details: { from_gift_card_id: args.oldGiftCardId },
+        createdAt: args.now,
+      }),
+    ]);
+
+    await verifyIssuedAccount(issueInput, issuanceKey);
+    const adjustmentRow = await database.prepare(`${LEDGER_SELECT} WHERE business_key = ? LIMIT 1`)
+      .bind(adjustmentKey).first<LedgerRow>();
+    const adjustment = adjustmentRow ? mapLedger(adjustmentRow) : undefined;
+    if (
+      !adjustment
+      || adjustment.entryType !== "adjustment"
+      || adjustment.giftCardId !== args.oldGiftCardId
+      || !adjustment.amountDelta.equals(amount.negate())
+    ) {
+      throw new GiftCardConflictError("Gift-card reissue adjustment conflicts with durable state");
+    }
 
     return {
-      created: adjustment.created && issued.created,
+      created: (result[0]?.meta.changes ?? 0) === 1,
       newGiftCardId,
-      amount: balance.availableBalance,
+      amount,
     };
   };
 
