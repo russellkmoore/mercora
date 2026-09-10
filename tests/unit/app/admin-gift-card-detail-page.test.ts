@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("next/navigation", () => ({
@@ -69,5 +71,38 @@ describe("admin gift-card detail page gating (D-16)", () => {
       { giftCardAcquisition: false, giftCardReconciliation: false },
       expect.any(Number),
     );
+  });
+});
+
+describe("gift-card action bar source contracts (D-17, D-22, D-12)", () => {
+  const actionBarSource = readFileSync(
+    join(process.cwd(), "components", "admin", "gift-cards", "GiftCardActionBar.tsx"),
+    "utf8",
+  );
+
+  it("imports AlertDialog from the alert-dialog component and toast from sonner", () => {
+    expect(actionBarSource).toContain('from "@/components/ui/alert-dialog"');
+    expect(actionBarSource).toMatch(/import\s*\{\s*[^}]*\bAlertDialog\b[^}]*\}\s*from\s*"@\/components\/ui\/alert-dialog"/);
+    expect(actionBarSource).toContain('import { toast } from "sonner"');
+  });
+
+  it("contains no window.confirm call", () => {
+    expect(actionBarSource).not.toMatch(/window\.confirm/);
+  });
+
+  it("renders the reveal control conditionally on the settings flag from the detail response", () => {
+    expect(actionBarSource).toContain("capabilities.codeRevealEnabled");
+    expect(actionBarSource).toContain("canReveal &&");
+  });
+});
+
+describe("gift-card note form source contract (D-11, GCA-03)", () => {
+  it("bounds the note textarea at 2000 characters", () => {
+    const detailSource = readFileSync(
+      join(process.cwd(), "components", "admin", "gift-cards", "GiftCardDetail.tsx"),
+      "utf8",
+    );
+    expect(detailSource).toContain("NOTE_MAX_LENGTH = 2_000");
+    expect(detailSource).toMatch(/maxLength=\{NOTE_MAX_LENGTH\}/);
   });
 });
