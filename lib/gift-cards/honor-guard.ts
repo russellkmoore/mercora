@@ -209,6 +209,20 @@ export async function honorIsEffectivelyOn(
 const HONOR_GUARD_DEFAULT_CURRENCY = 'USD';
 
 /**
+ * Recorded in place of a currency code when the active cards span more than
+ * one currency.
+ *
+ * `outstandingMinor` is a bare SUM of minor units with no GROUP BY, so a store
+ * holding both USD and EUR cards produces a number that is not a total of
+ * anything. It is still a perfectly good answer to the only question this
+ * record has to answer — is there money out there — so it is kept, and the
+ * currency is replaced with a sentinel that cannot be mistaken for an ISO code.
+ * The banner refuses to format a total marked this way rather than printing a
+ * mixed sum under whichever code happened to sort first.
+ */
+export const HONOR_GUARD_MIXED_CURRENCY = 'MIXED';
+
+/**
  * One five-minute tick of the honor guard: measure, store, decide, and page.
  *
  * Called only from the scheduled handler. It is the sole writer of the guard
@@ -226,7 +240,9 @@ export async function runGiftCardHonorGuard(
   const balances = await sumOutstandingGiftCardBalances(database, nowSeconds);
   const record: HonorGuardRecord = {
     outstanding_minor: balances.outstandingMinor,
-    currency: balances.currency ?? HONOR_GUARD_DEFAULT_CURRENCY,
+    currency: balances.currencyCount > 1
+      ? HONOR_GUARD_MIXED_CURRENCY
+      : balances.currency ?? HONOR_GUARD_DEFAULT_CURRENCY,
     open_reservations: balances.openReservations,
     measured_at: nowSeconds,
   };
