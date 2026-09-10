@@ -12,7 +12,8 @@ vi.mock('@opennextjs/cloudflare', () => ({
 // `resolveHonorEffective` owns that decision now (D-18), so it is what gets
 // stubbed here — and the short-circuit these tests used to assert through a
 // mock is asserted against the real function in
-// `tests/unit/lib/gift-cards/honor-guard.test.ts`, which is stronger.
+// `tests/integration/lib/gift-cards/honor-guard.test.ts`, where a database that
+// throws on any read proves it is never consulted. That is stronger.
 vi.mock('@/lib/gift-cards/honor-guard', () => ({
   resolveHonorEffective: mocks.resolveHonorEffective,
 }));
@@ -107,7 +108,7 @@ describe('runtime honor override', () => {
     // redeem into a clean capability set, erasing GCF-04 silently. The
     // short-circuit that guarantees it — sell on means the guard is never even
     // read — is asserted against the real function in
-    // tests/unit/lib/gift-cards/honor-guard.test.ts.
+    // tests/integration/lib/gift-cards/honor-guard.test.ts.
     mocks.resolveHonorEffective.mockResolvedValue(false);
 
     await expect(resolveRuntimeCommerceCapabilities())

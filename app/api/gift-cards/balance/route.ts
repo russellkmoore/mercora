@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     // balances still outstanding the runtime keeps redeeming and settling
     // (D-04), so answering `{ valid: false }` for a card the checkout would
     // accept is a lie to the one shopper the guard exists for. Configured-on
-    // short-circuits inside `honorIsEffectivelyOn` without reading D1, and any
+    // short-circuits inside `resolveHonorEffective` without reading D1, and any
     // failure reading the guard row answers "keep honoring".
     if (!raw.DB) return NextResponse.json({ valid: false });
     const honorEffective = await resolveHonorEffective(

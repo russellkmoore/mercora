@@ -49,9 +49,10 @@ export const HONOR_GUARD_SETTING_CATEGORY = 'gift_cards';
 export const HONOR_GUARD_STALE_SECONDS = 900;
 
 /**
- * The measurement, exactly as D-15 fixes it. Four fields, no more: anything
- * else belongs in the aggregate the cron runs, not in the row every request
- * may read.
+ * The measurement, as D-15 fixes it: the four fields the decision needs, plus
+ * `held_minor` for the one consumer that has to *display* it honestly. Nothing
+ * else belongs here — the rest of the aggregate the cron runs stays in the
+ * aggregate, not in the row every request may read.
  */
 export interface HonorGuardRecord {
   outstanding_minor: number;
@@ -164,8 +165,14 @@ export async function readHonorGuard(database: D1Database): Promise<HonorGuardRe
 }
 
 /**
- * Write the measurement. The five-minute cron is the only caller (D-15); a
- * source-contract test in plan 13-08 asserts no file under `app/` imports it.
+ * Write the measurement. The five-minute cron is the only caller (D-15).
+ *
+ * Two source contracts hold that, and it takes both:
+ * `honor-guard-writer-source.test.ts` asserts nothing under `app/`, `lib/` or
+ * `workers/` imports this function, and `admin-settings-writer-source.test.ts`
+ * asserts nothing writes the `admin_settings` row without saying what it does
+ * about the guard key. The first alone missed CR-02, which wrote the row
+ * through Drizzle and imported nothing from here.
  *
  * Upsert on the primary key so a tick never fails on the row it wrote last
  * time.
