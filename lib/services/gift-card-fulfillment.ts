@@ -271,6 +271,9 @@ async function issueLine(args: {
       issuedLineId: args.line.id,
       purchaserCustomerId: args.order.customer_id,
       createdAt: args.now,
+      // D-02: the second of the two issuance paths that carry a code suffix —
+      // issueAdminGiftCard is the first. Pre-0024 cards stay NULL (no backfill).
+      codeSuffix: giftCardCodeSuffix(code) ?? undefined,
       delivery: {
         id: deliveryId,
         recipientEmail: recipient.recipientEmail,
