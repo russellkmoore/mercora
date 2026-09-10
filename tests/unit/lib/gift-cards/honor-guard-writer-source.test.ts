@@ -1,19 +1,36 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
  * The cron is the only writer of the honor-guard record (D-15). A
  * request-path write would let a caller declare that no balances exist and
- * switch honoring off while cards still carry money (T-13-33). This walks
- * every `.ts`/`.tsx` file under `app/` and asserts none of them references
- * the writer or the cron entry point that calls it.
+ * switch honoring off while cards still carry money (T-13-33).
+ *
+ * The contract is "no request path writes this record", which is broader than
+ * one directory: a server action, an MCP tool or a service module under `lib/`
+ * is reachable from a request too. So this walks `app/`, `lib/` and `workers/`
+ * and asserts none of them references the writer or the cron entry point that
+ * calls it — except the two files that legitimately do.
  *
  * The forbidden list is its own declared array, not inlined into a string
- * the scan itself could match — this file lives outside `app/`, so it is
+ * the scan itself could match — this file lives under `tests/`, so it is
  * never a candidate the scan walks.
  */
 const FORBIDDEN_IDENTIFIERS = ["writeHonorGuard", "runGiftCardHonorGuard"];
+
+/**
+ * The two files the contract exists to permit: the module that defines the
+ * writer, and the scheduled handler that is the one caller. Everything else
+ * under the scanned roots is a request path until proven otherwise.
+ */
+const ALLOWED_PATHS = [
+  join("lib", "gift-cards", "honor-guard.ts"),
+  join("lib", "observability", "scheduled.ts"),
+];
+
+/** The roots a request can be served from. `workers/` is included so a tail or side worker cannot become a second writer. */
+const SCANNED_ROOTS = ["app", "lib", "workers"];
 
 function collectSourceFiles(dir: string): string[] {
   const files: string[] = [];
@@ -38,16 +55,19 @@ function stripCommentLines(source: string): string {
 }
 
 describe("honor-guard writer contract (D-15, T-13-33)", () => {
-  const appDir = join(process.cwd(), "app");
-  const files = collectSourceFiles(appDir);
+  const root = process.cwd();
+  const files = SCANNED_ROOTS
+    .flatMap((directory) => collectSourceFiles(join(root, directory)))
+    .map((file) => relative(root, file))
+    .filter((file) => !ALLOWED_PATHS.includes(file));
 
   it(
-    "references no writer or cron entry point under app/, because a request-path write " +
-      "would let a caller declare that no balances exist",
+    "references no writer or cron entry point under app/, lib/ or workers/, because a " +
+      "request-path write would let a caller declare that no balances exist",
     () => {
       const offenders: Array<{ file: string; identifier: string }> = [];
       for (const file of files) {
-        const stripped = stripCommentLines(readFileSync(file, "utf8"));
+        const stripped = stripCommentLines(readFileSync(join(root, file), "utf8"));
         for (const identifier of FORBIDDEN_IDENTIFIERS) {
           if (stripped.includes(identifier)) {
             offenders.push({ file, identifier });
@@ -58,7 +78,19 @@ describe("honor-guard writer contract (D-15, T-13-33)", () => {
     },
   );
 
-  it("walked at least one file under app/, so an empty directory could not fake a pass", () => {
-    expect(files.length).toBeGreaterThan(0);
+  it("walked files under every scanned root, so an empty directory could not fake a pass", () => {
+    for (const directory of SCANNED_ROOTS) {
+      expect(files.some((file) => file.startsWith(`${directory}/`)), directory).toBe(true);
+    }
+  });
+
+  it("each allowlisted file exists and does reference the writer, so the allowlist cannot rot", () => {
+    for (const allowed of ALLOWED_PATHS) {
+      const source = stripCommentLines(readFileSync(join(root, allowed), "utf8"));
+      expect(
+        FORBIDDEN_IDENTIFIERS.some((identifier) => source.includes(identifier)),
+        allowed,
+      ).toBe(true);
+    }
   });
 });
