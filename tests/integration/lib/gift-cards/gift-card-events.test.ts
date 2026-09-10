@@ -23,6 +23,7 @@ import {
   listGiftCardEvents,
 } from "@/lib/gift-cards/events";
 import { buildGiftCardTimeline } from "@/lib/gift-cards/timeline";
+import { listAdminGiftCardPresentations } from "@/lib/gift-cards/presentations";
 import type { ReserveGiftCardInput } from "@/lib/gift-cards/domain";
 
 const now = 1_800_500_000;
@@ -48,6 +49,18 @@ function issuance(overrides: Partial<IssueGiftCardInput> = {}): IssueGiftCardInp
 async function issueTestAccount(id = giftCardId, digest = hash): Promise<void> {
   const repository = createGiftCardRepository(env.DB);
   await repository.issueAccount(issuance({ id, codeHash: { keyVersion: 1, digest } }));
+}
+
+async function insertPendingOrder(id: string): Promise<void> {
+  await env.DB.prepare(`INSERT INTO orders
+    (id, status, total_amount, currency_code, items, payment_status, created_at, updated_at)
+    VALUES (?, 'pending', ?, 'USD', '[]', 'pending', ?, ?)`)
+    .bind(
+      id,
+      JSON.stringify({ amount: 1, currency: "USD" }),
+      new Date(now * 1_000).toISOString(),
+      new Date(now * 1_000).toISOString(),
+    ).run();
 }
 
 function reservation(
@@ -252,5 +265,113 @@ describe("buildGiftCardTimeline on real D1", () => {
     expect(note).toMatchObject({
       source: "event", actorType: "admin", actorId: "admin_1", details: { text: "test note" },
     });
+  });
+});
+
+async function insertTestPersonCustomer(id: string, person: Record<string, unknown>): Promise<void> {
+  await env.DB.prepare(
+    `INSERT INTO customers (id, type, person) VALUES (?, 'person', ?)`,
+  ).bind(id, JSON.stringify(person)).run();
+}
+
+describe("listAdminGiftCardPresentations search and projection (D-14, D-15)", () => {
+  beforeAll(async () => {
+    await applyTestMigrations();
+  });
+
+  beforeEach(() => {
+    testSequence += 1;
+    giftCardId = `gift_search_test_${testSequence}`;
+    hash = testSequence.toString(16).padStart(64, "0");
+  });
+
+  it("carries id, codeSuffix, maskedCode, recipientEmail, and a resolved purchaser", async () => {
+    const repository = createGiftCardRepository(env.DB);
+    const customerId = `customer_${testSequence}`;
+    await insertTestPersonCustomer(customerId, { email: "jane@example.com", full_name: "Jane Doe" });
+    await repository.issueAccount(issuance({
+      codeSuffix: "4A7K",
+      purchaserCustomerId: customerId,
+      delivery: {
+        id: `${giftCardId}_delivery`,
+        recipientEmail: "recipient@example.com",
+        emailIdempotencyKey: `${giftCardId}_idem`,
+        codeCiphertext: "c".repeat(10),
+        codeNonce: "n".repeat(10),
+        codeKeyVersion: 1,
+      },
+    }));
+
+    const { cards, total } = await listAdminGiftCardPresentations({
+      database: env.DB, now: now + 1, limit: 10, offset: 0,
+    });
+    expect(total).toBe(1);
+    expect(cards[0]).toMatchObject({
+      id: giftCardId,
+      codeSuffix: "4A7K",
+      maskedCode: "GC-****-****-****-****-****-****-4A7K",
+      recipientEmail: "recipient@example.com",
+      purchaser: "Jane Doe",
+    });
+  });
+
+  it("renders a null maskedCode for a card with no stored code suffix", async () => {
+    const repository = createGiftCardRepository(env.DB);
+    await repository.issueAccount(issuance());
+    const { cards } = await listAdminGiftCardPresentations({
+      database: env.DB, now: now + 1, limit: 10, offset: 0,
+    });
+    expect(cards[0]).toMatchObject({ codeSuffix: undefined, maskedCode: null });
+  });
+
+  it("matches an exact order id, an exact recipient email, and an exact suffix, case-insensitively for the latter two", async () => {
+    const repository = createGiftCardRepository(env.DB);
+    await insertPendingOrder(`order_${testSequence}`);
+    const orderCardId = `${giftCardId}_order`;
+    await repository.issueAccount(issuance({
+      id: orderCardId,
+      codeHash: { keyVersion: 1, digest: altDigest(1) },
+      issuedOrderId: `order_${testSequence}`,
+      issuedLineId: "line_1",
+      codeSuffix: "9WXZ",
+      delivery: {
+        id: `${orderCardId}_delivery`,
+        recipientEmail: "Search-Target@Example.com",
+        emailIdempotencyKey: `${orderCardId}_idem`,
+        codeCiphertext: "c".repeat(10),
+        codeNonce: "n".repeat(10),
+        codeKeyVersion: 1,
+      },
+    }));
+    // A sibling card that must never match any of the three queries below.
+    await repository.issueAccount(issuance({
+      id: `${giftCardId}_other`,
+      codeHash: { keyVersion: 1, digest: altDigest(2) },
+      codeSuffix: "PQRS",
+    }));
+
+    const byOrderId = await listAdminGiftCardPresentations({
+      database: env.DB, now: now + 1, limit: 10, offset: 0, q: `order_${testSequence}`,
+    });
+    expect(byOrderId.total).toBe(1);
+    expect(byOrderId.cards[0]?.id).toBe(orderCardId);
+
+    const byEmail = await listAdminGiftCardPresentations({
+      database: env.DB, now: now + 1, limit: 10, offset: 0, q: "search-target@example.com",
+    });
+    expect(byEmail.total).toBe(1);
+    expect(byEmail.cards[0]?.id).toBe(orderCardId);
+
+    const bySuffix = await listAdminGiftCardPresentations({
+      database: env.DB, now: now + 1, limit: 10, offset: 0, q: "9wxz",
+    });
+    expect(bySuffix.total).toBe(1);
+    expect(bySuffix.cards[0]?.id).toBe(orderCardId);
+
+    const noMatch = await listAdminGiftCardPresentations({
+      database: env.DB, now: now + 1, limit: 10, offset: 0, q: "no-such-card-anywhere",
+    });
+    expect(noMatch.total).toBe(0);
+    expect(noMatch.cards).toHaveLength(0);
   });
 });
