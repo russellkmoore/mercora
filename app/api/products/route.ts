@@ -96,12 +96,18 @@ export async function GET(request: NextRequest) {
       total = visibleProducts.length;
       products = visibleProducts.slice(offset, offset + limit);
     } else {
-      const [allProducts, page] = await Promise.all([
-        listProducts({ status: statusFilter }),
-        listProducts({ status: statusFilter, limit, offset }),
-      ]);
-      total = filterByVisibility(filterByStatus(allProducts)).length;
-      products = filterByVisibility(filterByStatus(page));
+      // Filter the full set once, then slice from it — the same shape the
+      // category branch above uses. Slicing in SQL and filtering in memory
+      // afterwards meant whichever page held the gift card came back one item
+      // short while `total` described the fully filtered set, so a client
+      // paginating on `total` saw a hole. The bug predates the gift-card
+      // filter (`filterByStatus` had the same shape) but only became visible
+      // when a filter started removing a row a shopper would notice.
+      const visibleProducts = filterByVisibility(
+        filterByStatus(await listProducts({ status: statusFilter })),
+      );
+      total = visibleProducts.length;
+      products = visibleProducts.slice(offset, offset + limit);
     }
 
     const responseProducts = (isAdmin
