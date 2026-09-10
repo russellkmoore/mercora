@@ -270,6 +270,29 @@ async function issueLine(args: {
   return giftCardId;
 }
 
+export interface IssueAdminGiftCardResult {
+  giftCardId: string;
+  created: boolean;
+}
+
+/**
+ * RED scaffold (Task 1, 14-05) — replaced by the real implementation in
+ * GREEN. Deliberately does not validate or write anything, so every RED
+ * assertion fails for the actual missing behavior rather than vacuously
+ * (an unconditional throw would make the "invalid amount rejects" case pass
+ * for the wrong reason).
+ */
+export async function issueAdminGiftCard(_args: {
+  requestId: string;
+  amount: Money;
+  recipientEmail: string;
+  recipientName?: string;
+  environment: GiftCardFulfillmentEnvironment;
+  now?: number;
+}): Promise<IssueAdminGiftCardResult> {
+  return { giftCardId: 'issue-admin-gift-card-not-implemented', created: false };
+}
+
 async function deliverOne(args: {
   database: D1Database;
   giftCardId: string;
