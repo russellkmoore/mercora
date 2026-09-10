@@ -21,8 +21,14 @@
  *    says zero. A corrupt row therefore returns `null` rather than throwing —
  *    taking down every request would be a worse answer than honoring a card
  *    the store meant to stop honoring.
+ *
+ * `runGiftCardHonorGuard` is the cron's entry point and the only writer of the
+ * record. The five-minute scheduled tick calls it; nothing else does. It is the
+ * one function here that runs the balance aggregate, which is why it must never
+ * be reachable from a request path (D-05, D-06, D-15).
  */
 
+import { sumOutstandingGiftCardBalances } from '@/lib/gift-cards/repository';
 import { recordTelemetry, type TelemetryOptions } from '@/lib/observability/telemetry';
 
 /** The `admin_settings` primary key this measurement lives under (D-15). */
@@ -192,4 +198,43 @@ export async function honorIsEffectivelyOn(
   } catch {
     return true;
   }
+}
+
+/**
+ * The store's default currency (`storeDefaults.commerce.currency`), used only
+ * when there are no active cards at all and the aggregate has no currency to
+ * report. Held locally rather than imported so this module — which capability
+ * resolution loads on the request path — stays free of the store-config graph.
+ */
+const HONOR_GUARD_DEFAULT_CURRENCY = 'USD';
+
+/**
+ * One five-minute tick of the honor guard: measure, store, decide, and page.
+ *
+ * Called only from the scheduled handler. It is the sole writer of the guard
+ * record and the only place the balance aggregate runs on a schedule (D-05).
+ *
+ * The alarm fires on every tick the condition holds rather than once, because
+ * "honor is off and shoppers still hold money" is a state an operator must fix,
+ * not an event they can acknowledge away.
+ */
+export async function runGiftCardHonorGuard(
+  database: D1Database,
+  configuredHonor: boolean,
+  nowSeconds: number,
+): Promise<{ honorEffective: boolean; record: HonorGuardRecord }> {
+  const balances = await sumOutstandingGiftCardBalances(database, nowSeconds);
+  const record: HonorGuardRecord = {
+    outstanding_minor: balances.outstandingMinor,
+    currency: balances.currency ?? HONOR_GUARD_DEFAULT_CURRENCY,
+    open_reservations: balances.openReservations,
+    measured_at: nowSeconds,
+  };
+  await writeHonorGuard(database, record);
+  const honorEffective = configuredHonor || balancesMayExist(record, nowSeconds);
+  // Only the configured-off-but-still-honoring state is an alarm. Honor
+  // configured on is ordinary operation, and a fresh zeroed record under
+  // honor off is the flag doing exactly what it was set to do.
+  if (!configuredHonor && honorEffective) reportHonorDisabledWithBalances(record);
+  return { honorEffective, record };
 }
