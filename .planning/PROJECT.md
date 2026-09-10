@@ -87,6 +87,21 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 
 </details>
 
+## Current Milestone: v2.2 Operations & Polish
+
+**Goal:** Make gift cards operable (flags that mean what they say, an admin that can manage individual cards with an audit trail), close the shopper-facing gaps the v2.1 live test exposed (subscription address entry in place, blog reachable, saved payment methods), and clear the accumulated tech debt and operator checklist.
+
+**Target features:**
+- Sell/honor gift-card flags: sell=off stops sales, honor=off refuses while balances exist, off/off hides every gift-card surface including the admin nav
+- Gift-card admin: list and search, per-card timeline (issuance, holds, redemptions, refunds, admin actions) with CSR notes, disable / reissue / resend / release-hold / admin-create, and a decided code-reveal policy
+- Subscription product page: add a shipping address in a modal without leaving the page; the saved address is pre-selected
+- Blog reachable from the header and a configurable home-page articles block, both admin-configurable
+- Saved payment methods for signed-in shoppers (Stripe Customer, Account → Payment methods)
+- Tech-debt closure: orphaned `/api/tax`, `order-effects` `{ DB }` fallback, cart notes with URLs, delivery-failed event split, one digital-only rule, billing address on digital receipts, stale docs claims, theme metadata on the Appearance cards
+- Operator checklist with human checkpoints: Stripe Tax on the live account, support address and `orders@` routing, missing production secrets, stale `ADMIN_USER_IDS`
+
+**Key context:** Phase numbering continues at 13. Gift-card backend semantics stay locked behind ADR-CTB-10; the admin work adds an expand-only `gift_card_events` table and admin APIs on top. Env var names for the flags stay for compatibility; only their behaviour and documentation change.
+
 ## Requirements
 
 ### Validated
@@ -323,4 +338,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-10 after v2.1 milestone*
+*Last updated: 2026-09-10 — milestone v2.2 started*

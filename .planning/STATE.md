@@ -1,20 +1,16 @@
 ---
 gsd_state_version: "1.0"
-milestone: v2.1
-milestone_name: Gift Card Product
-status: Awaiting next milestone
-stopped_at: Milestone v2.1 archived and tagged; ready for /gsd-new-milestone
-last_updated: "2026-09-10T05:25:42.120Z"
+milestone: v2.2
+milestone_name: Operations & Polish
+status: planning
+last_updated: "2026-09-10T06:08:56.718Z"
 last_activity: 2026-09-09
-last_activity_desc: Milestone v2.1 completed and archived
-state_head: bdbe599be91dc25f48e39c00092d7904a788c949
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 20
-  completed_plans: 20
-  percent: 100
-current_phase: 12
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -28,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-09-09 after Phase 11)
 
 ## Current Position
 
-Phase: Milestone v2.1 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-09-09 — Milestone v2.1 completed and archived
+Status: Defining requirements
+Last activity: 2026-09-09 — Milestone v2.2 started
 
 ## Performance Metrics
 
