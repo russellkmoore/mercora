@@ -1,7 +1,7 @@
 ---
 title: Surface the blog publicly — header navigation and a configurable home-page articles block
 created: 2026-09-10
-resolves_phase: null
+resolves_phase: 16
 source: Russell, 2026-09-10 (while testing gift-card checkout)
 audit_acknowledged:
   milestone: v2.1

@@ -1,7 +1,7 @@
 ---
 title: Theme metadata (industry + synopsis) surfaced in admin Appearance
 created: 2026-09-03
-resolves_phase: 6
+resolves_phase: 18
 source: user note during Phase 5 execution
 audit_acknowledged:
   milestone: v2

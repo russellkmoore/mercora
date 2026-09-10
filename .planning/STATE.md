@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 milestone: v2.2
 milestone_name: Operations & Polish
 status: planning
-last_updated: "2026-09-10T06:08:56.718Z"
-last_activity: 2026-09-09
+last_updated: "2026-09-10T18:00:00.000Z"
+last_activity: 2026-09-10
 progress:
-  total_phases: 0
+  total_phases: 7
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,14 +20,26 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-09 after Phase 11)
 
 **Core value:** A customer or an external AI agent can find the right product through Volt, pay for it exactly once, and have inventory, order state, and refunds end up correct, whether they arrive via the storefront or the MCP server.
-**Current focus:** No active milestone — v2.1 shipped 2026-09-10. Next: /gsd-new-milestone (seeds in .planning/todos/pending/: gift-card admin + sell/honor flags, blog navigation/home block, saved payment methods)
+**Current focus:** Milestone v2.2 Operations & Polish — Phases 13-19 roadmapped 2026-09-10. Gift cards operable (sell/honor flags, admin with audit trail), the shopper gaps the v2.1 live test exposed (subscription address in place, blog reachable, saved payment methods), then tech-debt closure and the operator checklist. Next: /gsd-discuss-phase 13
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 13 — Gift-Card Flags (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-09-09 — Milestone v2.2 started
+Status: Roadmapped, awaiting phase discussion
+Last activity: 2026-09-10 — v2.2 ROADMAP.md created (Phases 13-19, 34/34 requirements mapped)
+
+**Milestone v2.2 phases:**
+
+| Phase | Name | Requirements | Depends on | Status |
+|-------|------|--------------|------------|--------|
+| 13 | Gift-Card Flags | GCF-01..05 | — | Not started |
+| 14 | Gift-Card Admin & Audit Trail | GCA-01..09 | Phase 13 | Not started |
+| 15 | Subscription Address In Place | SUB-01..03 | — | Not started |
+| 16 | Blog Surfacing | BLOG-01..03 | — | Not started |
+| 17 | Saved Payment Methods | PAY-01..03 | — | Not started |
+| 18 | Tech-Debt Closure | DEBT-01..08 | — | Not started |
+| 19 | Operator Checklist (human checkpoints) | OPS-05..07 | Kept last | Not started |
 
 ## Performance Metrics
 
@@ -63,6 +75,13 @@ Last activity: 2026-09-09 — Milestone v2.2 started
 | 11 | 5 | - | - |
 | 10 | 5 | - | - |
 | 12 | 6 | - | - |
+| 13 (v2.2) | TBD | - | - |
+| 14 (v2.2) | TBD | - | - |
+| 15 (v2.2) | TBD | - | - |
+| 16 (v2.2) | TBD | - | - |
+| 17 (v2.2) | TBD | - | - |
+| 18 (v2.2) | TBD | - | - |
+| 19 (v2.2) | TBD | - | - |
 
 **Recent Trend:**
 
@@ -289,7 +308,7 @@ None.
 
 ### Blockers/Concerns
 
-Nothing blocks Phase 9. Open items carried out of v2 (full list in `milestones/v2-MILESTONE-AUDIT.md`):
+Nothing blocks Phase 13. Open items carried out of v2 (full list in `milestones/v2-MILESTONE-AUDIT.md`):
 
 - [Closed 2026-09-06] Live not-found pages returned 200: root `app/loading.tsx` removed (a04e1ea); 404s verified live. Admin toasts doubled: storefront Toaster gated off `/admin` (ecc6c4f)
 
@@ -313,6 +332,7 @@ Open items carried from v1 close (`milestones/v1-MILESTONE-AUDIT.md`):
 
 ### Roadmap Evolution
 
+- v2.2 ROADMAP.md created 2026-09-10: Phases 13-19 derived from the 34 v2.2 requirements (GCF-01..05, GCA-01..09, SUB-01..03, BLOG-01..03, PAY-01..03, DEBT-01..08, OPS-05..07). Grouping approved by Russell before roadmapping; one dependency (14 → 13, because the flag rules decide whether the admin nav entry and `/admin/gift-cards` render). 15, 16, 17 and 18 are independent of each other and of the gift-card phases. 19 is a human-checkpoint phase kept last by design — every task needs Russell in the Stripe or Cloudflare dashboard. 100% coverage, no orphans, no duplicates.
 - v2.1 ROADMAP.md created: Phases 9-12 derived from the 18 v1 requirements (CAT-01..04, SHOP-01..07, OPS-01..04, CONTENT-01..03), in vertical-slice dependency order — catalogue, storefront purchase flow, production enablement, content/Volt/live proof. 100% coverage, no orphans.
 - Phase 06.1 inserted after Phase 6: Remaining presets from the theme direction doc (Clinical, Retro, Atelier, Market) — Russell asked for all six during autonomous run (URGENT)
 
@@ -361,12 +381,13 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-09T22:35:23.207Z
-Stopped at: Phase 12 complete — all phases complete
+Last session: 2026-09-10
+Stopped at: v2.2 roadmap written — Phases 13-19, 34/34 requirements mapped
 Resume file: None
 
-Next: `/gsd-plan-phase 12` (then `/gsd-verify-work 10`)
+Next: `/gsd-discuss-phase 13`
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Review `.planning/ROADMAP.md` for v2.2 (Phases 13-19), then run `/gsd-discuss-phase 13`
+- Phase 19 will need you in the Stripe dashboard (enable Stripe Tax) and the Cloudflare dashboard (Email Routing rule for `orders@`, secret list hygiene) — it is deliberately last

@@ -1,7 +1,7 @@
 ---
 title: Gift cards v2 — admin management, audit trail, and flags that mean what they say
 created: 2026-09-10
-resolves_phase: null
+resolves_phase: 14
 source: Russell, 2026-09-10, after the first live gift-card purchase ("this admin panel is next to useless")
 audit_acknowledged:
   milestone: v2.1

@@ -85,3 +85,39 @@ Deferred to a later milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| GCF-01 | Phase 13 | Pending |
+| GCF-02 | Phase 13 | Pending |
+| GCF-03 | Phase 13 | Pending |
+| GCF-04 | Phase 13 | Pending |
+| GCF-05 | Phase 13 | Pending |
+| GCA-01 | Phase 14 | Pending |
+| GCA-02 | Phase 14 | Pending |
+| GCA-03 | Phase 14 | Pending |
+| GCA-04 | Phase 14 | Pending |
+| GCA-05 | Phase 14 | Pending |
+| GCA-06 | Phase 14 | Pending |
+| GCA-07 | Phase 14 | Pending |
+| GCA-08 | Phase 14 | Pending |
+| GCA-09 | Phase 14 | Pending |
+| SUB-01 | Phase 15 | Pending |
+| SUB-02 | Phase 15 | Pending |
+| SUB-03 | Phase 15 | Pending |
+| BLOG-01 | Phase 16 | Pending |
+| BLOG-02 | Phase 16 | Pending |
+| BLOG-03 | Phase 16 | Pending |
+| PAY-01 | Phase 17 | Pending |
+| PAY-02 | Phase 17 | Pending |
+| PAY-03 | Phase 17 | Pending |
+| DEBT-01 | Phase 18 | Pending |
+| DEBT-02 | Phase 18 | Pending |
+| DEBT-03 | Phase 18 | Pending |
+| DEBT-04 | Phase 18 | Pending |
+| DEBT-05 | Phase 18 | Pending |
+| DEBT-06 | Phase 18 | Pending |
+| DEBT-07 | Phase 18 | Pending |
+| DEBT-08 | Phase 18 | Pending |
+| OPS-05 | Phase 19 | Pending |
+| OPS-06 | Phase 19 | Pending |
+| OPS-07 | Phase 19 | Pending |
+
+**Coverage:** 34/34 v1 requirements mapped to exactly one phase each. No orphans, no duplicates.
