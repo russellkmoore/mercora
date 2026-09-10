@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { checkAdminPermissions } from "@/lib/auth/admin-middleware";
 import type { Actor } from "@/lib/fulfillment/types";
+import { assertGiftCardId } from "@/lib/gift-cards/domain";
 import type { GiftCardVisibilityFeatures } from "@/lib/gift-cards/visibility";
 
 /**
@@ -103,4 +104,22 @@ export type GiftCardAdminErrorCode =
 /** A `NextResponse.json` error body shaped `{ code, error }`. */
 export function jsonError(code: GiftCardAdminErrorCode, message: string, status: number): NextResponse {
   return NextResponse.json({ code, error: message }, { status });
+}
+
+/**
+ * IN-09/D-13: a path `[id]` that is not a well-formed gift-card id (empty,
+ * over 128 characters, surrounding whitespace) names a card that cannot
+ * exist, so the answer is 404 `gift_card_not_found` — not a 500 from
+ * `assertGiftCardId` throwing inside an id derivation, nor a 503 from the
+ * first repository read refusing it. Every `[id]` route calls this right
+ * after reading the param. Returns the response to send, or `null` when the
+ * id is well-formed.
+ */
+export function invalidGiftCardIdResponse(id: unknown): NextResponse | null {
+  try {
+    assertGiftCardId(id);
+    return null;
+  } catch {
+    return jsonError("gift_card_not_found", "Gift card not found", 404);
+  }
 }

@@ -1,7 +1,7 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { NextRequest, NextResponse } from "next/server";
 import { checkAdminPermissions, isSuperAdminActor } from "@/lib/auth/admin-middleware";
-import { giftCardAdminFlags, jsonError } from "@/lib/gift-cards/admin-http";
+import { giftCardAdminFlags, invalidGiftCardIdResponse, jsonError } from "@/lib/gift-cards/admin-http";
 import { resolveHonorEffective } from "@/lib/gift-cards/honor-guard";
 import { getAdminGiftCardPresentation } from "@/lib/gift-cards/presentations";
 import {
@@ -27,6 +27,8 @@ export async function GET(
   }
 
   const { id } = await params;
+  const invalidId = invalidGiftCardIdResponse(id);
+  if (invalidId) return invalidId;
 
   try {
     const { env } = await getCloudflareContext({ async: true });
