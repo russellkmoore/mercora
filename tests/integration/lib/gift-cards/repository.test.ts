@@ -774,6 +774,58 @@ describe("gift-card repository on real D1", () => {
     });
   });
 
+  it("answers a lost pre-check race with a conflict, not a raw D1 error (IN-10, D-06)", async () => {
+    // Both admins pass the prior-state probe; the second batch then hits the
+    // ledger's UNIQUE business_key. Simulate by letting a competing reissue
+    // complete inside this repository's `batch` call, after its own probe.
+    const competitor = createGiftCardRepository(env.DB);
+    await competitor.issueAccount(issuance());
+    await competitor.disableAccount({ giftCardId, disabledAt: now + 1 });
+
+    let raced = false;
+    const racingDatabase = new Proxy(env.DB, {
+      get(target, property, receiver) {
+        if (property === "batch") {
+          return async (statements: D1PreparedStatement[]) => {
+            if (!raced) {
+              raced = true;
+              await competitor.reissue({
+                oldGiftCardId: giftCardId,
+                now: now + 2,
+                actor: ADMIN_ACTOR,
+                codeHash: { keyVersion: 1, digest: altDigest(1) },
+              });
+            }
+            return target.batch(statements);
+          };
+        }
+        const value = Reflect.get(target, property, receiver);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+
+    const loser = createGiftCardRepository(racingDatabase);
+    await expect(loser.reissue({
+      oldGiftCardId: giftCardId,
+      now: now + 2,
+      actor: ADMIN_ACTOR,
+      codeHash: { keyVersion: 1, digest: altDigest(2) },
+    })).rejects.toThrow(new GiftCardConflictError("Gift card has already been reissued"));
+    expect(raced).toBe(true);
+
+    // Exactly the winner's rows exist.
+    const expectedNewId = await giftCardReissueId(giftCardId);
+    const adjustments = await env.DB.prepare(`SELECT COUNT(*) AS count FROM gift_card_ledger_entries
+      WHERE gift_card_id = ? AND entry_type = 'adjustment'`).bind(giftCardId).first<{ count: number }>();
+    expect(adjustments?.count).toBe(1);
+    const accounts = await env.DB.prepare(`SELECT COUNT(*) AS count FROM gift_card_accounts WHERE id = ?`)
+      .bind(expectedNewId).first<{ count: number }>();
+    expect(accounts?.count).toBe(1);
+    const events = await env.DB.prepare(`SELECT COUNT(*) AS count FROM gift_card_events
+      WHERE gift_card_id IN (?, ?)`).bind(giftCardId, expectedNewId).first<{ count: number }>();
+    expect(events?.count).toBe(2);
+  });
+
   it("fails a second reissue attempt on the same card and leaves no partial state", async () => {
     const repository = createGiftCardRepository(env.DB);
     await repository.issueAccount(issuance());
