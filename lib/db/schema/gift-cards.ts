@@ -48,7 +48,10 @@ export const giftCardAccounts = sqliteTable("gift_card_accounts", {
     .on(table.id, table.currencyCode),
   index("gift_card_accounts_status_idx").on(table.status, table.currencyCode),
   index("gift_card_accounts_order_idx").on(table.issuedOrderId, table.issuedLineId),
-  index("gift_card_accounts_code_suffix_idx").on(table.codeSuffix),
+  // Partial, exactly as 0024 declares it: pre-0024 rows carry NULL and are
+  // never searched by suffix, so they do not belong in the index.
+  index("gift_card_accounts_code_suffix_idx").on(table.codeSuffix)
+    .where(sql`${table.codeSuffix} IS NOT NULL`),
   check("gift_card_accounts_id_check", sql`length(${table.id}) BETWEEN 1 AND 128`),
   check("gift_card_accounts_hash_check", sql`
     length(${table.codeHash}) = 64
