@@ -48,6 +48,12 @@ interface CustomerPersonRow {
   person: string | null;
 }
 
+interface AdminCreatorRow {
+  gift_card_id: string;
+  display_name: string | null;
+  email: string | null;
+}
+
 const PRESENTATION_SELECT = `SELECT account.id, account.currency_code, account.issued_amount_minor,
   (COALESCE((SELECT SUM(entry.amount_delta_minor)
     FROM gift_card_ledger_entries entry WHERE entry.gift_card_id = account.id), 0) -
@@ -140,6 +146,40 @@ async function resolvePurchaserLabels(
   return labels;
 }
 
+/**
+ * D-17/D-22: "admin: {display name}" for a card with no purchaser and no
+ * issuing order, from its `admin_created` event's actor joined to
+ * `admin_users` — batched per page exactly like `resolvePurchaserLabels`. A
+ * creator with no `admin_users` row (the development bypass) yields no label,
+ * and the UI falls back to a generic "Admin created". The admin's user id is
+ * never returned, only the resolved name or email.
+ */
+async function resolveAdminCreatorLabels(
+  database: D1Database,
+  giftCardIds: readonly string[],
+): Promise<Map<string, string>> {
+  const labels = new Map<string, string>();
+  if (giftCardIds.length === 0) return labels;
+  const placeholders = giftCardIds.map(() => '?').join(', ');
+  const { results } = await database.prepare(
+    `SELECT event.gift_card_id, admin.display_name, admin.email
+     FROM gift_card_events event
+     LEFT JOIN admin_users admin ON admin.user_id = event.actor_id
+     WHERE event.event_type = 'admin_created' AND event.actor_type = 'admin'
+       AND event.gift_card_id IN (${placeholders})`,
+  ).bind(...giftCardIds).all<AdminCreatorRow>();
+  for (const row of results ?? []) {
+    const name = row.display_name?.trim() || row.email?.trim() || '';
+    if (name && !labels.has(row.gift_card_id)) labels.set(row.gift_card_id, `admin: ${name}`);
+  }
+  return labels;
+}
+
+/** A card with neither a purchasing customer nor an issuing order was created by hand. */
+function isAdminCreated(row: PresentationRow): boolean {
+  return row.purchaser_customer_id === null && row.issued_order_id === null;
+}
+
 /** D-15: one bound-parameter WHERE fragment for the status filter and the ordered `q` match. */
 function buildWhere(args: { status?: 'active' | 'disabled'; q?: string }): {
   clause: string;
@@ -194,13 +234,18 @@ export async function listAdminGiftCardPresentations(args: {
   const purchaserIds = [...new Set(
     rows.map((row) => row.purchaser_customer_id).filter((id): id is string => Boolean(id)),
   )];
-  const purchaserLabels = await resolvePurchaserLabels(args.database, purchaserIds);
+  const [purchaserLabels, creatorLabels] = await Promise.all([
+    resolvePurchaserLabels(args.database, purchaserIds),
+    resolveAdminCreatorLabels(args.database, rows.filter(isAdminCreated).map((row) => row.id)),
+  ]);
 
   return {
     cards: rows.map((row) => mapRow(
       row,
       true,
-      row.purchaser_customer_id ? purchaserLabels.get(row.purchaser_customer_id) : undefined,
+      row.purchaser_customer_id
+        ? purchaserLabels.get(row.purchaser_customer_id)
+        : creatorLabels.get(row.id),
     ) as AdminGiftCardPresentation),
     total,
   };
@@ -222,12 +267,11 @@ export async function getAdminGiftCardPresentation(
   const row = await database.prepare(`${PRESENTATION_SELECT} WHERE account.id = ? LIMIT 1`)
     .bind(now, id).first<PresentationRow>();
   if (!row) return undefined;
-  const purchaserLabels = row.purchaser_customer_id
-    ? await resolvePurchaserLabels(database, [row.purchaser_customer_id])
-    : new Map<string, string>();
-  return mapRow(
-    row,
-    true,
-    row.purchaser_customer_id ? purchaserLabels.get(row.purchaser_customer_id) : undefined,
-  ) as AdminGiftCardPresentation;
+  let purchaser: string | undefined;
+  if (row.purchaser_customer_id) {
+    purchaser = (await resolvePurchaserLabels(database, [row.purchaser_customer_id])).get(row.purchaser_customer_id);
+  } else if (isAdminCreated(row)) {
+    purchaser = (await resolveAdminCreatorLabels(database, [row.id])).get(row.id);
+  }
+  return mapRow(row, true, purchaser) as AdminGiftCardPresentation;
 }
