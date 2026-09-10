@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({
@@ -152,5 +154,14 @@ describe("gift-card flag states (GCF-01, GCF-03, D-07, D-10)", () => {
     commerceFeatures.giftCardReconciliation = false;
     vi.mocked(getProductBySlug).mockResolvedValue(ACTIVE_PRODUCT as never);
     await expect(render("arctic-pulse-tool")).resolves.toBeTruthy();
+  });
+});
+
+describe("product page identifies gift cards by type, never by slug (T-13-11)", () => {
+  it("compares product.type to GIFT_CARD_PRODUCT_TYPE and never a slug literal", () => {
+    const source = readFileSync(join(process.cwd(), "app/product/[slug]/page.tsx"), "utf8");
+    expect(source).toMatch(/storedProduct\.type === GIFT_CARD_PRODUCT_TYPE/);
+    expect(source).not.toMatch(/slug\s*===?\s*["'`]gift-card["'`]/);
+    expect(source).not.toMatch(/["'`]gift-card["'`]\s*===?\s*/);
   });
 });

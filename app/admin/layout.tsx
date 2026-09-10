@@ -28,6 +28,7 @@ import AdminLayoutProvider from "@/components/admin/AdminLayoutProvider";
 import AdminGuard from "@/components/admin/AdminGuard";
 import { Toaster } from "sonner";
 import { getStoreConfig } from "@/lib/store-config";
+import { checkAdminSession } from "@/lib/auth/admin-middleware";
 
 export function generateMetadata() {
   const store = getStoreConfig();
@@ -40,14 +41,22 @@ export function generateMetadata() {
 /**
  * Admin layout component that wraps all admin pages
  *
+ * Server gate (T-13-42): admin pages may server-render operational data (the
+ * gift-card honor banner, for one), so the page tree is only mounted for a
+ * request that already carries an admin Clerk session. Anyone else gets the
+ * chrome and the client `AdminGuard`'s sign-in / access-denied UI, and no
+ * page output. The API routes keep their own `checkAdminPermissions` gate.
+ *
  * @param children - Admin page components to render within the layout
  * @returns Admin layout with sidebar and header
  */
-export default function AdminLayout({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await checkAdminSession();
+  const content = session.success ? children : null;
   return (
     <AdminGuard>
       <AdminLayoutProvider>
@@ -67,7 +76,7 @@ export default function AdminLayout({
                     <div className="text-gray-400">Loading...</div>
                   </div>
                 }>
-                  {children}
+                  {content}
                 </Suspense>
               </div>
             </div>

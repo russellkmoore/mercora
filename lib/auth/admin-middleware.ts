@@ -53,53 +53,62 @@ export async function checkAdminPermissions(request: NextRequest): Promise<Admin
     }
 
     // Check Clerk authentication for browser-based requests
-    try {
-      const { userId, sessionClaims } = await auth();
-      
-      if (!userId) {
-        return { success: false, error: "Authentication required. Please sign in." };
-      }
-
-      // For now, allow any authenticated user to be admin in development
-      // In production, you should check specific user IDs or roles
-      if (process.env.NODE_ENV === "development") {
-        console.log(`✅ DEV MODE: User ${userId} granted admin access`);
-        return { success: true, userId };
-      }
-
-      // Check admin status in database
-      const isAdmin = await isUserAdmin(userId);
-      
-      if (isAdmin) {
-        // Update last login timestamp
-        updateAdminLastLogin(userId).catch(console.error);
-        return { success: true, userId };
-      }
-
-      // Fallback: Check for admin role in Clerk metadata (for backward compatibility)
-      const userRole = (sessionClaims as any)?.metadata?.role;
-      if (userRole === "admin") {
-        return { success: true, userId };
-      }
-
-      return { 
-        success: false, 
-        error: "Admin access required. Contact administrator to request access." 
-      };
-
-    } catch (clerkError) {
-      console.error("Clerk auth error:", clerkError);
-      return { 
-        success: false, 
-        error: "Authentication service error. Please try again." 
-      };
-    }
-
+    return await checkAdminSession();
   } catch (error) {
     console.error("Admin auth error:", error);
     return { 
       success: false, 
       error: "Authentication error. Please try again." 
+    };
+  }
+}
+
+/**
+ * The browser (Clerk cookie) branch of admin authorization, usable from server
+ * components as well as route handlers: `app/admin/layout.tsx` calls it so an
+ * admin page's server-rendered data never reaches an anonymous request. The
+ * client `AdminGuard` still owns the sign-in UI; this is the server gate.
+ * Signed in but not an admin: same closed answer as the API routes give.
+ */
+export async function checkAdminSession(): Promise<AdminAuthResult> {
+  try {
+    const { userId, sessionClaims } = await auth();
+    
+    if (!userId) {
+      return { success: false, error: "Authentication required. Please sign in." };
+    }
+
+    // For now, allow any authenticated user to be admin in development
+    // In production, you should check specific user IDs or roles
+    if (process.env.NODE_ENV === "development") {
+      console.log(`✅ DEV MODE: User ${userId} granted admin access`);
+      return { success: true, userId };
+    }
+
+    // Check admin status in database
+    const isAdmin = await isUserAdmin(userId);
+    
+    if (isAdmin) {
+      // Update last login timestamp
+      updateAdminLastLogin(userId).catch(console.error);
+      return { success: true, userId };
+    }
+
+    // Fallback: Check for admin role in Clerk metadata (for backward compatibility)
+    const userRole = (sessionClaims as any)?.metadata?.role;
+    if (userRole === "admin") {
+      return { success: true, userId };
+    }
+
+    return { 
+      success: false, 
+      error: "Admin access required. Contact administrator to request access." 
+    };
+  } catch (clerkError) {
+    console.error("Clerk auth error:", clerkError);
+    return { 
+      success: false, 
+      error: "Authentication service error. Please try again." 
     };
   }
 }
