@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   adminCards: vi.fn(),
   adminAuth: vi.fn(),
   resolveHonorEffective: vi.fn(),
+  issueAdminGiftCard: vi.fn(),
+  appendGiftCardEvent: vi.fn(),
 }));
 
 vi.mock('@clerk/nextjs/server', () => ({ auth: mocks.auth }));
@@ -22,8 +24,14 @@ vi.mock('@/lib/auth/admin-middleware', () => ({ checkAdminPermissions: mocks.adm
 vi.mock('@/lib/gift-cards/honor-guard', () => ({
   resolveHonorEffective: mocks.resolveHonorEffective,
 }));
+vi.mock('@/lib/services/gift-card-fulfillment', () => ({
+  issueAdminGiftCard: mocks.issueAdminGiftCard,
+}));
+vi.mock('@/lib/gift-cards/events', () => ({
+  appendGiftCardEvent: mocks.appendGiftCardEvent,
+}));
 
-import { GET as adminGet } from '@/app/api/admin/gift-cards/route';
+import { GET as adminGet, POST as adminPost } from '@/app/api/admin/gift-cards/route';
 import { POST as balancePost } from '@/app/api/gift-cards/balance/route';
 
 const safeCard = {
@@ -41,6 +49,21 @@ function balanceRequest(code: string) {
   });
 }
 
+const validCreateBody = {
+  amountMinor: 2_500,
+  recipientEmail: 'shopper@example.com',
+  reason: 'Customer service credit',
+  requestId: 'req_1',
+};
+
+function createRequest(body: unknown, headers?: Record<string, string>) {
+  return new NextRequest('https://store.example/api/admin/gift-cards', {
+    method: 'POST',
+    headers,
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.auth.mockResolvedValue({ userId: 'user_owner' });
@@ -49,6 +72,8 @@ beforeEach(() => {
   mocks.adminAuth.mockResolvedValue({ success: true, userId: 'admin_one' });
   mocks.adminCards.mockResolvedValue({ cards: [{ ...safeCard, issuedOrderId: 'WEB-1', issuedLineId: 'line_1' }], total: 1 });
   mocks.resolveHonorEffective.mockResolvedValue(true);
+  mocks.issueAdminGiftCard.mockResolvedValue({ giftCardId: 'gift_card_new', created: true });
+  mocks.appendGiftCardEvent.mockResolvedValue('event_id');
 });
 
 describe('gift-card presentation routes', () => {
@@ -166,5 +191,93 @@ describe('gift-card presentation routes', () => {
     const response = await balancePost(balanceRequest('ABC123'));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ valid: false });
+  });
+
+  it('passes q through to the projection and reports meta.total (D-15)', async () => {
+    mocks.context.mockResolvedValue({ env: { DB: {}, STORE_FEATURE_GIFT_CARD_RECONCILIATION: 'true' } });
+    mocks.adminCards.mockResolvedValue({ cards: [{ ...safeCard, issuedOrderId: 'WEB-99', issuedLineId: 'line_1' }], total: 7 });
+    const response = await adminGet(new NextRequest('https://store.example/api/admin/gift-cards?q=WEB-99'));
+    expect(response.status).toBe(200);
+    expect(mocks.adminCards).toHaveBeenCalledWith(expect.objectContaining({ q: 'WEB-99' }));
+    const body = await response.json() as { meta: { limit: number; offset: number; total: number } };
+    expect(body.meta).toEqual({ limit: 25, offset: 0, total: 7 });
+  });
+
+  it.each(['q=' + 'x'.repeat(300), 'q=a&q=b'])(
+    'rejects a malformed q with invalid_query: %s',
+    async (query) => {
+      const response = await adminGet(new NextRequest(`https://store.example/api/admin/gift-cards?${query}`));
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ code: 'invalid_query' });
+    },
+  );
+
+  describe('POST /api/admin/gift-cards (admin-create, D-07)', () => {
+    it('401s without admin auth', async () => {
+      mocks.adminAuth.mockResolvedValue({ success: false, error: 'Admin access required' });
+      const response = await adminPost(createRequest(validCreateBody));
+      expect(response.status).toBe(401);
+    });
+
+    it('413s a body over the size cap', async () => {
+      const response = await adminPost(createRequest('x'.repeat(5_000), { 'content-length': '5000' }));
+      expect(response.status).toBe(413);
+    });
+
+    it('400s a malformed body with invalid_json', async () => {
+      const response = await adminPost(createRequest('{not valid json'));
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ code: 'invalid_json' });
+    });
+
+    it.each(['amountMinor', 'recipientEmail', 'reason', 'requestId'])(
+      '400s a body missing %s with invalid_body',
+      async (field) => {
+        const body = { ...validCreateBody } as Record<string, unknown>;
+        delete body[field];
+        const response = await adminPost(createRequest(body));
+        expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({ code: 'invalid_body' });
+      },
+    );
+
+    it('issues a card, writes one admin_created event, and returns the new card id', async () => {
+      mocks.context.mockResolvedValue({ env: { DB: {}, STORE_FEATURE_GIFT_CARD_RECONCILIATION: 'true' } });
+      const response = await adminPost(createRequest(validCreateBody));
+      expect(response.status).toBe(201);
+      expect(await response.json()).toMatchObject({ giftCardId: 'gift_card_new', created: true });
+      expect(mocks.appendGiftCardEvent).toHaveBeenCalledTimes(1);
+      expect(mocks.appendGiftCardEvent).toHaveBeenCalledWith(expect.objectContaining({
+        giftCardId: 'gift_card_new',
+        eventType: 'admin_created',
+        actor: { type: 'admin', id: 'admin_one' },
+        details: expect.objectContaining({
+          reason: 'Customer service credit',
+          amount_minor: 2_500,
+          recipient_email: 'shopper@example.com',
+        }),
+      }));
+    });
+
+    it('converges two identical requestId posts into one card and one event', async () => {
+      mocks.context.mockResolvedValue({ env: { DB: {}, STORE_FEATURE_GIFT_CARD_RECONCILIATION: 'true' } });
+      mocks.issueAdminGiftCard.mockResolvedValueOnce({ giftCardId: 'gift_card_new', created: true });
+      mocks.issueAdminGiftCard.mockResolvedValueOnce({ giftCardId: 'gift_card_new', created: false });
+
+      const first = await adminPost(createRequest(validCreateBody));
+      const second = await adminPost(createRequest(validCreateBody));
+
+      expect(await first.json()).toMatchObject({ giftCardId: 'gift_card_new' });
+      expect(await second.json()).toMatchObject({ giftCardId: 'gift_card_new' });
+      expect(mocks.appendGiftCardEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it('503s on a write failure with gift_cards_write_failed', async () => {
+      mocks.context.mockResolvedValue({ env: { DB: {}, STORE_FEATURE_GIFT_CARD_RECONCILIATION: 'true' } });
+      mocks.issueAdminGiftCard.mockRejectedValue(new Error('D1 write failed'));
+      const response = await adminPost(createRequest(validCreateBody));
+      expect(response.status).toBe(503);
+      expect(await response.json()).toMatchObject({ code: 'gift_cards_write_failed' });
+    });
   });
 });
