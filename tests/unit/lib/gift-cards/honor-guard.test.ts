@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   HONOR_GUARD_SETTING_CATEGORY,
   HONOR_GUARD_SETTING_KEY,
   HONOR_GUARD_STALE_SECONDS,
   balancesMayExist,
+  reportHonorDisabledWithBalances,
   type HonorGuardRecord,
 } from "@/lib/gift-cards/honor-guard";
 
@@ -94,4 +95,32 @@ describe("balancesMayExist", () => {
       expect(balancesMayExist(testCase.record, now)).toBe(testCase.expected);
     });
   }
+});
+
+describe("reportHonorDisabledWithBalances", () => {
+  it("logs a critical envelope naming the event and the open-reservation count", () => {
+    const logged: string[] = [];
+    const spy = vi.spyOn(console, "error").mockImplementation((line: unknown) => {
+      logged.push(String(line));
+    });
+    try {
+      reportHonorDisabledWithBalances(record({ outstanding_minor: 4_200, open_reservations: 2 }));
+    } finally {
+      spy.mockRestore();
+    }
+    expect(logged).toHaveLength(1);
+    const envelope = JSON.parse(logged[0]) as {
+      event: string;
+      severity: string;
+      fields?: Record<string, unknown>;
+    };
+    expect(envelope.event).toBe("gift_card.honor_disabled_with_balances");
+    expect(envelope.severity).toBe("critical");
+    expect(envelope.fields).toMatchObject({
+      effect_type: "gift_card",
+      trigger: "scheduled",
+      outcome: "needs_review",
+      count: 2,
+    });
+  });
 });
