@@ -159,7 +159,9 @@ alone, so both of those normally-privileged paths are refused.
 
 A reveal is not free: it writes a permanent `gift_card_events` row naming the admin who asked and
 when, and that row is written *before* the code is returned — if the write fails, no code comes
-back. Reveal does not change anything else. Codes stay absent from every list, every card detail
+back. If the decrypt then fails, a second `code_reveal_failed` row records that no code was
+returned (reason `decrypt` for bad ciphertext, answered 409; reason `configuration` for a
+missing or rotated-out delivery key, answered 503). Reveal does not change anything else. Codes stay absent from every list, every card detail
 view, every other API response, and every log line, whether or not the setting is on.
 
 Recommendation: leave code reveal off. Turn it on only for the duration of a specific

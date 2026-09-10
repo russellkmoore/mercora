@@ -7,6 +7,7 @@ import {
   jsonError,
   readBoundedJsonBody,
 } from "@/lib/gift-cards/admin-http";
+import { GiftCardDecryptionError } from "@/lib/gift-cards/encryption";
 import { appendGiftCardEvent } from "@/lib/gift-cards/events";
 import { resolveHonorEffective } from "@/lib/gift-cards/honor-guard";
 import { giftCardSurfacesHidden } from "@/lib/gift-cards/visibility";
@@ -95,7 +96,22 @@ export async function POST(
     const response = NextResponse.json({ code });
     response.headers.set("Cache-Control", "no-store");
     return response;
-  } catch {
-    return jsonError("code_unavailable", "Gift-card code is unavailable", 409);
+  } catch (error) {
+    // WR-02: `code_revealed` is already on the record, so say what actually
+    // happened. A decrypt failure (tampered or foreign ciphertext) is the
+    // card's problem and stays 409; a key-ring misconfiguration (missing or
+    // rotated-out key) is the operator's and is reported as 503, not as
+    // "code unavailable". The audit write is best-effort: it must not turn
+    // an already-failed reveal into a different failure.
+    const reason = error instanceof GiftCardDecryptionError ? "decrypt" : "configuration";
+    await appendGiftCardEvent({
+      giftCardId: id,
+      eventType: "code_reveal_failed",
+      actor,
+      details: { reason },
+    }).catch(() => undefined);
+    return reason === "decrypt"
+      ? jsonError("code_unavailable", "Gift-card code is unavailable", 409)
+      : jsonError("gift_cards_write_failed", "Gift-card code could not be revealed", 503);
   }
 }
