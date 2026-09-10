@@ -7,6 +7,7 @@ import { type AddressFormState, emptyAddressForm, saveAddress } from "@/lib/acco
 type FormMessage = { kind: "error" | "success"; text: string } | null;
 
 export function AddressForm(props: {
+  /** Seeds state on mount only; re-key the element to change it (as `AddressManager` does). */
   initial?: Partial<AddressFormState>;
   mode: "create" | "edit";
   addressId?: string;
@@ -20,6 +21,7 @@ export function AddressForm(props: {
   /** Mirrors the form's busy flag so a parent can lock its own controls during a save. */
   onBusyChange?: (busy: boolean) => void;
   onCancel?: () => void;
+  /** Forces `type` and hides its select. Read on mount only; re-key the element to change it. */
   lockType?: "shipping" | "billing";
   submitLabel?: string;
 }) {
