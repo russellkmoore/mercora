@@ -44,6 +44,10 @@ export const GIFT_CARD_EVENT_FORBIDDEN_DETAIL_KEYS = [
   "code_key_version",
   "claim_token",
   "email_idempotency_key",
+  // UF-14-3: the plaintext bearer code itself, under the one name a reveal
+  // response carries it. Exact-match after normalisation (`code`, `Code`),
+  // so `code_suffix` / `codeSuffix` / `maskedCode` stay allowed.
+  "code",
 ] as const;
 
 const DEFAULT_GIFT_CARD_EVENT_LIMIT = 100;

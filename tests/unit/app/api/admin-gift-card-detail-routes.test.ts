@@ -192,12 +192,25 @@ describe('GET /api/admin/gift-cards/[id]', () => {
     expect(mocks.isSuperAdminActor).not.toHaveBeenCalled();
   });
 
-  it('carries no forbidden column names in a successful response body', async () => {
+  it('carries no forbidden key anywhere in a successful response body', async () => {
     const { request, params } = detailRequest('gift_card_1');
     const response = await detailGet(request, { params });
-    const text = JSON.stringify(await response.json());
-    for (const column of GIFT_CARD_EVENT_FORBIDDEN_DETAIL_KEYS) {
-      expect(text).not.toContain(column);
+    // Compare keys, not substrings: `code` (UF-14-3) is forbidden as a key
+    // while `codeSuffix` and `maskedCode` are legitimate display fields.
+    const normalize = (key: string) => key.replace(/_/g, '').toLowerCase();
+    const forbidden = new Set(GIFT_CARD_EVENT_FORBIDDEN_DETAIL_KEYS.map(normalize));
+    const keys: string[] = [];
+    const walk = (value: unknown): void => {
+      if (Array.isArray(value)) { value.forEach(walk); return; }
+      if (value === null || typeof value !== 'object') return;
+      for (const [key, nested] of Object.entries(value as Record<string, unknown>)) { keys.push(key); walk(nested); }
+    };
+    walk(await response.json());
+    expect(keys.length).toBeGreaterThan(0);
+    for (const key of keys) {
+      const normalized = normalize(key);
+      expect(forbidden.has(normalized), `response must not carry key "${key}"`).toBe(false);
+      expect(normalized.endsWith('businesskey'), `response must not carry key "${key}"`).toBe(false);
     }
   });
 

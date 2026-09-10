@@ -199,6 +199,10 @@ describe("gift-card events on real D1", () => {
     expect(() => assertGiftCardEventDetails({ nested: { claim_token: "abc" } })).toThrow(TypeError);
     expect(() => assertGiftCardEventDetails({ list: [{ email_idempotency_key: "abc" }] })).toThrow(TypeError);
     expect(() => assertGiftCardEventDetails({ gift_card_reissue_business_key: "abc" })).toThrow(TypeError);
+    // UF-14-3: the bare bearer-code key, at any depth; display material is not it.
+    expect(() => assertGiftCardEventDetails({ code: "GC-2345-6789-2345-6789-2345-6789-2345" })).toThrow(TypeError);
+    expect(() => assertGiftCardEventDetails({ nested: { Code: "abc" } })).toThrow(TypeError);
+    expect(() => assertGiftCardEventDetails({ codeSuffix: "AB12", maskedCode: "GC-****-AB12" })).not.toThrow();
     expect(() => assertGiftCardEventDetails({ safe: "ok", nested: { alsoSafe: 1 } })).not.toThrow();
     expect(() => assertGiftCardEventDetails(undefined)).not.toThrow();
   });
