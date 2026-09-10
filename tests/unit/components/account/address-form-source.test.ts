@@ -48,6 +48,14 @@ describe("AddressManager edit-mode wiring", () => {
     expect(managerSource).toContain("onCancel={editing ? () => setEditing(null) : undefined}");
     expect(occurrences(managerSource, "addressFormFrom(")).toBe(1);
   });
+
+  it("owns the save feedback so the confirmation survives the post-edit remount", () => {
+    // Re-keying the form on setEditing(null) unmounts the instance that would
+    // have shown its own success message, so the manager must say it.
+    expect(managerSource).toContain('setMessage("Address saved.")');
+    expect(managerSource).toContain("onError={setMessage}");
+    expect(formSource).toContain("const inlineFeedback = props.onError === undefined");
+  });
 });
 
 describe("SUB-02 source contract: one shared address form, one save path", () => {

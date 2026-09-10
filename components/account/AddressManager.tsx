@@ -34,6 +34,7 @@ export function AddressManager({ initial }: { initial: MACHCustomerAddress[] }) 
         : [...reset, address];
     });
     setEditing(null);
+    setMessage("Address saved.");
   }
 
   const entryBeingEdited = editing ? addresses.find((entry) => entry.id === editing) : undefined;
@@ -61,6 +62,7 @@ export function AddressManager({ initial }: { initial: MACHCustomerAddress[] }) 
           initial={editing && entryBeingEdited ? addressFormFrom(entryBeingEdited) : undefined}
           submitLabel={editing ? "Save changes" : "Save"}
           onSaved={handleSaved}
+          onError={setMessage}
           onCancel={editing ? () => setEditing(null) : undefined}
         />
       </div>
