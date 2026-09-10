@@ -40,6 +40,7 @@ export const giftCardAccounts = sqliteTable("gift_card_accounts", {
     .references(() => customers.id, { onDelete: "restrict" }),
   createdAt: integer("created_at").notNull(),
   disabledAt: integer("disabled_at"),
+  codeSuffix: text("code_suffix"),
 }, (table) => [
   uniqueIndex("gift_card_accounts_code_hash_unique")
     .on(table.codeHashVersion, table.codeHash),
@@ -47,6 +48,7 @@ export const giftCardAccounts = sqliteTable("gift_card_accounts", {
     .on(table.id, table.currencyCode),
   index("gift_card_accounts_status_idx").on(table.status, table.currencyCode),
   index("gift_card_accounts_order_idx").on(table.issuedOrderId, table.issuedLineId),
+  index("gift_card_accounts_code_suffix_idx").on(table.codeSuffix),
   check("gift_card_accounts_id_check", sql`length(${table.id}) BETWEEN 1 AND 128`),
   check("gift_card_accounts_hash_check", sql`
     length(${table.codeHash}) = 64
@@ -232,3 +234,26 @@ export type GiftCardAccountRow = typeof giftCardAccounts.$inferSelect;
 export type GiftCardReservationRow = typeof giftCardReservations.$inferSelect;
 export type GiftCardLedgerEntryRow = typeof giftCardLedgerEntries.$inferSelect;
 export type GiftCardDeliveryRow = typeof giftCardDeliveries.$inferSelect;
+
+export const giftCardEvents = sqliteTable("gift_card_events", {
+  id: text("id").primaryKey(),
+  giftCardId: text("gift_card_id").notNull()
+    .references(() => giftCardAccounts.id, { onDelete: "restrict" }),
+  eventType: text("event_type").notNull(),
+  actorType: text("actor_type").notNull(),
+  actorId: text("actor_id"),
+  details: text("details", { mode: "json" }),
+  createdAt: integer("created_at").notNull(),
+}, (table) => [
+  index("gift_card_events_gift_card_id_created_at_idx")
+    .on(table.giftCardId, table.createdAt),
+  index("gift_card_events_event_type_created_at_idx")
+    .on(table.eventType, table.createdAt),
+  uniqueIndex("gift_card_events_reissued_once_idx")
+    .on(table.giftCardId).where(sql`${table.eventType} = 'reissued'`),
+  check("gift_card_events_actor_type_check", sql`
+    ${table.actorType} IN ('admin', 'service', 'system')
+  `),
+]);
+
+export type GiftCardEventRow = typeof giftCardEvents.$inferSelect;
