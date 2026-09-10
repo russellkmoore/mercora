@@ -66,12 +66,14 @@ export function AddressForm(props: {
           className={input}
           maxLength={80}
           placeholder="Label"
+          aria-label="Label"
           value={form.label}
           onChange={(e) => setForm({ ...form, label: e.target.value })}
         />
         {props.lockType ? null : (
           <select
             name="type"
+            aria-label="Address type"
             className={input}
             value={form.type}
             onChange={(e) => setForm({ ...form, type: e.target.value === "billing" ? "billing" : "shipping" })}
@@ -86,6 +88,7 @@ export function AddressForm(props: {
           required
           maxLength={200}
           placeholder="Address line 1"
+          aria-label="Address line 1"
           value={form.line1}
           onChange={(e) => setForm({ ...form, line1: e.target.value })}
         />
@@ -94,6 +97,7 @@ export function AddressForm(props: {
           className={input}
           maxLength={200}
           placeholder="Address line 2"
+          aria-label="Address line 2"
           value={form.line2}
           onChange={(e) => setForm({ ...form, line2: e.target.value })}
         />
@@ -103,6 +107,7 @@ export function AddressForm(props: {
           required
           maxLength={200}
           placeholder="City"
+          aria-label="City"
           value={form.city}
           onChange={(e) => setForm({ ...form, city: e.target.value })}
         />
@@ -111,6 +116,7 @@ export function AddressForm(props: {
           className={input}
           maxLength={200}
           placeholder="Region"
+          aria-label="Region"
           value={form.region}
           onChange={(e) => setForm({ ...form, region: e.target.value })}
         />
@@ -119,6 +125,7 @@ export function AddressForm(props: {
           className={input}
           maxLength={32}
           placeholder="Postal code"
+          aria-label="Postal code"
           value={form.postal_code}
           onChange={(e) => setForm({ ...form, postal_code: e.target.value })}
         />
