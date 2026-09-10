@@ -69,6 +69,11 @@ describe("product subscription acquisition integration", () => {
     expect(region).not.toContain("setSelectedPlanId");
     expect(region).not.toContain("setQuantityText");
     expect(region).not.toContain("setAccepted");
+    // The three resets land before the refresh is awaited, and Continue is
+    // disabled for the whole refresh, so the previous address can never start
+    // a SetupIntent in the gap.
+    expect(region.indexOf("setCompletedOwner(null)")).toBeLessThan(region.indexOf("await fetchSavedAddressesForPlan("));
+    expect(source).toContain("disabled={working || loadingAddresses || !accepted");
 
     // D-06: the signed-out branch is untouched -- exactly one sign-in button.
     expect(source.split('<SignInButton mode="modal">').length - 1).toBe(1);

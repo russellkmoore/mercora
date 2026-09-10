@@ -271,6 +271,12 @@ export default function SubscriptionAcquisitionPanel({
     setAddressDialogOpen(false);
     const owner = currentOwner;
     if (!owner || !selectedPlan) return;
+    // Same reset discipline as a manual address change (D-05), applied before
+    // the refresh so nothing can be started against the previous address while
+    // the list is reloading; `loadingAddresses` also gates Continue below.
+    setSetup(null);
+    setCheckoutError("");
+    setCompletedOwner(null);
     setLoadingAddresses(true);
     setAddressError("");
     try {
@@ -279,9 +285,6 @@ export default function SubscriptionAcquisitionPanel({
       setAddresses(next);
       setAddressesOwner(owner);
       setAddressId(nextAddressSelection(next, saved.id));
-      setSetup(null);
-      setCheckoutError("");
-      setCompletedOwner(null);
     } catch (error) {
       if (ownerRef.current === owner) {
         setAddressError(error instanceof Error ? error.message : "Saved addresses could not be loaded");
@@ -491,7 +494,8 @@ export default function SubscriptionAcquisitionPanel({
           {checkoutError ? <p className="text-sm text-danger" role="alert">{checkoutError}</p> : null}
           <button
             type="button"
-            disabled={working || !accepted || quantity === null || total === null || !currentOwner
+            disabled={working || loadingAddresses || !accepted || quantity === null || total === null
+              || !currentOwner
               || (selectedPlan.shippingRequired
               && !selectedShippingAddress)}
             onClick={async () => {
