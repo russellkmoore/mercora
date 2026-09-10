@@ -15,11 +15,14 @@ const read = (path: string) => readFileSync(join(root, path), 'utf8');
  * agent-chat/route.ts` was exactly that miss: D-07 names "Volt's product
  * results", and Volt is the drawer a shopper actually talks to, but it
  * hydrates from Drizzle directly and was not in the original nine.
+ * `app/sitemap.ts` was the other: an index that kept advertising a URL the
+ * store had started 404ing.
  */
 const PUBLIC_LISTING_CALL_SITES = [
   'app/api/products/route.ts',
   'app/api/agent-chat/route.ts',
   'app/page.tsx',
+  'app/sitemap.ts',
   'app/category/[slug]/page.tsx',
   'lib/recommendations/index.ts',
   'lib/mcp/catalog.ts',
