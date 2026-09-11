@@ -3,6 +3,8 @@ title: Two migrations share number 0023 — record it and make check:migrations 
 created: 2026-09-10
 resolves_phase: 18
 source: Phase 14 planning scout, 2026-09-10
+completed: 2026-09-11
+status: completed
 ---
 
 # Duplicate migration number 0023
