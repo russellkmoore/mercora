@@ -19,6 +19,8 @@ export interface CartItem {
   quantity: number;
   primaryImageUrl: string;
   giftCardCustomization?: GiftCardCustomization;
+  /** Set only when a stored gift note failed re-validation on load; its customization was not carried forward. */
+  giftCardNoteInvalid?: boolean;
 }
 
 export type StableCartItem = CartItem & { lineId: string };

@@ -70,14 +70,74 @@ describe('cart line identity', () => {
     expect(JSON.stringify(item)).not.toContain('must-not-survive');
   });
 
-  it('fails closed for invalid quantities and malformed customization', () => {
+  it('fails closed for invalid quantities; malformed customization now flags rather than drops (D-03)', () => {
     expect(normalizeCartItemForStore({ ...base, quantity: 1_001 })).toBeNull();
-    expect(normalizeCartItemForStore({
+    // Pre-D-03 this returned null (dropped the whole line). Any customization
+    // parse failure — not just a rejected note — now flags a surviving line
+    // with no customization; a smuggled redemptionToken is stripped exactly
+    // as before, it just no longer takes the whole cart line down with it.
+    const flagged = normalizeCartItemForStore({
       ...base,
       giftCardCustomization: {
         recipientEmail: 'recipient@example.com',
         redemptionToken: 'secret',
       },
+    });
+    expect(flagged).not.toBeNull();
+    expect(flagged?.giftCardNoteInvalid).toBe(true);
+    expect(flagged).not.toHaveProperty('giftCardCustomization');
+    expect(JSON.stringify(flagged)).not.toContain('secret');
+  });
+
+  // Ledger #10 (WINDOWS.md, D-03): a note containing a link previously
+  // deleted the whole line on hydration. It must now survive, flagged.
+  it('flags a surviving line rather than dropping it when the note contains a link (ledger #10)', () => {
+    const item = normalizeCartItemForStore({
+      ...base,
+      giftCardCustomization: {
+        recipientEmail: 'recipient@example.com',
+        message: 'Happy birthday! See https://example.com/cake for details',
+      },
+    });
+
+    expect(item).not.toBeNull();
+    expect(item?.giftCardNoteInvalid).toBe(true);
+    expect(item).not.toHaveProperty('giftCardCustomization');
+    expect(item?.lineId).toBe(createCartLineId({
+      productId: base.productId,
+      variantId: base.variantId,
+    }));
+  });
+
+  it('still drops the line entirely for a bad price, regardless of the note', () => {
+    expect(normalizeCartItemForStore({
+      ...base,
+      price: { amount: Number.NaN, currency: 'USD' },
+      giftCardCustomization: { recipientEmail: 'recipient@example.com' },
     })).toBeNull();
+  });
+
+  it('carries no giftCardNoteInvalid key at all when the note is valid', () => {
+    const item = normalizeCartItemForStore({
+      ...base,
+      giftCardCustomization: { recipientEmail: 'recipient@example.com' },
+    });
+
+    expect(item).not.toBeNull();
+    expect(item).not.toHaveProperty('giftCardNoteInvalid');
+  });
+
+  it('refuses to project a flagged line into a checkout request', () => {
+    const item = normalizeCartItemForStore({
+      ...base,
+      giftCardCustomization: {
+        recipientEmail: 'recipient@example.com',
+        message: 'visit www.example.com',
+      },
+    });
+
+    expect(item).not.toBeNull();
+    expect(item?.giftCardNoteInvalid).toBe(true);
+    expect(() => projectCartLineForCheckout(item!)).toThrow('Cart contains an invalid line');
   });
 });
