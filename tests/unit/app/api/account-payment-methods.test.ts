@@ -175,7 +175,7 @@ describe("DELETE /api/account/payment-methods/[id]", () => {
     expect(mocks.detach).toHaveBeenCalledWith("pm_1");
   });
 
-  it("returns 503 without leaking the caught error when retrieve throws", async () => {
+  it("returns 503 without leaking the caught error when retrieve throws a non-Stripe error", async () => {
     mocks.auth.mockResolvedValue({ userId: "user_1" });
     mocks.findStripeCustomerId.mockResolvedValue("cus_owner");
     mocks.retrieve.mockRejectedValue(new Error("cus_owner secret leak"));
@@ -183,6 +183,34 @@ describe("DELETE /api/account/payment-methods/[id]", () => {
     expect(response.status).toBe(503);
     const body = await response.json() as { error: string };
     expect(body.error).not.toContain("cus_owner");
+    expect(mocks.detach).not.toHaveBeenCalled();
+  });
+
+  it("returns 404, not 503, when retrieve throws Stripe's resource_missing (WR-01: a nonexistent id must read the same as a foreign one)", async () => {
+    mocks.auth.mockResolvedValue({ userId: "user_1" });
+    mocks.findStripeCustomerId.mockResolvedValue("cus_owner");
+    const resourceMissing = Object.assign(
+      new Error("No such PaymentMethod: 'pm_does_not_exist'"),
+      { type: "StripeInvalidRequestError", code: "resource_missing" },
+    );
+    mocks.retrieve.mockRejectedValue(resourceMissing);
+    const response = await DELETE(deleteRequest("pm_does_not_exist"), paramsFor("pm_does_not_exist"));
+    expect(response.status).toBe(404);
+    const body = await response.json() as { error: string };
+    expect(body.error).toBe("Payment method not found");
+    expect(mocks.detach).not.toHaveBeenCalled();
+  });
+
+  it("returns 404, not 503, when resource_missing is nested under raw.code", async () => {
+    mocks.auth.mockResolvedValue({ userId: "user_1" });
+    mocks.findStripeCustomerId.mockResolvedValue("cus_owner");
+    const resourceMissing = Object.assign(
+      new Error("No such PaymentMethod: 'pm_does_not_exist'"),
+      { type: "StripeInvalidRequestError", raw: { code: "resource_missing" } },
+    );
+    mocks.retrieve.mockRejectedValue(resourceMissing);
+    const response = await DELETE(deleteRequest("pm_does_not_exist"), paramsFor("pm_does_not_exist"));
+    expect(response.status).toBe(404);
     expect(mocks.detach).not.toHaveBeenCalled();
   });
 
