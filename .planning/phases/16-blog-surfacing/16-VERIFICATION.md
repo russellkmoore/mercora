@@ -37,7 +37,7 @@ covered_files:
   - tests/unit/app/admin-settings-content-tab-source.test.ts
   - tests/unit/app/admin-settings-content-normalize.test.ts
   - ".planning/phases/16-blog-surfacing/16-SECURITY.md"
-covered_digest: "v1:sha256:5491ec51f3779b949df8f4530830a68cfb849dfe3bda6734a0370dfa1540b003"
+covered_digest: "v1:sha256:681d9017352ce480e2b1546ddc0f26883979e1c75dcef9e4e9db0491e1b12042"
 behavior_unverified: 0
 overrides_applied: 0
 human_verification:
