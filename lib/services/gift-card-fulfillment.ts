@@ -498,8 +498,10 @@ async function deliverOne(args: {
     const status = result.success ? 'sent' : (result.needsReview || exhausted) ? 'needs_review' : 'pending';
     if (!result.success) {
       // The retry/status decision above is unchanged; this only records it.
+      // A delivery that will be retried automatically is a warning, and only
+      // an outcome a human has to act on pages.
       recordDeliveryFailure({
-        event: 'gift_card.delivery_failed',
+        event: status === 'needs_review' ? 'gift_card.delivery_failed' : 'gift_card.delivery_retry',
         provider: telemetryProvider(result.provider, args.emailEnvironment?.EMAIL_PROVIDER),
         retryable: status !== 'needs_review',
         trigger: args.trigger,
@@ -511,8 +513,10 @@ async function deliverOne(args: {
       .bind(status, status === 'sent' || status === 'needs_review' ? args.now : null, args.now, claimed.id, token).run();
   } catch (error) {
     const status = exhausted ? 'needs_review' : 'pending';
+    // A delivery that will be retried automatically is a warning, and only
+    // an outcome a human has to act on pages.
     recordDeliveryFailure({
-      event: 'gift_card.delivery_failed',
+      event: exhausted ? 'gift_card.delivery_failed' : 'gift_card.delivery_retry',
       provider: 'd1', retryable: !exhausted, trigger: args.trigger, attempt: claimed.attempt_count,
     }, error);
     await args.database.prepare(`UPDATE gift_card_deliveries SET status = ?, claim_token = NULL,
