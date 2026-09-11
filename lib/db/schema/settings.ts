@@ -204,5 +204,42 @@ export const defaultSettings = [
     category: 'gift_cards',
     description: 'Allow a super admin to reveal a gift-card code; each reveal writes a permanent audit event naming the admin who asked',
     data_type: 'boolean'
+  },
+
+  // Content
+  {
+    key: 'content.blog_nav_label',
+    value: JSON.stringify('Blog'),
+    category: 'content',
+    description: 'Storefront header link text for the blog',
+    data_type: 'string'
+  },
+  {
+    key: 'content.blog_home_block_enabled',
+    value: JSON.stringify(true),
+    category: 'content',
+    description: 'Show the home-page latest-articles block',
+    data_type: 'boolean'
+  },
+  {
+    key: 'content.blog_home_block_heading',
+    value: JSON.stringify('From the Blog'),
+    category: 'content',
+    description: 'Heading text for the home-page latest-articles block',
+    data_type: 'string'
+  },
+  {
+    key: 'content.blog_home_block_count',
+    value: JSON.stringify(3),
+    category: 'content',
+    description: 'Number of articles shown in the home-page block (server range 1-6)',
+    data_type: 'number'
+  },
+  {
+    key: 'content.blog_home_block_placement',
+    value: JSON.stringify('after_featured'),
+    category: 'content',
+    description: 'Home-page block placement: before_featured or after_featured',
+    data_type: 'string'
   }
 ];
