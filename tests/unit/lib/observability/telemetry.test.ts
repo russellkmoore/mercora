@@ -103,6 +103,18 @@ describe('privacy-safe telemetry envelope', () => {
       .toEqual({ path: '/api/agent-chat' });
   });
 
+  it('accepts a bounded, safe-charset delivery_id but rejects free text or oversized values (WR-01)', () => {
+    expect(sanitizeTelemetryFields({ delivery_id: 'gift_delivery_ab12cd34' }))
+      .toEqual({ delivery_id: 'gift_delivery_ab12cd34' });
+    // Not a closed enum -- every delivery has a distinct id -- so this is a
+    // format/length check, not an allowlist of exact values.
+    expect(sanitizeTelemetryFields({ delivery_id: `x${'a'.repeat(128)}` })).toBeUndefined();
+    expect(sanitizeTelemetryFields({ delivery_id: 'friend@example.com' })).toBeUndefined();
+    expect(sanitizeTelemetryFields({ delivery_id: 'gift note text with spaces' })).toBeUndefined();
+    expect(sanitizeTelemetryFields({ delivery_id: '' })).toBeUndefined();
+    expect(sanitizeTelemetryFields({ delivery_id: 123 })).toBeUndefined();
+  });
+
   it('records AI guard outcomes without rejected response content', () => {
     recordTelemetry(
       'ai.response_guard_replaced',

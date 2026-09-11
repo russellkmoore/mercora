@@ -90,10 +90,10 @@ function epochSeconds(): number { return Math.floor(Date.now() / 1_000); }
 /**
  * Record a failed delivery attempt through the project's telemetry contract.
  *
- * Everything here is a closed enum or a bounded number, so
- * `sanitizeTelemetryFields` keeps all of it and nothing free-text can reach the
- * log stream. Three consequences of routing through `recordTelemetry` rather
- * than a bespoke console line:
+ * Everything here is a closed enum, a bounded number, or (as of WR-01) a
+ * bounded opaque identifier, so `sanitizeTelemetryFields` keeps all of it and
+ * nothing free-text can reach the log stream. Consequences of routing through
+ * `recordTelemetry` rather than a bespoke console line:
  *
  *   - the envelope carries the `commerce.telemetry.v1` marker, so the tail
  *     consumer sees it at all;
@@ -105,11 +105,16 @@ function epochSeconds(): number { return Math.floor(Date.now() / 1_000); }
  *     going to be retried does not page anyone eight times over;
  *   - a throwable is reduced to an `error_class` from a fixed allowlist.
  *
- * There is deliberately no gift-card id: the contract has no identifier field,
- * and `sanitizeTelemetryFields` would drop one anyway. There is also no
- * provider error code — the contract has no slot for it, and the previous
- * bespoke line carried up to 200 characters of unfiltered third-party text
- * (which could include the recipient address on a rejection).
+ * WR-01: `deliveryId` (the `gift_card_deliveries.id` row, a `stableId`-derived
+ * hash with no PII content) rides along as `fields.delivery_id`, so an
+ * operator reading either event in the log stream can correlate it to a
+ * specific delivery row without paging. It stays optional (some call sites
+ * predate a claimed row) and is validated by `boundedIdentifier` in
+ * telemetry.ts, not a free-text field. There is still deliberately no
+ * recipient email, gift-card code, or provider error code carried — the
+ * contract has no slot for any of those, and the previous bespoke line
+ * carried up to 200 characters of unfiltered third-party text (which could
+ * include the recipient address on a rejection).
  */
 type DeliveryTrigger = 'recovery' | 'request';
 type GiftCardDeliveryTelemetryEvent = 'gift_card.delivery_failed' | 'gift_card.delivery_retry';
@@ -120,6 +125,7 @@ function recordDeliveryFailure(fields: {
   retryable: boolean;
   trigger: DeliveryTrigger;
   attempt?: number;
+  deliveryId?: string;
 }, error?: unknown): void {
   recordTelemetry(fields.event, {
     operation: 'send',
@@ -128,6 +134,7 @@ function recordDeliveryFailure(fields: {
     retryable: fields.retryable,
     trigger: fields.trigger,
     ...(fields.attempt === undefined ? {} : { attempt: fields.attempt }),
+    ...(fields.deliveryId === undefined ? {} : { delivery_id: fields.deliveryId }),
   }, error);
 }
 
@@ -463,6 +470,7 @@ async function deliverOne(args: {
     recordDeliveryFailure({
       event: 'gift_card.delivery_failed',
       provider: 'd1', retryable: false, trigger: args.trigger, attempt: claimed.attempt_count,
+      deliveryId: claimed.id,
     });
     await args.database.prepare(`UPDATE gift_card_deliveries SET status = 'needs_review',
       claim_token = NULL, lease_expires_at = NULL, completed_at = ?, updated_at = ?
@@ -506,6 +514,7 @@ async function deliverOne(args: {
         retryable: status !== 'needs_review',
         trigger: args.trigger,
         attempt: claimed.attempt_count,
+        deliveryId: claimed.id,
       });
     }
     await args.database.prepare(`UPDATE gift_card_deliveries SET status = ?, claim_token = NULL,
@@ -518,6 +527,7 @@ async function deliverOne(args: {
     recordDeliveryFailure({
       event: exhausted ? 'gift_card.delivery_failed' : 'gift_card.delivery_retry',
       provider: 'd1', retryable: !exhausted, trigger: args.trigger, attempt: claimed.attempt_count,
+      deliveryId: claimed.id,
     }, error);
     await args.database.prepare(`UPDATE gift_card_deliveries SET status = ?, claim_token = NULL,
       lease_expires_at = NULL, completed_at = ?, updated_at = ? WHERE id = ? AND claim_token = ?`)
