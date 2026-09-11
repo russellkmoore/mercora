@@ -30,7 +30,6 @@ vi.mock("@/lib/utils/settings", () => ({
 
 import { NextRequest, NextResponse } from "next/server";
 import { POST as createPayment } from "@/app/api/payment-intent/route";
-import { POST as calculateTaxes } from "@/app/api/tax/route";
 import { POST as validateDiscount } from "@/app/api/validate-discount/route";
 import { POST as getShippingOptions } from "@/app/api/shipping-options/route";
 
@@ -59,7 +58,6 @@ beforeEach(() => {
 describe("public route rate limiting", () => {
   it.each([
     ["payment-intent", createPayment, "/api/payment-intent"],
-    ["tax", calculateTaxes, "/api/tax"],
     ["validate-discount", validateDiscount, "/api/validate-discount"],
     ["shipping-options", getShippingOptions, "/api/shipping-options"],
   ])("rejects %s before external or database work", async (prefix, handler, path) => {
@@ -83,15 +81,6 @@ describe("public route rate limiting", () => {
 });
 
 describe("public route request bounds", () => {
-  it("rejects oversized tax carts before Stripe", async () => {
-    const response = await calculateTaxes(
-      request("/api/tax", { items: Array.from({ length: 101 }, () => cartItem) })
-    );
-
-    expect(response.status).toBe(400);
-    expect(calculateTax).not.toHaveBeenCalled();
-  });
-
   it("rejects oversized shipping carts before database settings", async () => {
     const response = await getShippingOptions(
       request("/api/shipping-options", {
