@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   DIGITAL_CHECKOUT_STEPS,
@@ -7,6 +9,15 @@ import {
 import { hasPhysicalCheckoutLines } from '@/lib/gift-cards/checkout';
 import type { OrderItem } from '@/lib/types/order';
 import type { GiftCardCustomization } from '@/lib/types/cartitem';
+
+const root = process.cwd();
+
+// Pinned to the fixture array below as it exists after 18-02 (D-05): 4
+// non-empty-cart fixtures, covering both expected outcomes. If a future
+// edit drops fixtures below this floor, the paired-invariant loop could
+// silently stop exercising a composition (or run zero times) while the
+// suite stays green — this assertion turns that into a red test instead.
+const MIN_NON_EMPTY_CART_FIXTURES = 4;
 
 const giftCardCustomization: GiftCardCustomization = {
   recipientEmail: 'friend@example.com',
@@ -93,7 +104,15 @@ describe('isDigitalOnlyCart', () => {
     // (must_haves, "empty" truth). The invariant is meaningful only when both
     // signals are evaluated over an actual, non-empty fulfilment mix; the
     // empty-array case is covered on its own above.
-    for (const fixture of fixtures.filter((f) => f.cartItems.length > 0)) {
+    const nonEmptyCartFixtures = fixtures.filter((f) => f.cartItems.length > 0);
+
+    it('the fixture list has not been hollowed out below the pinned floor', () => {
+      expect(nonEmptyCartFixtures.length).toBeGreaterThanOrEqual(MIN_NON_EMPTY_CART_FIXTURES);
+      expect(nonEmptyCartFixtures.some((f) => f.expected === true)).toBe(true);
+      expect(nonEmptyCartFixtures.some((f) => f.expected === false)).toBe(true);
+    });
+
+    for (const fixture of nonEmptyCartFixtures) {
       it(`agrees with the negation of hasPhysicalCheckoutLines for: ${fixture.name}`, () => {
         const clientSignal = isDigitalOnlyCart(fixture.cartItems);
         const serverSignal = !hasPhysicalCheckoutLines(fixture.orderItems);
@@ -102,6 +121,20 @@ describe('isDigitalOnlyCart', () => {
         expect(clientSignal).toBe(serverSignal);
       });
     }
+  });
+
+  describe('cross-reference source contract (D-05)', () => {
+    it('lib/checkout/digital-only.ts names the invariant test and the server-side predicate', () => {
+      const source = readFileSync(join(root, 'lib/checkout/digital-only.ts'), 'utf8');
+      expect(source).toContain('tests/unit/lib/checkout/digital-only.test.ts');
+      expect(source).toContain('hasPhysicalCheckoutLines');
+    });
+
+    it('lib/gift-cards/checkout.ts names the invariant test and the client-side predicate', () => {
+      const source = readFileSync(join(root, 'lib/gift-cards/checkout.ts'), 'utf8');
+      expect(source).toContain('tests/unit/lib/checkout/digital-only.test.ts');
+      expect(source).toContain('isDigitalOnlyCart');
+    });
   });
 });
 
