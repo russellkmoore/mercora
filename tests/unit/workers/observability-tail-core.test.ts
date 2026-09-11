@@ -3,12 +3,15 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   ALLOWED_FIELD_ENUMS,
+  DELIVERY_ID_MAX_LENGTH as TELEMETRY_DELIVERY_ID_MAX_LENGTH,
+  sanitizeTelemetryFields,
   TELEMETRY_EVENTS,
   TELEMETRY_MARKER,
   TELEMETRY_PATHS,
 } from '@/lib/observability/telemetry';
 import {
   buildEmailMessage,
+  DELIVERY_ID_MAX_LENGTH as TAIL_DELIVERY_ID_MAX_LENGTH,
   ENUM_FIELDS,
   escapeHtml,
   extractCriticalAlerts,
@@ -257,6 +260,40 @@ describe('observability Tail Worker parser and renderer', () => {
       ALERT_EMAIL_TO: { get: () => { throw new Error('secret getter'); } },
     }))).not.toThrow();
   });
+
+  // CR-01: a gift_card.delivery_failed envelope (critical, in TAIL_CRITICAL_EVENTS,
+  // the exact event this worker turns into a paging alert email) must carry its
+  // delivery_id all the way through parseEnvelope -> sanitizeFields -> alertLine ->
+  // the rendered email body, not just the raw producer-side log line.
+  it('carries delivery_id from a gift_card.delivery_failed envelope into the alert payload and rendered email (CR-01)', () => {
+    const deliveryId = 'gift_delivery_02419c227ba01eae595c700f92856d6ea6eb4ac54ea49d20d0731d1ad9d83d14';
+    const alert = extractCriticalAlerts([trace(envelope({
+      event: 'gift_card.delivery_failed',
+      area: 'gift_card',
+      fields: {
+        operation: 'send', outcome: 'failed', provider: 'cloudflare_email',
+        trigger: 'recovery', retryable: false, attempt: 8, delivery_id: deliveryId,
+      },
+    }))]).alerts[0];
+    expect(alert.fields.delivery_id).toBe(deliveryId);
+
+    const rendered = renderAlert([alert], 0, { environment: 'production', operatorIdentity: 'on-call' });
+    expect(rendered.text).toContain(deliveryId);
+    expect(rendered.html).toContain(deliveryId);
+  });
+
+  it('drops a delivery_id that fails the bound/charset check the same way sanitizeTelemetryFields does', () => {
+    const alert = extractCriticalAlerts([trace(envelope({
+      event: 'gift_card.delivery_failed',
+      area: 'gift_card',
+      fields: {
+        operation: 'send', outcome: 'failed', provider: 'cloudflare_email',
+        trigger: 'recovery', retryable: false, attempt: 8,
+        delivery_id: 'not a safe id; has spaces and secret@example.com',
+      },
+    }))]).alerts[0];
+    expect(alert.fields).not.toHaveProperty('delivery_id');
+  });
 });
 
 describe('ENUM_FIELDS parity with lib/observability/telemetry.ts', () => {
@@ -269,6 +306,38 @@ describe('ENUM_FIELDS parity with lib/observability/telemetry.ts', () => {
     expect(Object.keys(ENUM_FIELDS).sort()).toEqual(Object.keys(ALLOWED_FIELD_ENUMS).sort());
     for (const key of Object.keys(ALLOWED_FIELD_ENUMS) as (keyof typeof ALLOWED_FIELD_ENUMS)[]) {
       expect([...ENUM_FIELDS[key]].sort()).toEqual([...ALLOWED_FIELD_ENUMS[key]].sort());
+    }
+  });
+
+  // CR-01: ENUM_FIELDS parity above only ever covered the six closed-enum keys
+  // -- it structurally cannot see delivery_id, which is handled by ad hoc
+  // imperative code in both files, not an enum object. That gap is exactly
+  // what let the tail worker silently drop delivery_id after WR-01 added it
+  // to the producer side. Assert both the bound and the accept/reject
+  // behavior stay identical between the two independent sanitizers.
+  it('mirrors delivery_id bound and charset behavior with lib/observability/telemetry.ts (CR-01)', () => {
+    expect(TAIL_DELIVERY_ID_MAX_LENGTH).toBe(TELEMETRY_DELIVERY_ID_MAX_LENGTH);
+
+    const candidates = [
+      'gift_delivery_02419c227ba01eae595c700f92856d6ea6eb4ac54ea49d20d0731d1ad9d83d14',
+      'gift_delivery_admin_9d3629d09eb31182dc3df8078682f9a463b657b17815d1f5b798c286f317d15c',
+      '', // empty
+      'a'.repeat(TAIL_DELIVERY_ID_MAX_LENGTH), // exactly at the bound: accepted
+      'a'.repeat(TAIL_DELIVERY_ID_MAX_LENGTH + 1), // over the bound: rejected
+      'friend@example.com', // free text / PII-shaped
+      'note with spaces',
+      123 as unknown as string, // wrong type
+    ];
+
+    for (const candidate of candidates) {
+      const producerAccepted = sanitizeTelemetryFields({ delivery_id: candidate })?.delivery_id;
+      const consumerAlert = extractCriticalAlerts([trace(envelope({
+        event: 'gift_card.delivery_failed',
+        area: 'gift_card',
+        fields: { provider: 'd1', outcome: 'failed', delivery_id: candidate },
+      }))]).alerts[0];
+      const consumerAccepted = consumerAlert?.fields.delivery_id;
+      expect(consumerAccepted, `delivery_id candidate: ${JSON.stringify(candidate)}`).toBe(producerAccepted);
     }
   });
 });

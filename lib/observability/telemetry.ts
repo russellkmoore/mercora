@@ -197,6 +197,18 @@ function queryFreePath(value: unknown): string | undefined {
 }
 
 /**
+ * CR-01: kept in parity with `DELIVERY_ID_MAX_LENGTH` in
+ * workers/observability-tail/src/core.ts (the consumer-side bound for the
+ * same field). Exported, rather than an inline literal, so
+ * tests/unit/workers/observability-tail-core.test.ts can assert byte-equal
+ * parity between the two independent sanitizers the same way it already
+ * does for `ALLOWED_FIELD_ENUMS`/`ENUM_FIELDS` -- this is what a prior drift
+ * (the tail worker silently dropping `delivery_id`, CR-01) needed and did
+ * not have.
+ */
+export const DELIVERY_ID_MAX_LENGTH = 128;
+
+/**
  * A bounded, format-checked opaque identifier (e.g. a gift-card delivery id
  * shaped like `gift_delivery_<64 hex chars>` by `stableId` in
  * gift-card-fulfillment.ts). Unlike the closed-enum fields, this cannot be an
@@ -244,7 +256,7 @@ export function sanitizeTelemetryFields(value: unknown): TelemetryFields | undef
     const path = queryFreePath(source.path);
     if (path) fields.path = path;
 
-    const deliveryId = boundedIdentifier(source.delivery_id, 128);
+    const deliveryId = boundedIdentifier(source.delivery_id, DELIVERY_ID_MAX_LENGTH);
     if (deliveryId) fields.delivery_id = deliveryId;
     return Object.keys(fields).length > 0 ? fields : undefined;
   } catch {

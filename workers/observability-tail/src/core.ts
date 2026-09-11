@@ -145,6 +145,24 @@ function boundedInteger(value: unknown, min: number, max: number): number | unde
     : undefined;
 }
 
+// Kept in parity with `boundedIdentifier` in lib/observability/telemetry.ts (the
+// producer-side validator for the same field). CR-01: the tail worker's own
+// sanitizeFields() is a second, independent allowlist -- it does not import
+// telemetry.ts's sanitizer, so the two bound checks must be kept byte-identical
+// by hand (same length cap, same charset) or a field the producer allows can be
+// silently dropped again on this consumer side before it reaches the alert
+// email. Exported so tests/unit/workers/observability-tail-core.test.ts can
+// assert byte-equal parity, the same pattern ENUM_FIELDS already uses.
+export const DELIVERY_ID_MAX_LENGTH = 128;
+const DELIVERY_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+function boundedIdentifier(value: unknown, maxLength: number): string | undefined {
+  return typeof value === 'string' && value.length > 0 && value.length <= maxLength &&
+    DELIVERY_ID_PATTERN.test(value)
+    ? value
+    : undefined;
+}
+
 function sanitizeFields(value: unknown): Record<string, string | number | boolean> {
   if (!isRecord(value)) return {};
   const output: Record<string, string | number | boolean> = {};
@@ -167,6 +185,12 @@ function sanitizeFields(value: unknown): Record<string, string | number | boolea
     if (typeof value.path === 'string' && TAIL_ROUTE_PATHS.has(value.path)) {
       output.path = value.path;
     }
+    // CR-01 (WR-01 follow-up): without this, delivery_id reaches the raw log
+    // line (producer side, lib/observability/telemetry.ts) but was silently
+    // stripped here before the critical-alert email is built -- the one path
+    // that actually pages an operator.
+    const deliveryId = boundedIdentifier(value.delivery_id, DELIVERY_ID_MAX_LENGTH);
+    if (deliveryId !== undefined) output.delivery_id = deliveryId;
   } catch {
     return {};
   }
