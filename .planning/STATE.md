@@ -384,6 +384,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 | Category | Item | Status | Deferred At | Milestone |
 |----------|------|--------|-------------|-----------|
+| todos | consolidate-stripe-customer-bindings.md | (presence-only) | 2026-09-11 | v2.2 |
+| deferred_items | 18/deferred-items.md: Concurrent-edit test noise in gift-card-fulfillment.ts (out of scope for 18-03) | acknowledged | 2026-09-11 | v2.2 |
 | todos | blog-public-navigation-and-home-block.md | (presence-only) | 2026-09-10 | v2.1 |
 | todos | gift-card-admin-and-flags.md | (presence-only) | 2026-09-10 | v2.1 |
 | todos | saved-payment-methods.md | (presence-only) | 2026-09-10 | v2.1 |

@@ -75,7 +75,8 @@ covered_files:
   - tests/unit/app/api/admin-gift-cards-reveal.test.ts
   - tests/unit/app/api/admin-settings-honor-guard.test.ts
   - tests/unit/app/admin-gift-card-detail-page.test.ts
-covered_digest: "v1:sha256:1c23eec82909640ba0df853e16574faeaf7293f4a975ac86dd83e654051f6f9c"
+  - ".planning/phases/14-gift-card-admin-audit-trail/14-SECURITY.md"
+covered_digest: "v1:sha256:d063f40d5ba6361d48e9f61ea5ec1836392bf2ef7c14b65b80e657284b8532d2"
 behavior_unverified: 1
 overrides_applied: 0
 behavior_unverified_items:
