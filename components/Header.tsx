@@ -13,19 +13,22 @@
  *
  * === Architecture ===
  * ```
- * Header (Server) → getCategories() → HeaderClient (Client)
+ * Header (Server) → getCategories() / getContentSettings() / getPublishedBlogPosts() → HeaderClient (Client)
  * ```
  *
  * === Data Flow ===
  * 1. Server component fetches categories from database
- * 2. Categories passed as props to client component
- * 3. Client component handles interactivity and state
+ * 2. Server component resolves the blog nav label and whether any article is
+ *    published (collapsed to a boolean before it leaves the server)
+ * 3. Categories, blog nav visibility, and blog nav label passed as props to
+ *    client component
+ * 4. Client component handles interactivity and state
  *
  * === Usage ===
  * ```tsx
  * <Header />
  * ```
- * 
+ *
  * No props required - this is a top-level server component.
  */
 
@@ -33,6 +36,8 @@ import { listCategories } from "@/lib/models";
 import HeaderClient from "./HeaderClient";
 import { unstable_cache } from "next/cache";
 import { CATEGORY_NAV_CACHE_TAG } from "@/lib/cache-tags";
+import { getContentSettings } from "@/lib/content/settings";
+import { getPublishedBlogPosts } from "@/lib/models/blog";
 
 // Cache categories for an hour; admin category writes expire the tag early.
 const getCachedCategories = unstable_cache(
@@ -49,7 +54,21 @@ const getCachedCategories = unstable_cache(
 export default async function Header() {
   // Fetch categories on the server for optimal performance with caching
   const categories = await getCachedCategories();
-  
+
+  // Resolve the blog nav label and whether any article is published.
+  // getPublishedBlogPosts already excludes drafts and future-dated posts;
+  // the result is collapsed to a boolean here so no post row ever crosses
+  // into the client component (T-16-11).
+  const { blogNavLabel } = await getContentSettings();
+  const latestPublishedPosts = await getPublishedBlogPosts({ limit: 1 });
+  const showBlogNav = latestPublishedPosts.length > 0;
+
   // Pass data to client component for interactive functionality
-  return <HeaderClient categories={categories} />;
+  return (
+    <HeaderClient
+      categories={categories}
+      showBlogNav={showBlogNav}
+      blogNavLabel={blogNavLabel}
+    />
+  );
 }
