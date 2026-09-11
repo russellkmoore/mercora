@@ -241,8 +241,14 @@ export async function POST(request: NextRequest) {
   // Bind this shopper to a Stripe Customer so a saved card at checkout attaches
   // to them (D-04). This is a convenience, not a checkout blocker: failure here
   // must never turn into a non-2xx response, only a customer-less PaymentIntent.
+  // WR-03: gated on the same non-zero-cash condition as the PaymentIntent
+  // below — a signed-in shopper whose order is entirely covered by a gift
+  // card never sees a card field or a Customer Session in that transaction,
+  // so there is nothing for a Stripe Customer to do here. Creating one
+  // anyway would be a real, billable Stripe resource carrying the shopper's
+  // email/name for zero benefit.
   let stripeCustomerId: string | undefined;
-  if (userId) {
+  if (userId && total.gt(Money.zero(total.currency))) {
     try {
       stripeCustomerId = await ensureStripeCustomerForShopper({
         customerId: userId,

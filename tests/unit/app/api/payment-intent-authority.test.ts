@@ -573,7 +573,7 @@ describe('payment-intent durable authority boundary', () => {
     expect(tender.code).toBe('gift_card_unavailable');
   });
 
-  it('takes no PaymentIntent and no Customer Session for a signed-in zero-cash gift-card checkout (D-05)', async () => {
+  it('takes no PaymentIntent, no Customer Session, and creates no Stripe customer for a signed-in zero-cash gift-card checkout (D-05, WR-03)', async () => {
     mocks.auth.mockResolvedValue({ userId: 'user_123' });
     mocks.ensureStripeCustomerForShopper.mockResolvedValue('cus_signed_in');
     mocks.priceCheckout.mockResolvedValueOnce({ ...quote, total: { amount: 0, currency: 'USD' } });
@@ -589,6 +589,10 @@ describe('payment-intent durable authority boundary', () => {
     expect(body).not.toHaveProperty('customerSessionClientSecret');
     expect(mocks.createPaymentIntent).not.toHaveBeenCalled();
     expect(mocks.customerSessionsCreate).not.toHaveBeenCalled();
+    // WR-03/IN-01: a zero-cash order never sees a card field or a Customer
+    // Session, so no real Stripe Customer (carrying the shopper's email/name)
+    // should be created on their behalf for this transaction.
+    expect(mocks.ensureStripeCustomerForShopper).not.toHaveBeenCalled();
   });
 
   it('never lets a recorded telemetry call carry either client secret', async () => {
