@@ -109,7 +109,7 @@ export function generateOrderConfirmationText(orderData: OrderData): string {
     `Tax: ${Money.fromStored(orderData.tax).format()}`,
     `Total: ${Money.fromStored(orderData.total).format()}`,
     orderData.shippingAddress
-      ? `Ship to: ${orderData.shippingAddress.street}, ${orderData.shippingAddress.city}, ${orderData.shippingAddress.state} ${orderData.shippingAddress.zipCode}, ${orderData.shippingAddress.country}`
+      ? `${orderData.addressLabel === 'billing' ? 'Billing address' : 'Ship to'}: ${orderData.shippingAddress.street}, ${orderData.shippingAddress.city}, ${orderData.shippingAddress.state} ${orderData.shippingAddress.zipCode}, ${orderData.shippingAddress.country}`
       : 'This order contains no shippable items.',
     `Questions? Contact ${store.contact.supportEmail}.`,
     postalFooterText(),
@@ -238,9 +238,9 @@ export function generateOrderConfirmationHTML(orderData: OrderData, tokens: Them
         </div>
 
         ${orderData.shippingAddress ? `
-          <!-- Shipping Address -->
+          <!-- ${orderData.addressLabel === 'billing' ? 'Billing' : 'Shipping'} Address -->
           <div style="padding: 24px 32px;">
-            <h3 style="color: ${tokens.onInverse}; font-size: 18px; font-weight: bold; margin: 0 0 12px;">Shipping Address</h3>
+            <h3 style="color: ${tokens.onInverse}; font-size: 18px; font-weight: bold; margin: 0 0 12px;">${orderData.addressLabel === 'billing' ? 'Billing Address' : 'Shipping Address'}</h3>
             <p style="color: ${tokens.mutedOnInverse}; font-size: 14px; line-height: 20px; margin: 0;">
               ${escapeHtmlText(orderData.shippingAddress.street)}<br>
               ${escapeHtmlText(orderData.shippingAddress.city)}, ${escapeHtmlText(orderData.shippingAddress.state)} ${escapeHtmlText(orderData.shippingAddress.zipCode)}<br>
@@ -519,7 +519,9 @@ export async function sendNewOrderMerchantNotification(
       .filter(Boolean).join(', '),
     orderData.shippingAddress.country,
   ].filter(Boolean).join('\n') : '';
-  const itemHeading = orderData.shippingAddress ? 'Items to ship' : 'Order items';
+  const isBillingAddress = orderData.addressLabel === 'billing';
+  const itemHeading = orderData.shippingAddress && !isBillingAddress ? 'Items to ship' : 'Order items';
+  const addressHeading = isBillingAddress ? 'Billing address' : 'Ship to';
   const text = [
     `New order ${orderData.orderNumber}`,
     itemHeading,
@@ -528,7 +530,7 @@ export async function sendNewOrderMerchantNotification(
     `Shipping: ${Money.fromStored(orderData.shipping).format()}`,
     `Tax: ${Money.fromStored(orderData.tax).format()}`,
     `Total: ${Money.fromStored(orderData.total).format()}`,
-    orderData.shippingAddress ? 'Ship to' : null,
+    orderData.shippingAddress ? addressHeading : null,
     orderData.shippingAddress ? address : 'No shipping required',
     orderData.customerEmail ? `Customer email: ${orderData.customerEmail}` : null,
     `Manage this order: ${adminUrl}`,
@@ -536,7 +538,7 @@ export async function sendNewOrderMerchantNotification(
   const rows = orderData.items.map((item) =>
     `<tr><td style="padding:6px 0;border-bottom:1px solid ${tokens.borderInverse}"><strong>${escapeHtmlText(String(item.quantity))} &times;</strong> ${escapeHtmlText(item.name)}</td><td style="padding:6px 0;border-bottom:1px solid ${tokens.borderInverse};text-align:right">${escapeHtmlText(Money.fromStored(item.price).times(item.quantity).format())}</td></tr>`
   ).join('');
-  const html = `<div style="font-family:Arial,sans-serif;max-width:600px"><h2>New order ${escapeHtmlText(orderData.orderNumber)}</h2><p>${escapeHtmlText(Money.fromStored(orderData.total).format())}${orderData.customerEmail ? ` · ${escapeHtmlText(orderData.customerEmail)}` : ''}</p><h3>${itemHeading}</h3><table style="border-collapse:collapse;width:100%">${rows}</table>${orderData.shippingAddress ? `<h3>Ship to</h3><p style="white-space:pre-line">${escapeHtmlText(address)}</p>` : '<p>No shipping required.</p>'}<p><a href="${escapeHtmlText(adminUrl)}">Manage this order</a></p>${postalFooterHtml(tokens)}</div>`;
+  const html = `<div style="font-family:Arial,sans-serif;max-width:600px"><h2>New order ${escapeHtmlText(orderData.orderNumber)}</h2><p>${escapeHtmlText(Money.fromStored(orderData.total).format())}${orderData.customerEmail ? ` · ${escapeHtmlText(orderData.customerEmail)}` : ''}</p><h3>${itemHeading}</h3><table style="border-collapse:collapse;width:100%">${rows}</table>${orderData.shippingAddress ? `<h3>${addressHeading}</h3><p style="white-space:pre-line">${escapeHtmlText(address)}</p>` : '<p>No shipping required.</p>'}<p><a href="${escapeHtmlText(adminUrl)}">Manage this order</a></p>${postalFooterHtml(tokens)}</div>`;
 
   return sendEmail({
     from: store.contact.senderEmail,
