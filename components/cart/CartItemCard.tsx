@@ -24,6 +24,9 @@ export default function CartItemCard({ item }: CartItemCardProps) {
   // line whatever this renders.
   const giftCardLineUnavailable =
     item.giftCardCustomization !== undefined && !commerce.features.giftCardAcquisition;
+  // Advisory only: the checkout projection already refuses a line carrying
+  // this flag before any request is made (D-15).
+  const giftCardNoteInvalid = item.giftCardNoteInvalid === true;
 
   return (
     <div className="flex gap-3 sm:gap-4 border p-3 rounded shadow-sm">
@@ -68,6 +71,11 @@ export default function CartItemCard({ item }: CartItemCardProps) {
         {giftCardLineUnavailable && (
           <p className="text-xs sm:text-sm text-warning mt-1">
             No longer available — remove this line to check out.
+          </p>
+        )}
+        {giftCardNoteInvalid && (
+          <p className="text-xs sm:text-sm text-warning mt-1">
+            This gift note can no longer be sent — remove this line and add the item again to fix it.
           </p>
         )}
         {item.giftCardCustomization && (
