@@ -70,7 +70,11 @@ beforeEach(() => {
 afterEach(() => {
   delete process.env.ORDER_STATUS_SECRET;
   delete process.env.NEXT_PUBLIC_STORE_NAME;
-  delete process.env.STORE_SUPPORT_EMAIL;
+  // STORE_SUPPORT_EMAIL is now a required (non-optional) field on the
+  // generated ProcessEnv type since it's a plain wrangler.jsonc var, so
+  // `delete` no longer type-checks; beforeEach always resets it fresh
+  // before every test, so clearing it here was redundant anyway.
+  process.env.STORE_SUPPORT_EMAIL = "";
 });
 
 describe("guest order-status page", () => {
