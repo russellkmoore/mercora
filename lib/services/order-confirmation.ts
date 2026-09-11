@@ -1,5 +1,6 @@
 import { Money } from '@/lib/money';
 import type { Order } from '@/lib/types/order';
+import { hasPhysicalCheckoutLines } from '@/lib/gift-cards/checkout';
 import {
   sendNewOrderMerchantNotification,
   sendOrderConfirmationEmail,
@@ -63,10 +64,17 @@ function localizedText(value: unknown): string {
 type FulfillmentOrderData = Omit<OrderData, 'customerEmail'>;
 
 async function buildFulfillmentOrderData(order: Order): Promise<FulfillmentOrderData | null> {
-  const address = order.shipping_address;
   const extensions = order.extensions ?? {};
-  const addresslessDigitalOrder = extensions.subscription_shipping_required === false;
-  if ((!address && !addresslessDigitalOrder) || !order.id || order.items.length === 0) return null;
+  // Union, not replacement: a subscription renewal's OrderItem carries no
+  // fulfillment_type at all, so hasPhysicalCheckoutLines alone reads it as
+  // physical. The extension flag is still consulted so a digital renewal
+  // stays recognized as addressless; hasPhysicalCheckoutLines widens the
+  // same signal to cover a plain gift-card-only order too (D-06).
+  const digitalOnlyOrder = extensions.subscription_shipping_required === false
+    || !hasPhysicalCheckoutLines(order.items);
+  const address = order.shipping_address
+    ?? (digitalOnlyOrder ? order.billing_address : undefined);
+  if ((!address && !digitalOnlyOrder) || !order.id || order.items.length === 0) return null;
   const images = await resolveOrderLineImages(order.items.map((item) => item.product_id));
   const persistedName = typeof extensions.customer_name === 'string'
     && extensions.customer_name.trim().length > 0
@@ -104,6 +112,7 @@ async function buildFulfillmentOrderData(order: Order): Promise<FulfillmentOrder
         zipCode: address.postal_code || '',
         country: address.country,
       },
+      addressLabel: order.shipping_address ? 'shipping' as const : 'billing' as const,
     } : {}),
   };
 }
