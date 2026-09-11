@@ -76,6 +76,18 @@ describe('order confirmation provider boundary', () => {
     expect(message.text).toContain('no shippable items');
     expect(message.text).not.toContain('Ship to:');
   });
+
+  it('names the address a billing address when addressLabel is billing, values unchanged', async () => {
+    const billing = { ...orderData, addressLabel: 'billing' as const };
+    await sendOrderConfirmationEmail(billing);
+    const message = mocks.send.mock.calls.at(-1)?.[0] as { html: string; text: string };
+    expect(message.html).toContain('Billing Address');
+    expect(message.html).not.toContain('>Shipping Address<');
+    expect(message.text).toContain('Billing address:');
+    expect(message.text).not.toContain('Ship to:');
+    expect(message.html).toContain('Denver');
+    expect(message.text).toContain('Denver');
+  });
 });
 
 describe('order status provider boundary', () => {
