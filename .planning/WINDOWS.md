@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 9
+open_count: 8
 waived_count: 0
-fixed_count: 3
+fixed_count: 4
 total_count: 12
-last_updated: 2026-09-11T11:52:55.562Z
+last_updated: 2026-09-11T12:10:40.569Z
 ---
 
 # Broken Windows Ledger
@@ -26,7 +26,7 @@ last_updated: 2026-09-11T11:52:55.562Z
 | 9 | 12 | deviation | wrangler.jsonc, lib/services/checkout-pricing.ts, lib/services/gift-card-fulfillment.ts |  | 12-06's scope assertion (zero files under lib/, app/, components/, migrations/, wrangler.jsonc over the phase range) did not hold: three files changed, all attributable to the four unattended orchestrator commits 3b821f7, 32b9df1, f813499, d8b4d11 made during 12-05. app/, components/ and migrations/ are empty in the range and no migration was added, so D-11's template/component claim and T-12-31 hold; the secret scan over added lines is 0. Recorded rather than narrowed. | open |  | 2026-09-09T22:35:16.228Z |  |
 | 10 | 12 | deviation | lib/gift-cards/customization.ts |  | Gift-card notes containing a URL are rejected by parseGiftCardCustomization (12 review WR-08); the same parser runs over persisted cart state on load (migrateCartState -> normalizeCartItemForStore), so a browser holding a pre-deploy cart whose note contains a URL silently loses that cart line. Paid orders unaffected. Open debt from the iteration-3 review (WR-16); fix is a validation prompt instead of a dropped line. | fixed |  | 2026-09-09T23:42:12.862Z | 2026-09-11T11:52:55.562Z |
 | 11 | 13 | deviation | lib/gift-cards/honor-guard.ts |  | reportHonorDisabledWithBalances has no caller until plan 13-07 wires the cron tick | open |  | 2026-09-10T16:42:05.501Z |  |
-| 12 | 18 | deviation | lib/checkout/digital-only.ts |  | isDigitalOnlyCart keys on item.giftCardCustomization presence; a D-03-flagged gift-card line (invalid note) has no customization, so a cart holding only a flagged gift-card line is misclassified as not-digital-only, showing a shipping-address step for a checkout that projectCartLineForCheckout will refuse regardless. Not fixed here: digital-only.ts is owned by plan 18-02 (D-05), out of 18-04's files_modified scope. | open |  | 2026-09-11T11:52:52.347Z |  |
+| 12 | 18 | deviation | lib/checkout/digital-only.ts |  | isDigitalOnlyCart keys on item.giftCardCustomization presence; a D-03-flagged gift-card line (invalid note) has no customization, so a cart holding only a flagged gift-card line is misclassified as not-digital-only, showing a shipping-address step for a checkout that projectCartLineForCheckout will refuse regardless. Not fixed here: digital-only.ts is owned by plan 18-02 (D-05), out of 18-04's files_modified scope. | fixed |  | 2026-09-11T11:52:52.347Z | 2026-09-11T12:10:40.569Z |
 
 ````json
 [
@@ -169,10 +169,10 @@ last_updated: 2026-09-11T11:52:55.562Z
     "file": "lib/checkout/digital-only.ts",
     "line": null,
     "description": "isDigitalOnlyCart keys on item.giftCardCustomization presence; a D-03-flagged gift-card line (invalid note) has no customization, so a cart holding only a flagged gift-card line is misclassified as not-digital-only, showing a shipping-address step for a checkout that projectCartLineForCheckout will refuse regardless. Not fixed here: digital-only.ts is owned by plan 18-02 (D-05), out of 18-04's files_modified scope.",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-09-11T11:52:52.347Z",
-    "resolved_at": null
+    "resolved_at": "2026-09-11T12:10:40.569Z"
   }
 ]
 ````

@@ -12,12 +12,12 @@ import type { GiftCardCustomization } from '@/lib/types/cartitem';
 
 const root = process.cwd();
 
-// Pinned to the fixture array below as it exists after 18-02 (D-05): 4
+// Pinned to the fixture array below as it exists after 18-07 (WR-02): 5
 // non-empty-cart fixtures, covering both expected outcomes. If a future
 // edit drops fixtures below this floor, the paired-invariant loop could
 // silently stop exercising a composition (or run zero times) while the
 // suite stays green — this assertion turns that into a red test instead.
-const MIN_NON_EMPTY_CART_FIXTURES = 4;
+const MIN_NON_EMPTY_CART_FIXTURES = 5;
 
 const giftCardCustomization: GiftCardCustomization = {
   recipientEmail: 'friend@example.com',
@@ -25,7 +25,7 @@ const giftCardCustomization: GiftCardCustomization = {
 
 interface Fixture {
   name: string;
-  cartItems: { giftCardCustomization?: GiftCardCustomization }[];
+  cartItems: { giftCardCustomization?: GiftCardCustomization; giftCardNoteInvalid?: boolean }[];
   orderItems: OrderItem[];
   expected: boolean;
 }
@@ -73,6 +73,16 @@ const fixtures: Fixture[] = [
     orderItems: [orderItem('physical')],
     expected: false,
   },
+  {
+    // WR-02: a DEBT-03-flagged line lost its giftCardCustomization on load
+    // (the invalid customization is not carried forward), but it is still a
+    // gift-card/digital line -- checkout refuses it either way, so both
+    // signals must agree the cart is digital-only until the line is removed.
+    name: 'one flagged (invalid-note) gift-card line, no customization',
+    cartItems: [{ giftCardNoteInvalid: true }],
+    orderItems: [orderItem('digital')],
+    expected: true,
+  },
 ];
 
 describe('isDigitalOnlyCart', () => {
@@ -94,6 +104,14 @@ describe('isDigitalOnlyCart', () => {
 
   it('returns false for one line without a customization', () => {
     expect(isDigitalOnlyCart([{}])).toBe(false);
+  });
+
+  it('returns true for one flagged (invalid-note) line carrying no customization (WR-02)', () => {
+    expect(isDigitalOnlyCart([{ giftCardNoteInvalid: true }])).toBe(true);
+  });
+
+  it('returns false for a plain line even when giftCardNoteInvalid is absent (WR-02 control)', () => {
+    expect(isDigitalOnlyCart([{ giftCardNoteInvalid: false }])).toBe(false);
   });
 
   describe('paired invariant against hasPhysicalCheckoutLines', () => {
