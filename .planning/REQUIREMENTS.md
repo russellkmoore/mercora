@@ -60,9 +60,9 @@ Requirements for this milestone. Each maps to a roadmap phase.
 
 ### Operator checklist
 
-- [ ] **OPS-05**: Stripe Tax is enabled on the live Stripe account and a production order records `tax_source = provider`; the fallback path stays as the documented degraded mode
-- [ ] **OPS-06**: `STORE_SUPPORT_EMAIL` is a real address and an Email Routing rule exists for `orders@` (or the sender changes to a routed address) so replies to store email reach a person
-- [ ] **OPS-07**: `ORDER_STATUS_SECRET` and `EMAIL_UNSUBSCRIBE_SECRET_CURRENT` exist as production secrets (names only in docs) and the stale `ADMIN_USER_IDS` secret is deleted; `wrangler secret list` proves it
+- [x] **OPS-05**: Stripe Tax is enabled on the live Stripe account and a production order records `tax_source = provider`; the fallback path stays as the documented degraded mode
+- [x] **OPS-06**: `STORE_SUPPORT_EMAIL` is a real address and an Email Routing rule exists for `orders@` (or the sender changes to a routed address) so replies to store email reach a person
+- [x] **OPS-07**: `ORDER_STATUS_SECRET` and `EMAIL_UNSUBSCRIBE_SECRET_CURRENT` exist as production secrets (names only in docs) and the stale `ADMIN_USER_IDS` secret is deleted; `wrangler secret list` proves it
 
 ## Future Requirements
 
@@ -116,8 +116,8 @@ Deferred to a later milestone.
 | DEBT-06 | Phase 18 | Complete |
 | DEBT-07 | Phase 18 | Complete |
 | DEBT-08 | Phase 18 | Complete |
-| OPS-05 | Phase 19 | Pending |
-| OPS-06 | Phase 19 | Pending |
-| OPS-07 | Phase 19 | Pending |
+| OPS-05 | Phase 19 | Complete |
+| OPS-06 | Phase 19 | Complete |
+| OPS-07 | Phase 19 | Complete |
 
 **Coverage:** 34/34 v1 requirements mapped to exactly one phase each. No orphans, no duplicates.
