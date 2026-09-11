@@ -62,7 +62,7 @@ Full phase details, success criteria, and plan lists: `milestones/v2.1-ROADMAP.m
 - [x] **Phase 14: Gift-Card Admin & Audit Trail** - An admin can find, read the history of, and act on any individual gift card (completed 2026-09-10)
 - [x] **Phase 15: Subscription Address In Place** - A shopper adds a shipping address on the subscription product page without leaving it (completed 2026-09-11)
 - [x] **Phase 16: Blog Surfacing** - The blog is reachable from the header and the latest articles appear on the home page (completed 2026-09-11)
-- [ ] **Phase 17: Saved Payment Methods** - A signed-in shopper saves a card at checkout and manages it from their account
+- [x] **Phase 17: Saved Payment Methods** - A signed-in shopper saves a card at checkout and manages it from their account (completed 2026-09-11)
 - [ ] **Phase 18: Tech-Debt Closure** - The debt carried out of v2.1 is closed and the docs match the code
 - [ ] **Phase 19: Operator Checklist** - **Human-checkpoint phase, last by design** — every task needs Russell in the Stripe or Cloudflare dashboard
 
@@ -237,21 +237,21 @@ error. The effect the criterion asks for is unchanged.*
 Plans:
 **Wave 1**
 
-- [ ] 17-01-PLAN.md — Migration 0025, the `payment_customers` schema, and `ensureStripeCustomer`
+- [x] 17-01-PLAN.md — Migration 0025, the `payment_customers` schema, and `ensureStripeCustomer`
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 17-02-PLAN.md — Checkout server wiring: Stripe customer on the PaymentIntent plus a Customer Session
-- [ ] 17-04-PLAN.md — Account API: list saved cards, remove one after an ownership check
+- [x] 17-02-PLAN.md — Checkout server wiring: Stripe customer on the PaymentIntent plus a Customer Session
+- [x] 17-04-PLAN.md — Account API: list saved cards, remove one after an ownership check
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 17-03-PLAN.md — Checkout client wiring: Elements gets the Customer Session secret; Link stays off
-- [ ] 17-05-PLAN.md — Account UI: the Payment methods page, list component and navigation entry
+- [x] 17-03-PLAN.md — Checkout client wiring: Elements gets the Customer Session secret; Link stays off
+- [x] 17-05-PLAN.md — Account UI: the Payment methods page, list component and navigation entry
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 17-06-PLAN.md — Full gate suite, deploy by push, read-only production check, handover list
+- [x] 17-06-PLAN.md — Full gate suite, deploy by push, read-only production check, handover list
 
 **UI hint**: yes
 
@@ -295,6 +295,6 @@ Plans:
 | 14. Gift-Card Admin & Audit Trail | 9/9 | Complete    | 2026-09-10 |
 | 15. Subscription Address In Place | 3/3 | Complete    | 2026-09-11 |
 | 16. Blog Surfacing | 4/4 | Complete    | 2026-09-11 |
-| 17. Saved Payment Methods | 0/? | Not started | - |
+| 17. Saved Payment Methods | 6/6 | Complete    | 2026-09-11 |
 | 18. Tech-Debt Closure | 0/? | Not started | - |
 | 19. Operator Checklist (human checkpoints) | 0/? | Not started | - |
