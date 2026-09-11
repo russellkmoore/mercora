@@ -1,10 +1,10 @@
 ---
 phase: 18-tech-debt-closure
-fixed_at: 2026-09-11T12:15:00Z
+fixed_at: 2026-09-11T12:25:00Z
 review_path: .planning/phases/18-tech-debt-closure/18-REVIEW.md
-iteration: 1
-findings_in_scope: 4
-fixed: 3
+iteration: 2
+findings_in_scope: 6
+fixed: 5
 skipped: 1
 status: partial
 ---
@@ -133,7 +133,7 @@ not a defect.
   (17/17), `cart-store-lines.test.ts` (7/7) — all passing before the full
   suite run above.
 
-## FIX COMPLETE
+## Iteration 1 Summary
 
 - Fixed: 3 (WR-01, WR-02, IN-02)
 - Skipped: 1 (IN-01 — no action needed, confirmed and documented, not silently dropped)
@@ -141,6 +141,92 @@ not a defect.
 
 ---
 
-_Fixed: 2026-09-11T12:15:00Z_
+## Iteration 2
+
+**Fixed at:** 2026-09-11T12:25:00Z
+**Source review:** `.planning/phases/18-tech-debt-closure/18-REVIEW.md` — `## Iteration 2` section (reviewed 2026-09-11T12:16:43Z)
+
+**Scope:** 1 Critical (CR-01), 0 Warning, 1 Info (IN-03), both raised by the re-review of the three iteration-1 commits.
+
+**Summary:**
+
+- Findings in scope: 2 (1 Critical, 1 Info)
+- Fixed: 2
+- Skipped: 0
+
+| id | title | status | commit |
+| --- | --- | --- | --- |
+| CR-01 | `delivery_id` never reaches the tail worker's critical alert email | fixed | ad97e56 |
+| IN-03 | No fixture for "flagged gift-card line + physical line" composition | fixed | 5f22d75 |
+
+### Fixed Issues
+
+#### CR-01: `delivery_id` never reaches the tail worker's critical alert email
+
+**Files modified:** `lib/observability/telemetry.ts`, `workers/observability-tail/src/core.ts`, `tests/unit/workers/observability-tail-core.test.ts`
+**Commit:** ad97e56
+**Applied fix:** `workers/observability-tail/src/core.ts`'s `sanitizeFields` is a
+second, independent field allowlist from `lib/observability/telemetry.ts`'s
+`sanitizeTelemetryFields` — it does not import the producer's sanitizer, so
+WR-01's `delivery_id` addition to the producer side never reached the
+consumer side that actually builds the critical-alert email. Added the same
+bound/charset check (`^[A-Za-z0-9_-]+$`, length ≤ 128) to `sanitizeFields`,
+matching the reviewer's suggested snippet. Exported `DELIVERY_ID_MAX_LENGTH`
+from *both* `telemetry.ts` and `core.ts` (previously an inline `128`
+literal in each) so a test can assert byte-equal parity between the two
+independent sanitizers — the existing `ENUM_FIELDS` parity test only ever
+covered the six closed-enum fields and structurally cannot see a
+non-enum, format-checked identifier field like this one. Added two tests:
+one proving a `gift_card.delivery_failed` envelope's `delivery_id` survives
+`extractCriticalAlerts` and appears in `renderAlert`'s text/html output
+(the actual alert email body), and a parity test that runs eight
+boundary-case candidates (empty, at-bound, over-bound, free text, wrong
+type, real-shaped ids) through both sanitizers and asserts identical
+accept/reject behavior.
+**Verification:** 14/14 baseline, then 17/17 with the three new tests
+(the alert-survival test, the reject-test, and the widened parity test),
+all pass in `observability-tail-core.test.ts`; confirmed `alertLine()`
+iterates `alert.fields` generically (no separate wiring needed once
+`sanitizeFields` includes the key) by reading the function directly before
+writing the test.
+
+### IN-03: No fixture for "flagged gift-card line + physical line" composition
+
+**Files modified:** `tests/unit/lib/checkout/digital-only.test.ts`
+**Commit:** 5f22d75
+**Applied fix:** Added the sixth fixture specified by the review —
+`cartItems: [{ giftCardNoteInvalid: true }, {}]`, `orderItems:
+[orderItem('digital'), orderItem('physical')]`, `expected: false` — to the
+paired-invariant fixture array, and bumped `MIN_NON_EMPTY_CART_FIXTURES`
+from 5 to 6 so the floor stays pinned to the array's actual length.
+**Verification:** 18/18 tests pass in `digital-only.test.ts` (up from 17),
+including the new fixture running through the paired-invariant loop
+against `hasPhysicalCheckoutLines`.
+
+### Verification Performed (Iteration 2)
+
+- `npm run lint` → 0 errors, 54 pre-existing warnings (unchanged from
+  iteration 1; none in files touched this iteration, confirmed by targeted
+  `eslint` runs).
+- `npm run typecheck` → clean, no errors.
+- `mise exec -- npm test` → **2958/2958 tests passed, 322/322 files** (up
+  from 2954 — the 4 net new tests this iteration: 3 in
+  `observability-tail-core.test.ts`, 1 in `digital-only.test.ts`).
+- `mise exec -- npm run test:observability-worker` → **3/3 tests passed,
+  1/1 files.**
+- Targeted reruns during development: `observability-tail-core.test.ts`
+  (14/14 baseline, then 17/17 with the new tests), `digital-only.test.ts`
+  (18/18, up from 17) — both passing before the full suite runs above.
+
+## FIX COMPLETE
+
+- Iteration 1 — Fixed: 3 (WR-01, WR-02, IN-02); Skipped: 1 (IN-01, no action needed, confirmed)
+- Iteration 2 — Fixed: 2 (CR-01, IN-03); Skipped: 0
+- Cumulative — Fixed: 5 of 6 in-scope findings; Skipped: 1
+- Gates: lint clean (0 errors), typecheck clean, `npm test` 2958/2958 passed, `test:workers` 255/255 passed, `test:observability-worker` 3/3 passed.
+
+---
+
+_Fixed: 2026-09-11T12:25:00Z_
 _Fixer: Claude (gsd-code-fixer)_
-_Iteration: 1_
+_Iteration: 2_
