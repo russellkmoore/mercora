@@ -213,6 +213,39 @@ describe("subscription customer routes", () => {
     expect(mocks.begin).not.toHaveBeenCalled();
   });
 
+  it("accepts a 200-char city/region and rejects 201, matching the account API and client filter", async () => {
+    const accepted = await setup(request("/api/setup-intent", {
+      planId: "plan_one",
+      quantity: 1,
+      shippingAddress: {
+        line1: "1 Main", city: "C".repeat(200), region: "R".repeat(200), country: "US",
+      },
+      consent: { termsVersion: "terms-1", accepted: true },
+    }, { "idempotency-key": "checkout-key-001" }));
+    expect(accepted.status).toBe(201);
+    expect(mocks.begin).toHaveBeenCalledWith(expect.objectContaining({
+      shippingAddress: expect.objectContaining({ city: "C".repeat(200), region: "R".repeat(200) }),
+    }));
+
+    const overCity = await setup(request("/api/setup-intent", {
+      planId: "plan_one",
+      quantity: 1,
+      shippingAddress: { line1: "1 Main", city: "C".repeat(201), country: "US" },
+      consent: { termsVersion: "terms-1", accepted: true },
+    }, { "idempotency-key": "checkout-key-002" }));
+    expect(overCity.status).toBe(400);
+    expect(await overCity.json()).toEqual({ error: "Invalid subscription request" });
+
+    const overRegion = await setup(request("/api/setup-intent", {
+      planId: "plan_one",
+      quantity: 1,
+      shippingAddress: { line1: "1 Main", city: "Denver", region: "R".repeat(201), country: "US" },
+      consent: { termsVersion: "terms-1", accepted: true },
+    }, { "idempotency-key": "checkout-key-003" }));
+    expect(overRegion.status).toBe(400);
+    expect(await overRegion.json()).toEqual({ error: "Invalid subscription request" });
+  });
+
   it("rejects malformed terms versions before provider work", async () => {
     const response = await setup(request("/api/setup-intent", {
       planId: "plan_one",
