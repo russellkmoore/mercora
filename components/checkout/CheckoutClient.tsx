@@ -128,6 +128,7 @@ export default function CheckoutClient({ userId, honorEffective }: CheckoutClien
   });
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
   const [clientSecret, setClientSecret] = useState<string>('');
+  const [customerSessionClientSecret, setCustomerSessionClientSecret] = useState<string>('');
   const [orderId, setOrderId] = useState<string>('');
   const [authoritativeQuote, setAuthoritativeQuote] = useState<AuthoritativeCheckoutQuote>();
   const [isLoading, setIsLoading] = useState(false);
@@ -281,6 +282,7 @@ export default function CheckoutClient({ userId, honorEffective }: CheckoutClien
       const data = await res.json() as {
         noCash?: boolean;
         clientSecret: string;
+        customerSessionClientSecret?: string;
         paymentIntentId: string;
         orderId: string;
         quote: AuthoritativeCheckoutQuote;
@@ -299,6 +301,7 @@ export default function CheckoutClient({ userId, honorEffective }: CheckoutClien
       } else {
         savePendingCheckout({ orderId: data.orderId, paymentIntentId: data.paymentIntentId });
         setClientSecret(data.clientSecret);
+        setCustomerSessionClientSecret(data.customerSessionClientSecret ?? '');
         setCurrentStep('payment');
       }
 
@@ -530,7 +533,11 @@ export default function CheckoutClient({ userId, honorEffective }: CheckoutClien
               <div className="w-full">
                 {/* Keyed on the client secret: Elements cannot change secrets
                     after mount, so a re-quote must remount the form. */}
-                <StripeProvider key={clientSecret} clientSecret={clientSecret}>
+                <StripeProvider
+                  key={clientSecret}
+                  clientSecret={clientSecret}
+                  customerSessionClientSecret={customerSessionClientSecret || undefined}
+                >
                   <PaymentForm
                     clientSecret={clientSecret}
                     onSuccess={handlePaymentSuccess}
