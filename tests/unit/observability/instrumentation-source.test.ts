@@ -22,14 +22,34 @@ function parseSource(path: string): ts.SourceFile {
 function telemetryCalls(source: ts.SourceFile): Set<string> {
   const events = new Set<string>();
   const collectEventLiterals = (node: ts.Node): void => {
-    if (ts.isStringLiteralLike(node)) events.add(node.text);
-    else ts.forEachChild(node, collectEventLiterals);
+    if (ts.isStringLiteralLike(node)) {
+      events.add(node.text);
+    } else if (ts.isConditionalExpression(node)) {
+      // Only the two branches select an event name; the condition itself
+      // (e.g. `status === 'needs_review'`) is not an event literal.
+      collectEventLiterals(node.whenTrue);
+      collectEventLiterals(node.whenFalse);
+    } else {
+      ts.forEachChild(node, collectEventLiterals);
+    }
   };
   const visit = (node: ts.Node): void => {
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) &&
-      node.expression.text === 'recordTelemetry' &&
-      node.arguments[0]) {
-      collectEventLiterals(node.arguments[0]);
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.arguments[0]) {
+      if (node.expression.text === 'recordTelemetry') {
+        collectEventLiterals(node.arguments[0]);
+      } else if (node.expression.text === 'recordDeliveryFailure' &&
+        ts.isObjectLiteralExpression(node.arguments[0])) {
+        // recordDeliveryFailure (lib/services/gift-card-fulfillment.ts) takes
+        // its event name from the caller and forwards it to recordTelemetry,
+        // so the literal lives on the `event` property here, not positionally
+        // in a direct recordTelemetry call.
+        const eventProperty = node.arguments[0].properties.find(
+          (property): property is ts.PropertyAssignment =>
+            ts.isPropertyAssignment(property) && ts.isIdentifier(property.name) &&
+            property.name.text === 'event',
+        );
+        if (eventProperty) collectEventLiterals(eventProperty.initializer);
+      }
     }
     ts.forEachChild(node, visit);
   };
