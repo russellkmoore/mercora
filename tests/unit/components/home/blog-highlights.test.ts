@@ -130,7 +130,7 @@ describe("BlogHighlights", () => {
 
   it("shows tag-free derived text when there is no explicit excerpt but there is a body", () => {
     const markup = render("From the Blog", [DERIVED_EXCERPT_POST]);
-    expect(markup).toContain("Ridge lines & switchbacks");
+    expect(markup).toContain("Ridge lines &amp; switchbacks");
     expect(markup).not.toContain("<p>Ridge lines");
   });
 
