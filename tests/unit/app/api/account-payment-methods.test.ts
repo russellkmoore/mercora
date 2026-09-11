@@ -89,7 +89,7 @@ describe("GET /api/account/payment-methods", () => {
         { id: "pm_1", brand: "visa", last4: "4242", expMonth: 4, expYear: 2030 },
       ],
     });
-    expect(mocks.list).toHaveBeenCalledWith({ customer: "cus_123", type: "card" });
+    expect(mocks.list).toHaveBeenCalledWith({ customer: "cus_123", type: "card", limit: 100 });
   });
 
   it("returns 503 without leaking the caught error when Stripe is unreachable", async () => {

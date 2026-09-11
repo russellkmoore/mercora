@@ -19,9 +19,17 @@ export async function GET() {
   if (!stripeCustomerId) return NextResponse.json({ paymentMethods: [] });
 
   try {
+    // WR-04: Stripe's own list default page size is 10 — without an explicit
+    // bound a shopper with more than 10 saved cards silently loses visibility
+    // into (and the ability to remove) the rest. 100 is Stripe's own list-API
+    // ceiling and matches this codebase's convention for a bounded single-page
+    // fetch (app/api/webhooks/stripe/handlers/refund-handlers.ts's
+    // `stripe.refunds.list({ ..., limit: 100 })`). A shopper with more than
+    // 100 saved cards is not a case this store needs to auto-paginate for.
     const methods = await getStripeClient().paymentMethods.list({
       customer: stripeCustomerId,
       type: "card",
+      limit: 100,
     });
     const paymentMethods: SavedPaymentMethod[] = methods.data
       .filter((method) => method.card)
