@@ -207,3 +207,54 @@ documenting the merge is intentional/acceptable, or key `canonicalLineFacts` on
 _Reviewed: 2026-09-11T12:02:44Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+
+## Iteration 2
+
+**Reviewed:** 2026-09-11T12:16:43Z
+**Scope:** Re-review of the three 18-REVIEW-FIX.md commits (`eac58eb` WR-01, `134ae6a` WR-02, `5067f48` IN-02) against `lib/observability/telemetry.ts`, `lib/services/gift-card-fulfillment.ts`, `lib/checkout/digital-only.ts`, `workers/observability-tail/src/core.ts`, and the touched test files.
+
+### Verified clean
+
+- **WR-01 sanitizer (`boundedIdentifier` in `lib/observability/telemetry.ts:210-215`):** genuinely bounds the field. Rejects non-strings, empty strings, anything over 128 chars, and anything outside `[A-Za-z0-9_-]+` — no path for free text, an email address, or a bearer code to slip through. Confirmed directly against the unit tests (`telemetry.test.ts:106-116`) and against a live integration run (`gift_delivery_admin_9d3629d0...` — 84 chars, safe charset, well under the 128 cap).
+- **WR-01 `claimed.id` threading (`lib/services/gift-card-fulfillment.ts`):** correct at all three `recordDeliveryFailure` call sites (`:470-474`, `:511-518`, `:527-531`). `claimed.id` is bound from the `RETURNING id, ...` clause of the `UPDATE gift_card_deliveries ... WHERE gift_card_id = ?` statement (`:448-461`) — it is the delivery row's own primary key, not `gift_card_id` or `order_id`. All three sites pass it through unchanged.
+- **WR-02 boolean logic (`lib/checkout/digital-only.ts:62-68`):** `items.every((item) => item.giftCardCustomization !== undefined || item.giftCardNoteInvalid === true)` is an AND-across-items of an OR-within-item. Traced by hand for the specific composition in the review brief — one flagged gift-card line (`giftCardNoteInvalid: true`, no `giftCardCustomization`) plus one real physical line (neither field set): the physical line fails both disjuncts, so `.every()` short-circuits to `false`. **Not** misclassified as digital-only. No regression.
+- **cart-store / IN-02:** `5067f48` added a documenting test only, no source change; re-confirmed the premise it documents (`canonicalLineFacts` drops `giftCardCustomization` for a flagged line, so two different-note flagged lines for the same product/variant merge on migration) is unchanged and intentional. No new regression in `cart-store.ts`.
+
+### New finding
+
+#### CR-01: WR-01's `delivery_id` never reaches the tail worker's critical alert email — the fix's stated goal does not hold for the one event that actually pages anyone
+
+**File:** `workers/observability-tail/src/core.ts:148-174` (`sanitizeFields`), consumed by `parseEnvelope` (`:198`) and `alertLine` (`:346-352`)
+**Issue:** `eac58eb` added `delivery_id` extraction to `sanitizeTelemetryFields` in `lib/observability/telemetry.ts` (the producer, used when `recordDeliveryFailure` writes the log line) but did **not** add the equivalent extraction to `sanitizeFields` in `workers/observability-tail/src/core.ts` (the consumer, used when the tail worker re-parses the JSON log line to build the critical-alert email). `core.ts`'s `sanitizeFields` only pulls `ENUM_FIELDS` keys, `attempt`/`count`/`duration_ms`/`http_status`, `retryable`, and `path` — there is no `delivery_id` handling anywhere in that file (confirmed by grep: zero hits for `delivery_id` in `workers/observability-tail/src/core.ts`).
+
+`gift_card.delivery_failed` (the terminal, critical-severity event) **is** in `TAIL_CRITICAL_EVENTS`, so it is exactly the event this worker turns into a paging alert email. Because `sanitizeFields` silently drops any field not in its own closed set, the `delivery_id` present in the raw JSON log line is stripped before it reaches `alert.fields`, `alertLine()`, and the rendered email body (`renderAlert`/`buildEmailMessage`). An operator who receives the actual alert email — the mechanism WR-01 exists to make useful — still cannot correlate it to a delivery row without separately grepping raw structured logs; they are back to exactly the state WR-01 was meant to fix, for the one event class (critical/paging) where it matters most. (`gift_card.delivery_retry` is warning-severity and structurally excluded from `TAIL_CRITICAL_EVENTS` by design, so it never goes through this path at all — the gap is specific to the terminal event.)
+
+This is precisely the failure mode `tests/unit/workers/observability-tail-core.test.ts:262-274` already has a named regression test for (`ENUM_FIELDS parity with lib/observability/telemetry.ts`, referencing a prior finding "01-REVIEW.md WR-05": *"core.ts's sanitizeFields() silently drops any field/value not in its own enum, so drift here means a critical alert email silently loses a diagnostic field with no test failure to catch it"*) — but that parity test only compares `ENUM_FIELDS` against `ALLOWED_FIELD_ENUMS` (the six closed-enum keys: `effect_type`, `operation`, `outcome`, `provider`, `reason`, `trigger`). `delivery_id` is not part of either enum object in either file — it is handled by ad hoc imperative code alongside `path`/`attempt`/`count`/etc. — so the existing parity test structurally cannot and did not catch this drift.
+
+The integration test added by the WR-01 fix (`tests/integration/lib/services/gift-card-fulfillment.test.ts:335-337`) asserts the claim directly in a comment — *"this is the operator-facing proof: a retry is still findable and attributable ... without paging anyone"* — but only asserts against the raw `console.error`/`console.warn` envelope on the producer side; it never runs the payload through `extractCriticalAlerts`/`sanitizeFields` on the consumer side, so it could not have caught this either.
+
+**Fix:** Add `delivery_id` extraction to `sanitizeFields` in `workers/observability-tail/src/core.ts`, mirroring `boundedIdentifier`'s bounds (safe charset, length cap) — e.g.:
+```ts
+// workers/observability-tail/src/core.ts, inside sanitizeFields, alongside the path check
+if (typeof value.delivery_id === 'string' && value.delivery_id.length > 0 &&
+  value.delivery_id.length <= 128 && /^[A-Za-z0-9_-]+$/.test(value.delivery_id)) {
+  output.delivery_id = value.delivery_id;
+}
+```
+Then extend `tests/unit/workers/observability-tail-core.test.ts` with a case that runs a `gift_card.delivery_failed` envelope carrying `fields.delivery_id` through `extractCriticalAlerts` and asserts the resulting `alert.fields.delivery_id` (and the rendered `alertLine`/email body) actually carries it — closing the same class of gap the file's own `ENUM_FIELDS parity` test was written to prevent, for a field that test cannot see.
+
+### Info
+
+#### IN-03: WR-02's fixture set has no explicit "flagged gift-card line + physical line" composition, even though the logic is verified correct
+
+**File:** `tests/unit/lib/checkout/digital-only.test.ts`
+**Issue:** The review brief's specific regression scenario (one flagged gift-card line + one real physical line) is not present as its own fixture; only "one gift-card line plus one plain line" (an *unflagged* plain line) and "one flagged gift-card line" (alone) are covered. Traced by hand above and confirmed correct via the `.every()`/OR structure, so this is not a live bug, but the exact composition this iteration was asked to check has no fixture that would catch a future regression in it.
+**Fix:** Add a sixth fixture — `cartItems: [{ giftCardNoteInvalid: true }, {}]`, `orderItems: [orderItem('digital'), orderItem('physical')]`, `expected: false` — to both the paired-invariant array and `MIN_NON_EMPTY_CART_FIXTURES`.
+
+---
+
+**Iteration 2 status:** 3 of 4 iteration-1 findings hold up under re-verification (WR-01's sanitizer and id-threading, WR-02's boolean logic, IN-02's documented behavior). WR-01's fix is incomplete: it addressed the producer side only, leaving the consumer side (tail worker) silently dropping the new field on exactly the event class — the critical, paging one — the fix was written for. One new Critical finding (CR-01), one new Info finding (IN-03).
+
+_Reviewed: 2026-09-11T12:16:43Z_
+_Reviewer: Claude (gsd-code-reviewer)_
+_Depth: standard (iteration 2)_
