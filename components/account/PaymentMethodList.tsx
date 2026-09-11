@@ -14,7 +14,11 @@ function expiryLabel(method: SavedPaymentMethod) {
 export function PaymentMethodList() {
   const [methods, setMethods] = useState<SavedPaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
+  // IN-02: per-row, not a single global boolean — removing card A must not
+  // disable card B's Remove button too (that reads as a stall on an
+  // unrelated row). Also doubles as the same-row double-submit guard the
+  // single boolean used to provide.
+  const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -37,9 +41,10 @@ export function PaymentMethodList() {
   }, []);
 
   async function remove(method: SavedPaymentMethod) {
+    if (busyIds.has(method.id)) return;
     const confirmed = window.confirm(`Remove ${brandLabel(method.brand)} ending in ${method.last4}?`);
     if (!confirmed) return;
-    setBusy(true);
+    setBusyIds((current) => new Set(current).add(method.id));
     setMessage("");
     try {
       const response = await fetch(`/api/account/payment-methods/${encodeURIComponent(method.id)}`, {
@@ -53,7 +58,11 @@ export function PaymentMethodList() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Card could not be removed");
     } finally {
-      setBusy(false);
+      setBusyIds((current) => {
+        const next = new Set(current);
+        next.delete(method.id);
+        return next;
+      });
     }
   }
 
@@ -84,7 +93,7 @@ export function PaymentMethodList() {
             <div className="mt-4 flex gap-3 text-sm">
               <button
                 type="button"
-                disabled={busy}
+                disabled={busyIds.has(method.id)}
                 className="text-danger"
                 onClick={() => void remove(method)}
               >
