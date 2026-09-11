@@ -92,6 +92,24 @@ describe("ensureStripeCustomer", () => {
     expect(options.idempotencyKey).toEqual(expect.any(String));
   });
 
+  it("derives a byte-identical idempotency key across two separate calls for the same shopper", async () => {
+    async function createOnceAndCaptureKey(resultId: string): Promise<string> {
+      const repository = fakeRepository(undefined);
+      const stripe = fakeStripe({});
+      (stripe.customers.create as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: resultId, metadata: { mercora_customer_id: "cust_retry" },
+      });
+      await ensureStripeCustomer({ repository, stripe: stripe as never, customerId: "cust_retry" });
+      const [, options] = (stripe.customers.create as ReturnType<typeof vi.fn>).mock.calls[0];
+      return options.idempotencyKey;
+    }
+
+    const keyFromFirstAttempt = await createOnceAndCaptureKey("cus_attempt_one");
+    const keyFromRetryAttempt = await createOnceAndCaptureKey("cus_attempt_two");
+
+    expect(keyFromFirstAttempt).toBe(keyFromRetryAttempt);
+  });
+
   it("returns the race winner's id, not the id this call created, when the bind loses", async () => {
     const repository = fakeRepository(undefined);
     const originalBind = repository.bindPaymentCustomer;
