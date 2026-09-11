@@ -297,7 +297,7 @@ async function executeEffect(
         state: extensions.checkout_tender_state,
       });
       await fulfillPaidGiftCards(order, {
-        environment: runtime.giftCardEnvironment ?? (runtime.database ? { DB: runtime.database } : undefined),
+        environment: runtime.giftCardEnvironment,
       });
       return { applied: true };
     case 'subscription':
