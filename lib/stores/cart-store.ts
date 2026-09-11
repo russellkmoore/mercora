@@ -399,6 +399,9 @@ export function migrateCartState(persistedState: unknown): unknown {
           MAX_CART_LINE_QUANTITY,
           existing.quantity + normalized.quantity,
         );
+        if (normalized.giftCardNoteInvalid) {
+          existing.giftCardNoteInvalid = true;
+        }
         return items;
       }
       let lineId = normalized.lineId;

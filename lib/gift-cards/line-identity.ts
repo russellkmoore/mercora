@@ -83,14 +83,28 @@ export function normalizeCartItemForStore(value: unknown): StableCartItem | null
   }
 
   let price;
-  let giftCardCustomization: GiftCardCustomization | undefined;
   try {
     price = Money.fromStored(candidate.price).toJSON();
-    if (candidate.giftCardCustomization !== undefined) {
-      giftCardCustomization = parseGiftCardCustomization(candidate.giftCardCustomization);
-    }
   } catch {
     return null;
+  }
+
+  // The price and the gift-note parse fail independently: a bad price still
+  // drops the whole line (unchanged), but a rejected note no longer does —
+  // the line survives, flagged, with no customization (D-03, ledger #10).
+  // A candidate that is itself an already-flagged StableCartItem (re-normalized
+  // by projectCartLineForCheckout) carries no customization to re-parse, so the
+  // prior flag is forwarded rather than lost; a fresh, valid customization on
+  // this pass clears it.
+  let giftCardCustomization: GiftCardCustomization | undefined;
+  let giftCardNoteInvalid = candidate.giftCardNoteInvalid === true;
+  if (candidate.giftCardCustomization !== undefined) {
+    try {
+      giftCardCustomization = parseGiftCardCustomization(candidate.giftCardCustomization);
+      giftCardNoteInvalid = false;
+    } catch {
+      giftCardNoteInvalid = true;
+    }
   }
 
   const facts: CartLineFacts = {
@@ -107,6 +121,7 @@ export function normalizeCartItemForStore(value: unknown): StableCartItem | null
     quantity: Number(candidate.quantity),
     primaryImageUrl: candidate.primaryImageUrl,
     ...(giftCardCustomization ? { giftCardCustomization } : {}),
+    ...(giftCardNoteInvalid ? { giftCardNoteInvalid: true } : {}),
   };
 }
 
@@ -114,6 +129,10 @@ export function projectCartLineForCheckout(item: StableCartItem): CheckoutCartLi
   const normalized = normalizeCartItemForStore(item);
   if (
     !normalized ||
+    // A flagged line normalises successfully but carries no customization —
+    // without this check checkout would silently price a bare gift-card line
+    // for a note nobody validated (D-15, T-18-15).
+    normalized.giftCardNoteInvalid ||
     !/^line_[0-9a-f]{16}(?:_[2-9]\d*)?$/u.test(item.lineId)
   ) {
     throw new Error('Cart contains an invalid line');

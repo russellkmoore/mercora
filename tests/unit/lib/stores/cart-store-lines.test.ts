@@ -69,7 +69,15 @@ describe('stable cart lines', () => {
     const first = migrateCartState(legacy) as { items: StableCartItem[] };
     const second = migrateCartState(legacy) as { items: StableCartItem[] };
     expect(first.items).toHaveLength(1);
-    expect(first.items[0]).toMatchObject({ quantity: 2, price: { amount: 2_500, currency: 'USD' } });
+    // D-03: the third item's malformed customization (a smuggled `code`
+    // field) previously dropped that line entirely, so this bucket merged
+    // to quantity 2. It now flags and survives instead, merging in as a
+    // third no-customization line and carrying the flag onto the bucket.
+    expect(first.items[0]).toMatchObject({
+      quantity: 3,
+      price: { amount: 2_500, currency: 'USD' },
+      giftCardNoteInvalid: true,
+    });
     expect(first.items[0].lineId).toBe(second.items[0].lineId);
     expect(JSON.stringify(first)).not.toContain('must-not-survive');
   });
@@ -80,5 +88,60 @@ describe('stable cart lines', () => {
     expect(useCartStore.getState().items).toEqual([
       expect.objectContaining({ variantId: base.variantId, quantity: 2 }),
     ]);
+  });
+
+  // Ledger #10 (WINDOWS.md, D-03): a link-bearing note used to be dropped
+  // silently by migration. It must now survive alongside a valid line.
+  it('migrates a mixed valid/invalid persisted state with both lines surviving, flag on the invalid one only', () => {
+    const persisted = {
+      items: [
+        {
+          ...base,
+          price: 25,
+          giftCardCustomization: { recipientEmail: 'ada@example.com' },
+        },
+        {
+          ...base,
+          price: 25,
+          giftCardCustomization: {
+            recipientEmail: 'grace@example.com',
+            message: 'see https://example.com/note for the surprise',
+          },
+        },
+      ],
+    };
+
+    const result = migrateCartState(persisted) as { items: StableCartItem[] };
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0].giftCardNoteInvalid).toBeUndefined();
+    expect(result.items[1].giftCardNoteInvalid).toBe(true);
+    expect(result.items[1]).not.toHaveProperty('giftCardCustomization');
+  });
+
+  it('migrates the mixed valid/invalid persisted state deterministically across two runs', () => {
+    const persisted = {
+      items: [
+        {
+          ...base,
+          price: 25,
+          giftCardCustomization: { recipientEmail: 'ada@example.com' },
+        },
+        {
+          ...base,
+          price: 25,
+          giftCardCustomization: {
+            recipientEmail: 'grace@example.com',
+            message: 'see https://example.com/note for the surprise',
+          },
+        },
+      ],
+    };
+
+    const first = migrateCartState(persisted) as { items: StableCartItem[] };
+    const second = migrateCartState(persisted) as { items: StableCartItem[] };
+    expect(first.items.map((item) => item.lineId)).toEqual(second.items.map((item) => item.lineId));
+    expect(first.items.map((item) => item.giftCardNoteInvalid)).toEqual(
+      second.items.map((item) => item.giftCardNoteInvalid),
+    );
   });
 });
