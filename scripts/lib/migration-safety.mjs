@@ -102,6 +102,57 @@ export function inspectMigration(file, text) {
     : { file, status: "contract", contractions };
 }
 
+/** Matches a migration filename's leading number, e.g. "0023" in "0023_foo.sql". */
+const MIGRATION_NUMBER_RE = /^(\d+)_/;
+
+/** The basename of a path, so a `migrations/` prefix never affects comparison. */
+function basename(filePath) {
+  const parts = String(filePath).split("/");
+  return parts[parts.length - 1];
+}
+
+/** A filename's leading migration number, or null if it has none. */
+function migrationNumber(filePath) {
+  const match = MIGRATION_NUMBER_RE.exec(basename(filePath));
+  return match ? match[1] : null;
+}
+
+/**
+ * Reports a migration number reused by a file this change added.
+ *
+ * `applyD1Migrations` orders by filename, so a shared number is only a
+ * problem when at least one side of the collision is new — a number two
+ * already-applied files share, like this repository's two `0023` files, is
+ * left alone on purpose (D-16). The rule fires whenever an added file's
+ * number matches any other file's number, whether that other file is
+ * pre-existing or itself newly added; it never fires for a collision between
+ * two files that are both pre-existing.
+ */
+export function findDuplicateNumbers(addedFiles, allFiles) {
+  const reports = [];
+
+  for (const added of addedFiles) {
+    const addedBase = basename(added);
+    const number = migrationNumber(added);
+    if (number === null) continue;
+
+    const collidesWith = [];
+    for (const other of allFiles) {
+      const otherBase = basename(other);
+      if (otherBase === addedBase) continue;
+      if (migrationNumber(other) === number && !collidesWith.includes(otherBase)) {
+        collidesWith.push(otherBase);
+      }
+    }
+
+    if (collidesWith.length) {
+      reports.push({ file: added, number, collidesWith });
+    }
+  }
+
+  return reports;
+}
+
 /** Fail only on unacknowledged contractions; report the rest for the log. */
 export function summarize(reports) {
   return {
