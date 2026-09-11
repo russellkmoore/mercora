@@ -81,8 +81,11 @@ export default function PaymentForm({
       applePay: 'auto', // Will show only if device supports it and domain is verified
       googlePay: 'auto', // Will show only if device supports it
       // Link is off: it renders a "Save my information for faster checkout"
-      // box that saves the card to Stripe's Link, not to this store. The
-      // store has no saved-payment-method feature, so the box only misleads.
+      // box that saves the card to Stripe's Link, not to this store — and
+      // this store now saves payment methods itself, through the Payment
+      // Element's Customer Session, so the Link box would offer a second,
+      // parallel place a card can live. Re-enabling Link alongside this
+      // feature is a separate, deliberate decision this phase did not make.
       link: 'never',
     },
     fields: {

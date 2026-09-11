@@ -33,7 +33,7 @@ describe('gift-card tender on the payment step', () => {
       checkout.indexOf('<PaymentForm'),
     );
     expect(paymentBox).toContain('<GiftCardApplyPanel');
-    expect(paymentBox).toMatch(/<StripeProvider key=\{clientSecret\} clientSecret=\{clientSecret\}>/);
+    expect(paymentBox).toMatch(/<StripeProvider[\s\S]*?key=\{clientSecret\}[\s\S]*?clientSecret=\{clientSecret\}/);
     // Neither the summary nor the client renders its own code input any more.
     expect(summary).not.toContain('id="gift-card-code"');
     expect(checkout).not.toContain('id="gift-card-code"');

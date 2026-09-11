@@ -28,11 +28,14 @@ import StripeProvider from '@/components/checkout/StripeProvider';
 describe('StripeProvider Customer Session forwarding (D-06, D-07)', () => {
   it('forwards customerSessionClientSecret into Elements options when supplied', () => {
     renderToStaticMarkup(
-      React.createElement(StripeProvider, {
-        clientSecret: 'pi_123_secret_abc',
-        customerSessionClientSecret: 'cuss_secret_xyz',
-        children: React.createElement('div', null, 'child'),
-      })
+      React.createElement(
+        StripeProvider,
+        {
+          clientSecret: 'pi_123_secret_abc',
+          customerSessionClientSecret: 'cuss_secret_xyz',
+        } as unknown as Parameters<typeof StripeProvider>[0],
+        React.createElement('div', null, 'child')
+      )
     );
 
     const options = mocks.capturedOptions;
@@ -58,10 +61,13 @@ describe('StripeProvider Customer Session forwarding (D-06, D-07)', () => {
 
   it('omits customerSessionClientSecret from Elements options when not supplied', () => {
     renderToStaticMarkup(
-      React.createElement(StripeProvider, {
-        clientSecret: 'pi_123_secret_abc',
-        children: React.createElement('div', null, 'child'),
-      })
+      React.createElement(
+        StripeProvider,
+        {
+          clientSecret: 'pi_123_secret_abc',
+        } as unknown as Parameters<typeof StripeProvider>[0],
+        React.createElement('div', null, 'child')
+      )
     );
 
     const options = mocks.capturedOptions;
