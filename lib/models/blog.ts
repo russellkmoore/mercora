@@ -72,7 +72,7 @@ type BlogSummaryRow = Pick<BlogPostRow,
   | "id" | "title" | "slug" | "author" | "excerpt" | "tags"
   | "coverImageUrl" | "coverImageAlt" | "status" | "readingTime"
   | "publishedAt" | "createdAt" | "updatedAt"
->;
+> & { html?: string };
 
 function optionalText(value: unknown, field: string, maximum: number): string | null {
   if (value === null || value === undefined || value === "") return null;
@@ -134,6 +134,10 @@ function toSummary(row: BlogSummaryRow): BlogPostSummary {
     slug: row.slug,
     author: row.author,
     excerpt: row.excerpt,
+    // Spread an empty object when the row carries no html member, so a
+    // summary built from a narrow (non-opted-in) row has no such member at
+    // all — rather than one explicitly set to `undefined`.
+    ...(row.html !== undefined && { html: row.html }),
     tags: parseStoredTags(row.tags),
     coverImageUrl: row.coverImageUrl,
     coverImageAlt: row.coverImageAlt,
@@ -177,7 +181,7 @@ function normalizedCoverImage(value: string | null | undefined): string | null {
   return image;
 }
 
-function summaryColumns() {
+function summaryColumns(includeHtml = false) {
   return {
     id: blogPosts.id,
     title: blogPosts.title,
@@ -192,19 +196,30 @@ function summaryColumns() {
     publishedAt: blogPosts.publishedAt,
     createdAt: blogPosts.createdAt,
     updatedAt: blogPosts.updatedAt,
+    ...(includeHtml && { html: blogPosts.html }),
   };
 }
 
+/**
+ * Returns published, currently-live posts (`status = 'published' AND
+ * publishedAt <= now`), newest first. Pass `includeHtml: true` to also
+ * select the post body — an opt-in only this call takes; every other
+ * reader of this table (`adminListBlogPosts`) keeps its exact existing
+ * column set. The body is a server-only value: derive display text from
+ * it (e.g. via `resolveBlogExcerpt`) rather than handing it to a client
+ * component.
+ */
 export async function getPublishedBlogPosts(options: {
   now?: number;
   limit?: number;
   offset?: number;
+  includeHtml?: boolean;
 } = {}): Promise<BlogPostSummary[]> {
   const now = options.now ?? Math.floor(Date.now() / 1000);
   const limit = Math.max(1, Math.min(MAX_LIMIT, options.limit ?? 50));
   const offset = Math.max(0, options.offset ?? 0);
   const db = await getDbAsync();
-  const rows = await db.select(summaryColumns()).from(blogPosts)
+  const rows = await db.select(summaryColumns(options.includeHtml === true)).from(blogPosts)
     .where(and(eq(blogPosts.status, "published"), lte(blogPosts.publishedAt, now)))
     .orderBy(desc(blogPosts.publishedAt), desc(blogPosts.id))
     .limit(limit).offset(offset);

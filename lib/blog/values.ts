@@ -6,6 +6,8 @@ export interface BlogPostSummary {
   slug: string;
   author: string;
   excerpt: string | null;
+  /** Post body HTML — present only when the caller opted in via `getPublishedBlogPosts({ includeHtml: true })`. */
+  html?: string;
   tags: string[];
   coverImageUrl: string | null;
   coverImageAlt: string | null;
