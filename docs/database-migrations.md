@@ -49,3 +49,19 @@ Step 1b and §9). It creates the gift-card event log and adds one nullable
 column, and is expand-only like every migration in this repository. Gift
 cards issued before it carry no code suffix and are not searchable by one —
 there is no backfill.
+
+## Two migrations share the number 0023
+
+`0023_add_order_effects_payload.sql` and `0023_normalize_tax_category_codes.sql`
+both use the number `0023`. Both are already applied in production. Migration
+application orders by filename, and `add_` sorts before `normalize_`, so the
+pair applies in a fixed, deterministic order and nothing is broken.
+
+Neither file is ever renamed to "fix" the duplicate number. A production
+database records which migrations it has already applied by filename; renaming
+one of these two files would make that recorded name disagree with the
+repository, which is a far worse problem than a cosmetic duplicate.
+
+`npm run check:migrations` now refuses a new migration that reuses a number
+an existing file already uses, so the next collision is caught at gate time,
+before review.
