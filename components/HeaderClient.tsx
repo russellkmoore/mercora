@@ -28,16 +28,18 @@
  *
  * === Navigation Structure ===
  * ```
- * Logo | Home | Categories ↓ | Help & Search | Cart | Login
+ * Logo | Home | Categories ↓ | Blog | Help & Search | Cart | Login
  * ```
  *
  * === Usage ===
  * ```tsx
- * <HeaderClient categories={categoryData} />
+ * <HeaderClient categories={categoryData} showBlogNav={true} blogNavLabel="Blog" />
  * ```
  *
  * === Props ===
  * @param categories - Array of category objects for navigation dropdown
+ * @param showBlogNav - Whether any article is published (server-resolved boolean)
+ * @param blogNavLabel - Admin-configured label for the blog nav entry
  *
  * === Styling ===
  * - Dark theme with orange accent colors
@@ -71,6 +73,8 @@ import type { MACHCategory } from '@/lib/types/mach';
  */
 interface HeaderClientProps {
   categories: MACHCategory[];
+  showBlogNav: boolean;
+  blogNavLabel: string;
 }
 
 /**
@@ -129,6 +133,8 @@ const getCategorySlug = (category: MACHCategory): string => {
  */
 export default function HeaderClient({
   categories,
+  showBlogNav,
+  blogNavLabel,
 }: HeaderClientProps) {
   const store = useStoreConfig();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -401,6 +407,15 @@ export default function HeaderClient({
           </DropdownMenuContent>
         </DropdownMenu>
 
+        {showBlogNav && (
+          <Link
+            href="/blog"
+            prefetch={true}
+            className="flex items-center gap-2 px-4 py-2 text-foreground hover:bg-foreground hover:text-primary rounded-md transition-colors"
+          >
+            {blogNavLabel}
+          </Link>
+        )}
 
         <ClientOnly>
           <AgentDrawer />
@@ -461,6 +476,17 @@ export default function HeaderClient({
               <div>
                 <SimpleMobileCategoryList categories={categories} onCategorySelect={() => setIsMobileMenuOpen(false)} />
               </div>
+
+              {showBlogNav && (
+                <Link
+                  href="/blog"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center space-x-3 text-foreground hover:text-primary py-3 px-4 rounded-lg hover:bg-surface-elevated"
+                  prefetch={true}
+                >
+                  <span>{blogNavLabel}</span>
+                </Link>
+              )}
 
               <div className="border-t border-border pt-6 space-y-3">
                 <button 
