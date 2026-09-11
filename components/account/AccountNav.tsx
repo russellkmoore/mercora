@@ -9,6 +9,7 @@ export function accountLinks(subscriptionReconciliation: boolean) {
       ? [["Subscriptions", "/account/subscriptions"] as const]
       : []),
     ["Addresses", "/account/addresses"],
+    ["Payment methods", "/account/payment-methods"],
     ["Settings", "/account/settings"],
   ] as const;
 }
