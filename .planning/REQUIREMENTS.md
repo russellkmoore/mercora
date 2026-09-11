@@ -37,9 +37,9 @@ Requirements for this milestone. Each maps to a roadmap phase.
 
 ### Blog
 
-- [ ] **BLOG-01**: The header navigation (desktop and mobile) shows a blog entry with a configurable label, hidden automatically when no published article exists
-- [ ] **BLOG-02**: The home page renders a configurable articles block: heading, N latest published articles as excerpts (title, cover image, date, excerpt), and a "Read all" link to `/blog`; enabled/heading/count/placement are admin settings, not template code
-- [ ] **BLOG-03**: Excerpts come from an explicit excerpt field when present, otherwise the first paragraph with markup stripped and a length cap; the block links to articles rather than duplicating content
+- [x] **BLOG-01**: The header navigation (desktop and mobile) shows a blog entry with a configurable label, hidden automatically when no published article exists
+- [x] **BLOG-02**: The home page renders a configurable articles block: heading, N latest published articles as excerpts (title, cover image, date, excerpt), and a "Read all" link to `/blog`; enabled/heading/count/placement are admin settings, not template code
+- [x] **BLOG-03**: Excerpts come from an explicit excerpt field when present, otherwise the first paragraph with markup stripped and a length cap; the block links to articles rather than duplicating content
 
 ### Saved payment methods
 
@@ -102,9 +102,9 @@ Deferred to a later milestone.
 | SUB-01 | Phase 15 | Complete |
 | SUB-02 | Phase 15 | Complete |
 | SUB-03 | Phase 15 | Complete |
-| BLOG-01 | Phase 16 | Pending |
-| BLOG-02 | Phase 16 | Pending |
-| BLOG-03 | Phase 16 | Pending |
+| BLOG-01 | Phase 16 | Complete |
+| BLOG-02 | Phase 16 | Complete |
+| BLOG-03 | Phase 16 | Complete |
 | PAY-01 | Phase 17 | Pending |
 | PAY-02 | Phase 17 | Pending |
 | PAY-03 | Phase 17 | Pending |
