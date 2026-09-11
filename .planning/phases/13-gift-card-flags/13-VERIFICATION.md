@@ -78,7 +78,8 @@ covered_files:
   - "tests/unit/worker-cron-routing.test.ts"
   - "workers/observability-tail/src/core.ts"
 
-covered_digest: "v1:sha256:9765a022d66ae56e942acc51ea20b9edaf3e4f12b091c3f04fea9d39bb018750"
+  - ".planning/phases/13-gift-card-flags/13-SECURITY.md"
+covered_digest: "v1:sha256:43c5d6341cdef26a6f880c9d7d5b2f2f8f4cbbee03e5a42178756fd2a038fbe9"
 decision_coverage:
   honored: 17
   total: 17
