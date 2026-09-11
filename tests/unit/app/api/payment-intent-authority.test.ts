@@ -238,6 +238,80 @@ describe('payment-intent durable authority boundary', () => {
     });
   });
 
+  it('sends no save-for-later parameter at PaymentIntent creation for a signed-in shopper (D-06a)', async () => {
+    mocks.auth.mockResolvedValue({ userId: 'user_123' });
+    mocks.ensureStripeCustomerForShopper.mockResolvedValue('cus_signed_in');
+
+    await POST(request());
+
+    expect(mocks.createPaymentIntent).toHaveBeenCalledWith(
+      expect.not.objectContaining({ setup_future_usage: expect.anything() })
+    );
+  });
+
+  it('leaves a guest checkout completely unaffected (D-07)', async () => {
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as any;
+    expect(body).not.toHaveProperty('customerSessionClientSecret');
+    expect(mocks.ensureStripeCustomerForShopper).not.toHaveBeenCalled();
+    expect(mocks.customerSessionsCreate).not.toHaveBeenCalled();
+    expect(mocks.createPaymentIntent).toHaveBeenCalledWith(
+      expect.not.objectContaining({ customer: expect.anything() })
+    );
+  });
+
+  it('falls through to a customer-less PaymentIntent when the Stripe customer binding fails (D-04)', async () => {
+    mocks.auth.mockResolvedValue({ userId: 'user_123' });
+    const bindingError = new Error('Stripe customer binding unavailable');
+    mocks.ensureStripeCustomerForShopper.mockRejectedValue(bindingError);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as any;
+    expect(body.clientSecret).toBe('pi_authoritative_secret_x');
+    expect(body).not.toHaveProperty('customerSessionClientSecret');
+    expect(mocks.createPaymentIntent).toHaveBeenCalledWith(
+      expect.not.objectContaining({ customer: expect.anything() })
+    );
+    expect(mocks.customerSessionsCreate).not.toHaveBeenCalled();
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      'payment.customer_binding_failed',
+      {
+        operation: 'create', outcome: 'degraded', provider: 'stripe',
+        retryable: true, path: '/api/payment-intent',
+      },
+      bindingError,
+    );
+  });
+
+  it('falls through to a plain PaymentIntent when the Customer Session call fails', async () => {
+    mocks.auth.mockResolvedValue({ userId: 'user_123' });
+    mocks.ensureStripeCustomerForShopper.mockResolvedValue('cus_signed_in');
+    const sessionError = new Error('Customer Session unavailable');
+    mocks.customerSessionsCreate.mockRejectedValue(sessionError);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as any;
+    expect(body.clientSecret).toBe('pi_authoritative_secret_x');
+    expect(body).not.toHaveProperty('customerSessionClientSecret');
+    expect(mocks.createPaymentIntent).toHaveBeenCalledWith(
+      expect.objectContaining({ customer: 'cus_signed_in' })
+    );
+    expect(mocks.recordTelemetry).toHaveBeenCalledWith(
+      'payment.customer_session_failed',
+      {
+        operation: 'create', outcome: 'degraded', provider: 'stripe',
+        retryable: true, path: '/api/payment-intent',
+      },
+      sessionError,
+    );
+  });
+
   it('withholds the client secret and cancels the PI if pending persistence fails', async () => {
     const persistenceError = new Error('D1 unavailable');
     mocks.insertError = persistenceError;
