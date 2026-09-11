@@ -6,10 +6,11 @@ score: 3/3 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0
 covered_files:
+  - ".planning/phases/19-operator-checklist/19-CONTEXT.md"
+  - ".planning/phases/19-operator-checklist/19-01-PLAN.md"
+  - ".planning/phases/19-operator-checklist/19-01-SUMMARY.md"
   - "wrangler.jsonc"
-  - "docs/runtime-configuration.md"
-  - "AGENTS.md"
-covered_digest: "n/a — human-checkpoint phase, evidence-based verification"
+covered_digest: "v1:sha256:c22bf79f99106def457b3d953aff631af1722616ab7c4c4e93ced51c02efd09e"
 human_verification:
   - "Stripe Tax enabled on the live Stripe Dashboard account — Russell confirmed directly"
 ---
