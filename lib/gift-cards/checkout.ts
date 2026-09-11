@@ -53,6 +53,29 @@ export function isGiftCardOrderLine(item: OrderItem): boolean {
   return item.fulfillment_type === 'digital' && item.gift_card !== undefined;
 }
 
+/**
+ * The authoritative server-side signal for "this order is digital-only" —
+ * the negation of this function's result. It has real consumers beyond the
+ * invariant test: `app/api/payment-intent/route.ts` uses it to decide
+ * whether to persist a shipping address and shipping method on the order.
+ *
+ * This is one half of a pinned pair (D-05). The other half is
+ * `isDigitalOnlyCart` in `lib/checkout/digital-only.ts`, the client-side
+ * signal for the same fact. The two must stay logically equivalent: for
+ * any non-empty cart, `!hasPhysicalCheckoutLines(orderItems) ===
+ * isDigitalOnlyCart(items)`.
+ *
+ * They read different fields because the client `CartItem` type carries no
+ * `fulfillment_type` at all, so the client keys on the gift-card
+ * customization instead of this field. The two agree today only because
+ * `lib/services/checkout-pricing.ts` refuses to attach a
+ * `giftCardCustomization` to any line that is not already digital and
+ * non-shipping; that check is what keeps the client signal sufficient.
+ *
+ * `tests/unit/lib/checkout/digital-only.test.ts` is where the equivalence
+ * is proven, fixture by fixture. If this predicate's semantics change,
+ * update that test deliberately — do not let it drift.
+ */
 export function hasPhysicalCheckoutLines(items: OrderItem[]): boolean {
   return items.some((item) => item.fulfillment_type !== 'digital');
 }
