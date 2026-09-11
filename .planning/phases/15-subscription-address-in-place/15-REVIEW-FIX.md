@@ -1,10 +1,10 @@
 ---
 phase: 15-subscription-address-in-place
-fixed_at: 2026-09-10T23:45:05Z
+fixed_at: 2026-09-11T07:47:59Z
 review_path: .planning/phases/15-subscription-address-in-place/15-REVIEW.md
-iteration: 1
-findings_in_scope: 19
-fixed: 19
+iteration: 2
+findings_in_scope: 20
+fixed: 20
 skipped: 0
 status: all_fixed
 ---
@@ -86,3 +86,46 @@ None.
 _Fixed: 2026-09-10T23:45:05Z_
 _Fixer: Claude (gsd-code-fixer)_
 _Iteration: 1_
+
+## Iteration 2
+
+**Fixed at:** 2026-09-11T07:47:59Z
+**Source review:** `.planning/phases/15-subscription-address-in-place/15-REVIEW.md` (iteration 2 review appended: 1 Critical, 0 Warning, 0 Info)
+
+**Summary:**
+- Findings in scope: 1
+- Fixed: 1
+- Skipped: 0
+
+| ID | Title | Files | Commit | Status |
+|---|---|---|---|---|
+| CR-01 | `parseAddress` in `app/api/setup-intent/route.ts` still capped city/region at 128 after WR-05 raised the client filter and `acquisition-service.ts` to 200 | `lib/subscriptions/address-limits.ts` (new), `app/api/setup-intent/route.ts`, `components/subscriptions/acquisition-client.ts`, `lib/subscriptions/acquisition-service.ts`, `tests/unit/app/api/subscription-routes.test.ts`, `tests/unit/components/subscriptions/acquisition-client.test.ts` | `84b21af` | fixed |
+
+### What the fix does
+
+WR-05 (iteration 1) raised the city/region cap from 128 to 200 in two places — the panel's client filter (`shippingAddressFromSaved`) and `lib/subscriptions/acquisition-service.ts`'s shipping-address guard — but missed a third, independently maintained copy: `app/api/setup-intent/route.ts`'s own `parseAddress` function, which still capped both at 128. A 129–200 char city or region was therefore selectable and pre-selected in the subscription panel (client filter said yes), passed the acquisition service's own bound if reached directly, but was rejected at "Continue to payment method" by the setup-intent route with a generic "Invalid subscription request" — a regression the iteration-1 fix introduced by fixing two of three sites.
+
+Rather than raise the third number in isolation and risk a fourth future drift, the bound is now `ADDRESS_CITY_REGION_MAX` in a new `lib/subscriptions/address-limits.ts`, and all three sites (`acquisition-client.ts`, `acquisition-service.ts`, `setup-intent/route.ts`) import it instead of hardcoding their own literal. The module's own doc comment names all three call sites so a future editor sees the other two before changing the number in isolation.
+
+**Tests added:**
+- `tests/unit/app/api/subscription-routes.test.ts`: a route-level test posting a 200-char city and 200-char region (succeeds, `begin` called with both fields intact) and, separately, a 201-char city and a 201-char region (each rejected with `400 { error: "Invalid subscription request" }` before `begin` is called).
+- `tests/unit/components/subscriptions/acquisition-client.test.ts`: a behavioural round-trip test — not just the client filter — that loads a saved address with a 150-char city and a 200-char region through `fetchSavedAddressesForPlan`, selects it via `nextAddressSelection`, derives the shipping address via `shippingAddressFromSaved`, and posts it through `createOwnerBoundSubscriptionSetupAttempt` to the **real** `setup-intent` route handler (imported directly, with only its external dependencies — Clerk auth, customer lookup, store config, the acquisition service, rate limiting, telemetry — mocked). This is the test that would have caught CR-01 in iteration 1: it fails if any one of the three layers' bound drifts from the other two, not just if the client filter alone regresses.
+
+**Gates** (run in the main checkout, `workflow.use_worktrees=false`, no worktree was created):
+
+| Gate | Result |
+|---|---|
+| `npm run lint` | 0 errors, 54 warnings (same pre-existing set as iteration 1; none in a touched file) |
+| `npm run typecheck` | clean |
+| `npm run scan:tokens` | 0 violations |
+| `mise exec -- npm test` | 308 files / 2783 tests passed (2781 before this fix; +2 tests) |
+
+### Skipped Issues
+
+None.
+
+---
+
+_Fixed: 2026-09-11T07:47:59Z_
+_Fixer: Claude (gsd-code-fixer)_
+_Iteration: 2_
