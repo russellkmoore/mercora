@@ -60,8 +60,17 @@ export default async function Header() {
   // the result is collapsed to a boolean here so no post row ever crosses
   // into the client component (T-16-11).
   const { blogNavLabel } = await getContentSettings();
-  const latestPublishedPosts = await getPublishedBlogPosts({ limit: 1 });
-  const showBlogNav = latestPublishedPosts.length > 0;
+
+  // A blog-table read failure must degrade the nav link, not the whole
+  // page — Header renders on every route via the root layout, with no
+  // error boundary above it that can catch a thrown promise. Mirrors
+  // getContentSettings()'s own D-17 posture for the identical reason.
+  let showBlogNav = false;
+  try {
+    showBlogNav = (await getPublishedBlogPosts({ limit: 1 })).length > 0;
+  } catch {
+    // Degrade to "no blog nav entry" rather than crashing the header.
+  }
 
   // Pass data to client component for interactive functionality
   return (

@@ -126,6 +126,16 @@ describe("Header() resolves blog nav visibility and label server-side", () => {
     expect(mocks.getPublishedBlogPosts).toHaveBeenCalledTimes(1);
     expect(mocks.getPublishedBlogPosts).toHaveBeenCalledWith({ limit: 1 });
   });
+
+  it("resolves showBlogNav: false and does not throw when getPublishedBlogPosts rejects (CR-01)", async () => {
+    mocks.getPublishedBlogPosts.mockImplementation(async () => {
+      throw new Error("D1 connectivity error");
+    });
+
+    await expect(headerClientProps()).resolves.toBeDefined();
+    const props = await headerClientProps();
+    expect(props?.showBlogNav).toBe(false);
+  });
 });
 
 describe("HeaderClient.tsx: desktop and mobile navs read the same two props", () => {
