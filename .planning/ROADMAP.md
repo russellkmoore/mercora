@@ -64,7 +64,7 @@ Full phase details, success criteria, and plan lists: `milestones/v2.1-ROADMAP.m
 - [x] **Phase 16: Blog Surfacing** - The blog is reachable from the header and the latest articles appear on the home page (completed 2026-09-11)
 - [x] **Phase 17: Saved Payment Methods** - A signed-in shopper saves a card at checkout and manages it from their account (completed 2026-09-11)
 - [x] **Phase 18: Tech-Debt Closure** - The debt carried out of v2.1 is closed and the docs match the code (completed 2026-09-11)
-- [ ] **Phase 19: Operator Checklist** - **Human-checkpoint phase, last by design** — every task needs Russell in the Stripe or Cloudflare dashboard
+- [x] **Phase 19: Operator Checklist** - **Human-checkpoint phase, last by design** — every task needs Russell in the Stripe or Cloudflare dashboard (completed 2026-09-11)
 
 **Phase Numbering:** continues from v2.1 (which ended at Phase 12); this milestone runs Phases 13-19. Decimal phases (13.1, 13.2, ...) are urgent insertions.
 
@@ -312,4 +312,4 @@ Plans:
 | 16. Blog Surfacing | 4/4 | Complete    | 2026-09-11 |
 | 17. Saved Payment Methods | 6/6 | Complete    | 2026-09-11 |
 | 18. Tech-Debt Closure | 7/7 | Complete    | 2026-09-11 |
-| 19. Operator Checklist (human checkpoints) | 0/? | Not started | - |
+| 19. Operator Checklist (human checkpoints) | 1/1 | Complete    | 2026-09-11 |
