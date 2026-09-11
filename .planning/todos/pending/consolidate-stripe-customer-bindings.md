@@ -3,6 +3,9 @@ title: Consolidate the two Stripe Customer binding tables (payment_customers and
 created: 2026-09-11
 resolves_phase: 18
 source: Phase 17 (Saved Payment Methods), D-02
+audit_acknowledged:
+  milestone: v2.2
+  at: 2026-09-11
 ---
 
 # Two separate Stripe Customer bindings

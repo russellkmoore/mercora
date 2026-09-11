@@ -2,20 +2,19 @@
 gsd_state_version: "1.0"
 milestone: v2.2
 milestone_name: Operations & Polish
-current_phase: 19
-current_plan: Not started
-status: completed
+status: Awaiting next milestone
 stopped_at: Phase 19 complete — all phases complete
-last_updated: "2026-09-11T16:27:27.741Z"
+last_updated: "2026-09-11T16:29:35.718Z"
 last_activity: 2026-09-11
-last_activity_desc: Phase 19 complete
-state_head: f3a67a76502fe4b9aca44504f1c30f5da6a1ea66
+last_activity_desc: Milestone v2.2 completed and archived
+state_head: e69862a8a0ddc5905956b9f42942382bff065e7d
 progress:
   total_phases: 7
-  completed_phases: 1
+  completed_phases: 7
   total_plans: 39
   completed_plans: 39
-  percent: 14
+  percent: 100
+current_phase: 19
 ---
 
 # Project State
@@ -29,23 +28,10 @@ See: .planning/PROJECT.md (updated 2026-09-09 after Phase 11)
 
 ## Current Position
 
-Phase: 19
-Current Plan: Not started
-Total Plans in Phase: 7
-Status: All phases complete
-Last activity: 2026-09-11 — Phase 19 complete
-
-**Milestone v2.2 phases:**
-
-| Phase | Name | Requirements | Depends on | Status |
-|-------|------|--------------|------------|--------|
-| 13 | Gift-Card Flags | GCF-01..05 | — | In progress (1/9 plans) |
-| 14 | Gift-Card Admin & Audit Trail | GCA-01..09 | Phase 13 | Not started |
-| 15 | Subscription Address In Place | SUB-01..03 | — | Not started |
-| 16 | Blog Surfacing | BLOG-01..03 | — | Not started |
-| 17 | Saved Payment Methods | PAY-01..03 | — | Not started |
-| 18 | Tech-Debt Closure | DEBT-01..08 | — | Not started |
-| 19 | Operator Checklist (human checkpoints) | OPS-05..07 | Kept last | Not started |
+Phase: Milestone v2.2 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-09-11 — Milestone v2.2 completed and archived
 
 ## Performance Metrics
 
@@ -416,5 +402,4 @@ Next: `/gsd-discuss-phase 13`
 
 ## Operator Next Steps
 
-- Review `.planning/ROADMAP.md` for v2.2 (Phases 13-19), then run `/gsd-discuss-phase 13`
-- Phase 19 will need you in the Stripe dashboard (enable Stripe Tax) and the Cloudflare dashboard (Email Routing rule for `orders@`, secret list hygiene) — it is deliberately last
+- Start the next milestone with /gsd-new-milestone
