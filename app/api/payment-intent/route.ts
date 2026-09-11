@@ -4,11 +4,12 @@ import { getDbAsync } from '@/lib/db';
 import { orders } from '@/lib/db/schema/order';
 import { Money, toWireMoney } from '@/lib/money';
 import { priceCheckout, type CheckoutLineInput } from '@/lib/services/checkout-pricing';
-import { cancelPaymentIntent, createPaymentIntent } from '@/lib/stripe';
+import { cancelPaymentIntent, createPaymentIntent, getStripeClient } from '@/lib/stripe';
 import type { Address } from '@/lib/types';
 import { enforceRateLimit, getClientIp } from '@/lib/rate-limit';
 import { isBoundedString, isPlainRecord } from '@/lib/public-request-validation';
 import { createCustomer, getCustomer } from '@/lib/models/mach/customer';
+import { ensureStripeCustomerForShopper } from '@/lib/payments/customer-binding';
 import {
   assertCheckoutInventoryAvailable,
   InventoryUnavailableError,
@@ -237,6 +238,25 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Bind this shopper to a Stripe Customer so a saved card at checkout attaches
+  // to them (D-04). This is a convenience, not a checkout blocker: failure here
+  // must never turn into a non-2xx response, only a customer-less PaymentIntent.
+  let stripeCustomerId: string | undefined;
+  if (userId) {
+    try {
+      stripeCustomerId = await ensureStripeCustomerForShopper({
+        customerId: userId,
+        email: shippingAddress.email,
+        name: shippingAddress.recipient,
+      });
+    } catch (error) {
+      recordTelemetry('payment.customer_binding_failed', {
+        operation: 'create', outcome: 'degraded', provider: 'stripe',
+        retryable: true, path: '/api/payment-intent',
+      }, error);
+    }
+  }
+
   const orderId = newOrderId(userId);
   let paymentIntent: Awaited<ReturnType<typeof createPaymentIntent>> | undefined;
   if (total.gt(Money.zero(total.currency))) try {
@@ -244,6 +264,7 @@ export async function POST(request: NextRequest) {
       amount: total.toMinorUnits(),
       currency: total.currency.toLowerCase(),
       automatic_payment_methods: { enabled: true },
+      ...(stripeCustomerId ? { customer: stripeCustomerId } : {}),
       metadata: {
         orderId,
         expectedAmount: String(total.toMinorUnits()),
@@ -301,6 +322,35 @@ export async function POST(request: NextRequest) {
       }).catch(() => undefined);
     }
     return NextResponse.json({ error: 'Payment provider returned an invalid intent' }, { status: 502 });
+  }
+
+  // Best-effort Customer Session so the Payment Element can show saved cards
+  // and a save-this-card checkbox (D-06). Never sets setup_future_usage on the
+  // PaymentIntent itself (D-06a) and never blocks checkout on failure.
+  let customerSessionClientSecret: string | undefined;
+  if (userId && stripeCustomerId && paymentIntent) {
+    try {
+      const session = await getStripeClient().customerSessions.create({
+        customer: stripeCustomerId,
+        components: {
+          payment_element: {
+            enabled: true,
+            features: {
+              payment_method_save: 'enabled',
+              payment_method_redisplay: 'enabled',
+              payment_method_remove: 'disabled',
+              payment_method_save_usage: 'off_session',
+            },
+          },
+        },
+      });
+      customerSessionClientSecret = session.client_secret ?? undefined;
+    } catch (error) {
+      recordTelemetry('payment.customer_session_failed', {
+        operation: 'create', outcome: 'degraded', provider: 'stripe',
+        retryable: true, path: '/api/payment-intent',
+      }, error);
+    }
   }
 
   const catalogSubtotal = Money.fromStored(quote.subtotal);
@@ -406,6 +456,7 @@ export async function POST(request: NextRequest) {
     clientSecret: paymentIntent.client_secret,
     paymentIntentId: paymentIntent.id,
     orderId,
+    ...(customerSessionClientSecret ? { customerSessionClientSecret } : {}),
     amount: toWireMoney(Money.fromMinor(providerAmount, providerCurrency).toJSON()),
     quote: {
       items: quote.items.map((item) => ({

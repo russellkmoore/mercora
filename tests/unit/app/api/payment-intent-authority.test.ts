@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   currentUser: vi.fn(),
   getCustomer: vi.fn(),
   createCustomer: vi.fn(),
+  ensureStripeCustomerForShopper: vi.fn(),
+  customerSessionsCreate: vi.fn(),
 }));
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -27,12 +29,18 @@ vi.mock('@/lib/models/mach/customer', () => ({
   getCustomer: mocks.getCustomer,
   createCustomer: mocks.createCustomer,
 }));
+vi.mock('@/lib/payments/customer-binding', () => ({
+  ensureStripeCustomerForShopper: mocks.ensureStripeCustomerForShopper,
+}));
 vi.mock('@/lib/services/checkout-pricing', () => ({
   priceCheckout: mocks.priceCheckout,
 }));
 vi.mock('@/lib/stripe', () => ({
   createPaymentIntent: mocks.createPaymentIntent,
   cancelPaymentIntent: mocks.cancelPaymentIntent,
+  getStripeClient: () => ({
+    customerSessions: { create: mocks.customerSessionsCreate },
+  }),
 }));
 vi.mock('@/lib/services/inventory-adjustments', () => {
   class InventoryUnavailableError extends Error {
@@ -134,6 +142,8 @@ beforeEach(() => {
   mocks.insertError = null;
   mocks.cancelPaymentIntent.mockClear();
   mocks.createPaymentIntent.mockClear();
+  mocks.ensureStripeCustomerForShopper.mockReset();
+  mocks.customerSessionsCreate.mockReset();
   requoteMocks.getOrderById.mockReset();
   requoteMocks.releaseTender.mockReset();
   mocks.auth.mockResolvedValue({ userId: null });
@@ -143,6 +153,8 @@ beforeEach(() => {
   mocks.cancelPaymentIntent.mockResolvedValue(undefined);
   mocks.priceCheckout.mockResolvedValue(quote);
   mocks.assertCheckoutInventoryAvailable.mockResolvedValue(undefined);
+  mocks.ensureStripeCustomerForShopper.mockResolvedValue('cus_default');
+  mocks.customerSessionsCreate.mockResolvedValue({ client_secret: 'cuss_default_secret' });
   mocks.createPaymentIntent.mockResolvedValue({
     id: 'pi_authoritative',
     client_secret: 'pi_authoritative_secret_x',
@@ -189,6 +201,41 @@ describe('payment-intent durable authority boundary', () => {
       lineTotal: { amount: 20, currency: 'USD' },
     }]);
     expect(JSON.stringify(body)).not.toContain('tenderState');
+  });
+
+  it('binds a signed-in shopper\'s PaymentIntent to their Stripe customer and returns a Customer Session secret', async () => {
+    mocks.auth.mockResolvedValue({ userId: 'user_123' });
+    mocks.ensureStripeCustomerForShopper.mockResolvedValue('cus_signed_in');
+    mocks.customerSessionsCreate.mockResolvedValue({ client_secret: 'cuss_signed_in_secret' });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as any;
+    expect(body.clientSecret).toBe('pi_authoritative_secret_x');
+    expect(body.customerSessionClientSecret).toBe('cuss_signed_in_secret');
+    expect(mocks.ensureStripeCustomerForShopper).toHaveBeenCalledWith({
+      customerId: 'user_123',
+      email: 'buyer@example.com',
+      name: undefined,
+    });
+    expect(mocks.createPaymentIntent).toHaveBeenCalledWith(
+      expect.objectContaining({ customer: 'cus_signed_in' })
+    );
+    expect(mocks.customerSessionsCreate).toHaveBeenCalledWith({
+      customer: 'cus_signed_in',
+      components: {
+        payment_element: {
+          enabled: true,
+          features: {
+            payment_method_save: 'enabled',
+            payment_method_redisplay: 'enabled',
+            payment_method_remove: 'disabled',
+            payment_method_save_usage: 'off_session',
+          },
+        },
+      },
+    });
   });
 
   it('withholds the client secret and cancels the PI if pending persistence fails', async () => {
