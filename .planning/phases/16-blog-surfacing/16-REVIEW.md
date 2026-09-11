@@ -154,3 +154,110 @@ caught this regression, and won't catch one if it reappears after CR-01 is fixed
 _Reviewed: 2026-09-11T09:21:09Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+
+## Iteration 2
+
+**Reviewed:** 2026-09-11T09:30:00Z
+**Depth:** standard (targeted re-review of iteration-1 fixes)
+**Commits verified:** `24fcfb7` (CR-01/WR-02), `0581841` (WR-01), both confirmed ancestors of HEAD (`d3a81b4`)
+
+### CR-01 — CLOSED
+
+`components/Header.tsx:68-73` now wraps only the `getPublishedBlogPosts({ limit: 1 })` call in
+try/catch, defaulting `showBlogNav = false` on rejection. Traced the actual control flow:
+`getContentSettings()` (line 62) is resolved *before* the try block and is not inside it — it
+still relies solely on its own internal guard (`readContentSettings()`'s try/catch in
+`lib/content/settings.ts:188-194`), so the CR-01 fix does not accidentally widen its blast radius
+or swallow `getContentSettings()` errors it shouldn't. `showBlogNav` is declared with `let` and
+initialized to `false` before the try, so the catch block's empty body is correct — no path
+leaves it in an unset/undefined state. Confirmed no `app/error.tsx`/`global-error.tsx` dependency
+remains for this specific read.
+
+### WR-02 — CLOSED
+
+`tests/unit/components/header-blog-nav.test.ts:130-138` adds a case that mocks
+`getPublishedBlogPosts` to reject and asserts `headerClientProps()` resolves (does not throw) with
+`showBlogNav: false`. This exercises the exact rejection path CR-01 fixed. Ran this file plus the
+other two named smoke targets — 22 tests pass.
+
+### WR-01 — CLOSED
+
+`app/admin/settings/page.tsx:146-174` adds four normalize helpers
+(`normalizeContentText`/`Flag`/`Count`/`Placement`) applied to all five `content.*` branches of
+`loadSettings()`'s `forEach` (lines 331-350). Traced each helper line-by-line against its
+`lib/content/settings.ts` resolver counterpart:
+
+- `normalizeContentCount` vs `resolveContentCount`: identical type/finite guard, identical
+  `Math.max(MIN, Math.min(MAX, Math.trunc(value)))` clamp expression.
+- `normalizeContentPlacement` vs `resolveContentEnum`: identical type guard and
+  `.includes(trimmed)` membership check against the same imported `BLOG_HOME_BLOCK_PLACEMENTS`
+  array (no re-typed literals — confirmed by the existing
+  `admin-settings-content-tab-source.test.ts` "never retypes" assertion, which still passes).
+  `resolveContentEnum` has an explicit `trimmed === "" → fallback` branch that
+  `normalizeContentPlacement` omits, but this is a no-op difference: `""` is never a member of
+  `BLOG_HOME_BLOCK_PLACEMENTS`, so `.includes("")` already falls through to the same fallback.
+- `normalizeContentText` vs `resolveContentText`: identical non-string guard, identical
+  trim-then-check-empty-or-overlength logic, identical boundary (`length > maxLength`, not
+  `>=`). Also confirmed the *input* shapes match — both the admin's `parseSettingValue`
+  (`lib/admin/settings-parse.ts`) and the storefront's `getSettings()`
+  (`lib/utils/settings.ts:44-49`) run `JSON.parse` with a raw-string fallback on parse failure,
+  so a given D1 row produces the same JS value (string/number/boolean/object) on both the admin
+  read path and the storefront read path — no undetected shape mismatch feeding the two clamp
+  implementations differently.
+- `normalizeContentFlag` vs `resolveContentFlag`: identical `typeof === "boolean"` guard.
+
+No case was found where the admin clamp discards a value the storefront would have accepted, or
+vice versa — the two implementations are behaviorally equivalent for every input class (absent,
+correct type, wrong type, out-of-range, boundary-exact).
+
+Ran the three specified smoke targets and `npm run typecheck` — all clean (22 tests pass across
+the three files, `tsc --noEmit` exits 0 with no output).
+
+### New Finding
+
+#### WR-03: WR-01's normalize helpers have no behavioral test — only a source-contract test
+
+**File:** `app/admin/settings/page.tsx:146-174`
+**Issue:** `normalizeContentText`/`Flag`/`Count`/`Placement` are unexported, file-local functions.
+The only test that touches the Content tab's load path,
+`tests/unit/app/admin-settings-content-tab-source.test.ts`, is a source-contract test (regex over
+the file's raw text — imports present, bound literals absent, key counts correct); it never
+imports or invokes these four functions with an actual out-of-range value (e.g.
+`blog_home_block_count: 99`, `blog_home_block_placement: "sideways"`) to assert the clamped
+result. The manual trace above confirms today's implementation is correct, but nothing in the
+suite would catch a future edit that silently diverges the admin's clamp from
+`lib/content/settings.ts`'s resolver — which is the exact class of gap CR-01/WR-02 flagged and
+fixed for the sibling `Header.tsx` case one commit earlier in this same phase.
+**Fix:** Export the four helpers (or extract them to a small shared, side-effect-free module,
+e.g. `lib/content/normalize-client.ts`) and add a plain unit test file
+(`tests/unit/app/admin-settings-content-normalize.test.ts`) asserting each one clamps/falls back
+identically to its `lib/content/settings.ts` counterpart for: absent/undefined, wrong type,
+boundary-exact (count `1` and `6`), one-past-boundary (count `0` and `7`), empty-string, and
+unrecognized-enum-member inputs. No jsdom/rendering required — these are pure functions.
+
+### Regression Scan
+
+- No React/Next anti-pattern introduced by either fix: the five `setContentSettings(prev => ...)`
+  calls in the `forEach` were already using the functional-updater form before WR-01 (avoids
+  stale-closure bugs from batched synchronous updates); WR-01 only changed the value expression
+  passed into each spread, not the update pattern itself.
+- `Header.tsx`'s try/catch does not swallow `getContentSettings()`'s errors — verified by direct
+  trace of the two calls' ordering (see CR-01 above).
+- No unhandled-promise-rejection risk introduced: the two async reads in `Header()` remain
+  sequential `await`s (not `Promise.all`), so the try/catch scoped to the second call cannot
+  leave the first call's rejection unhandled.
+
+### Iteration 2 Summary
+
+All 3 iteration-1 findings (CR-01, WR-01, WR-02) verified closed in code at HEAD, with passing
+targeted tests and a clean `npm run typecheck`. One new Warning (WR-03) identified: the WR-01 fix
+is correct on inspection but has no behavioral regression test, unlike its sibling CR-01/WR-02 fix
+in the same commit pair.
+
+**Findings:** 0 Critical, 1 Warning, 0 Info (1 total)
+
+---
+
+_Reviewed: 2026-09-11T09:30:00Z_
+_Reviewer: Claude (gsd-code-reviewer)_
+_Depth: standard (iteration 2 — targeted re-review)_
