@@ -2,20 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v2.2
 milestone_name: Operations & Polish
-current_phase: 17
-current_phase_name: Saved Payment Methods
+current_phase: 18
+current_phase_name: Tech-Debt Closure
 current_plan: Not started
-status: executing
-stopped_at: Phase 16 complete, ready to plan Phase 17
-last_updated: "2026-09-11T10:09:06.177Z"
+status: planning
+stopped_at: Phase 17 complete, ready to plan Phase 18
+last_updated: "2026-09-11T11:10:50.638Z"
 last_activity: 2026-09-11
-last_activity_desc: Phase 16 complete, transitioned to Phase 17
-state_head: d488647bc5ca56a33d95c6ad247a0fb981576035
+last_activity_desc: Phase 17 complete, transitioned to Phase 18
+state_head: 290170d8b15931fffc05b562a4013d2e76bd4679
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 31
-  completed_plans: 25
+  completed_plans: 31
   percent: 14
 ---
 
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-09-09 after Phase 11)
 
 ## Current Position
 
-Phase: 17 (Saved Payment Methods) — READY TO EXECUTE
+Phase: 18 — Tech-Debt Closure
 Current Plan: Not started
 Total Plans in Phase: 6
-Status: Ready to execute
-Last activity: 2026-09-11 — Phase 16 complete, transitioned to Phase 17
+Status: Ready to plan
+Last activity: 2026-09-11 — Phase 17 complete, transitioned to Phase 18
 
 **Milestone v2.2 phases:**
 
@@ -52,7 +52,7 @@ Last activity: 2026-09-11 — Phase 16 complete, transitioned to Phase 17
 
 **Velocity:**
 
-- Total plans completed: 106 (17 v1, 44 v2)
+- Total plans completed: 112 (17 v1, 44 v2)
 - Average duration: 56 min/plan (Phase 5, 12 plans)
 - Total execution time: ~11.3 hours (v2)
 
@@ -93,6 +93,7 @@ Last activity: 2026-09-11 — Phase 16 complete, transitioned to Phase 17
 | 14 | 9 | - | - |
 | 15 | 3 | - | - |
 | 16 | 4 | - | - |
+| 17 | 6 | - | - |
 
 **Recent Trend:**
 
@@ -322,6 +323,7 @@ Decisions locked for v2:
 - [Phase 15]: Phase 14 (autonomous): grey areas answered by Claude — reissue drains the old card via an `adjustment` ledger entry and issues a new card in one D1 batch (once-only via deterministic id + partial unique index); resend audits before sending with a per-event idempotency key; admin-create currency comes from store config; disabled cards' balances count toward the honor guard; code reveal is off by default behind `gift_cards.code_reveal_enabled`, super-admin + confirm + audit-event-first. Security audit 63/63 closed; UF-14-1 showed the Phase 13 admin layout gate insufficient (App Router streams page segments) — fixed by middleware sign-in redirect for /admin pages plus `requireAdminSession()` in every async admin page. AR-14-01..03 accepted by Claude; Russell to confirm. Migration numbering collision (two 0023 files) logged as a Phase 18 todo.
 - [Phase 16]: Phase 15 (autonomous): shared address form extracted from the account page into AddressForm; subscription PDP gets a sentinel "Add a new address…" select option opening a token-class modal, saving through the same account API, pre-selecting the new address, preserving plan/quantity/terms. Two review iterations found and fixed 20 items including two account-page regressions from the extraction (save message, busy locking) and a validation-bound drift across three layers (client filter, acquisition-service, setup-intent route) now unified behind one exported constant. Security audit 11/11 closed. Four items left for Russell's own click-through since this repo has no jsdom render tests.
 - [Phase 17]: Phase 16 (autonomous): header gets a server-resolved, admin-labeled blog nav entry that hides automatically when no article is published; home page gets an admin-configurable "latest articles" block (enable, heading, count, placement) built from existing card markup, no new query path. Review found and fixed an unguarded D1 read in Header.tsx that could 500 the whole storefront on a blog-table failure, plus an admin/storefront settings-validation parity gap, both closed with tests. Security audit 21/21 closed. Production currently has zero published articles, so the hide-when-empty path is what's live; three items (mobile menu click, admin tab click, a real published article) left for Russell's own look.
+- [Phase 18]: Phase 17 (autonomous, money/PCI-adjacent): signed-in shoppers get a real Stripe Customer (a new payment_customers table, deliberately independent of the subscriptions provider-customer table — consolidation logged as Phase 18 tech debt), a Stripe Customer Session powers the Payment Element's saved-card checkbox and selector. Research corrected the roadmap's literal "setup_future_usage on the PaymentIntent" wording: that field lives only on the Customer Session, combining both is a Stripe integration error. Account gets a Payment methods page (list/remove, no add — cards are only added at checkout). Review found and fixed a zero-cash gift-card-order Stripe-customer leak, a sequential test masquerading as a concurrency proof, a 404/503 existence side-channel on delete, and a shared busy-state bug; all closed with tests. Security audit ran at ASVS L2 given the sensitivity, 39/39 closed. Four card-in-hand checks (save, reuse, remove, guest-sees-nothing) need Russell's own click-through.
 
 ### Pending Todos
 
@@ -403,7 +405,7 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-09-10T17:15:28.171Z
-Stopped at: Phase 16 complete, ready to plan Phase 17
+Stopped at: Phase 17 complete, ready to plan Phase 18
 Resume file: None
 
 Next: `/gsd-discuss-phase 13`
