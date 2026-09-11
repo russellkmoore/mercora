@@ -70,6 +70,10 @@ export const TELEMETRY_EVENTS = {
   'gift_card.delivery_failed': { severity: 'critical', sampleRate: 1 },
   'gift_card.honor_disabled_with_balances': { severity: 'critical', sampleRate: 1 },
   'gift_card.delivery_note_dropped': { severity: 'warning', sampleRate: 1 },
+  // Deliberately NOT in TAIL_CRITICAL_EVENTS (workers/observability-tail/src/core.ts):
+  // a delivery that will be retried automatically must not page anyone. Only the
+  // terminal outcome recorded under gift_card.delivery_failed does that. See D-04.
+  'gift_card.delivery_retry': { severity: 'warning', sampleRate: 1 },
   'email.audit_write_failed': { severity: 'error', sampleRate: 0.25 },
   'recommendation.rebuild_failed': { severity: 'critical', sampleRate: 1 },
   'recommendation.no_rows_written': { severity: 'warning', sampleRate: 0.25 },

@@ -97,9 +97,12 @@ function epochSeconds(): number { return Math.floor(Date.now() / 1_000); }
  *
  *   - the envelope carries the `commerce.telemetry.v1` marker, so the tail
  *     consumer sees it at all;
- *   - `gift_card.delivery_failed` is registered critical and listed in
- *     `TAIL_CRITICAL_EVENTS`, so a permanent misconfiguration now pages someone
- *     instead of quietly burning the eight-attempt budget;
+ *   - the caller picks the event: a retryable outcome records
+ *     `gift_card.delivery_retry` (warning, never in `TAIL_CRITICAL_EVENTS`),
+ *     and only a terminal outcome records `gift_card.delivery_failed`
+ *     (critical, listed in `TAIL_CRITICAL_EVENTS`) — so a permanent
+ *     misconfiguration still pages someone, but a delivery that is simply
+ *     going to be retried does not page anyone eight times over;
  *   - a throwable is reduced to an `error_class` from a fixed allowlist.
  *
  * There is deliberately no gift-card id: the contract has no identifier field,
@@ -109,14 +112,16 @@ function epochSeconds(): number { return Math.floor(Date.now() / 1_000); }
  * (which could include the recipient address on a rejection).
  */
 type DeliveryTrigger = 'recovery' | 'request';
+type GiftCardDeliveryTelemetryEvent = 'gift_card.delivery_failed' | 'gift_card.delivery_retry';
 
 function recordDeliveryFailure(fields: {
+  event: GiftCardDeliveryTelemetryEvent;
   provider: 'cloudflare_email' | 'resend' | 'd1';
   retryable: boolean;
   trigger: DeliveryTrigger;
   attempt?: number;
 }, error?: unknown): void {
-  recordTelemetry('gift_card.delivery_failed', {
+  recordTelemetry(fields.event, {
     operation: 'send',
     outcome: 'failed',
     provider: fields.provider,
@@ -456,6 +461,7 @@ async function deliverOne(args: {
     // would eventually surface it: a paid card whose encrypted code material is
     // gone needs a human to reissue it, and nobody was being told.
     recordDeliveryFailure({
+      event: 'gift_card.delivery_failed',
       provider: 'd1', retryable: false, trigger: args.trigger, attempt: claimed.attempt_count,
     });
     await args.database.prepare(`UPDATE gift_card_deliveries SET status = 'needs_review',
@@ -493,6 +499,7 @@ async function deliverOne(args: {
     if (!result.success) {
       // The retry/status decision above is unchanged; this only records it.
       recordDeliveryFailure({
+        event: 'gift_card.delivery_failed',
         provider: telemetryProvider(result.provider, args.emailEnvironment?.EMAIL_PROVIDER),
         retryable: status !== 'needs_review',
         trigger: args.trigger,
@@ -505,6 +512,7 @@ async function deliverOne(args: {
   } catch (error) {
     const status = exhausted ? 'needs_review' : 'pending';
     recordDeliveryFailure({
+      event: 'gift_card.delivery_failed',
       provider: 'd1', retryable: !exhausted, trigger: args.trigger, attempt: claimed.attempt_count,
     }, error);
     await args.database.prepare(`UPDATE gift_card_deliveries SET status = ?, claim_token = NULL,
