@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   createCustomer: vi.fn(),
   ensureStripeCustomerForShopper: vi.fn(),
   customerSessionsCreate: vi.fn(),
+  finalizeZeroCashGiftOrder: vi.fn(),
 }));
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -65,6 +66,9 @@ vi.mock('@/lib/db', () => ({
 }));
 vi.mock('@/lib/observability/telemetry', () => ({
   recordTelemetry: mocks.recordTelemetry,
+}));
+vi.mock('@/lib/services/order-finalization', () => ({
+  finalizeZeroCashGiftOrder: mocks.finalizeZeroCashGiftOrder,
 }));
 const requoteMocks = vi.hoisted(() => ({
   getOrderById: vi.fn(),
@@ -144,6 +148,7 @@ beforeEach(() => {
   mocks.createPaymentIntent.mockClear();
   mocks.ensureStripeCustomerForShopper.mockReset();
   mocks.customerSessionsCreate.mockReset();
+  mocks.finalizeZeroCashGiftOrder.mockReset();
   requoteMocks.getOrderById.mockReset();
   requoteMocks.releaseTender.mockReset();
   mocks.auth.mockResolvedValue({ userId: null });
@@ -566,5 +571,44 @@ describe('payment-intent durable authority boundary', () => {
     expect(sale.code).not.toBe(tender.code);
     expect(sale.error).not.toBe(tender.error);
     expect(tender.code).toBe('gift_card_unavailable');
+  });
+
+  it('takes no PaymentIntent and no Customer Session for a signed-in zero-cash gift-card checkout (D-05)', async () => {
+    mocks.auth.mockResolvedValue({ userId: 'user_123' });
+    mocks.ensureStripeCustomerForShopper.mockResolvedValue('cus_signed_in');
+    mocks.priceCheckout.mockResolvedValueOnce({ ...quote, total: { amount: 0, currency: 'USD' } });
+    mocks.finalizeZeroCashGiftOrder.mockResolvedValue({
+      paid: true, promoted: true, order: { id: 'WEB-USER-zero-cash' },
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as any;
+    expect(body.noCash).toBe(true);
+    expect(body).not.toHaveProperty('customerSessionClientSecret');
+    expect(mocks.createPaymentIntent).not.toHaveBeenCalled();
+    expect(mocks.customerSessionsCreate).not.toHaveBeenCalled();
+  });
+
+  it('never lets a recorded telemetry call carry either client secret', async () => {
+    mocks.auth.mockResolvedValue({ userId: 'user_123' });
+    mocks.ensureStripeCustomerForShopper.mockResolvedValue('cus_signed_in');
+    mocks.customerSessionsCreate.mockResolvedValue({ client_secret: 'cuss_redaction_check_secret' });
+    mocks.createPaymentIntent.mockResolvedValue({
+      id: 'pi_redaction_check',
+      client_secret: 'pi_redaction_check_secret',
+      amount: 2_600,
+      currency: 'usd',
+    });
+
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+
+    for (const call of mocks.recordTelemetry.mock.calls) {
+      const serialized = JSON.stringify(call);
+      expect(serialized).not.toContain('pi_redaction_check_secret');
+      expect(serialized).not.toContain('cuss_redaction_check_secret');
+    }
   });
 });
