@@ -42,6 +42,9 @@ import { getLayoutSettings } from "@/lib/layout/settings";
 import { HOME_HERO_MAP } from "@/components/layout/home/home-hero-map";
 import { getStoreConfig } from "@/lib/store-config";
 import { filterListedProducts } from "@/lib/gift-cards/visibility";
+import { getContentSettings } from "@/lib/content/settings";
+import { getPublishedBlogPosts } from "@/lib/models/blog";
+import BlogHighlights from "@/components/home/BlogHighlights";
 
 /**
  * Home page component - main landing page for the application
@@ -63,21 +66,38 @@ export default async function HomePage() {
   const { homeHero } = await getLayoutSettings();
   const HeroVariant = HOME_HERO_MAP[homeHero];
 
+  // Both fixed slots below render this one resolved element (Phase 16,
+  // BLOG-02) — computed once so the block can never appear twice or show
+  // different content at each position. A disabled block short-circuits
+  // before the query runs; the count that reaches getPublishedBlogPosts
+  // arrives already clamped by getContentSettings, not re-checked here.
+  const { blogHomeBlockEnabled, blogHomeBlockHeading, blogHomeBlockCount, blogHomeBlockPlacement } =
+    await getContentSettings();
+  const blogPosts = blogHomeBlockEnabled
+    ? await getPublishedBlogPosts({ limit: blogHomeBlockCount, includeHtml: true })
+    : [];
+  const blogHighlights =
+    blogPosts.length > 0 ? <BlogHighlights heading={blogHomeBlockHeading} posts={blogPosts} /> : null;
+
   return (
     <div className="bg-surface-elevated text-foreground px-4 sm:px-6 lg:px-12 py-12 sm:py-16">
       {/* Hero Section — resolved variant (Phase 7, LAYOUT-02) */}
       <HeroVariant featuredProduct={featuredProducts[0] ?? null} />
 
+      {blogHomeBlockPlacement === "before_featured" && blogHighlights}
+
       {/* Featured Products Grid */}
       <section className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10 mb-12 sm:mb-16">
         {featuredProducts.map((product, index) => (
-          <ProductCard 
-            key={product.id} 
-            product={product} 
+          <ProductCard
+            key={product.id}
+            product={product}
             priority={index === 0} // Only prioritize the first product image
           />
         ))}
       </section>
+
+      {blogHomeBlockPlacement === "after_featured" && blogHighlights}
     </div>
   );
 }
