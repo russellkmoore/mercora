@@ -268,7 +268,22 @@ Plans:
   4. A digital-only order keeps the billing address the shopper entered and shows it on the confirmation email and the account order detail; client and server decide "digital-only cart" from fulfillment type by one shared rule, pinned by a test
   5. Docs and tests match the code: the stale "scan:tokens is local-only" claim, the REQUIREMENTS-wide verify check and the retroactive-note behaviour for pre-existing pending deliveries are each resolved with their broken-windows entries closed, and the admin Appearance cards show each theme's industry and synopsis (verify first — `components/admin/ThemePresetGrid.tsx` already renders both, so this may reduce to confirming and closing the todo)
 
-**Plans**: TBD
+**Plans**: 7 plans
+
+Plans:
+**Wave 1** *(six file-disjoint plans, no ordering between them)*
+
+- [ ] 18-01-PLAN.md — Tracer: a digital-only order keeps and shows its billing address, on the email and the account page (DEBT-06) (wave 1)
+- [ ] 18-02-PLAN.md — One digital-only rule, cross-referenced in both files and pinned by the invariant test (DEBT-05) (wave 1)
+- [ ] 18-03-PLAN.md — Delete the orphaned `/api/tax`; remove the database-only gift-card env fallback (DEBT-01, DEBT-02) (wave 1)
+- [ ] 18-04-PLAN.md — A cart line with an unparseable gift note survives, warns, and cannot reach checkout (DEBT-03) (wave 1)
+- [ ] 18-05-PLAN.md — Delivery retries warn; only terminal failures page (DEBT-04) (wave 1)
+- [ ] 18-06-PLAN.md — Migration-number collision check and the 0023 record (DEBT-07 code half) (wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 18-07-PLAN.md — Phase gate: close four broken-windows entries and two todos, ratify D-10, full CI suite, push, read-only production confirmation (DEBT-07, DEBT-08) (wave 2)
+
 **UI hint**: yes
 
 ### Phase 19: Operator Checklist
