@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   acknowledgement,
+  findDuplicateNumbers,
   inspectMigration,
   stripSqlComments,
   summarize,
@@ -68,6 +69,69 @@ describe("inspectMigration", () => {
     );
     expect(report.status).toBe("acknowledged");
     expect(report.reason).toBe("reader shipped in 1.4");
+  });
+});
+
+describe("findDuplicateNumbers", () => {
+  it("reports an added file that reuses an existing file's number", () => {
+    const reports = findDuplicateNumbers(
+      ["migrations/0030_new_thing.sql"],
+      ["migrations/0030_existing_thing.sql", "migrations/0030_new_thing.sql"],
+    );
+    expect(reports).toEqual([
+      {
+        file: "migrations/0030_new_thing.sql",
+        number: "0030",
+        collidesWith: ["0030_existing_thing.sql"],
+      },
+    ]);
+  });
+
+  it("reports two added files that collide with each other", () => {
+    const added = ["migrations/0031_a.sql", "migrations/0031_b.sql"];
+    const allFiles = [...added];
+    const reports = findDuplicateNumbers(added, allFiles);
+    expect(reports).toHaveLength(2);
+    expect(reports.find((r) => r.file === "migrations/0031_a.sql")?.collidesWith).toEqual([
+      "0031_b.sql",
+    ]);
+    expect(reports.find((r) => r.file === "migrations/0031_b.sql")?.collidesWith).toEqual([
+      "0031_a.sql",
+    ]);
+  });
+
+  it("produces no report for an added file whose number nobody else uses", () => {
+    const reports = findDuplicateNumbers(
+      ["migrations/0032_unique.sql"],
+      ["migrations/0001_initial_schema.sql", "migrations/0032_unique.sql"],
+    );
+    expect(reports).toEqual([]);
+  });
+
+  it("produces no report for two pre-existing files sharing a number when nothing was added", () => {
+    const reports = findDuplicateNumbers(
+      [],
+      ["migrations/0023_add_order_effects_payload.sql", "migrations/0023_normalize_tax_category_codes.sql"],
+    );
+    expect(reports).toEqual([]);
+  });
+
+  it("ignores a filename with no leading number instead of throwing", () => {
+    expect(() =>
+      findDuplicateNumbers(["migrations/README.md"], ["migrations/README.md", "migrations/0001_initial_schema.sql"]),
+    ).not.toThrow();
+    expect(findDuplicateNumbers(["migrations/README.md"], ["migrations/README.md"])).toEqual([]);
+  });
+
+  it("stays silent on this repository's real 0023 pair when an unrelated migration is added", () => {
+    const allFiles = [
+      "migrations/0023_add_order_effects_payload.sql",
+      "migrations/0023_normalize_tax_category_codes.sql",
+      "migrations/0025_add_payment_customers.sql",
+      "migrations/0026_add_unrelated_thing.sql",
+    ];
+    const reports = findDuplicateNumbers(["migrations/0026_add_unrelated_thing.sql"], allFiles);
+    expect(reports).toEqual([]);
   });
 });
 
