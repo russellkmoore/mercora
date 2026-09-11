@@ -30,7 +30,7 @@ covered_files:
   - .planning/phases/15-subscription-address-in-place/15-REVIEW-FIX.md
   - .planning/REQUIREMENTS.md
   - ".planning/phases/15-subscription-address-in-place/15-SECURITY.md"
-covered_digest: "v1:sha256:9680adfcbe8872a95674a8cb76f0727c211a4963d9b0c25126d6a4e017628424"
+covered_digest: "v1:sha256:618e6766e35a7481b909f783ae6d658dc02696d6c4fdac1bd4345fab54ba94b7"
 behavior_unverified: 2
 overrides_applied: 0
 behavior_unverified_items:
