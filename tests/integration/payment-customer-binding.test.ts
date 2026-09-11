@@ -70,7 +70,7 @@ describe("payment customer binding against real D1", () => {
     expect(row?.created_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
   });
 
-  it("leaves the original binding untouched when a bind for a different Stripe id conflicts", async () => {
+  it("leaves the original binding untouched when a bind for a different Stripe id arrives after it (sequential re-bind, not a race)", async () => {
     await applyThroughPaymentCustomers();
     await env.DB.prepare(`INSERT INTO customers
       (id, type, person, created_at, updated_at)
@@ -99,5 +99,56 @@ describe("payment customer binding against real D1", () => {
       "SELECT stripe_customer_id FROM payment_customers WHERE customer_id = ?",
     ).bind("cust-conflict-shopper").first<{ stripe_customer_id: string }>();
     expect(row?.stripe_customer_id).toBe("cus_original_binding");
+  });
+
+  // WR-02: the test above only proves the INSERT OR IGNORE shape is
+  // idempotent across two *sequential* calls (the second await only starts
+  // once the first has fully resolved) — that is a real property, but it is
+  // not proof of atomicity under two genuinely in-flight writers. This test
+  // races two concurrent `bindPaymentCustomer` calls for the same shopper
+  // with `Promise.all`, the same real-D1-concurrency pattern this codebase
+  // already uses for a same-row write race
+  // (tests/integration/lib/subscriptions/repository.test.ts:128,
+  // tests/integration/d1-harness.test.ts:180) — genuinely overlapping D1
+  // statements, not two sequential awaits.
+  it("races two concurrent binds for the same shopper: exactly one wins under INSERT OR IGNORE (real D1 concurrency)", async () => {
+    await applyThroughPaymentCustomers();
+    await env.DB.prepare(`INSERT INTO customers
+      (id, type, person, created_at, updated_at)
+      VALUES ('cust-race-shopper', 'person', ?, ?, ?)`)
+      .bind(
+        JSON.stringify({ email: "race@example.test" }),
+        "2026-09-11T00:00:00.000Z",
+        "2026-09-11T00:00:00.000Z",
+      ).run();
+
+    const repository = createPaymentCustomerRepository(env.DB);
+
+    const [left, right] = await Promise.all([
+      repository.bindPaymentCustomer({
+        customerId: "cust-race-shopper",
+        stripeCustomerId: "cus_race_a",
+      }),
+      repository.bindPaymentCustomer({
+        customerId: "cust-race-shopper",
+        stripeCustomerId: "cus_race_b",
+      }),
+    ]);
+
+    // Exactly one of the two genuinely concurrent writers wins the row;
+    // the other converges to "conflict" against whichever id actually landed.
+    expect([left, right].sort()).toEqual(["conflict", "created"]);
+
+    const row = await env.DB.prepare(
+      "SELECT stripe_customer_id FROM payment_customers WHERE customer_id = ?",
+    ).bind("cust-race-shopper").first<{ stripe_customer_id: string }>();
+    expect(["cus_race_a", "cus_race_b"]).toContain(row?.stripe_customer_id);
+
+    // Whichever id is actually stored tells us which call won; assert the
+    // two results are self-consistent with that stored row rather than
+    // assuming call order (Promise.all does not guarantee it).
+    const leftWon = row?.stripe_customer_id === "cus_race_a";
+    expect(left).toBe(leftWon ? "created" : "conflict");
+    expect(right).toBe(leftWon ? "conflict" : "created");
   });
 });
