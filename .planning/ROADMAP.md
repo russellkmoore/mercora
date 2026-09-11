@@ -235,12 +235,22 @@ error. The effect the criterion asks for is unchanged.*
 **Plans**: 6 plans
 
 Plans:
+**Wave 1**
 
 - [ ] 17-01-PLAN.md — Migration 0025, the `payment_customers` schema, and `ensureStripeCustomer`
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 17-02-PLAN.md — Checkout server wiring: Stripe customer on the PaymentIntent plus a Customer Session
-- [ ] 17-03-PLAN.md — Checkout client wiring: Elements gets the Customer Session secret; Link stays off
 - [ ] 17-04-PLAN.md — Account API: list saved cards, remove one after an ownership check
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 17-03-PLAN.md — Checkout client wiring: Elements gets the Customer Session secret; Link stays off
 - [ ] 17-05-PLAN.md — Account UI: the Payment methods page, list component and navigation entry
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 17-06-PLAN.md — Full gate suite, deploy by push, read-only production check, handover list
 
 **UI hint**: yes
