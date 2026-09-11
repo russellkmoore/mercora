@@ -60,7 +60,7 @@ Full phase details, success criteria, and plan lists: `milestones/v2.1-ROADMAP.m
 
 - [x] **Phase 13: Gift-Card Flags** - Sell and honor each control what their name says, and both off makes gift cards vanish (completed 2026-09-10)
 - [x] **Phase 14: Gift-Card Admin & Audit Trail** - An admin can find, read the history of, and act on any individual gift card (completed 2026-09-10)
-- [ ] **Phase 15: Subscription Address In Place** - A shopper adds a shipping address on the subscription product page without leaving it
+- [x] **Phase 15: Subscription Address In Place** - A shopper adds a shipping address on the subscription product page without leaving it (completed 2026-09-11)
 - [ ] **Phase 16: Blog Surfacing** - The blog is reachable from the header and the latest articles appear on the home page
 - [ ] **Phase 17: Saved Payment Methods** - A signed-in shopper saves a card at checkout and manages it from their account
 - [ ] **Phase 18: Tech-Debt Closure** - The debt carried out of v2.1 is closed and the docs match the code
@@ -173,15 +173,15 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 15-01-PLAN.md — Extract the shared AddressForm and saveAddress helper; refactor AddressManager (SUB-02)
+- [x] 15-01-PLAN.md — Extract the shared AddressForm and saveAddress helper; refactor AddressManager (SUB-02)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 15-02-PLAN.md — Sentinel select option, AddAddressDialog, post-save refresh and pre-select (SUB-01, SUB-03)
+- [x] 15-02-PLAN.md — Sentinel select option, AddAddressDialog, post-save refresh and pre-select (SUB-01, SUB-03)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 15-03-PLAN.md — Gate suite, scope assertions, deploy, read-only production check, human list
+- [x] 15-03-PLAN.md — Gate suite, scope assertions, deploy, read-only production check, human list
 
 **UI hint**: yes
 
@@ -253,7 +253,7 @@ Plans:
 | 9-12 (v2.1 Gift Card Product) | 20/20 | Complete | 2026-09-10 |
 | 13. Gift-Card Flags | 9/9 | Complete    | 2026-09-10 |
 | 14. Gift-Card Admin & Audit Trail | 9/9 | Complete    | 2026-09-10 |
-| 15. Subscription Address In Place | 0/? | Not started | - |
+| 15. Subscription Address In Place | 3/3 | Complete    | 2026-09-11 |
 | 16. Blog Surfacing | 0/? | Not started | - |
 | 17. Saved Payment Methods | 0/? | Not started | - |
 | 18. Tech-Debt Closure | 0/? | Not started | - |
