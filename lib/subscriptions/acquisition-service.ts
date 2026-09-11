@@ -1,4 +1,5 @@
 import type { Address } from "@/lib/types";
+import { ADDRESS_CITY_REGION_MAX } from "@/lib/subscriptions/address-limits";
 import type { SubscriptionProvider } from "./ports";
 import {
   assertLifecycleSnapshot,
@@ -157,7 +158,8 @@ function validateBeginInput(input: BeginSubscriptionAcquisitionInput): void {
     if (Object.getPrototypeOf(address) !== Object.prototype
       || Object.keys(address).some((key) => !allowed.has(key))
       || typeof address.line1 !== "string" || address.line1.trim().length < 1 || address.line1.length > 256
-      || typeof address.city !== "string" || address.city.trim().length < 1 || address.city.length > 200
+      || typeof address.city !== "string" || address.city.trim().length < 1
+      || address.city.length > ADDRESS_CITY_REGION_MAX
       || typeof address.country !== "string" || !/^[A-Z]{2}$/.test(address.country)
       || (address.type !== undefined && address.type !== "shipping")
       || (address.status !== undefined && !["active", "verified", "unverified"].includes(address.status))
@@ -166,7 +168,7 @@ function validateBeginInput(input: BeginSubscriptionAcquisitionInput): void {
       throw new TypeError("Subscription shipping address is invalid");
     }
     const bounds: Record<string, number> = {
-      line2: 256, region: 200, postal_code: 32, company: 200, recipient: 200,
+      line2: 256, region: ADDRESS_CITY_REGION_MAX, postal_code: 32, company: 200, recipient: 200,
       phone: 40, email: 320, delivery_instructions: 500,
     };
     for (const [key, max] of Object.entries(bounds)) {

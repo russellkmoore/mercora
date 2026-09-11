@@ -4,6 +4,7 @@ import { hasSameOrigin } from "@/lib/auth/same-origin";
 import { getOrCreateCustomer } from "@/lib/account/customer";
 import { getStoreConfig } from "@/lib/store-config";
 import { isBoundedString, isPlainRecord } from "@/lib/public-request-validation";
+import { ADDRESS_CITY_REGION_MAX } from "@/lib/subscriptions/address-limits";
 import type { Address } from "@/lib/types";
 import {
   getSubscriptionAcquisitionService,
@@ -43,7 +44,7 @@ function parseAddress(value: unknown): Address | undefined | null {
     return null;
   }
   const line1 = boundedText(value.line1, 256);
-  const city = boundedText(value.city, 128);
+  const city = boundedText(value.city, ADDRESS_CITY_REGION_MAX);
   const country = boundedText(value.country, 2)?.toUpperCase();
   if (!line1 || !city || !country || !/^[A-Z]{2}$/.test(country)) return null;
 
@@ -54,7 +55,7 @@ function parseAddress(value: unknown): Address | undefined | null {
   };
   const fields = {
     line2: optional("line2", 256),
-    region: optional("region", 128),
+    region: optional("region", ADDRESS_CITY_REGION_MAX),
     postal_code: optional("postal_code", 32),
     company: optional("company", 200),
     recipient: optional("recipient", 200),

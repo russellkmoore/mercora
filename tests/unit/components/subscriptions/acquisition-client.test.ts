@@ -1,5 +1,30 @@
 import { describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 import type { SetupIntent, StripeElements } from "@stripe/stripe-js";
+
+// Mocks for the round-trip test below only: this file otherwise exercises
+// components/subscriptions/acquisition-client.ts directly, never the route.
+const routeMocks = vi.hoisted(() => ({
+  auth: vi.fn(),
+  getOrCreateCustomer: vi.fn(),
+  getStoreConfig: vi.fn(),
+  begin: vi.fn(),
+  getService: vi.fn(),
+  rateLimit: vi.fn(),
+  telemetry: vi.fn(),
+}));
+vi.mock("@clerk/nextjs/server", () => ({ auth: routeMocks.auth }));
+vi.mock("@/lib/account/customer", () => ({ getOrCreateCustomer: routeMocks.getOrCreateCustomer }));
+vi.mock("@/lib/store-config", () => ({ getStoreConfig: routeMocks.getStoreConfig }));
+vi.mock("@/lib/subscriptions/acquisition-service", () => ({
+  getSubscriptionAcquisitionService: routeMocks.getService,
+  SubscriptionNotFoundError: class SubscriptionNotFoundError extends Error {},
+  SubscriptionProviderConflictError: class SubscriptionProviderConflictError extends Error {},
+}));
+vi.mock("@/lib/rate-limit", () => ({ enforceRateLimit: routeMocks.rateLimit }));
+vi.mock("@/lib/observability/telemetry", () => ({ recordTelemetry: routeMocks.telemetry }));
+
+import { POST as setupIntentPOST } from "@/app/api/setup-intent/route";
 import {
   ADD_NEW_ADDRESS_VALUE,
   attemptFactsKey,
@@ -380,6 +405,82 @@ describe("subscription acquisition client", () => {
     }), { status: 200 })) as unknown as FetchLike;
     await expect(fetchSubscriptionPlans(invalidUtf8, "var_one")).rejects.toThrow("invalid");
     expect(canceled).toHaveBeenCalledOnce();
+  });
+});
+
+describe("a saved address near the city/region bound round-trips through select and setup-intent", () => {
+  // Closes the gap that let CR-01 slip past iteration 1: the WR-05 test above
+  // only proved the client filter kept a 150-char city. This exercises the
+  // real setup-intent route (app/api/setup-intent/route.ts's own parseAddress)
+  // too, so a bound mismatch reintroduced at any one of the three layers
+  // fails here even if the other two still agree.
+  function setupRoute() {
+    routeMocks.auth.mockResolvedValue({ userId: "user_one" });
+    routeMocks.rateLimit.mockResolvedValue(null);
+    routeMocks.getService.mockResolvedValue({ begin: routeMocks.begin });
+    routeMocks.getStoreConfig.mockReturnValue({
+      commerce: {
+        currency: "USD",
+        subscriptionTermsVersion: "terms-1",
+        features: { subscriptionAcquisition: true, subscriptionReconciliation: true },
+      },
+    });
+    routeMocks.getOrCreateCustomer.mockResolvedValue({
+      id: "user_one", type: "person",
+      person: { email: "trusted@example.test", full_name: "Trusted Name" },
+    });
+    routeMocks.begin.mockResolvedValue({
+      acquisitionId: "acq_one",
+      setupIntentId: "seti_0123456789abcdef0123456789abcdef01234",
+      clientSecret: "seti_0123456789abcdef0123456789abcdef01234_secret_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP",
+    });
+  }
+
+  it("selects a saved 150-char-city address and successfully starts a setup intent for it", async () => {
+    setupRoute();
+    const longCity = "C".repeat(150);
+    const longRegion = "R".repeat(200);
+    const listFetcher = vi.fn(async () => new Response(JSON.stringify({
+      addresses: [{
+        id: "addr_long",
+        address: { line1: "1 Main", city: longCity, region: longRegion, country: "US" },
+      }],
+    }), { status: 200 })) as unknown as FetchLike;
+
+    // 1. The panel's load path: the client filter must keep the address.
+    const saved = await fetchSavedAddressesForPlan(listFetcher, { shippingRequired: true });
+    expect(saved.map((entry) => entry.id)).toEqual(["addr_long"]);
+    expect(nextAddressSelection(saved, "addr_long")).toBe("addr_long");
+    const shippingAddress = shippingAddressFromSaved(saved[0]!);
+    expect(shippingAddress.city).toBe(longCity);
+
+    // 2. "Continue to payment method": the client posts the selected address
+    // to the real route handler (its own parseAddress, not a mock).
+    const routeFetcher: FetchLike = async (_input, init) => {
+      const req = new NextRequest("https://store.example/api/setup-intent", {
+        method: "POST",
+        headers: { origin: "https://store.example", ...(init?.headers as Record<string, string>) },
+        body: init?.body as string,
+      });
+      return setupIntentPOST(req);
+    };
+    const result = await createOwnerBoundSubscriptionSetupAttempt(routeFetcher, {
+      planId: "plan_one",
+      quantity: 1,
+      shippingAddress,
+      termsVersion: "terms-1",
+      idempotencyKey: "checkout-key-001",
+    }, "user_one", () => "user_one");
+
+    expect(result).toEqual({
+      acquisitionId: "acq_one",
+      setupIntentId: "seti_0123456789abcdef0123456789abcdef01234",
+      clientSecret: "seti_0123456789abcdef0123456789abcdef01234_secret_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP",
+      ownerId: "user_one",
+    });
+    expect(routeMocks.begin).toHaveBeenCalledWith(expect.objectContaining({
+      shippingAddress: expect.objectContaining({ city: longCity, region: longRegion }),
+    }));
   });
 });
 
