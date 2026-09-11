@@ -118,6 +118,42 @@ describe('stable cart lines', () => {
     expect(result.items[1]).not.toHaveProperty('giftCardCustomization');
   });
 
+  // IN-02: canonicalLineFacts omits giftCardCustomization for a flagged line
+  // (the invalid customization is never carried forward), so two persisted
+  // lines for the same product/variant with two *different*, both-invalid
+  // gift notes merge into a single flagged line on migration. This is
+  // documented, accepted behavior, not a fix: the original note text is
+  // unrecoverable either way (the remediation is remove-and-re-add), so
+  // there is no data-loss consequence beyond what already exists -- the
+  // shopper just sees one combined-quantity flagged line instead of two.
+  it('merges two different invalid gift notes for the same product/variant into one flagged line (IN-02)', () => {
+    const persisted = {
+      items: [
+        {
+          ...base,
+          price: 25,
+          giftCardCustomization: {
+            recipientEmail: 'ada@example.com',
+            message: 'see https://example.com/ada-note for the surprise',
+          },
+        },
+        {
+          ...base,
+          price: 25,
+          giftCardCustomization: {
+            recipientEmail: 'grace@example.com',
+            message: 'see https://example.com/grace-note for the surprise',
+          },
+        },
+      ],
+    };
+
+    const result = migrateCartState(persisted) as { items: StableCartItem[] };
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({ quantity: 2, giftCardNoteInvalid: true });
+    expect(result.items[0]).not.toHaveProperty('giftCardCustomization');
+  });
+
   it('migrates the mixed valid/invalid persisted state deterministically across two runs', () => {
     const persisted = {
       items: [
