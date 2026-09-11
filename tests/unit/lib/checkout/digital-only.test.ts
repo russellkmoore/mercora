@@ -12,12 +12,12 @@ import type { GiftCardCustomization } from '@/lib/types/cartitem';
 
 const root = process.cwd();
 
-// Pinned to the fixture array below as it exists after 18-07 (WR-02): 5
+// Pinned to the fixture array below as it exists after iteration 2 (IN-03): 6
 // non-empty-cart fixtures, covering both expected outcomes. If a future
 // edit drops fixtures below this floor, the paired-invariant loop could
 // silently stop exercising a composition (or run zero times) while the
 // suite stays green — this assertion turns that into a red test instead.
-const MIN_NON_EMPTY_CART_FIXTURES = 5;
+const MIN_NON_EMPTY_CART_FIXTURES = 6;
 
 const giftCardCustomization: GiftCardCustomization = {
   recipientEmail: 'friend@example.com',
@@ -82,6 +82,16 @@ const fixtures: Fixture[] = [
     cartItems: [{ giftCardNoteInvalid: true }],
     orderItems: [orderItem('digital')],
     expected: true,
+  },
+  {
+    // IN-03: the exact composition the WR-02 review brief traced by hand
+    // (one flagged gift-card line plus one real physical line) had no
+    // fixture of its own. The physical line fails both disjuncts in
+    // isDigitalOnlyCart's .every() predicate, so this must stay false.
+    name: 'one flagged (invalid-note) gift-card line plus one physical line',
+    cartItems: [{ giftCardNoteInvalid: true }, {}],
+    orderItems: [orderItem('digital'), orderItem('physical')],
+    expected: false,
   },
 ];
 
