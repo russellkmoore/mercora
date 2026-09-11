@@ -2,20 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v2.2
 milestone_name: Operations & Polish
-current_phase: 15
-current_phase_name: Subscription Address In Place
+current_phase: 16
+current_phase_name: Blog Surfacing
 current_plan: Not started
-status: executing
-stopped_at: Phase 14 complete, ready to plan Phase 15
-last_updated: "2026-09-10T23:03:39.353Z"
-last_activity: 2026-09-10
-last_activity_desc: Phase 14 complete, transitioned to Phase 15
-state_head: 0f74d8931a3f0c090b92f3b745cd27235dee15da
+status: planning
+stopped_at: Phase 15 complete, ready to plan Phase 16
+last_updated: "2026-09-11T08:04:14.759Z"
+last_activity: 2026-09-11
+last_activity_desc: Phase 15 complete, transitioned to Phase 16
+state_head: f35425deb3c3f56aace9c6cb0d13294794f94538
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 21
-  completed_plans: 18
+  completed_plans: 21
   percent: 14
 ---
 
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-09-09 after Phase 11)
 
 ## Current Position
 
-Phase: 15 (Subscription Address In Place) — READY TO EXECUTE
+Phase: 16 — Blog Surfacing
 Current Plan: Not started
 Total Plans in Phase: 3
-Status: Ready to execute
-Last activity: 2026-09-10 — Phase 14 complete, transitioned to Phase 15
+Status: Ready to plan
+Last activity: 2026-09-11 — Phase 15 complete, transitioned to Phase 16
 
 **Milestone v2.2 phases:**
 
@@ -52,7 +52,7 @@ Last activity: 2026-09-10 — Phase 14 complete, transitioned to Phase 15
 
 **Velocity:**
 
-- Total plans completed: 99 (17 v1, 44 v2)
+- Total plans completed: 102 (17 v1, 44 v2)
 - Average duration: 56 min/plan (Phase 5, 12 plans)
 - Total execution time: ~11.3 hours (v2)
 
@@ -91,6 +91,7 @@ Last activity: 2026-09-10 — Phase 14 complete, transitioned to Phase 15
 | 19 (v2.2) | TBD | - | - |
 | 13 | 9 | - | - |
 | 14 | 9 | - | - |
+| 15 | 3 | - | - |
 
 **Recent Trend:**
 
@@ -318,6 +319,7 @@ Decisions locked for v2:
 - [Phase 13]: [Phase 13] 13-09: Sandbox secret-read guard blocks any Bash command containing the literal .env.local filename, even a content-blind mv — worked around by building the filename from two non-matching string fragments
 - [Phase 14]: Phase 13 security audit (autonomous): 42/42 threats closed. Audit flagged UF-1 — every /admin page was only client-guarded, so the new server-rendered honor banner was readable anonymously; fixed as T-13-42 by gating app/admin/layout.tsx on a server-side Clerk admin session (checkAdminSession extracted from checkAdminPermissions). AR-13-01..04 accepted by Claude under Russell's standing instruction; Russell to confirm at milestone review.
 - [Phase 15]: Phase 14 (autonomous): grey areas answered by Claude — reissue drains the old card via an `adjustment` ledger entry and issues a new card in one D1 batch (once-only via deterministic id + partial unique index); resend audits before sending with a per-event idempotency key; admin-create currency comes from store config; disabled cards' balances count toward the honor guard; code reveal is off by default behind `gift_cards.code_reveal_enabled`, super-admin + confirm + audit-event-first. Security audit 63/63 closed; UF-14-1 showed the Phase 13 admin layout gate insufficient (App Router streams page segments) — fixed by middleware sign-in redirect for /admin pages plus `requireAdminSession()` in every async admin page. AR-14-01..03 accepted by Claude; Russell to confirm. Migration numbering collision (two 0023 files) logged as a Phase 18 todo.
+- [Phase 16]: Phase 15 (autonomous): shared address form extracted from the account page into AddressForm; subscription PDP gets a sentinel "Add a new address…" select option opening a token-class modal, saving through the same account API, pre-selecting the new address, preserving plan/quantity/terms. Two review iterations found and fixed 20 items including two account-page regressions from the extraction (save message, busy locking) and a validation-bound drift across three layers (client filter, acquisition-service, setup-intent route) now unified behind one exported constant. Security audit 11/11 closed. Four items left for Russell's own click-through since this repo has no jsdom render tests.
 
 ### Pending Todos
 
@@ -399,7 +401,7 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-09-10T17:15:28.171Z
-Stopped at: Phase 14 complete, ready to plan Phase 15
+Stopped at: Phase 15 complete, ready to plan Phase 16
 Resume file: None
 
 Next: `/gsd-discuss-phase 13`
