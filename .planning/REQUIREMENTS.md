@@ -31,9 +31,9 @@ Requirements for this milestone. Each maps to a roadmap phase.
 
 ### Subscription address
 
-- [ ] **SUB-01**: On a subscription product page the shipping-address select always offers "Add a new address…", including when the shopper has none; the "Manage addresses" navigation link is gone
-- [ ] **SUB-02**: Choosing it opens a modal with the same address form the account page uses (one shared component, no second field list or validation); saving posts to the existing account addresses API
-- [ ] **SUB-03**: After a successful save the modal closes, the list refreshes and the new address is pre-selected; plan, quantity and other page state survive; API errors show inside the modal; cancel restores the previous selection
+- [x] **SUB-01**: On a subscription product page the shipping-address select always offers "Add a new address…", including when the shopper has none; the "Manage addresses" navigation link is gone
+- [x] **SUB-02**: Choosing it opens a modal with the same address form the account page uses (one shared component, no second field list or validation); saving posts to the existing account addresses API
+- [x] **SUB-03**: After a successful save the modal closes, the list refreshes and the new address is pre-selected; plan, quantity and other page state survive; API errors show inside the modal; cancel restores the previous selection
 
 ### Blog
 
@@ -99,9 +99,9 @@ Deferred to a later milestone.
 | GCA-07 | Phase 14 | Complete |
 | GCA-08 | Phase 14 | Complete |
 | GCA-09 | Phase 14 | Complete |
-| SUB-01 | Phase 15 | Pending |
-| SUB-02 | Phase 15 | Pending |
-| SUB-03 | Phase 15 | Pending |
+| SUB-01 | Phase 15 | Complete |
+| SUB-02 | Phase 15 | Complete |
+| SUB-03 | Phase 15 | Complete |
 | BLOG-01 | Phase 16 | Pending |
 | BLOG-02 | Phase 16 | Pending |
 | BLOG-03 | Phase 16 | Pending |
