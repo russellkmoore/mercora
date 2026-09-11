@@ -146,6 +146,12 @@ export type TelemetryFields = Partial<
   Record<NumberField, number> &
   Record<BooleanField, boolean> & {
     path: string;
+    /**
+     * WR-01: a bounded, non-PII correlation id (currently used for gift-card
+     * delivery/order ids -- see `boundedIdentifier` for the format check).
+     * Never a bearer code, recipient address, or free-text field.
+     */
+    delivery_id: string;
   }
 >;
 
@@ -190,6 +196,24 @@ function queryFreePath(value: unknown): string | undefined {
   return TELEMETRY_PATHS.has(withoutQuery) ? withoutQuery : undefined;
 }
 
+/**
+ * A bounded, format-checked opaque identifier (e.g. a gift-card delivery id
+ * shaped like `gift_delivery_<64 hex chars>` by `stableId` in
+ * gift-card-fulfillment.ts). Unlike the closed-enum fields, this cannot be an
+ * allowlist of exact values (every delivery has a distinct id) -- so instead
+ * it is bounded by length and restricted to a safe charset, which rules out
+ * free text, PII, and anything that could blow the envelope size budget.
+ * WR-01: this is the one non-enum identifier field the taxonomy permits,
+ * deliberately narrow (letters, digits, underscore, hyphen only) so it can
+ * never carry a recipient address, gift message, or bearer code.
+ */
+function boundedIdentifier(value: unknown, maxLength: number): string | undefined {
+  if (typeof value !== 'string' || value.length === 0 || value.length > maxLength) {
+    return undefined;
+  }
+  return /^[A-Za-z0-9_-]+$/.test(value) ? value : undefined;
+}
+
 export function sanitizeTelemetryFields(value: unknown): TelemetryFields | undefined {
   try {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
@@ -219,6 +243,9 @@ export function sanitizeTelemetryFields(value: unknown): TelemetryFields | undef
 
     const path = queryFreePath(source.path);
     if (path) fields.path = path;
+
+    const deliveryId = boundedIdentifier(source.delivery_id, 128);
+    if (deliveryId) fields.delivery_id = deliveryId;
     return Object.keys(fields).length > 0 ? fields : undefined;
   } catch {
     return undefined;

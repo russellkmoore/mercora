@@ -231,9 +231,17 @@ describe('gift-card issuance and durable delivery on real D1', () => {
       await drainGiftCardDeliveries({ environment: runtimeEnvironment(), now: now + attempt });
     }
 
+    // WR-01: every event on this delivery, retry or terminal, must carry the
+    // same delivery id, so an operator can correlate the whole attempt history
+    // to one row.
+    const deliveryRow = await env.DB.prepare(`SELECT id FROM gift_card_deliveries WHERE order_id = ?`)
+      .bind(order.id).first<{ id: string }>();
+    const deliveryId = deliveryRow?.id;
+    expect(deliveryId).toBeTruthy();
+
     // Only the terminal, eighth attempt is a paging envelope the tail
-    // consumer alerts on -- the marker, a registered critical event, and
-    // closed-enum fields only.
+    // consumer alerts on -- the marker, a registered critical event,
+    // closed-enum fields, and the bounded delivery_id (WR-01), never free text.
     const critical = errorSpy.mock.calls
       .map((call) => JSON.parse(String(call[0])))
       .filter((entry) => entry.event === 'gift_card.delivery_failed');
@@ -251,6 +259,7 @@ describe('gift-card issuance and durable delivery on real D1', () => {
         trigger: 'recovery',
         retryable: false,
         attempt: 8,
+        delivery_id: deliveryId,
       },
     });
     // The tail worker only alerts on events in its critical list.
@@ -277,10 +286,13 @@ describe('gift-card issuance and durable delivery on real D1', () => {
         trigger: 'request',
         retryable: true,
         attempt: 1,
+        delivery_id: deliveryId,
       },
     });
     expect(retries.slice(1).map((entry) => entry.fields.trigger)).toEqual(Array(6).fill('recovery'));
     expect(retries.slice(1).map((entry) => entry.fields.attempt)).toEqual([2, 3, 4, 5, 6, 7]);
+    // Every retry, not just the first, is attributable to this one delivery row.
+    expect(retries.map((entry) => entry.fields.delivery_id)).toEqual(Array(7).fill(deliveryId));
 
     // Nothing free-text survives sanitizeTelemetryFields, so the provider's
     // own message ('permanent bounce') must not appear anywhere in either
@@ -316,8 +328,13 @@ describe('gift-card issuance and durable delivery on real D1', () => {
 
     await fulfillPaidGiftCards(order, { environment: runtimeEnvironment(), now });
 
-    // This is the operator-facing proof: a retry is still findable and
-    // attributable -- provider, attempt, trigger -- without paging anyone.
+    const deliveryRow = await env.DB.prepare(`SELECT id FROM gift_card_deliveries WHERE order_id = ?`)
+      .bind(order.id).first<{ id: string }>();
+    expect(deliveryRow?.id).toBeTruthy();
+
+    // WR-01: this is the operator-facing proof: a retry is still findable and
+    // attributable -- provider, attempt, trigger, and now delivery_id --
+    // without paging anyone.
     const critical = errorSpy.mock.calls
       .map((call) => JSON.parse(String(call[0])))
       .filter((entry) => entry.event === 'gift_card.delivery_failed');
@@ -329,7 +346,10 @@ describe('gift-card issuance and durable delivery on real D1', () => {
     expect(retries).toHaveLength(1);
     expect(retries[0]).toMatchObject({
       severity: 'warning',
-      fields: { provider: 'cloudflare_email', attempt: 1, trigger: 'request', retryable: true },
+      fields: {
+        provider: 'cloudflare_email', attempt: 1, trigger: 'request', retryable: true,
+        delivery_id: deliveryRow?.id,
+      },
     });
     errorSpy.mockRestore();
     warnSpy.mockRestore();
@@ -393,6 +413,10 @@ describe('gift-card issuance and durable delivery on real D1', () => {
       code_nonce = NULL, code_key_version = NULL
       WHERE order_id = ?`).bind(order.id).run();
 
+    const deliveryRow = await env.DB.prepare(`SELECT id FROM gift_card_deliveries WHERE order_id = ?`)
+      .bind(order.id).first<{ id: string }>();
+    expect(deliveryRow?.id).toBeTruthy();
+
     await expect(drainGiftCardDeliveries({ environment: runtimeEnvironment(), now: now + 1 }))
       .resolves.toEqual({ attempted: 1 });
     expect(mocks.send).toHaveBeenCalledTimes(1);
@@ -402,13 +426,15 @@ describe('gift-card issuance and durable delivery on real D1', () => {
     // WR-10: terminal on the first attempt, so it never reaches the retry
     // budget that would otherwise surface it. A paid card that can never be
     // delivered has to page someone.
+    // WR-01: it must also be attributable to the delivery row, not just the
+    // provider/outcome shape.
     const parked = errorSpy.mock.calls
       .map((call) => JSON.parse(String(call[0])))
       .filter((entry) => entry.event === 'gift_card.delivery_failed');
     expect(parked).toHaveLength(1);
     expect(parked[0]).toMatchObject({
       severity: 'critical',
-      fields: { outcome: 'failed', provider: 'd1', retryable: false },
+      fields: { outcome: 'failed', provider: 'd1', retryable: false, delivery_id: deliveryRow?.id },
     });
     errorSpy.mockRestore();
   });
