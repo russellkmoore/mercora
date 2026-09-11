@@ -17,6 +17,31 @@ A customer or an external AI agent can find the right product through Volt, pay 
 
 ## Current State
 
+**Shipped: v2.2 Operations & Polish (2026-09-11).** Seven phases (13–19), 39 plans, over 2026-09-10 to 2026-09-11. Archive: `.planning/milestones/v2.2-ROADMAP.md`, `v2.2-REQUIREMENTS.md`, `v2.2-phases/`.
+
+What v2.2 changed:
+
+- Gift-card flags now mean what their names say: sell (`STORE_FEATURE_GIFT_CARD_ACQUISITION`) stops sales, honor (`STORE_FEATURE_GIFT_CARD_RECONCILIATION`) refuses to turn off while any balance or open reservation exists (measured by a cron-written honor guard, not a per-request scan), and both off hides every gift-card surface including the admin nav. `resolveHonorEffective` is the one owner of that decision, called by every surface.
+- The admin gift-card queue became a real panel: searchable list, a per-card timeline merging ledger, reservations, deliveries and human actions, disable/reissue (once-only, proven against a real D1 race)/resend/re-queue/release-hold/admin-create, CSR notes, and a confirm-gated code reveal — migration `0024` (`gift_card_events`, append-only).
+- Subscription product pages replace the "manage addresses" navigation link with a modal using the same shared `AddressForm` the account page uses; saving pre-selects the new address and leaves plan, quantity and terms untouched.
+- The blog is reachable from the header (desktop and mobile, admin-labelled, hidden when nothing is published) and from a configurable home-page articles block (heading, count, on/off, placement — Admin → Settings, not template code).
+- Signed-in shoppers can save a card at checkout (`payment_customers` migration `0025`, a Stripe Customer Session drives the Payment Element's saved-card UI) and manage it from Account → Payment methods; guests see the plain form; Stripe Link stays hidden.
+- Eight pieces of tech debt closed: the orphaned `/api/tax` route deleted, a gift-card delivery env fallback removed before it could strand issuance, an invalid cart gift note now warns instead of vanishing, delivery-retry telemetry split so only terminal failures page, one digital-only-cart rule pinned by a cross-referenced test, and a real bug fixed — order-confirmation email was silently skipped for every non-subscription digital-only (gift-card) order.
+- Phase 19, the deliberately-last human checkpoint: Stripe Tax enabled on the live account, `STORE_SUPPORT_EMAIL` set and routed, `ORDER_STATUS_SECRET`/`EMAIL_UNSUBSCRIBE_SECRET_CURRENT` added as Worker secrets and the stale `ADMIN_USER_IDS` deleted — all three confirmed live, not just claimed.
+- Every phase code-reviewed (two iterations each, several real regressions caught and fixed before deploy — a subscription-renewal email skip, a checkout-panel gap, a delivery-telemetry alert silently dropped by the tail worker's own sanitizer) and security-audited (ASVS L1–L2 depending on sensitivity, 0 open threats across all seven phases) before every push.
+
+Codebase after v2.2: 322 unit test files (2,958 tests) plus the Workers (255) and observability (3) suites; `docs/` 20 files.
+
+**Open items carried out of v2.2** (none blocks feature work; full list in `.planning/todos/pending/`):
+
+- Consolidate `payment_customers` and `subscription_provider_customers` into one Stripe-customer binding — deliberately deferred in Phase 17 to avoid touching revenue-critical subscription code in an unattended run (`consolidate-stripe-customer-bindings.md`).
+- Inline gift-note editing in the cart drawer — Phase 18 gave the shopper an actionable warning (remove and re-add), not a new edit flow.
+- The retroactive gift-note default (D-10: send the note on old pending deliveries) is ratified, not re-decided; Russell can override.
+- Review D-02 (gift-card admin reissue design) and the two-Stripe-customer trade-off at the next milestone checkpoint.
+
+<details>
+<summary>Previous: v2.1 Gift Card Product (2026-09-10)</summary>
+
 **Shipped: v2.1 Gift Card Product (2026-09-10).** Four phases (9–12), 20 plans, 30 tasks over 2026-09-07 to 2026-09-10. Archive: `.planning/milestones/v2.1-ROADMAP.md`, `v2.1-REQUIREMENTS.md`, `v2.1-MILESTONE-AUDIT.md`, `v2.1-phases/`.
 
 What v2.1 changed:
@@ -30,13 +55,7 @@ What v2.1 changed:
 
 Codebase after v2.1: 288 unit test files (2,375 tests) plus the Workers (157) and observability (3) suites; `docs/` 20 files.
 
-**Open items carried out of v2.1** (none blocks feature work; full list in `.planning/milestones/v2.1-MILESTONE-AUDIT.md` and `.planning/todos/pending/`):
-
-- Gift-card admin: disable/reissue/resend/release, per-card audit trail and CSR notes, and sell/honor flag semantics (`gift-card-admin-and-flags.md`).
-- Stripe Tax is unavailable on the live Stripe account; every taxable order uses the 8.25% fallback.
-- `STORE_SUPPORT_EMAIL` is still the placeholder and there is no routing rule for `orders@russellkmoore.me`, so replies bounce. `STORE_SENDER_EMAIL` in `wrangler.jsonc` is the reference deployment's domain; other operators must change it.
-- Orphaned `/api/tax`; `order-effects` `{ DB }` fallback; pre-deploy carts with a URL in the gift note; production secret list missing `ORDER_STATUS_SECRET` and the unsubscribe secrets; `ADMIN_USER_IDS` still present.
-- Blog navigation and home-page block; saved payment methods.
+</details>
 
 <details>
 <summary>Previous: v2 Themeable Storefront (2026-09-05)</summary>
@@ -86,21 +105,6 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 - Dependency review due 2026-12-01 (five moderate dev-only findings).
 
 </details>
-
-## Current Milestone: v2.2 Operations & Polish
-
-**Goal:** Make gift cards operable (flags that mean what they say, an admin that can manage individual cards with an audit trail), close the shopper-facing gaps the v2.1 live test exposed (subscription address entry in place, blog reachable, saved payment methods), and clear the accumulated tech debt and operator checklist.
-
-**Target features:**
-- Sell/honor gift-card flags: sell=off stops sales, honor=off refuses while balances exist, off/off hides every gift-card surface including the admin nav
-- Gift-card admin: list and search, per-card timeline (issuance, holds, redemptions, refunds, admin actions) with CSR notes, disable / reissue / resend / release-hold / admin-create, and a decided code-reveal policy
-- Subscription product page: add a shipping address in a modal without leaving the page; the saved address is pre-selected
-- Blog reachable from the header and a configurable home-page articles block, both admin-configurable
-- Saved payment methods for signed-in shoppers (Stripe Customer, Account → Payment methods)
-- Tech-debt closure: orphaned `/api/tax`, `order-effects` `{ DB }` fallback, cart notes with URLs, delivery-failed event split, one digital-only rule, billing address on digital receipts, stale docs claims, theme metadata on the Appearance cards
-- Operator checklist with human checkpoints: Stripe Tax on the live account, support address and `orders@` routing, missing production secrets, stale `ADMIN_USER_IDS`
-
-**Key context:** Phase numbering continues at 13. Gift-card backend semantics stay locked behind ADR-CTB-10; the admin work adds an expand-only `gift_card_events` table and admin APIs on top. Env var names for the flags stay for compatibility; only their behaviour and documentation change.
 
 ## Requirements
 
@@ -158,21 +162,28 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 - ✓ One real Stripe test-mode gift-card purchase on production issued a card and delivered the email (cron-driven, Cloudflare Email Sending) — v2.1 (Phase 12, SHOP-07 with the account-listing clause withdrawn)
 - ✓ Gift-card tender applied on the Payment Information step with Apply/Remove, previous hold released on re-quote, masked code on the summary and receipt — v2.1 (post-proof, from Russell's live checkout)
 
+- ✓ Gift-card flags sell and honor do what their names say: sell=off stops sales (product page unavailable notice, checkout server-side rejection), honor=off refuses while any balance or open reservation exists (a cron-written honor guard, not a per-request scan), off/off hides every surface including the admin nav — v2.2 (Phase 13)
+- ✓ Gift-card admin: searchable list, per-card timeline (ledger + reservations + deliveries + human actions), disable, once-only reissue, resend, re-queue, release-hold, admin-create, CSR notes, confirm-gated code reveal, expand-only `gift_card_events` audit table (migration 0024) — v2.2 (Phase 14)
+- ✓ Subscription product page: an "Add a new address…" select option opens a modal with the shared `AddressForm`; saving pre-selects the address and leaves plan/quantity/terms untouched — v2.2 (Phase 15)
+- ✓ Blog reachable from the header (desktop + mobile, admin-labelled, hidden when nothing published) and a configurable home-page articles block (heading, count, on/off, placement) — v2.2 (Phase 16)
+- ✓ Saved payment methods for signed-in shoppers: one Stripe Customer per shopper, a Customer Session drives the Payment Element's saved-card UI, Account → Payment methods lists/removes; guests unaffected, Link stays hidden — v2.2 (Phase 17)
+- ✓ Tech debt closed: `/api/tax` deleted, `order-effects` `{ DB }` fallback removed, invalid cart gift notes warn instead of vanishing, delivery-retry telemetry split (only terminal failures page), one digital-only-cart rule cross-referenced and pinned, digital-only order confirmation email and billing address fixed, migration-number-collision check added, admin Appearance theme metadata confirmed already shipping — v2.2 (Phase 18)
+- ✓ Operator checklist: Stripe Tax enabled on the live account, `STORE_SUPPORT_EMAIL` set and routed, `ORDER_STATUS_SECRET`/`EMAIL_UNSUBSCRIBE_SECRET_CURRENT` added, stale `ADMIN_USER_IDS` deleted — v2.2 (Phase 19, human-checkpoint)
+
 ### Active
 
 <!-- Next milestone candidates. Seeds in .planning/todos/pending/. -->
 
-- [ ] Gift-card admin: list/search cards, per-card audit trail and notes, disable, reissue, resend, release holds, admin-created cards; decision on revealing codes
-- [ ] Sell/honor gift-card flags that do what they say (sell=off stops sales; honor=off refuses while balances exist; off/off hides everything including admin nav)
-- [ ] Blog reachable from the header and a configurable home-page articles block
-- [ ] Saved payment methods for signed-in shoppers (Stripe Customer, Account → Payment methods)
+(None yet — v2.2 shipped with 0 open requirement gaps. Candidates for the next milestone live in `.planning/todos/pending/`: `consolidate-stripe-customer-bindings.md`, plus whatever surfaces from the next round of live testing.)
 
 ### Out of Scope
 
 <!-- Explicit boundaries. Includes reasoning to prevent re-adding. -->
 
 - An Account → Gift cards listing — removed 2026-09-10. A gift card is a bearer instrument delivered by email, not an account object; a purchaser-keyed listing could never show the recipient anything and misled the buyer. Admin management replaces it.
-- Stripe Link's "Save my information" box — hidden 2026-09-10; it saved cards to Link, not to the store. Returns only with a real saved-payment-methods feature.
+- Stripe Link's "Save my information" box — hidden 2026-09-10, replaced by a real saved-payment-methods feature in v2.2 (Phase 17); Link itself stays off — re-enabling it is a separate, explicit future decision, not part of this feature.
+- Inline gift-note editing in the cart drawer — v2.2 (Phase 18) gives the shopper an actionable warning (remove and re-add) instead; a full edit flow is a bigger UI feature than tech-debt closure scope.
+- Sharing one Stripe Customer table between checkout and subscriptions — v2.2 (Phase 17) deliberately kept `payment_customers` separate from `subscription_provider_customers` to avoid touching revenue-critical subscription code in an unattended run; consolidation is a future refactor (`consolidate-stripe-customer-bindings.md`).
 
 - The 12 planned items from the retired `docs/ROADMAP.md` (PWA, touch interactions, wishlist, social, visual search, predictive analytics, multi-language, advanced security, email marketing, advanced analytics, image caching, reviews header) — backlogged in `.planning/milestones/v1-REQUIREMENTS.md` by user decision; v1 was hardening only. Candidates for the next milestone, not out of scope forever
 - Unbuilt modules from the retired `docs/admin-dashboard-specification.md` (MFA, WebSocket/SSE, custom report builder, fulfillment automation, GDPR/CCPA tools, VIP tiers, personalization admin) — that document is a historical design doc, not a backlog (W2 resolved); admin is treated as shipped
@@ -195,19 +206,22 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 - Admin auth is enforced in production through Clerk role or an active `adminUsers` row, or a header-only bearer token. The `x-dev-admin` bypass and the signed-in-user shortcut require `NODE_ENV === "development"`, and `lib/auth/deployment-guard.ts` returns 503 if such a build ever reaches the Workers runtime.
 - The text model is `@cf/openai/gpt-oss-20b` (`lib/ai/config.ts`). The MCP server exposes 19 tools (`app/api/mcp/route.ts`).
 - `npm run deploy` never applies remote migrations (ADR-DBM-01). `npm run deploy:ci`, used by Cloudflare Workers Builds, applies production migrations before uploading. Expand-only migrations (ADR-DBM-05) is a hard rule because the schema lands before the new Worker.
-- Migrations live in `migrations/`; the highest tracked file is `0023_add_order_effects_payload.sql`; the next free schema-bearing number is `0024`.
+- Migrations live in `migrations/`; the highest tracked file is `0025_add_payment_customers.sql`; the next free schema-bearing number is `0026`. Two files share number `0023` (`0023_add_order_effects_payload.sql`, `0023_normalize_tax_category_codes.sql`), both applied in production and deterministically ordered by filename — documented in `docs/database-migrations.md`, and `check:migrations` now refuses any new file that reuses an existing number.
+- The gift-card money decision ("is honor effectively on") has one owner: `resolveHonorEffective` in `lib/gift-cards/honor-guard.ts`, called by the runtime, checkout, the balance route, and the admin page/API — never re-derived independently.
+- Two separate Stripe Customer bindings exist by design: `payment_customers` (checkout saved cards, migration 0025) and `subscription_provider_customers` (subscriptions, pre-v2.2). A shopper who uses both features gets two Stripe Customer objects; consolidating them is deferred (`consolidate-stripe-customer-bindings.md`).
 - Telemetry taxonomy now includes `auth.deployment_guard_tripped`, `checkout.tax_fallback`, `payment.intent_failed`, and `theme.unknown_selection`; web vitals go to the `mercora_web_vitals` Analytics Engine dataset via the `WEB_VITALS` binding. The `commerce-observability-tail` Worker is wired as a tail consumer in `wrangler.jsonc`.
 - `wrangler.jsonc` carries two `pk_test_` publishable keys by design (demo environment); the file stays tracked.
 
-**Known debt after v1 and v2** (nothing here blocks feature work):
+**Known debt after v1–v2.2** (nothing here blocks feature work):
 - Mobile Lighthouse scores are 72–80 on all four measured routes against a target of 85.
 - `NEXT_PUBLIC_SITE_URL` is a runtime var only, so the live sitemap advertises `mercora.example.com` until a Workers Build variable is added.
 - `lib/hooks/useEnhancedUserContext.ts` still has the cosmetic `favoriteCategories` TODO.
 - Six non-`/api/admin` callers of `authenticateRequest` get 401 rather than 503 when the deployment guard trips (documented residual, `docs/admin-authentication.md`).
 - Client-side dev-mode admin shortcuts in `components/admin/AdminGuard.tsx` remain (accepted risk AR-01-03).
-- `npm run docs:lint` is a local gate only, not in CI.
-- The admin Appearance page has never been walked through with a real Clerk admin session.
 - Direction-doc theme properties outside the 23-token contract are backlog (`.planning/todos/pending/`).
+- `payment_customers` and `subscription_provider_customers` are two separate Stripe-customer bindings for the same shopper (v2.2, Phase 17 D-02) — consolidation deferred.
+- Inline gift-note editing in the cart is not built; an invalid note gets an actionable warning (remove and re-add), not an edit flow (v2.2, Phase 18).
+- The retroactive gift-note default (send the note on old pending deliveries, ratified not re-decided) awaits Russell's confirmation or override (v2.2, Phase 18 D-10).
 
 ## Constraints
 
@@ -320,6 +334,23 @@ Live site: https://voltique.russellkmoore.me (demo, Stripe test mode). Codebase:
 | Gift-card flags are sell (`ACQUISITION`) and honor (`RECONCILIATION`); sell-without-honor is invalid; sell=off must stop sales, honor=off must refuse while balances exist; off/off hides everything | Prepaid balances must be honored after a store stops selling cards; today's code gates redemption instead of sales, so the flags are redesigned in the next milestone | — Pending (v2.2 seed) |
 | Stripe Link hidden in the Payment Element (`link: 'never'`) | Its "save my information" saved to Link, not to the store, which has no saved-payment feature | ✓ Good |
 
+| Tender is gated on honor only, never sell; sell-without-honor keeps throwing `CommerceCapabilityConfigurationError`; honor=off is ignored (redemption keeps working) while a cron-measured `admin_settings` row shows any active balance or open reservation, missing/stale reading as "balances may exist"; hiding (sell/honor state) and honoring (money) are separate decisions — a hidden-both-off gift card can still be honored if money is outstanding (Phase 13) | Prepaid money must never be stranded by flipping a var; a per-request balance scan would be too slow, so the cron writes one small row the request path reads cheaply | ✓ Good |
+| Listing visibility is one shared predicate (`lib/gift-cards/visibility.ts`) imported at nine public call sites, never inside `lib/models/mach/products.ts` (which `/admin/products` also uses); the money decision has exactly one owner, `resolveHonorEffective`, called by the runtime, checkout, the balance route and the admin page/API (Phase 13, review-found: four call sites had drifted to different preconditions before this was locked) | A second implementation of "is this hidden" or "is honoring effectively on" always drifts from the first; the review caught it once and the fix made drift structurally impossible | ✓ Good |
+| Admin server pages gate on `checkAdminSession()` as their first `await`, in addition to the client-side `AdminGuard`; middleware redirects an anonymous `/admin` page request to sign-in before any segment renders (Phase 13 security audit, T-13-42/T-14-63) | The client guard alone doesn't stop a server-rendered admin page's data from reaching an anonymous request in the RSC payload — a real gap the honor-guard banner's own data exposed | ✓ Good |
+| Reissue is one D1 `batch()` (adjustment, new account, issuance ledger, delivery, both audit events); once-only via a deterministic new-card id plus a partial UNIQUE index, not a sequential two-call implementation (Phase 14, code-review CR-01) | The first implementation could strand the old card's balance if the second write failed; the fix proved atomicity with a real injected-failure test, not just a same-input-twice test | ✓ Good |
+| Code reveal is off by default (`gift_cards.code_reveal_enabled`), requires a super-admin session, a confirm step, and writes the audit event before decrypting — a failed decrypt after the event still wrote a truthful record, not a phantom reveal (Phase 14) | Codes exist only as an HMAC hash plus an encrypted delivery copy; revealing means decrypting in admin, which needed its own audit trail separate from ledger events | ✓ Good |
+| Admin gift-card projections and event details are checked by a forbidden-column source contract that greps the actual read paths for code material (hash, ciphertext, nonce, key version, claim token, idempotency key), not relied on by review alone (Phase 14) | A single missed grep target let a WR-05 finding through a code-camelCase form the first pass didn't scan; the contract now covers both cases | ✓ Good |
+| The address form is one shared component (`AddressForm.tsx` + `saveAddress()`) used by both the account page and the subscription-panel modal; the client's `isDigitalOnlyCart` and the server's `hasPhysicalCheckoutLines` stay two implementations, cross-referenced by doc comment and pinned by one invariant test, not merged into one function (Phase 15, Phase 18 D-05) | Plumbing `fulfillment_type` onto client cart items to make the second pair literally one function is a bigger, riskier change than either phase's scope; the test is the enforcement mechanism either way | ✓ Good |
+| The blog's existence check on every storefront page is wrapped in its own try/catch, defaulting to "no blog link" on failure — kept separate from the unrelated `getContentSettings()` guard (Phase 16, code-review CR-01) | `Header.tsx` renders on every route; an unguarded D1 read for a link nobody needs to see that day would take down the whole storefront on a transient failure | ✓ Good |
+| Saved payment methods use a Stripe Customer Session (`payment_method_save_usage` on the session, never `setup_future_usage` on the PaymentIntent — combining both is a documented Stripe integration error); `payment_method_remove: 'disabled'` on the session since removal lives on the account page, not in checkout (Phase 17, D-06/D-06a, verified against Stripe's current docs and the installed SDK types, not training-data recall) | The roadmap's literal "PaymentIntent with `setup_future_usage`" phrasing was wrong; research resolved the actual current Stripe mechanism before planning | ✓ Good |
+| The DELETE payment-method route answers 404 for both "not yours" and "doesn't exist" through one shared function, and the idempotency-key derivation for the new Stripe-customer binding copies `stableId`'s exact NUL-byte separator from `lib/subscriptions/acquisition-service.ts` byte-for-byte, not from a paraphrase (Phase 17) | A distinguishable-but-different response leaks which ids exist to a probing caller; a wrong separator would silently produce different idempotency keys than the existing subscription-customer binding uses for the same concept | ✓ Good |
+| `/api/tax` deleted outright rather than wired up — it had zero non-test callers and diverged from the authoritative `checkout-pricing.ts` (a different hardcoded rate, no gift-card exemption); `order-effects.ts`'s `{ DB }`-only gift-card environment fallback removed, since a partial environment is worse than none for issuance's own key-ring parsing (Phase 18, DEBT-01/02) | Dead code that duplicates and disagrees with the real implementation is a landmine, not neutral; the request path today never hit the fallback, but a future caller could have | ✓ Good |
+| An invalid cart gift note is flagged (`giftCardNoteInvalid: true`), not silently dropped; `projectCartLineForCheckout` explicitly refuses a flagged line rather than letting an unvalidated blob through as if trusted (Phase 18, DEBT-03, code-review-found security edge) | Without the explicit refusal, a shopper could have paid for a gift card with no recipient ever recorded — the review found this before it shipped | ✓ Good |
+| Gift-card delivery telemetry splits into `gift_card.delivery_retry` (warning, never pages) and `gift_card.delivery_failed` (critical, terminal only); the new `delivery_id` correlation field had to be added to both the producer sanitizer and the tail worker's own independent sanitizer, not just one (Phase 18, DEBT-04, code-review iteration-2 CR-01) | Every retry attempt paged identically to a terminal failure before this; the second sanitizer gap would have silently dropped the correlation id from the one alert email that matters | ✓ Good |
+| Digital-only order confirmation emails use a union guard (the existing subscription flag OR `!hasPhysicalCheckoutLines`), not a straight replacement — a subscription renewal's `OrderItem` carries no `fulfillment_type`, so the server rule alone misreads it as physical (Phase 18, DEBT-06, planner-caught hazard, independently re-found by the executor) | A straight replacement would have re-introduced the exact bug (silently skipped confirmation emails) for a different order type; the union covers both | ✓ Good |
+| Three v2.1 broken-windows entries closed on cited code-level evidence rather than re-fixed: the "scan:tokens is local-only" doc claim was already stale-fixed by unrelated Phase 8.2 work, the REQUIREMENTS-wide verify check lived only in an archived plan, and the retroactive gift-note question is ratified as "send it" by default (Phase 18) | Closing with evidence, not silent deletion, keeps the audit trail honest about what changed versus what was already true | ✓ Good |
+| All three Phase 19 operator items executed and verified from outside the repo: Stripe Tax by Russell's direct dashboard confirmation, the support email and both new Worker secrets by live read-only checks (`curl`, `wrangler secret list`) after the fact, never by trusting the action alone | The whole milestone's own convention — code-level evidence over trust — extends to the one phase that has no code to check | ✓ Good |
+
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
@@ -338,4 +369,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-10 — milestone v2.2 started*
+*Last updated: 2026-09-11 — milestone v2.2 shipped*
