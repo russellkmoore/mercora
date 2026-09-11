@@ -48,6 +48,37 @@ function emailLessOrder(): Order {
   };
 }
 
+function giftCardOnlyOrder(): Order {
+  return {
+    id: 'MCP-GIFTCARD-1',
+    status: 'processing',
+    payment_status: 'paid',
+    total_amount: Money.fromMinor(2_500).toJSON(),
+    currency_code: 'USD',
+    billing_address: {
+      recipient: 'Ada Lovelace',
+      line1: '1 Main Street',
+      city: 'Austin',
+      region: 'TX',
+      postal_code: '73301',
+      country: 'US',
+    },
+    items: [{
+      id: 'line-1',
+      product_id: '',
+      variant_id: 'variant-1',
+      sku: 'SKU-1',
+      product_name: 'Gift Card',
+      quantity: 1,
+      unit_price: Money.fromMinor(2_500).toJSON(),
+      total_price: Money.fromMinor(2_500).toJSON(),
+      fulfillment_type: 'digital',
+      gift_card: { recipientEmail: 'recipient@example.test' },
+    }],
+    extensions: { email: 'buyer@example.test' },
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getStoreConfig.mockReturnValue({
@@ -106,6 +137,36 @@ describe('merchant order effect payload', () => {
       idempotencyKey: 'merchant/digital/v1',
     });
     expect(mocks.sendMerchant.mock.calls.at(-1)?.[0]).not.toHaveProperty('shippingAddress');
+  });
+
+  it('sends a gift-card-only order confirmation with the billing address and label', async () => {
+    mocks.sendConfirmation.mockResolvedValue({ success: true, id: 'customer-giftcard' });
+    const order = giftCardOnlyOrder();
+
+    await expect(sendOrderConfirmation(order, 'confirmation/giftcard/v1'))
+      .resolves.toMatchObject({ success: true, id: 'customer-giftcard' });
+    expect(mocks.sendConfirmation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customerEmail: 'buyer@example.test',
+        shippingAddress: expect.objectContaining({ city: 'Austin' }),
+        addressLabel: 'billing',
+      }),
+      { idempotencyKey: 'confirmation/giftcard/v1' },
+    );
+  });
+
+  it('sends the merchant notification for the same gift-card-only order', async () => {
+    const order = giftCardOnlyOrder();
+
+    await expect(sendMerchantOrderNotification(order, 'merchant/giftcard/v1'))
+      .resolves.toMatchObject({ success: true, id: 'merchant-1' });
+    expect(mocks.sendMerchant).toHaveBeenCalledWith(
+      expect.objectContaining({
+        shippingAddress: expect.objectContaining({ city: 'Austin' }),
+        addressLabel: 'billing',
+      }),
+      { idempotencyKey: 'merchant/giftcard/v1' },
+    );
   });
 
   it('reports a skip only when the merchant recipient is absent', async () => {

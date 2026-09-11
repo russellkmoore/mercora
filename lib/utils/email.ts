@@ -32,6 +32,8 @@ export interface OrderData {
     zipCode: string;
     country: string;
   };
+  /** Present only alongside shippingAddress; 'billing' when the address is a billing-address fallback (D-06). */
+  addressLabel?: 'shipping' | 'billing';
   estimatedDelivery?: string;
 }
 
