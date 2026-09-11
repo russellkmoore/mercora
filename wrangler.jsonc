@@ -132,7 +132,8 @@
     "STORE_FEATURE_GIFT_CARD_ACQUISITION": "true",
     "EMAIL_PROVIDER": "cloudflare",
     // Sender must be on a domain onboarded to Cloudflare Email Sending in this account.
-    "STORE_SENDER_EMAIL": "Voltique <orders@russellkmoore.me>"
+    "STORE_SENDER_EMAIL": "Voltique <orders@russellkmoore.me>",
+    "STORE_SUPPORT_EMAIL": "support@russellkmoore.me"
   },
   /**
    * Note: Use secrets to store sensitive data.
