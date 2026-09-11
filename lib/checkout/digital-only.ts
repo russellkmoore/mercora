@@ -27,9 +27,19 @@ export const DIGITAL_CHECKOUT_STEPS: readonly string[] = [
 ];
 
 /**
- * True when every line in a non-empty cart carries a gift-card
- * customization. An empty cart is not digital-only — it hits the existing
- * empty-cart branch before any step UI renders.
+ * True when every line in a non-empty cart is a gift-card/digital line —
+ * either it carries a gift-card customization, or (WR-02) it is a
+ * DEBT-03-flagged line whose customization failed re-validation on load
+ * (`giftCardNoteInvalid: true`). A flagged line lost its
+ * `giftCardCustomization` by design (DEBT-03 does not carry the invalid
+ * customization forward), but it is still a gift-card line — checkout will
+ * refuse it either way (`projectCartLineForCheckout` throws on a flagged
+ * line), so both signals must agree it is digital-only until the shopper
+ * removes it. Before this fix, a cart holding only a flagged line was
+ * misclassified as not-digital-only (closes WINDOWS.md ledger entry 12).
+ *
+ * An empty cart is not digital-only — it hits the existing empty-cart
+ * branch before any step UI renders.
  *
  * This is one half of a pinned pair (D-05). The other half is
  * `hasPhysicalCheckoutLines` in `lib/gift-cards/checkout.ts`, the
@@ -39,9 +49,10 @@ export const DIGITAL_CHECKOUT_STEPS: readonly string[] = [
  *
  * They read different fields because the client `CartItem` type carries no
  * `fulfillment_type` — the server field the other half reads — so this
- * function keys on the gift-card customization instead. The two agree
- * today only because `lib/services/checkout-pricing.ts` refuses to attach
- * a `giftCardCustomization` to any line that is not already digital and
+ * function keys on the gift-card customization (or the flagged-invalid
+ * marker) instead. The two agree today only because
+ * `lib/services/checkout-pricing.ts` refuses to attach a
+ * `giftCardCustomization` to any line that is not already digital and
  * non-shipping; that check is what keeps this signal sufficient.
  *
  * `tests/unit/lib/checkout/digital-only.test.ts` is where the equivalence
@@ -49,7 +60,9 @@ export const DIGITAL_CHECKOUT_STEPS: readonly string[] = [
  * update that test deliberately — do not let it drift.
  */
 export function isDigitalOnlyCart(
-  items: readonly { giftCardCustomization?: unknown }[]
+  items: readonly { giftCardCustomization?: unknown; giftCardNoteInvalid?: unknown }[]
 ): boolean {
-  return items.length > 0 && items.every((item) => item.giftCardCustomization !== undefined);
+  return items.length > 0 && items.every(
+    (item) => item.giftCardCustomization !== undefined || item.giftCardNoteInvalid === true,
+  );
 }
