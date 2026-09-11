@@ -214,7 +214,7 @@ describe('gift-card issuance and durable delivery on real D1', () => {
       .bind(order.id).first()).resolves.toMatchObject({ status: 'sent' });
   });
 
-  it('escalates a permanently failing delivery to review after the attempt budget', async () => {
+  it('escalates a permanently failing delivery to review after the attempt budget, paging once (D-04)', async () => {
     const order = giftOrder();
     await insertOrder(order);
     // A provider-configuration failure reports no provider at all (the sender
@@ -223,6 +223,7 @@ describe('gift-card issuance and durable delivery on real D1', () => {
       success: false, error: 'permanent bounce', errorCode: 'E_PROVIDER_CONFIG',
     });
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     // Attempt 1 happens in the paid effect; drain until the budget is exhausted.
     await fulfillPaidGiftCards(order, { environment: runtimeEnvironment(), now });
@@ -230,15 +231,43 @@ describe('gift-card issuance and durable delivery on real D1', () => {
       await drainGiftCardDeliveries({ environment: runtimeEnvironment(), now: now + attempt });
     }
 
-    // Every attempt emits a telemetry envelope the tail consumer can see:
-    // the marker, a registered critical event, and closed-enum fields only.
-    const logged = errorSpy.mock.calls.map((call) => JSON.parse(String(call[0])));
-    expect(logged).toHaveLength(8);
-    expect(logged[0]).toEqual({
+    // Only the terminal, eighth attempt is a paging envelope the tail
+    // consumer alerts on -- the marker, a registered critical event, and
+    // closed-enum fields only.
+    const critical = errorSpy.mock.calls
+      .map((call) => JSON.parse(String(call[0])))
+      .filter((entry) => entry.event === 'gift_card.delivery_failed');
+    expect(critical).toHaveLength(1);
+    expect(critical[0]).toEqual({
       marker: TELEMETRY_MARKER,
       event: 'gift_card.delivery_failed',
       area: 'gift_card',
       severity: 'critical',
+      timestamp: expect.any(String),
+      fields: {
+        operation: 'send',
+        outcome: 'failed',
+        provider: 'cloudflare_email',
+        trigger: 'recovery',
+        retryable: false,
+        attempt: 8,
+      },
+    });
+    // The tail worker only alerts on events in its critical list.
+    expect(TAIL_CRITICAL_EVENTS).toContain('gift_card.delivery_failed');
+    expect(TAIL_CRITICAL_EVENTS).not.toContain('gift_card.delivery_retry');
+
+    // The other seven attempts are warnings -- still visible to an operator,
+    // never paging.
+    const retries = warnSpy.mock.calls
+      .map((call) => JSON.parse(String(call[0])))
+      .filter((entry) => entry.event === 'gift_card.delivery_retry');
+    expect(retries).toHaveLength(7);
+    expect(retries[0]).toEqual({
+      marker: TELEMETRY_MARKER,
+      event: 'gift_card.delivery_retry',
+      area: 'gift_card',
+      severity: 'warning',
       timestamp: expect.any(String),
       fields: {
         operation: 'send',
@@ -250,17 +279,19 @@ describe('gift-card issuance and durable delivery on real D1', () => {
         attempt: 1,
       },
     });
-    // The last attempt is the one that parks the row for a human.
-    expect(logged.at(-1)?.fields).toMatchObject({ attempt: 8, retryable: false, trigger: 'recovery' });
-    // The tail worker only alerts on events in its critical list.
-    expect(TAIL_CRITICAL_EVENTS).toContain('gift_card.delivery_failed');
-    // Nothing free-text survives sanitizeTelemetryFields, so the provider's own
-    // message ('permanent bounce') must not appear anywhere in the envelope.
-    const serialized = JSON.stringify(logged);
+    expect(retries.slice(1).map((entry) => entry.fields.trigger)).toEqual(Array(6).fill('recovery'));
+    expect(retries.slice(1).map((entry) => entry.fields.attempt)).toEqual([2, 3, 4, 5, 6, 7]);
+
+    // Nothing free-text survives sanitizeTelemetryFields, so the provider's
+    // own message ('permanent bounce') must not appear anywhere in either
+    // collection -- the retry envelopes are held to the same bar as the
+    // critical one.
+    const serialized = JSON.stringify([...critical, ...retries]);
     expect(serialized).not.toContain('permanent bounce');
     expect(serialized).not.toContain(order.items[0].gift_card!.recipientEmail);
     expect(serialized).not.toMatch(/GC-[A-Z0-9]{4}/);
     errorSpy.mockRestore();
+    warnSpy.mockRestore();
 
     const parked = await env.DB.prepare(`SELECT status, attempt_count, completed_at
       FROM gift_card_deliveries WHERE order_id = ?`).bind(order.id)
@@ -272,6 +303,44 @@ describe('gift-card issuance and durable delivery on real D1', () => {
     await expect(drainGiftCardDeliveries({ environment: runtimeEnvironment(), now: now + 8 }))
       .resolves.toEqual({ attempted: 0 });
     expect(mocks.send).toHaveBeenCalledTimes(sends);
+  });
+
+  it('records a single retryable send failure as a warning, findable but never paging (D-04)', async () => {
+    const order = giftOrder();
+    await insertOrder(order);
+    mocks.send.mockResolvedValueOnce({
+      success: false, error: 'temporary provider hiccup', errorCode: 'E_TEMP',
+    });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await fulfillPaidGiftCards(order, { environment: runtimeEnvironment(), now });
+
+    // This is the operator-facing proof: a retry is still findable and
+    // attributable -- provider, attempt, trigger -- without paging anyone.
+    const critical = errorSpy.mock.calls
+      .map((call) => JSON.parse(String(call[0])))
+      .filter((entry) => entry.event === 'gift_card.delivery_failed');
+    expect(critical).toHaveLength(0);
+
+    const retries = warnSpy.mock.calls
+      .map((call) => JSON.parse(String(call[0])))
+      .filter((entry) => entry.event === 'gift_card.delivery_retry');
+    expect(retries).toHaveLength(1);
+    expect(retries[0]).toMatchObject({
+      severity: 'warning',
+      fields: { provider: 'cloudflare_email', attempt: 1, trigger: 'request', retryable: true },
+    });
+    errorSpy.mockRestore();
+    warnSpy.mockRestore();
+
+    // Resolve the delivery so a later test's drain -- scanning all due rows,
+    // not just its own order -- doesn't pick this one up too.
+    mocks.send.mockResolvedValueOnce({ success: true, id: 'single-retry-cleanup' });
+    await expect(drainGiftCardDeliveries({ environment: runtimeEnvironment(), now: now + 1 }))
+      .resolves.toEqual({ attempted: 1 });
+    await expect(env.DB.prepare(`SELECT status FROM gift_card_deliveries WHERE order_id = ?`)
+      .bind(order.id).first()).resolves.toMatchObject({ status: 'sent' });
   });
 
   it("carries the buyer's gift message into the delivery email, HTML-escaped", async () => {
