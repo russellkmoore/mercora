@@ -98,7 +98,7 @@ describe("GET /api/account/payment-methods", () => {
     mocks.list.mockRejectedValue(new Error("cus_123 secret leak"));
     const response = await GET();
     expect(response.status).toBe(503);
-    const body = await response.json();
+    const body = await response.json() as { error: string };
     expect(body.error).not.toContain("cus_123");
   });
 });
@@ -181,7 +181,7 @@ describe("DELETE /api/account/payment-methods/[id]", () => {
     mocks.retrieve.mockRejectedValue(new Error("cus_owner secret leak"));
     const response = await DELETE(deleteRequest("pm_1"), paramsFor("pm_1"));
     expect(response.status).toBe(503);
-    const body = await response.json();
+    const body = await response.json() as { error: string };
     expect(body.error).not.toContain("cus_owner");
     expect(mocks.detach).not.toHaveBeenCalled();
   });
@@ -193,7 +193,7 @@ describe("DELETE /api/account/payment-methods/[id]", () => {
     mocks.detach.mockRejectedValue(new Error("cus_owner secret leak"));
     const response = await DELETE(deleteRequest("pm_1"), paramsFor("pm_1"));
     expect(response.status).toBe(503);
-    const body = await response.json();
+    const body = await response.json() as { error: string };
     expect(body.error).not.toContain("cus_owner");
   });
 });
