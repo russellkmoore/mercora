@@ -53,3 +53,31 @@ describe('shared gift-card recipient block wiring', () => {
     expect(orderItemCard).toContain('item?.giftCardCustomization &&');
   });
 });
+
+describe('invalid-gift-note advisory warning (D-03, ledger #10)', () => {
+  const card = readFileSync(join(root, 'components/cart/CartItemCard.tsx'), 'utf8');
+
+  it('computes the flag with a strict boolean comparison so an absent key is falsy', () => {
+    expect(card).toMatch(/giftCardNoteInvalid\s*===\s*true/);
+  });
+
+  it('renders a warning paragraph guarded on the flag', () => {
+    expect(card).toMatch(/giftCardNoteInvalid\s*&&/);
+  });
+
+  it('reuses the exact className string from the existing unavailable-line warning', () => {
+    const warningClass = 'text-xs sm:text-sm text-warning mt-1';
+    const occurrences = card.split(warningClass).length - 1;
+    expect(occurrences).toBeGreaterThanOrEqual(2);
+  });
+
+  it('includes the D-03 remediation copy', () => {
+    expect(card).toContain(
+      'This gift note can no longer be sent — remove this line and add the item again to fix it.'
+    );
+  });
+
+  it('adds no disabled prop or submit gate tied to either advisory flag', () => {
+    expect(card).not.toMatch(/disabled=\{[^}]*(giftCardLineUnavailable|giftCardNoteInvalid)/);
+  });
+});
