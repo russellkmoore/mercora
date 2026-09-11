@@ -17,6 +17,7 @@
  * - **Store Settings**: Store name, contact info, currency, tax rates
  * - **AI Settings**: Assistant behavior, response length, personalization
  * - **System Settings**: Debug mode, maintenance mode, analytics, notifications
+ * - **Content Settings**: Blog navigation label and home-page latest-articles block
  *
  * === AI Configuration Options ===
  * - **Personality Mode**: Professional, friendly, or cheeky response style
@@ -68,8 +69,18 @@ import {
   Settings, Store, Bot, Mail, Database,
   RefreshCw, Save, Globe, DollarSign,
   Shield, Zap, AlertCircle, CheckCircle,
-  Share2, Palette
+  Share2, Palette, Newspaper
 } from "lucide-react";
+import {
+  BLOG_HOME_BLOCK_PLACEMENTS,
+  BLOG_HOME_BLOCK_COUNT_MIN,
+  BLOG_HOME_BLOCK_COUNT_MAX,
+  BLOG_NAV_LABEL_MAX_LENGTH,
+  BLOG_HOME_BLOCK_HEADING_MAX_LENGTH,
+  CONTENT_SETTING_KEYS,
+  CONTENT_SETTING_DEFAULTS,
+  type BlogHomeBlockPlacement,
+} from "@/lib/content/settings";
 
 interface SystemSettings {
   maintenance_mode: boolean;
@@ -111,6 +122,22 @@ interface PromotionSettings {
   new_customer_discount: number;
 }
 
+interface ContentSettingsForm {
+  blog_nav_label: string;
+  blog_home_block_enabled: boolean;
+  blog_home_block_heading: string;
+  blog_home_block_count: number;
+  blog_home_block_placement: BlogHomeBlockPlacement;
+}
+
+// Human labels for BLOG_HOME_BLOCK_PLACEMENTS, index-aligned so no placement
+// literal is retyped here — the <select> below maps the imported enum array
+// to this array by position.
+const BLOG_HOME_BLOCK_PLACEMENT_LABELS: readonly string[] = [
+  "Above featured products",
+  "Below featured products",
+];
+
 interface SocialMediaSettings {
   instagram: string;
   youtube: string;
@@ -129,7 +156,7 @@ interface VectorIndexStatus {
 export default function AdminSettingsPage() {
   const store = useStoreConfig();
   const pathname = usePathname();
-  const [activeTab, setActiveTab] = useState<"system" | "store" | "shipping" | "refunds" | "promotions" | "social" | "admins">("system");
+  const [activeTab, setActiveTab] = useState<"system" | "store" | "shipping" | "refunds" | "promotions" | "content" | "social" | "admins">("system");
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
@@ -178,6 +205,14 @@ export default function AdminSettingsPage() {
     banner_text: 'Free shipping is available on qualifying orders!',
     banner_type: 'info',
     new_customer_discount: 0
+  });
+
+  const [contentSettings, setContentSettings] = useState<ContentSettingsForm>({
+    blog_nav_label: CONTENT_SETTING_DEFAULTS.blogNavLabel,
+    blog_home_block_enabled: CONTENT_SETTING_DEFAULTS.blogHomeBlockEnabled,
+    blog_home_block_heading: CONTENT_SETTING_DEFAULTS.blogHomeBlockHeading,
+    blog_home_block_count: CONTENT_SETTING_DEFAULTS.blogHomeBlockCount,
+    blog_home_block_placement: CONTENT_SETTING_DEFAULTS.blogHomeBlockPlacement,
   });
 
   const [socialMediaSettings, setSocialMediaSettings] = useState<SocialMediaSettings>({
@@ -253,6 +288,12 @@ export default function AdminSettingsPage() {
             if (setting.key === 'promotions.banner_text') setPromotionSettings(prev => ({ ...prev, banner_text: value }));
             if (setting.key === 'promotions.banner_type') setPromotionSettings(prev => ({ ...prev, banner_type: value }));
             if (setting.key === 'promotions.new_customer_discount') setPromotionSettings(prev => ({ ...prev, new_customer_discount: value }));
+          } else if (setting.category === 'content') {
+            if (setting.key === CONTENT_SETTING_KEYS.blogNavLabel) setContentSettings(prev => ({ ...prev, blog_nav_label: value }));
+            if (setting.key === CONTENT_SETTING_KEYS.blogHomeBlockEnabled) setContentSettings(prev => ({ ...prev, blog_home_block_enabled: value }));
+            if (setting.key === CONTENT_SETTING_KEYS.blogHomeBlockHeading) setContentSettings(prev => ({ ...prev, blog_home_block_heading: value }));
+            if (setting.key === CONTENT_SETTING_KEYS.blogHomeBlockCount) setContentSettings(prev => ({ ...prev, blog_home_block_count: value }));
+            if (setting.key === CONTENT_SETTING_KEYS.blogHomeBlockPlacement) setContentSettings(prev => ({ ...prev, blog_home_block_placement: value }));
           } else if (setting.category === 'social') {
             if (setting.key === 'social.instagram') setSocialMediaSettings(prev => ({ ...prev, instagram: value }));
             if (setting.key === 'social.youtube') setSocialMediaSettings(prev => ({ ...prev, youtube: value }));
@@ -419,6 +460,13 @@ export default function AdminSettingsPage() {
         { key: 'social.twitter', value: socialMediaSettings.twitter, category: 'social' },
         { key: 'social.facebook', value: socialMediaSettings.facebook, category: 'social' },
         { key: 'social.tiktok', value: socialMediaSettings.tiktok, category: 'social' },
+
+        // Content settings
+        { key: CONTENT_SETTING_KEYS.blogNavLabel, value: contentSettings.blog_nav_label, category: 'content' },
+        { key: CONTENT_SETTING_KEYS.blogHomeBlockEnabled, value: contentSettings.blog_home_block_enabled, category: 'content' },
+        { key: CONTENT_SETTING_KEYS.blogHomeBlockHeading, value: contentSettings.blog_home_block_heading, category: 'content' },
+        { key: CONTENT_SETTING_KEYS.blogHomeBlockCount, value: contentSettings.blog_home_block_count, category: 'content' },
+        { key: CONTENT_SETTING_KEYS.blogHomeBlockPlacement, value: contentSettings.blog_home_block_placement, category: 'content' },
       ];
       
       const response = await fetch('/api/admin/settings', {
@@ -479,6 +527,7 @@ export default function AdminSettingsPage() {
     { kind: "state" as const, id: "shipping" as const, label: "Shipping", icon: Zap, description: "Methods & pricing" },
     { kind: "state" as const, id: "refunds" as const, label: "Refunds", icon: RefreshCw, description: "Return policies" },
     { kind: "state" as const, id: "promotions" as const, label: "Promotions", icon: DollarSign, description: "Sales & banners" },
+    { kind: "state" as const, id: "content" as const, label: "Content", icon: Newspaper, description: "Blog nav & home block" },
     { kind: "state" as const, id: "social" as const, label: "Social Media", icon: Share2, description: "Social links" },
     { kind: "state" as const, id: "admins" as const, label: "Admin Users", icon: Shield, description: "Access management" },
     { kind: "route" as const, id: "appearance" as const, href: "/admin/settings/appearance", label: "Appearance", icon: Palette, description: "Theme & look" },
@@ -1017,6 +1066,107 @@ export default function AdminSettingsPage() {
                       <option value="success">Success (Green)</option>
                       <option value="warning">Warning (Yellow)</option>
                       <option value="error">Alert (Red)</option>
+                    </select>
+                  </div>
+                </>
+              )}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Content Settings */}
+      {activeTab === "content" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="bg-neutral-800 border-neutral-700 p-6">
+            <div className="flex items-center space-x-3 mb-4">
+              <Newspaper className="w-5 h-5 text-orange-400" />
+              <h3 className="text-lg font-semibold text-white">Blog Navigation</h3>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Nav Link Label</label>
+                <Input
+                  value={contentSettings.blog_nav_label}
+                  maxLength={BLOG_NAV_LABEL_MAX_LENGTH}
+                  onChange={(e) => setContentSettings(prev => ({ ...prev, blog_nav_label: e.target.value }))}
+                  className="bg-neutral-700 border-neutral-600 text-white"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Shown in the header nav. The link hides itself automatically when no article
+                  is published, so there is no separate on/off switch for it.
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="bg-neutral-800 border-neutral-700 p-6">
+            <div className="flex items-center space-x-3 mb-4">
+              <Newspaper className="w-5 h-5 text-orange-400" />
+              <h3 className="text-lg font-semibold text-white">Home Page Articles</h3>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm font-medium text-gray-300">Show Latest Articles</label>
+                  <p className="text-xs text-gray-500">Display a block of recent posts on the home page</p>
+                </div>
+                <Switch
+                  checked={contentSettings.blog_home_block_enabled}
+                  onCheckedChange={(checked) => setContentSettings(prev => ({ ...prev, blog_home_block_enabled: checked }))}
+                />
+              </div>
+
+              {contentSettings.blog_home_block_enabled && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Block Heading</label>
+                    <Input
+                      value={contentSettings.blog_home_block_heading}
+                      maxLength={BLOG_HOME_BLOCK_HEADING_MAX_LENGTH}
+                      onChange={(e) => setContentSettings(prev => ({ ...prev, blog_home_block_heading: e.target.value }))}
+                      className="bg-neutral-700 border-neutral-600 text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Article Count</label>
+                    <Input
+                      type="number"
+                      min={BLOG_HOME_BLOCK_COUNT_MIN}
+                      max={BLOG_HOME_BLOCK_COUNT_MAX}
+                      value={contentSettings.blog_home_block_count}
+                      onChange={(e) => setContentSettings(prev => ({
+                        ...prev,
+                        blog_home_block_count: Math.max(
+                          BLOG_HOME_BLOCK_COUNT_MIN,
+                          Math.min(BLOG_HOME_BLOCK_COUNT_MAX, parseInt(e.target.value) || BLOG_HOME_BLOCK_COUNT_MIN)
+                        )
+                      }))}
+                      className="bg-neutral-700 border-neutral-600 text-white"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {BLOG_HOME_BLOCK_COUNT_MIN}–{BLOG_HOME_BLOCK_COUNT_MAX} articles
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Placement</label>
+                    <select
+                      value={contentSettings.blog_home_block_placement}
+                      onChange={(e) => setContentSettings(prev => ({
+                        ...prev,
+                        blog_home_block_placement: e.target.value as BlogHomeBlockPlacement
+                      }))}
+                      className="w-full px-3 py-2 bg-neutral-700 border border-neutral-600 text-white rounded-md"
+                    >
+                      {BLOG_HOME_BLOCK_PLACEMENTS.map((placement, index) => (
+                        <option key={placement} value={placement}>
+                          {BLOG_HOME_BLOCK_PLACEMENT_LABELS[index] ?? placement}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </>
