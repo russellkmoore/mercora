@@ -25,8 +25,8 @@ human_verification:
 Russell enabled Stripe Tax directly in the Stripe Dashboard (2026-09-11). This is a Stripe account-level setting this session has no API access to toggle or verify remotely without placing a real order; the code path itself (`quote.taxSource`, `configured_fallback` vs `provider`) was already built and exercised in earlier phases — before this change, every recent production order showed `tax_source: "configured_fallback"` (confirmed by direct D1 query, see 19-CONTEXT.md). The fallback stays in place as the documented degraded mode per the requirement's own wording. The next real order will record `tax_source: "provider"`; no order has been placed since the toggle to observe this directly.
 
 ### OPS-06 — Support email reachable
-**Status:** passed (verified live)
-`STORE_SUPPORT_EMAIL` set to `support@russellkmoore.me` in `wrangler.jsonc` (commit `03a4acc`), deployed, and confirmed live: `curl https://voltique.russellkmoore.me/` shows `mailto:support@russellkmoore.me` in the footer (verified after edge-cache lag cleared). Same domain as the already-working `STORE_SENDER_EMAIL`.
+**Status:** passed (verified live + Russell-confirmed)
+`STORE_SUPPORT_EMAIL` set to `support@russellkmoore.me` in `wrangler.jsonc` (commit `03a4acc`), deployed, and confirmed live: `curl https://voltique.russellkmoore.me/` shows `mailto:support@russellkmoore.me` in the footer (verified after edge-cache lag cleared). Russell confirmed `support@russellkmoore.me` is already routed to an inbox he checks (Cloudflare Email Routing), so a reply to a store email now reaches a person.
 
 ### OPS-07 — Secrets correct
 **Status:** passed (verified live, read-only)
