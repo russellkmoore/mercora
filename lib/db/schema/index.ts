@@ -139,3 +139,6 @@ export * from "./subscriptions";
 
 // Optional, default-off gift-card ledger and delivery foundation
 export * from "./gift-cards";
+
+// Durable customer <-> Stripe-customer binding for checkout saved cards
+export * from "./payments";
