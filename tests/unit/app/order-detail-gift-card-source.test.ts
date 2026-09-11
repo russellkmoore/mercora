@@ -42,4 +42,14 @@ describe("account order detail gift-card block source contract", () => {
   it("does not import anything from lib/gift-cards", () => {
     expect(source).not.toContain("lib/gift-cards");
   });
+
+  it("resolves the address from shipping with a nullish fallback to billing", () => {
+    expect(source).toMatch(/const address = order\.shipping_address \?\? order\.billing_address;/);
+  });
+
+  it("renders the address section heading from a variable, not a hardcoded literal", () => {
+    expect(source).toMatch(/const addressHeading = order\.shipping_address/);
+    expect(source).not.toMatch(/<h2[^>]*>Shipping address<\/h2>/);
+    expect(source).not.toMatch(/<h2[^>]*>Billing address<\/h2>/);
+  });
 });
