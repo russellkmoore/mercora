@@ -81,6 +81,12 @@ import {
   CONTENT_SETTING_DEFAULTS,
   type BlogHomeBlockPlacement,
 } from "@/lib/content/settings";
+import {
+  normalizeContentText,
+  normalizeContentFlag,
+  normalizeContentCount,
+  normalizeContentPlacement,
+} from "@/lib/content/normalize-client";
 
 interface SystemSettings {
   maintenance_mode: boolean;
@@ -138,40 +144,10 @@ const BLOG_HOME_BLOCK_PLACEMENT_LABELS: readonly string[] = [
   "Below featured products",
 ];
 
-// Client-side mirror of lib/content/settings.ts's resolver clamps (minus
-// the telemetry signal, which reads Cloudflare context and is server-only).
-// Applied to every loaded content.* value so the admin form can never
-// display a number/placement the storefront's getContentSettings()
-// wouldn't actually use (WR-01).
-function normalizeContentText(value: unknown, fallback: string, maxLength: number): string {
-  if (typeof value !== "string") return fallback;
-  const trimmed = value.trim();
-  if (trimmed === "" || trimmed.length > maxLength) return fallback;
-  return trimmed;
-}
-
-function normalizeContentFlag(value: unknown, fallback: boolean): boolean {
-  return typeof value === "boolean" ? value : fallback;
-}
-
-function normalizeContentCount(value: unknown, fallback: number): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
-  return Math.max(
-    BLOG_HOME_BLOCK_COUNT_MIN,
-    Math.min(BLOG_HOME_BLOCK_COUNT_MAX, Math.trunc(value)),
-  );
-}
-
-function normalizeContentPlacement(
-  value: unknown,
-  fallback: BlogHomeBlockPlacement,
-): BlogHomeBlockPlacement {
-  if (typeof value !== "string") return fallback;
-  const trimmed = value.trim();
-  return (BLOG_HOME_BLOCK_PLACEMENTS as readonly string[]).includes(trimmed)
-    ? (trimmed as BlogHomeBlockPlacement)
-    : fallback;
-}
+// normalizeContentText/Flag/Count/Placement (WR-01) now live in
+// lib/content/normalize-client.ts, imported above — extracted so a plain
+// unit test can call them directly and assert parity against
+// getContentSettings() (WR-03).
 
 interface SocialMediaSettings {
   instagram: string;
