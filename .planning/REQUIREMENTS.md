@@ -52,7 +52,7 @@ Requirements for this milestone. Each maps to a roadmap phase.
 - [ ] **DEBT-01**: `/api/tax` is either removed or wired to the authoritative pricing service; no route hardcodes a tax code
 - [ ] **DEBT-02**: `order-effects` no longer falls back to a `{ DB }`-only gift-card environment: the request path passes the full worker env (or the fallback fails loudly) so issuance-time delivery cannot silently degrade
 - [ ] **DEBT-03**: A persisted cart line whose gift note now fails validation is surfaced to the shopper for editing instead of being dropped silently on load
-- [ ] **DEBT-04**: Transient delivery retries emit a non-paging event; only terminal failures (`needs_review`) page through `gift_card.delivery_failed`
+- [x] **DEBT-04**: Transient delivery retries emit a non-paging event; only terminal failures (`needs_review`) page through `gift_card.delivery_failed`
 - [ ] **DEBT-05**: Client and server share one rule for "digital-only cart" (fulfillment type, not the presence of a customization), pinned by a test
 - [ ] **DEBT-06**: A digital-only order keeps the billing address the shopper entered and shows it on the confirmation email and account order detail
 - [ ] **DEBT-07**: Docs and tests match the code: the stale "scan:tokens is local-only" claim, the REQUIREMENTS-wide verify check, and the retroactive-note behaviour for pre-existing pending deliveries are each resolved and the corresponding broken-windows entries closed
@@ -111,7 +111,7 @@ Deferred to a later milestone.
 | DEBT-01 | Phase 18 | Pending |
 | DEBT-02 | Phase 18 | Pending |
 | DEBT-03 | Phase 18 | Pending |
-| DEBT-04 | Phase 18 | Pending |
+| DEBT-04 | Phase 18 | Complete |
 | DEBT-05 | Phase 18 | Pending |
 | DEBT-06 | Phase 18 | Pending |
 | DEBT-07 | Phase 18 | Pending |
