@@ -30,6 +30,7 @@ import { useThemeTokens } from '@/lib/store';
 interface StripeProviderProps {
   children: ReactNode;
   clientSecret?: string;
+  customerSessionClientSecret?: string;
   options?: StripeElementsOptions;
 }
 
@@ -42,6 +43,7 @@ const stripePromise = loadStripe();
 export default function StripeProvider({
   children,
   clientSecret,
+  customerSessionClientSecret,
   options = {}
 }: StripeProviderProps) {
   const tokens = useThemeTokens();
@@ -128,6 +130,7 @@ export default function StripeProvider({
     // Only spread appearance-related options to avoid conflicts with clientSecret mode
     ...(options.fonts && { fonts: options.fonts }),
     ...(options.locale && { locale: options.locale }),
+    ...(customerSessionClientSecret ? { customerSessionClientSecret } : {}),
   };
 
   return (
