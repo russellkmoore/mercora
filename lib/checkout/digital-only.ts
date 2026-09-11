@@ -30,6 +30,23 @@ export const DIGITAL_CHECKOUT_STEPS: readonly string[] = [
  * True when every line in a non-empty cart carries a gift-card
  * customization. An empty cart is not digital-only — it hits the existing
  * empty-cart branch before any step UI renders.
+ *
+ * This is one half of a pinned pair (D-05). The other half is
+ * `hasPhysicalCheckoutLines` in `lib/gift-cards/checkout.ts`, the
+ * server-side signal for the same fact. The two must stay logically
+ * equivalent: for any non-empty cart, `isDigitalOnlyCart(items) ===
+ * !hasPhysicalCheckoutLines(orderItems)`.
+ *
+ * They read different fields because the client `CartItem` type carries no
+ * `fulfillment_type` — the server field the other half reads — so this
+ * function keys on the gift-card customization instead. The two agree
+ * today only because `lib/services/checkout-pricing.ts` refuses to attach
+ * a `giftCardCustomization` to any line that is not already digital and
+ * non-shipping; that check is what keeps this signal sufficient.
+ *
+ * `tests/unit/lib/checkout/digital-only.test.ts` is where the equivalence
+ * is proven, fixture by fixture. If this predicate's semantics change,
+ * update that test deliberately — do not let it drift.
  */
 export function isDigitalOnlyCart(
   items: readonly { giftCardCustomization?: unknown }[]
