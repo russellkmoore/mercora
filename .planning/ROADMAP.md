@@ -227,7 +227,22 @@ Plans:
   3. Account → Payment methods lists each saved card by brand, last four and expiry and lets the shopper remove one; a removed card is gone from the next checkout
   4. Stripe Link stays hidden unless it is deliberately re-enabled alongside this feature
 
-**Plans**: TBD
+*Criterion 1's literal wording is corrected by locked decision D-06a: the card is saved for
+off-session use through the Customer Session's `payment_method_save_usage`, not by setting
+`setup_future_usage` on the PaymentIntent — setting both is a documented Stripe integration
+error. The effect the criterion asks for is unchanged.*
+
+**Plans**: 6 plans
+
+Plans:
+
+- [ ] 17-01-PLAN.md — Migration 0025, the `payment_customers` schema, and `ensureStripeCustomer`
+- [ ] 17-02-PLAN.md — Checkout server wiring: Stripe customer on the PaymentIntent plus a Customer Session
+- [ ] 17-03-PLAN.md — Checkout client wiring: Elements gets the Customer Session secret; Link stays off
+- [ ] 17-04-PLAN.md — Account API: list saved cards, remove one after an ownership check
+- [ ] 17-05-PLAN.md — Account UI: the Payment methods page, list component and navigation entry
+- [ ] 17-06-PLAN.md — Full gate suite, deploy by push, read-only production check, handover list
+
 **UI hint**: yes
 
 ### Phase 18: Tech-Debt Closure
