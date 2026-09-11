@@ -197,7 +197,22 @@ Plans:
   3. An admin turns the block on or off and changes its heading, article count and placement from Admin → Settings, and the storefront follows without a template change
   4. Each excerpt uses the article's explicit excerpt field when it has one, otherwise the first paragraph with markup stripped and a length cap; the block links to each article rather than reproducing its content
 
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 16-01-PLAN.md — Content settings resolver, excerpt resolver, opt-in post body on the published-posts read (BLOG-02, BLOG-03)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 16-02-PLAN.md — Header blog entry: server-resolved visibility and label, desktop and mobile links (BLOG-01)
+- [ ] 16-03-PLAN.md — BlogHighlights component and the home-page block at its two fixed placements (BLOG-02, BLOG-03)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 16-04-PLAN.md — Admin Content settings tab, write-path tests, gate suite, deploy, live check (BLOG-01, BLOG-02)
+
 **UI hint**: yes
 
 ### Phase 17: Saved Payment Methods
