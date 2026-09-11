@@ -138,6 +138,41 @@ const BLOG_HOME_BLOCK_PLACEMENT_LABELS: readonly string[] = [
   "Below featured products",
 ];
 
+// Client-side mirror of lib/content/settings.ts's resolver clamps (minus
+// the telemetry signal, which reads Cloudflare context and is server-only).
+// Applied to every loaded content.* value so the admin form can never
+// display a number/placement the storefront's getContentSettings()
+// wouldn't actually use (WR-01).
+function normalizeContentText(value: unknown, fallback: string, maxLength: number): string {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  if (trimmed === "" || trimmed.length > maxLength) return fallback;
+  return trimmed;
+}
+
+function normalizeContentFlag(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function normalizeContentCount(value: unknown, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.max(
+    BLOG_HOME_BLOCK_COUNT_MIN,
+    Math.min(BLOG_HOME_BLOCK_COUNT_MAX, Math.trunc(value)),
+  );
+}
+
+function normalizeContentPlacement(
+  value: unknown,
+  fallback: BlogHomeBlockPlacement,
+): BlogHomeBlockPlacement {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  return (BLOG_HOME_BLOCK_PLACEMENTS as readonly string[]).includes(trimmed)
+    ? (trimmed as BlogHomeBlockPlacement)
+    : fallback;
+}
+
 interface SocialMediaSettings {
   instagram: string;
   youtube: string;
@@ -289,11 +324,30 @@ export default function AdminSettingsPage() {
             if (setting.key === 'promotions.banner_type') setPromotionSettings(prev => ({ ...prev, banner_type: value }));
             if (setting.key === 'promotions.new_customer_discount') setPromotionSettings(prev => ({ ...prev, new_customer_discount: value }));
           } else if (setting.category === 'content') {
-            if (setting.key === CONTENT_SETTING_KEYS.blogNavLabel) setContentSettings(prev => ({ ...prev, blog_nav_label: value }));
-            if (setting.key === CONTENT_SETTING_KEYS.blogHomeBlockEnabled) setContentSettings(prev => ({ ...prev, blog_home_block_enabled: value }));
-            if (setting.key === CONTENT_SETTING_KEYS.blogHomeBlockHeading) setContentSettings(prev => ({ ...prev, blog_home_block_heading: value }));
-            if (setting.key === CONTENT_SETTING_KEYS.blogHomeBlockCount) setContentSettings(prev => ({ ...prev, blog_home_block_count: value }));
-            if (setting.key === CONTENT_SETTING_KEYS.blogHomeBlockPlacement) setContentSettings(prev => ({ ...prev, blog_home_block_placement: value }));
+            // Clamp/enum-validate on load, mirroring getContentSettings()'s
+            // own resolver bounds — an out-of-range stored value must not
+            // display raw in the admin form while the storefront silently
+            // renders its clamped default instead (WR-01).
+            if (setting.key === CONTENT_SETTING_KEYS.blogNavLabel) setContentSettings(prev => ({
+              ...prev,
+              blog_nav_label: normalizeContentText(value, CONTENT_SETTING_DEFAULTS.blogNavLabel, BLOG_NAV_LABEL_MAX_LENGTH),
+            }));
+            if (setting.key === CONTENT_SETTING_KEYS.blogHomeBlockEnabled) setContentSettings(prev => ({
+              ...prev,
+              blog_home_block_enabled: normalizeContentFlag(value, CONTENT_SETTING_DEFAULTS.blogHomeBlockEnabled),
+            }));
+            if (setting.key === CONTENT_SETTING_KEYS.blogHomeBlockHeading) setContentSettings(prev => ({
+              ...prev,
+              blog_home_block_heading: normalizeContentText(value, CONTENT_SETTING_DEFAULTS.blogHomeBlockHeading, BLOG_HOME_BLOCK_HEADING_MAX_LENGTH),
+            }));
+            if (setting.key === CONTENT_SETTING_KEYS.blogHomeBlockCount) setContentSettings(prev => ({
+              ...prev,
+              blog_home_block_count: normalizeContentCount(value, CONTENT_SETTING_DEFAULTS.blogHomeBlockCount),
+            }));
+            if (setting.key === CONTENT_SETTING_KEYS.blogHomeBlockPlacement) setContentSettings(prev => ({
+              ...prev,
+              blog_home_block_placement: normalizeContentPlacement(value, CONTENT_SETTING_DEFAULTS.blogHomeBlockPlacement),
+            }));
           } else if (setting.category === 'social') {
             if (setting.key === 'social.instagram') setSocialMediaSettings(prev => ({ ...prev, instagram: value }));
             if (setting.key === 'social.youtube') setSocialMediaSettings(prev => ({ ...prev, youtube: value }));
