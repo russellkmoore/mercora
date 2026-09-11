@@ -186,3 +186,59 @@ future pass wants per-row feedback.
 _Reviewed: 2026-09-11T10:48:31Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: deep_
+
+## Iteration 2
+
+**Reviewed:** 2026-09-11T00:00:00Z (iteration-2 re-review)
+**Scope:** Verification of all 6 iteration-1 findings against HEAD (commits `ad7b881`, `ae5512b`, `971db2a`, `7242f57`, `a8da99b`)
+
+All six findings verified closed in code, not just claimed closed in the fix report.
+
+### WR-01 (DELETE 404/503 unification) — CLOSED, verified
+
+`app/api/account/payment-methods/[id]/route.ts:22-56`. Traced both branches by hand:
+
+- **Ownership-mismatch branch** (lines 42-46): `retrieve(id)` succeeds, `owner !== stripeCustomerId`, returns `denial()`.
+- **resource_missing branch** (lines 50-51): `retrieve(id)` throws, `isResourceMissingError(error)` matches (duck-typed on `type === "StripeInvalidRequestError"` and `code`/`raw.code === "resource_missing"`), returns the same `denial()`.
+
+Both branches call `denial()`, the single shared function that returns `NextResponse.json({ error: "Payment method not found" }, { status: 404 })` — identical status code and identical body object, not just identical-looking literals duplicated in two places. Confirmed via the two new tests (`tests/unit/app/api/account-payment-methods.test.ts:189-215`) that both assert status 404 and, for the ownership case, an equal error string. `detach` is never called in either branch. The one remaining distinguishing signal is Stripe API latency itself (a `retrieve` that finds a foreign resource vs. one that 404s inside Stripe could plausibly differ by microseconds), which is inherent to proxying Stripe's own timing and not something this route's code controls or that's practically exploitable against unguessable `pm_` ids — consistent with the original finding's own "exploitability is low" framing. No new leak found.
+
+### WR-02 (D1 concurrency test) — CLOSED, verified
+
+`tests/integration/payment-customer-binding.test.ts:114-153`. The new test issues two `repository.bindPaymentCustomer(...)` calls inside a single `Promise.all([...])` (lines 127-136) with no `await` between them — both promises are in flight before either resolves, which is genuine concurrent dispatch at the JS level (each call does exactly one D1 `.prepare().bind().run()` round trip inside `bindPaymentCustomer`, per `lib/payments/customer-binding.ts:74-83`, so there's a real await point where interleaving can occur). The assertion doesn't assume call order — it reads back which `stripe_customer_id` actually landed in the row and asserts the two results are self-consistent with that (lines 147-152), and separately asserts exactly one `"created"`/one `"conflict"` regardless of which (line 140). The cited precedents (`tests/integration/lib/subscriptions/repository.test.ts:128`, `tests/integration/d1-harness.test.ts:180`) exist and use the identical `Promise.all` pattern against the same D1 test harness — not a fabricated citation. Ran the test directly against real D1 (`vitest.workers.config.mts`); passed. Old sequential test was kept and honestly renamed to "sequential re-bind, not a race" rather than deleted.
+
+### WR-03 (zero-cash gate) — CLOSED, verified, and the partial-gift-card regression the task asked about does NOT occur
+
+`app/api/payment-intent/route.ts:250-264` gates `ensureStripeCustomerForShopper` on `userId && total.gt(Money.zero(total.currency))`. The critical question is what `total` means. Traced into `lib/services/checkout-pricing.ts:803-851`: `total = beforeTender.subtract(tender)`, where `tender` is the gift-card amount actually applied and `beforeTender` is discounted merchandise + shipping + tax. This means `total` is **cash still due after gift-card tender is subtracted**, not the gross order value. Consequently:
+
+- A **true zero-cash** order (gift card covers 100% of `beforeTender`) has `total === 0` → gate skips, no Stripe customer created. Correct.
+- A **partial-gift-card** order (gift card covers part of the order, cash due remains) has `tender < beforeTender`, so `total > 0` → gate passes, `ensureStripeCustomerForShopper` still runs. Confirmed this is not just algebra: the existing non-zero-cash test at `tests/unit/app/api/payment-intent-authority.test.ts:211-244` (`quote.total = { amount: 26, ... }`) asserts `ensureStripeCustomerForShopper` **is** called and its result flows into `createPaymentIntent`'s `customer` field — that test's fixture total stands in for "any nonzero cash due," which a partial-gift-card order also produces via the same code path. The feared regression (partial-gift-card orders silently losing Customer Session / saved-card capability) does not occur.
+
+The new zero-cash test (`tests/unit/app/api/payment-intent-authority.test.ts:576-596`) asserts `ensureStripeCustomerForShopper` is **not** called when `quote.total = { amount: 0, ... }`, closing IN-01 in the same commit (`971db2a`).
+
+### WR-04 (GET limit) — CLOSED, verified
+
+`app/api/account/payment-methods/route.ts:29-33`: `stripe.paymentMethods.list({ customer: stripeCustomerId, type: "card", limit: 100 })`. Test at `tests/unit/app/api/account-payment-methods.test.ts` (line 92 region) asserts the call args include `limit: 100`.
+
+### IN-01 — CLOSED, verified (see WR-03 above; same commit, same test)
+
+### IN-02 (per-row busy state) — CLOSED, verified
+
+`components/account/PaymentMethodList.tsx`: `busy: boolean` replaced with `busyIds: Set<string>` (line 21). `remove()` early-returns on `busyIds.has(method.id)` (line 44) — same-row double-submit guard preserved. Each row's Remove button is `disabled={busyIds.has(method.id)}` (line 96) — scoped to that row's own id, not a shared boolean, so removing card A no longer disables card B's button. `setBusyIds` uses functional updates that copy the `Set` (`new Set(current).add(...)` / delete-and-return-new-Set in `finally`) rather than mutating in place, so React re-renders correctly and concurrent removes of two different rows would track independently without clobbering each other's entry.
+
+### Gates run for this iteration
+
+| Command | Result |
+|---|---|
+| `vitest run tests/unit/app/api/account-payment-methods.test.ts tests/unit/app/api/payment-intent-authority.test.ts tests/unit/components/account` | 6 files, 78 tests passed |
+| `npm run typecheck` | clean |
+| `vitest run --config vitest.workers.config.mts tests/integration/payment-customer-binding.test.ts` | 1 file, 3 tests passed (real D1) |
+
+No card number, PAN, CVC, fingerprint, or Stripe secret key appears anywhere in this iteration's findings.
+
+**Iteration 2 result: all 6 findings closed. No regressions found. No new findings.**
+
+---
+
+_Iteration 2 reviewed: 2026-09-11_
+_Reviewer: Claude (gsd-code-reviewer)_
