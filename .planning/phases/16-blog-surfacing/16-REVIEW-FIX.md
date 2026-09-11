@@ -1,10 +1,10 @@
 ---
 phase: 16-blog-surfacing
-fixed_at: 2026-09-11T09:24:43Z
+fixed_at: 2026-09-11T09:30:00Z
 review_path: .planning/phases/16-blog-surfacing/16-REVIEW.md
-iteration: 1
-findings_in_scope: 3
-fixed: 3
+iteration: 2
+findings_in_scope: 4
+fixed: 4
 skipped: 0
 status: all_fixed
 ---
@@ -66,3 +66,45 @@ All run via `mise exec --` from repo root, after all three commits above:
 _Fixed: 2026-09-11T09:24:43Z_
 _Fixer: Claude (gsd-code-fixer)_
 _Iteration: 1_
+
+## Iteration 2
+
+**Fixed at:** 2026-09-11T09:30:00Z (review) / same session (fix)
+**Source review:** .planning/phases/16-blog-surfacing/16-REVIEW.md (Iteration 2 — targeted re-review)
+
+**Summary:**
+- Findings in scope: 1 (0 Critical, 1 Warning)
+- Fixed: 1
+- Skipped: 0
+
+### Fixed Issues
+
+| Finding | Title | Files Modified | Commit | Status |
+|---|---|---|---|---|
+| WR-03 | WR-01's normalize helpers have no behavioral test — only a source-contract test | `lib/content/normalize-client.ts` (new), `app/admin/settings/page.tsx`, `tests/unit/app/admin-settings-content-normalize.test.ts` (new) | `89dcb25` | fixed |
+
+#### WR-03: WR-01's normalize helpers have no behavioral test
+
+**Files modified:** `lib/content/normalize-client.ts` (new), `app/admin/settings/page.tsx`, `tests/unit/app/admin-settings-content-normalize.test.ts` (new)
+**Commit:** `89dcb25`
+**Applied fix:** Extracted the four page-local `normalizeContentText`/`Flag`/`Count`/`Placement` functions out of `app/admin/settings/page.tsx` into a new pure, side-effect-free, client-safe module `lib/content/normalize-client.ts` (no React import, no `"use client"` directive, no D1/Cloudflare access — importable from both the client settings page and a Node test), keeping every clamp/fallback expression byte-identical to what shipped in WR-01. `page.tsx` now imports the four functions from the new module instead of declaring them locally; the five `content.*` `loadSettings()` branches are unchanged. Added `tests/unit/app/admin-settings-content-normalize.test.ts` (22 cases) that calls each normalizer directly and asserts its result equals `getContentSettings()`'s resolved value for the identical stored input, covering the same boundary classes `lib/content/settings.ts`'s own test suite uses: in-range, boundary-exact (count `1`/`6`), out-of-range low/high (`-3`/`999`), fractional truncation (`4.9`→`4`), wrong type, missing key, and an unrecognized enum member (`"middle_of_page"`). A future edit that silently diverges the admin clamp from the storefront resolver now fails this test, not just the pre-existing source-contract regex in `admin-settings-content-tab-source.test.ts` (which continues to pass unmodified).
+
+### Skipped Issues
+
+None — the finding was fixed.
+
+### Gate Results
+
+All run via `mise exec --` from repo root, after the commit above:
+
+| Gate | Result |
+|---|---|
+| `npm run lint` | 0 errors, 54 warnings (all pre-existing, same baseline as iteration 1) |
+| `npm run typecheck` | exit 0, no output |
+| `mise exec -- npm test` | 317 test files, 2873 tests passed (2851 iteration-1 total + 22 new: the WR-03 parity test suite) |
+
+---
+
+_Fixed: 2026-09-11T09:30:00Z_
+_Fixer: Claude (gsd-code-fixer)_
+_Iteration: 2_
