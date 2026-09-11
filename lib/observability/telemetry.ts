@@ -32,6 +32,8 @@ export const TELEMETRY_EVENTS = {
   'payment.inventory_unavailable': { severity: 'warning', sampleRate: 0.1 },
   'payment.inventory_check_failed': { severity: 'critical', sampleRate: 1 },
   'payment.customer_prepare_failed': { severity: 'critical', sampleRate: 1 },
+  'payment.customer_binding_failed': { severity: 'warning', sampleRate: 1 },
+  'payment.customer_session_failed': { severity: 'warning', sampleRate: 1 },
   'payment.intent_create_failed': { severity: 'critical', sampleRate: 1 },
   'payment.intent_invalid': { severity: 'critical', sampleRate: 1 },
   'payment.intent_cancel_failed': { severity: 'critical', sampleRate: 1 },
