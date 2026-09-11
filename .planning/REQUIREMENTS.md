@@ -43,9 +43,9 @@ Requirements for this milestone. Each maps to a roadmap phase.
 
 ### Saved payment methods
 
-- [ ] **PAY-01**: A signed-in shopper can save a card at checkout; the store creates a Stripe Customer per shopper (mapped from the Clerk user) and the PaymentIntent is created with that customer and `setup_future_usage`
-- [ ] **PAY-02**: Account → Payment methods lists saved methods (brand, last four, expiry) and lets the shopper remove one; guests never see saved-method UI
-- [ ] **PAY-03**: The Payment Element offers a signed-in shopper their saved methods; Stripe Link stays hidden unless explicitly re-enabled with this feature
+- [x] **PAY-01**: A signed-in shopper can save a card at checkout; the store creates a Stripe Customer per shopper (mapped from the Clerk user) and the PaymentIntent is created with that customer and `setup_future_usage`
+- [x] **PAY-02**: Account → Payment methods lists saved methods (brand, last four, expiry) and lets the shopper remove one; guests never see saved-method UI
+- [x] **PAY-03**: The Payment Element offers a signed-in shopper their saved methods; Stripe Link stays hidden unless explicitly re-enabled with this feature
 
 ### Tech-debt closure
 
@@ -105,9 +105,9 @@ Deferred to a later milestone.
 | BLOG-01 | Phase 16 | Complete |
 | BLOG-02 | Phase 16 | Complete |
 | BLOG-03 | Phase 16 | Complete |
-| PAY-01 | Phase 17 | Pending |
-| PAY-02 | Phase 17 | Pending |
-| PAY-03 | Phase 17 | Pending |
+| PAY-01 | Phase 17 | Complete |
+| PAY-02 | Phase 17 | Complete |
+| PAY-03 | Phase 17 | Complete |
 | DEBT-01 | Phase 18 | Pending |
 | DEBT-02 | Phase 18 | Pending |
 | DEBT-03 | Phase 18 | Pending |
