@@ -63,7 +63,7 @@ Full phase details, success criteria, and plan lists: `milestones/v2.1-ROADMAP.m
 - [x] **Phase 15: Subscription Address In Place** - A shopper adds a shipping address on the subscription product page without leaving it (completed 2026-09-11)
 - [x] **Phase 16: Blog Surfacing** - The blog is reachable from the header and the latest articles appear on the home page (completed 2026-09-11)
 - [x] **Phase 17: Saved Payment Methods** - A signed-in shopper saves a card at checkout and manages it from their account (completed 2026-09-11)
-- [ ] **Phase 18: Tech-Debt Closure** - The debt carried out of v2.1 is closed and the docs match the code
+- [x] **Phase 18: Tech-Debt Closure** - The debt carried out of v2.1 is closed and the docs match the code (completed 2026-09-11)
 - [ ] **Phase 19: Operator Checklist** - **Human-checkpoint phase, last by design** — every task needs Russell in the Stripe or Cloudflare dashboard
 
 **Phase Numbering:** continues from v2.1 (which ended at Phase 12); this milestone runs Phases 13-19. Decimal phases (13.1, 13.2, ...) are urgent insertions.
@@ -273,16 +273,16 @@ Plans:
 Plans:
 **Wave 1** *(six file-disjoint plans, no ordering between them)*
 
-- [ ] 18-01-PLAN.md — Tracer: a digital-only order keeps and shows its billing address, on the email and the account page (DEBT-06) (wave 1)
-- [ ] 18-02-PLAN.md — One digital-only rule, cross-referenced in both files and pinned by the invariant test (DEBT-05) (wave 1)
-- [ ] 18-03-PLAN.md — Delete the orphaned `/api/tax`; remove the database-only gift-card env fallback (DEBT-01, DEBT-02) (wave 1)
-- [ ] 18-04-PLAN.md — A cart line with an unparseable gift note survives, warns, and cannot reach checkout (DEBT-03) (wave 1)
-- [ ] 18-05-PLAN.md — Delivery retries warn; only terminal failures page (DEBT-04) (wave 1)
-- [ ] 18-06-PLAN.md — Migration-number collision check and the 0023 record (DEBT-07 code half) (wave 1)
+- [x] 18-01-PLAN.md — Tracer: a digital-only order keeps and shows its billing address, on the email and the account page (DEBT-06) (wave 1)
+- [x] 18-02-PLAN.md — One digital-only rule, cross-referenced in both files and pinned by the invariant test (DEBT-05) (wave 1)
+- [x] 18-03-PLAN.md — Delete the orphaned `/api/tax`; remove the database-only gift-card env fallback (DEBT-01, DEBT-02) (wave 1)
+- [x] 18-04-PLAN.md — A cart line with an unparseable gift note survives, warns, and cannot reach checkout (DEBT-03) (wave 1)
+- [x] 18-05-PLAN.md — Delivery retries warn; only terminal failures page (DEBT-04) (wave 1)
+- [x] 18-06-PLAN.md — Migration-number collision check and the 0023 record (DEBT-07 code half) (wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 18-07-PLAN.md — Phase gate: close four broken-windows entries and two todos, ratify D-10, full CI suite, push, read-only production confirmation (DEBT-07, DEBT-08) (wave 2)
+- [x] 18-07-PLAN.md — Phase gate: close four broken-windows entries and two todos, ratify D-10, full CI suite, push, read-only production confirmation (DEBT-07, DEBT-08) (wave 2)
 
 **UI hint**: yes
 
@@ -311,5 +311,5 @@ Plans:
 | 15. Subscription Address In Place | 3/3 | Complete    | 2026-09-11 |
 | 16. Blog Surfacing | 4/4 | Complete    | 2026-09-11 |
 | 17. Saved Payment Methods | 6/6 | Complete    | 2026-09-11 |
-| 18. Tech-Debt Closure | 0/? | Not started | - |
+| 18. Tech-Debt Closure | 7/7 | Complete    | 2026-09-11 |
 | 19. Operator Checklist (human checkpoints) | 0/? | Not started | - |
