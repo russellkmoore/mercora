@@ -2,20 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v2.2
 milestone_name: Operations & Polish
-current_phase: 16
-current_phase_name: Blog Surfacing
+current_phase: 17
+current_phase_name: Saved Payment Methods
 current_plan: Not started
-status: executing
-stopped_at: Phase 15 complete, ready to plan Phase 16
-last_updated: "2026-09-11T08:33:58.601Z"
+status: planning
+stopped_at: Phase 16 complete, ready to plan Phase 17
+last_updated: "2026-09-11T09:37:04.386Z"
 last_activity: 2026-09-11
-last_activity_desc: Phase 15 complete, transitioned to Phase 16
-state_head: cfba478684ae45f330158e5f4b590a8053c5eab6
+last_activity_desc: Phase 16 complete, transitioned to Phase 17
+state_head: 67257188a3379ca3a1659db3d656ce79d6674246
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 25
-  completed_plans: 21
+  completed_plans: 25
   percent: 14
 ---
 
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-09-09 after Phase 11)
 
 ## Current Position
 
-Phase: 16 (Blog Surfacing) — READY TO EXECUTE
+Phase: 17 — Saved Payment Methods
 Current Plan: Not started
 Total Plans in Phase: 4
-Status: Ready to execute
-Last activity: 2026-09-11 — Phase 15 complete, transitioned to Phase 16
+Status: Ready to plan
+Last activity: 2026-09-11 — Phase 16 complete, transitioned to Phase 17
 
 **Milestone v2.2 phases:**
 
@@ -52,7 +52,7 @@ Last activity: 2026-09-11 — Phase 15 complete, transitioned to Phase 16
 
 **Velocity:**
 
-- Total plans completed: 102 (17 v1, 44 v2)
+- Total plans completed: 106 (17 v1, 44 v2)
 - Average duration: 56 min/plan (Phase 5, 12 plans)
 - Total execution time: ~11.3 hours (v2)
 
@@ -92,6 +92,7 @@ Last activity: 2026-09-11 — Phase 15 complete, transitioned to Phase 16
 | 13 | 9 | - | - |
 | 14 | 9 | - | - |
 | 15 | 3 | - | - |
+| 16 | 4 | - | - |
 
 **Recent Trend:**
 
@@ -320,6 +321,7 @@ Decisions locked for v2:
 - [Phase 14]: Phase 13 security audit (autonomous): 42/42 threats closed. Audit flagged UF-1 — every /admin page was only client-guarded, so the new server-rendered honor banner was readable anonymously; fixed as T-13-42 by gating app/admin/layout.tsx on a server-side Clerk admin session (checkAdminSession extracted from checkAdminPermissions). AR-13-01..04 accepted by Claude under Russell's standing instruction; Russell to confirm at milestone review.
 - [Phase 15]: Phase 14 (autonomous): grey areas answered by Claude — reissue drains the old card via an `adjustment` ledger entry and issues a new card in one D1 batch (once-only via deterministic id + partial unique index); resend audits before sending with a per-event idempotency key; admin-create currency comes from store config; disabled cards' balances count toward the honor guard; code reveal is off by default behind `gift_cards.code_reveal_enabled`, super-admin + confirm + audit-event-first. Security audit 63/63 closed; UF-14-1 showed the Phase 13 admin layout gate insufficient (App Router streams page segments) — fixed by middleware sign-in redirect for /admin pages plus `requireAdminSession()` in every async admin page. AR-14-01..03 accepted by Claude; Russell to confirm. Migration numbering collision (two 0023 files) logged as a Phase 18 todo.
 - [Phase 16]: Phase 15 (autonomous): shared address form extracted from the account page into AddressForm; subscription PDP gets a sentinel "Add a new address…" select option opening a token-class modal, saving through the same account API, pre-selecting the new address, preserving plan/quantity/terms. Two review iterations found and fixed 20 items including two account-page regressions from the extraction (save message, busy locking) and a validation-bound drift across three layers (client filter, acquisition-service, setup-intent route) now unified behind one exported constant. Security audit 11/11 closed. Four items left for Russell's own click-through since this repo has no jsdom render tests.
+- [Phase 17]: Phase 16 (autonomous): header gets a server-resolved, admin-labeled blog nav entry that hides automatically when no article is published; home page gets an admin-configurable "latest articles" block (enable, heading, count, placement) built from existing card markup, no new query path. Review found and fixed an unguarded D1 read in Header.tsx that could 500 the whole storefront on a blog-table failure, plus an admin/storefront settings-validation parity gap, both closed with tests. Security audit 21/21 closed. Production currently has zero published articles, so the hide-when-empty path is what's live; three items (mobile menu click, admin tab click, a real published article) left for Russell's own look.
 
 ### Pending Todos
 
@@ -401,7 +403,7 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-09-10T17:15:28.171Z
-Stopped at: Phase 15 complete, ready to plan Phase 16
+Stopped at: Phase 16 complete, ready to plan Phase 17
 Resume file: None
 
 Next: `/gsd-discuss-phase 13`
