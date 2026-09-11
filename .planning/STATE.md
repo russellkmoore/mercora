@@ -2,20 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v2.2
 milestone_name: Operations & Polish
-current_phase: 18
-current_phase_name: Tech-Debt Closure
+current_phase: 19
+current_phase_name: Operator Checklist
 current_plan: Not started
-status: executing
-stopped_at: Phase 17 complete, ready to plan Phase 18
-last_updated: "2026-09-11T11:44:18.412Z"
+status: planning
+stopped_at: Phase 18 complete, ready to plan Phase 19
+last_updated: "2026-09-11T12:47:34.259Z"
 last_activity: 2026-09-11
-last_activity_desc: Phase 17 complete, transitioned to Phase 18
-state_head: 3952e174893125b27aad3c7caa9414b99d8a6499
+last_activity_desc: Phase 18 complete, transitioned to Phase 19
+state_head: 26845b9a6f36116939bbb46c31dfc67c67876bad
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 38
-  completed_plans: 31
+  completed_plans: 38
   percent: 14
 ---
 
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-09-09 after Phase 11)
 
 ## Current Position
 
-Phase: 18 (Tech-Debt Closure) — READY TO EXECUTE
+Phase: 19 — Operator Checklist
 Current Plan: Not started
 Total Plans in Phase: 7
-Status: Ready to execute
-Last activity: 2026-09-11 — Phase 17 complete, transitioned to Phase 18
+Status: Ready to plan
+Last activity: 2026-09-11 — Phase 18 complete, transitioned to Phase 19
 
 **Milestone v2.2 phases:**
 
@@ -52,7 +52,7 @@ Last activity: 2026-09-11 — Phase 17 complete, transitioned to Phase 18
 
 **Velocity:**
 
-- Total plans completed: 112 (17 v1, 44 v2)
+- Total plans completed: 119 (17 v1, 44 v2)
 - Average duration: 56 min/plan (Phase 5, 12 plans)
 - Total execution time: ~11.3 hours (v2)
 
@@ -94,6 +94,7 @@ Last activity: 2026-09-11 — Phase 17 complete, transitioned to Phase 18
 | 15 | 3 | - | - |
 | 16 | 4 | - | - |
 | 17 | 6 | - | - |
+| 18 | 7 | - | - |
 
 **Recent Trend:**
 
@@ -324,6 +325,7 @@ Decisions locked for v2:
 - [Phase 16]: Phase 15 (autonomous): shared address form extracted from the account page into AddressForm; subscription PDP gets a sentinel "Add a new address…" select option opening a token-class modal, saving through the same account API, pre-selecting the new address, preserving plan/quantity/terms. Two review iterations found and fixed 20 items including two account-page regressions from the extraction (save message, busy locking) and a validation-bound drift across three layers (client filter, acquisition-service, setup-intent route) now unified behind one exported constant. Security audit 11/11 closed. Four items left for Russell's own click-through since this repo has no jsdom render tests.
 - [Phase 17]: Phase 16 (autonomous): header gets a server-resolved, admin-labeled blog nav entry that hides automatically when no article is published; home page gets an admin-configurable "latest articles" block (enable, heading, count, placement) built from existing card markup, no new query path. Review found and fixed an unguarded D1 read in Header.tsx that could 500 the whole storefront on a blog-table failure, plus an admin/storefront settings-validation parity gap, both closed with tests. Security audit 21/21 closed. Production currently has zero published articles, so the hide-when-empty path is what's live; three items (mobile menu click, admin tab click, a real published article) left for Russell's own look.
 - [Phase 18]: Phase 17 (autonomous, money/PCI-adjacent): signed-in shoppers get a real Stripe Customer (a new payment_customers table, deliberately independent of the subscriptions provider-customer table — consolidation logged as Phase 18 tech debt), a Stripe Customer Session powers the Payment Element's saved-card checkbox and selector. Research corrected the roadmap's literal "setup_future_usage on the PaymentIntent" wording: that field lives only on the Customer Session, combining both is a Stripe integration error. Account gets a Payment methods page (list/remove, no add — cards are only added at checkout). Review found and fixed a zero-cash gift-card-order Stripe-customer leak, a sequential test masquerading as a concurrency proof, a 404/503 existence side-channel on delete, and a shared busy-state bug; all closed with tests. Security audit ran at ASVS L2 given the sensitivity, 39/39 closed. Four card-in-hand checks (save, reuse, remove, guest-sees-nothing) need Russell's own click-through.
+- [Phase 19]: Phase 18 (autonomous, tech-debt closure): closed all 8 DEBT items from the v2.1 audit. Deleted the orphaned /api/tax route. Removed a {DB}-only gift-card env fallback that could have silently broken issuance. Cart lines with an invalid gift note now warn and block checkout instead of vanishing. Split gift-card delivery telemetry so only terminal failures page, transient retries don't; added a delivery_id for operator correlation, requiring a fix in both the producer and the tail worker's independent sanitizer (code review caught this on its own). Fixed a real bug: order-confirmation emails were being silently skipped for non-subscription digital-only (gift-card) orders; widened the guard and added a billing-address fallback everywhere a digital-only order's shipping address would have shown blank. Documented the 0023 duplicate-migration-number collision and taught check:migrations to refuse new duplicates. Closed four stale WINDOWS.md entries and ratified sending the buyer's gift note on old pending deliveries (Phase 12's deferred IN-07 decision) as the default, flagged for Russell to override. Security audit 36/36 closed.
 
 ### Pending Todos
 
@@ -405,7 +407,7 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-09-10T17:15:28.171Z
-Stopped at: Phase 17 complete, ready to plan Phase 18
+Stopped at: Phase 18 complete, ready to plan Phase 19
 Resume file: None
 
 Next: `/gsd-discuss-phase 13`
