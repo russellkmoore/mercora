@@ -87,4 +87,30 @@ describe('merchant new-order notification', () => {
     expect(message.html).toContain('No shipping required');
     expect(message.html).not.toContain('<h3>Ship to</h3>');
   });
+
+  it('labels a billing-labelled payload with order-items and billing-address headings', async () => {
+    const billing: MerchantOrderData = { ...order, addressLabel: 'billing' };
+    await sendNewOrderMerchantNotification(billing);
+
+    const message = mocks.send.mock.calls.at(-1)?.[0];
+    expect(message.text).toContain('Order items');
+    expect(message.text).toContain('Billing address');
+    expect(message.text).not.toContain('Items to ship');
+    expect(message.text).not.toContain('Ship to');
+    expect(message.html).toContain('Order items');
+    expect(message.html).toContain('Billing address');
+    expect(message.html).not.toContain('<h3>Ship to</h3>');
+    expect(message.text).toContain('Denver');
+  });
+
+  it('keeps today\'s ship-oriented wording for a shipping-labelled payload', async () => {
+    const shipping: MerchantOrderData = { ...order, addressLabel: 'shipping' };
+    await sendNewOrderMerchantNotification(shipping);
+
+    const message = mocks.send.mock.calls.at(-1)?.[0];
+    expect(message.text).toContain('Items to ship');
+    expect(message.text).toContain('Ship to');
+    expect(message.html).toContain('Items to ship');
+    expect(message.html).toContain('<h3>Ship to</h3>');
+  });
 });
