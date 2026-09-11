@@ -163,6 +163,60 @@
 
 ---
 
+## Milestone: v2.2 — Operations & Polish
+
+**Shipped:** 2026-09-11
+**Phases:** 7 (13–19) | **Plans:** 39 | **Commits:** 499 over 2 days (2026-09-10 to 2026-09-11)
+
+### What Was Built
+
+- Gift-card sell/honor flags that do what their names say, with a cron-measured honor guard so money already taken is never stranded by a flag flip, and one function (`resolveHonorEffective`) owning that decision everywhere it's asked.
+- A full gift-card admin panel replacing a five-column read-only queue: search, a merged timeline, disable, once-only reissue, resend, re-queue, release-hold, admin-create, CSR notes, and a confirm-gated code reveal — migration `0024`.
+- A shared `AddressForm` used by both the account page and a new in-place modal on subscription product pages; the modal pre-selects the new address and leaves plan/quantity/terms untouched.
+- The blog reachable from the header and a configurable home-page articles block, neither hardcoded to template code.
+- Saved payment methods via a real Stripe Customer and Customer Session, replacing the Stripe Link box that saved nothing to the store.
+- Eight tech-debt items closed, one of them a real production bug (order-confirmation email silently skipped for every digital-only gift-card order, not just subscriptions).
+- The deliberately-last human-checkpoint phase: Stripe Tax, a routed support email, and corrected production secrets, each confirmed live rather than assumed done.
+
+### What Worked
+
+- **Two-iteration code review on every phase, every time.** Each phase shipped with at least one real, code-level finding the first pass missed and the second pass caught: a subscription-renewal email regression from a too-literal research suggestion, a checkout panel rendering under both gift-card flags off, an admin page's server render leaking behind a client-only guard, a delivery-alert field silently dropped by a second, independent sanitizer in the tail worker. None of these were style nits — each was a real behavioral gap, found because the reviewer re-derived the claim from source instead of trusting the fix report.
+- **Research before guessing on unfamiliar APIs.** Phase 17's Stripe Customer Session mechanics were verified against the installed SDK's own type declarations and a live docs fetch before planning, catching that the roadmap's literal wording ("PaymentIntent with `setup_future_usage`") was actually a documented Stripe integration error when combined with the Customer Session config.
+- **Planner-caught hazards that would have been real bugs.** The planner itself flagged, before any code was written, that Phase 18's digital-only email fix needed a union guard (not a replacement) to avoid re-breaking subscription renewals, and that Phase 18's cart-line fix needed the checkout projection to explicitly refuse a flagged line, not silently emit a bare gift card. Both were later independently re-found and fixed by the executors who implemented them — the same defect surfaced twice, from two different vantage points, and got caught both times.
+- **Security audits that verified, not summarized.** Every phase's audit re-derived each threat's mitigation from the code at HEAD rather than trusting the plan or the review; one audit found that an earlier phase's own fix (Phase 13's admin layout gate) didn't actually hold once traced through the App Router's rendering model, and registered it as a new threat closed in the very next phase.
+- **A live, verified milestone close instead of an assumed one.** All three Phase 19 operator items were confirmed from outside the repo after the fact — a `curl` for the support email, `wrangler secret list` for the secrets — not just marked done because the action was taken.
+
+### What Was Inefficient
+
+- **Verification digest churn from shared files.** Every phase's `covered_files` list included `ROADMAP.md`/`STATE.md`, and every subsequent phase's `phase.complete` call legitimately rewrote those files — so completing phase N kept re-invalidating phases 13..N-1's digests, requiring a final comprehensive re-refresh across all six phases right before milestone close. The fix in the moment worked; a covered-files convention that excludes shared bookkeeping files from the fingerprint would avoid the churn entirely.
+- **A regex mismatch produced a false "no overlap" reading mid-close.** Diagnosing the digest staleness, a hand-rolled YAML extraction script tripped on a blank line after `covered_files:` and returned an empty file list, which looked like confirmation that nothing had changed — the opposite of the truth. The tool's own `verification.status` command was right the whole time; the manual diagnostic script was not trustworthy for the same task.
+- **Shared, non-worktree parallel execution produced small git-index races.** Several waves ran multiple executors in the same checkout (`workflow.use_worktrees=false`, the v2/v2.1 precedent held), and more than once a sibling's staged file rode along into another executor's commit, or a commit message picked up a stale scratchpad file under `noclobber`. Every instance was self-caught, documented, and harmless (never a lost or duplicated line of code), but it happened often enough this milestone to be a real, recurring cost of the sequencing choice.
+- **`init.manager`'s cached view lagged a fresh per-phase check at least once.** A first call reported five phases stale immediately after their digests were confirmed fresh by the direct `verification.status` query; a second call, moments later, agreed. Transient, but cost a diagnostic detour before the real staleness cause (see above) was found.
+
+### Patterns Established
+
+- One function owns a money-adjacent decision everywhere it's asked ("is honor effectively on", "is this order digital-only"), enforced either by every caller importing the same predicate or, where the client genuinely can't (no `fulfillment_type` on client cart items), by a cross-referenced doc comment plus one invariant test pinning the two implementations' agreement.
+- A server-side gate is not optional wherever a server component renders data, even inside a route already covered by a client-side guard — the App Router streams a page segment in the RSC payload independent of what the layout mounts.
+- New telemetry or correlation fields need updating in every independent sanitizer that touches the payload, not just the producer — the tail worker's own allowlist is a second source of truth that drifts silently if only one side is updated.
+- A code-reviewer or security-auditor re-derives every claim from the code at HEAD; a fix report or a prior pass's "closed" verdict is a starting hypothesis, not evidence.
+- Locally-generated secrets (random bytes piped straight into `wrangler secret put`, never echoed) are the standard pattern for a new Worker secret; confirm the final state with a read-only `wrangler secret list`, never by trusting the write succeeded.
+
+### Key Lessons
+
+1. A review or audit's job is to independently re-derive the claim, not summarize the artifact that makes the claim — every real finding this milestone came from someone reading the actual code, not the report about the code.
+2. When research surfaces a correction to a locked decision or a roadmap's literal wording (Stripe's Customer Session mechanics, a migration-number collision), fold the correction into the context record explicitly rather than silently planning around it — the next reader needs to see both the original wording and why it changed.
+3. A verification digest that includes shared bookkeeping files (ROADMAP.md, STATE.md) will churn every time a later phase closes; scope covered_files to what the phase actually implements.
+4. Diagnostic scripts written under time pressure need the same skepticism as the code being diagnosed — a broken extraction script produced a confidently wrong answer before the tool's own authoritative check corrected it.
+5. Closing a milestone's human-only checkpoint phase the same way as every code phase — verify from the outside, don't just record that the action was taken — caught nothing wrong this time, but the convention is what would have caught it if there had been something.
+
+### Cost Observations
+
+- Model mix: opus for planners, plan-checkers, and executors on money-adjacent or security-sensitive phases (17's saved payment methods ran the full research→plan→execute→review×2→verify→audit chain at that depth); sonnet for most reviewers, security auditors, and routine executors; orchestrator on the session model throughout.
+- Sessions: one long autonomous run spanning both days, resumed after at least one context compaction; Phase 17 alone (money/PCI-adjacent) ran with explicitly elevated review depth (ASVS L2) given the sensitivity, mirrored by Phase 18's tech-debt audit and Phase 14's admin/audit-trail work.
+- Notable: six of seven phases ran two full code-review iterations before push; every iteration-2 finding was real (not a false positive), which is the signal that the depth was calibrated correctly for this milestone's risk profile, not wasted cycles.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -172,6 +226,7 @@
 | v1 | ~8 | 4 | First GSD milestone; map + ingest drove requirements; tracer-then-parallel plan shape |
 | v2 | ~6 | 7 | Autonomous run with batched decisions; two inserted phases (6.1 scope, 8.1 debt) plus 8.2 docs; fail-first gates and screenshot diffs |
 | v2.1 | ~4 | 4 | Fully unattended run with a decision log; live production proof as the closing phase; owner-in-the-loop UX fixes the same night |
+| v2.2 | ~2 | 7 | Two-iteration code review on every phase became standard, not exceptional; security audits verified from source, not from reports; the last phase was a deliberately human-only checkpoint, kept last so code work never waited on a dashboard session |
 
 ### Cumulative Quality
 
@@ -180,6 +235,7 @@
 | v1 | 233 unit files + Workers + observability suites; +65 tests in the audit's E2E sample | not measured | 1 (`lib/auth/deployment-guard.ts`, no new packages) |
 | v2 | 265 unit files (2,187 tests) + Workers (154) + observability suites | not measured | 2 zero-dep scripts (`build-themes.mjs`, `scan-hardcoded-colors.mjs`, `docs-lint.mjs`); Playwright added as a dev dependency for the screenshot harness |
 | v2.1 | 288 unit files (2,375 tests) + Workers (157) + observability (3) | not measured | 0 new packages; scratch scripts only |
+| v2.2 | 322 unit files (2,958 tests) + Workers (255) + observability (3) | not measured | 0 new packages; two D1 migrations (0024, 0025) |
 
 ### Top Lessons (Verified Across Milestones)
 
@@ -189,3 +245,6 @@
 4. Verify visual claims by render, not by grep. (v2)
 5. One real transaction through production beats every green suite. (v2.1)
 6. A cron that swallows per-item errors looks healthy while failing. (v2.1)
+7. Review and audit independently re-derive every claim from source; a fix report is a hypothesis, not evidence. (v2.2)
+8. A verification digest scoped to shared bookkeeping files (ROADMAP.md, STATE.md) churns every time a later phase closes — scope it to what the phase actually built. (v2.2)
+9. A new telemetry field needs updating in every independent sanitizer that touches it, not just the producer. (v2.2)
