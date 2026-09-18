@@ -212,9 +212,9 @@ Analyze the provided business data and generate actionable insights, trend analy
 - Current Date: ${now.toISOString().split("T")[0]}
 
 === CURRENT BUSINESS METRICS ===
-Total Revenue: $${(businessData.totalRevenue / 100).toFixed(2)}
-Total Orders: ${businessData.totalOrders}
-Average Order Value: $${(businessData.averageOrderValue / 100).toFixed(2)}
+Delivered Revenue (delivered orders only, all time): $${(businessData.totalRevenue / 100).toFixed(2)}
+Total Orders (all statuses, all time): ${businessData.totalOrders}
+Average Delivered Order Value: $${(businessData.averageOrderValue / 100).toFixed(2)}
 Active Products: ${businessData.activeProducts}
 Low Stock Products: ${businessData.lowStockProducts}
 Top Categories: ${businessData.topPerformingCategories.join(", ") || "None identified"}
@@ -230,7 +230,9 @@ Opportunities: ${businessData.conversionOpportunities.join(", ") || "None identi
 4. **Opportunity Detection**: Suggest growth opportunities
 5. **Actionable Recommendations**: Provide specific, implementable advice
 
-Be specific, data-driven, and focus on actionable insights. Use the actual numbers provided and avoid generic advice.`;
+Be specific, data-driven, and focus on actionable insights. Use the actual numbers provided and avoid generic advice.
+
+Keep the entire response under 350 words. Use short markdown headings and bullet points.`;
 
   let aiInsights = "";
   try {

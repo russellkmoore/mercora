@@ -57,7 +57,9 @@ export const AI_MODELS = {
   ANALYTICS: {
     ...TEXT_GENERATION_MODEL,
     temperature: 0.2, // Very low temperature for factual analysis
-    maxTokens: 800, // Reduced for faster dashboard loading
+    // gpt-oss spends ~500 tokens reasoning before it answers and Workers AI
+    // returns content:null on truncation, so anything under ~1500 yields nothing.
+    maxTokens: 2500,
   },
 
   /** For article/knowledge base content generation */
