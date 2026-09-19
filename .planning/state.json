@@ -21,43 +21,43 @@
     {
       "number": "13",
       "name": "Gift-Card Flags",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "14",
       "name": "Gift-Card Admin & Audit Trail",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "15",
       "name": "Subscription Address In Place",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "16",
       "name": "Blog Surfacing",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "17",
       "name": "Saved Payment Methods",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "18",
       "name": "Tech-Debt Closure",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "19",
       "name": "Operator Checklist (human checkpoints)",
-      "status": "pending"
+      "status": "complete"
     }
   ],
   "next": {
-    "command": "/gsd:progress --next",
-    "label": "Advance to the next step (plan phase 13)",
-    "reason": "Phase 13 of 7 — needs a plan"
+    "command": "/gsd:progress",
+    "label": "Show progress",
+    "reason": "Unsure of state — showing progress"
   },
-  "updated_at": "2026-09-10T16:28:00.285Z"
+  "updated_at": "2026-09-11T16:29:35.774Z"
 }
